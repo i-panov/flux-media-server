@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
-class MediaCard extends StatelessWidget {
+class MediaCard extends ConsumerWidget {
   const MediaCard({super.key, required this.media, this.onTap});
 
   final Media media;
   final VoidCallback? onTap;
 
-  String _thumbnailUrl() {
-    return 'http://localhost:8080/api/media/${media.id}/thumb';
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final baseUrl = ref.watch(baseUrlProvider);
+    final thumbnailUrl = '$baseUrl/media/${media.id}/thumb';
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -23,7 +23,7 @@ class MediaCard extends StatelessWidget {
           children: [
             Expanded(
               child: CachedNetworkImage(
-                imageUrl: _thumbnailUrl(),
+                imageUrl: thumbnailUrl,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => const Center(
                   child: CircularProgressIndicator(),

@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/features/library/data/datasources/library_remote_datasource.dart';
+import 'package:flux_media_server/features/library/data/repositories/library_repository_impl.dart';
 import 'package:flux_media_server/features/library/domain/repositories/library_repository.dart';
 import 'package:flux_media_server/shared/models/library.dart';
 
@@ -34,3 +37,16 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     await load();
   }
 }
+
+final libraryRemoteDataSourceProvider = Provider<LibraryRemoteDataSource>((ref) {
+  return LibraryRemoteDataSource(ref.watch(apiClientProvider));
+});
+
+final libraryRepositoryProvider = Provider<LibraryRepositoryImpl>((ref) {
+  return LibraryRepositoryImpl(ref.watch(libraryRemoteDataSourceProvider));
+});
+
+final libraryProvider =
+    StateNotifierProvider<LibraryNotifier, LibraryState>((ref) {
+  return LibraryNotifier(repository: ref.watch(libraryRepositoryProvider));
+});

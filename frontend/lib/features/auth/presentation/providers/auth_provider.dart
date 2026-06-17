@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/usecases/usecase.dart';
+import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:flux_media_server/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
@@ -58,3 +61,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 }
+
+final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
+  return AuthRemoteDataSource(ref.watch(apiClientProvider));
+});
+
+final authRepositoryProvider = Provider<AuthRepositoryImpl>((ref) {
+  return AuthRepositoryImpl(ref.watch(authRemoteDataSourceProvider));
+});
+
+final requestCodeProvider = Provider<RequestCode>((ref) {
+  return RequestCode(ref.watch(authRepositoryProvider));
+});
+
+final verifyCodeProvider = Provider<VerifyCode>((ref) {
+  return VerifyCode(ref.watch(authRepositoryProvider));
+});
+
+final getCurrentUserProvider = Provider<GetCurrentUser>((ref) {
+  return GetCurrentUser(ref.watch(authRepositoryProvider));
+});
+
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  return AuthNotifier(
+    requestCode: ref.watch(requestCodeProvider),
+    verifyCode: ref.watch(verifyCodeProvider),
+    getCurrentUser: ref.watch(getCurrentUserProvider),
+  );
+});

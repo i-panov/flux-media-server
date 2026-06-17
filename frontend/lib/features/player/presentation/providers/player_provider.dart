@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -20,15 +21,17 @@ class PlayerNotifierState with _$PlayerNotifierState {
 }
 
 class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
-  PlayerNotifier(this._datasource) : super(const PlayerNotifierState.initial());
+  PlayerNotifier(this._datasource, this._baseUrl)
+      : super(const PlayerNotifierState.initial());
 
   final VideoPlayerDatasource _datasource;
+  final String _baseUrl;
 
   Future<void> play(Media media) async {
     state = PlayerNotifierState.playing(media: media, isPaused: true);
     try {
       await _datasource.open(
-        'http://localhost:8080/api/media/${media.id}/stream',
+        '$_baseUrl/media/${media.id}/stream',
       );
       await _datasource.play();
       state = state.copyWith(isPaused: false);
@@ -96,5 +99,8 @@ final videoPlayerDatasourceProvider = Provider<VideoPlayerDatasource>((ref) {
 
 final playerProvider =
     StateNotifierProvider<PlayerNotifier, PlayerNotifierState>((ref) {
-  return PlayerNotifier(ref.watch(videoPlayerDatasourceProvider));
+  return PlayerNotifier(
+    ref.watch(videoPlayerDatasourceProvider),
+    ref.watch(baseUrlProvider),
+  );
 });

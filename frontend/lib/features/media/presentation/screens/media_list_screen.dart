@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
-import 'package:flux_media_server/features/media/presentation/screens/media_detail_screen.dart';
 
 @RoutePage()
 class MediaListScreen extends ConsumerStatefulWidget {
@@ -64,11 +63,7 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
               return MediaCard(
                 media: media,
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => MediaDetailScreen(mediaId: media.id),
-                    ),
-                  );
+                  context.router.push(MediaDetailRoute(mediaId: media.id));
                 },
               );
             },
@@ -92,10 +87,3 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
     );
   }
 }
-
-final mediaListProvider =
-    StateNotifierProvider<MediaListNotifier, MediaListState>((ref) {
-  throw UnimplementedError(
-    'mediaListProvider must be overridden at app level',
-  );
-});

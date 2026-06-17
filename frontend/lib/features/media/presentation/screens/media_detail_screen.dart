@@ -2,20 +2,9 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/shared/models/media.dart';
-
-final mediaDetailProvider =
-    StateNotifierProvider.autoDispose<MediaDetailNotifier, MediaDetailState>(
-  (ref) => MediaDetailNotifier(getMediaDetail: ref.watch(getMediaDetailUseCase)),
-);
-
-final getMediaDetailUseCase = Provider<GetMediaDetail>((ref) {
-  throw UnimplementedError(
-    'getMediaDetailUseCase must be overridden at app level',
-  );
-});
 
 @RoutePage()
 class MediaDetailScreen extends ConsumerStatefulWidget {
@@ -35,7 +24,8 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   }
 
   String _thumbnailUrl() {
-    return 'http://localhost:8080/api/media/${widget.mediaId}/thumb';
+    final baseUrl = ref.read(baseUrlProvider);
+    return '$baseUrl/media/${widget.mediaId}/thumb';
   }
 
   @override

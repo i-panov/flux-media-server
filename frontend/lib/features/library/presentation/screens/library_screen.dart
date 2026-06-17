@@ -75,10 +75,3 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 }
-
-final libraryProvider =
-    StateNotifierProvider<LibraryNotifier, LibraryState>((ref) {
-  throw UnimplementedError(
-    'libraryProvider must be overridden at app level',
-  );
-});

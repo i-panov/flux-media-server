@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 part 'media_detail_provider.freezed.dart';
@@ -30,3 +31,14 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
     );
   }
 }
+
+final getMediaDetailUseCaseProvider = Provider<GetMediaDetail>((ref) {
+  return GetMediaDetail(ref.watch(mediaRepositoryProvider));
+});
+
+final mediaDetailProvider =
+    StateNotifierProvider.autoDispose<MediaDetailNotifier, MediaDetailState>(
+  (ref) => MediaDetailNotifier(
+    getMediaDetail: ref.watch(getMediaDetailUseCaseProvider),
+  ),
+);
