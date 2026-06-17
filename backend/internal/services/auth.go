@@ -16,20 +16,56 @@ type OTPEntry struct {
 }
 
 type OTPStore struct {
-	mu      sync.RWMutex
-	entries map[string]*OTPEntry
-	ttl     time.Duration
+	mu         sync.RWMutex
+	entries    map[string]*OTPEntry
+	ttl        time.Duration
+	codeLength int
+	stopChan   chan struct{}
 }
 
-func NewOTPStore(ttl time.Duration) *OTPStore {
-	return &OTPStore{
-		entries: make(map[string]*OTPEntry),
-		ttl:     ttl,
+func NewOTPStore(ttl time.Duration, codeLength int) *OTPStore {
+	s := &OTPStore{
+		entries:    make(map[string]*OTPEntry),
+		ttl:        ttl,
+		codeLength: codeLength,
+		stopChan:   make(chan struct{}),
+	}
+	go s.cleanupLoop()
+	return s
+}
+
+func (s *OTPStore) cleanupLoop() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.cleanup()
+		case <-s.stopChan:
+			return
+		}
 	}
 }
 
+func (s *OTPStore) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for email, entry := range s.entries {
+		if now.After(entry.ExpiresAt) {
+			delete(s.entries, email)
+		}
+	}
+}
+
+func (s *OTPStore) Stop() {
+	close(s.stopChan)
+}
+
 func (s *OTPStore) Generate(addr string) string {
-	code := email.GenerateCode(6)
+	code := email.GenerateCode(s.codeLength)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

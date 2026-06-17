@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 
 	"flux/internal/config"
 	"flux/internal/email"
@@ -41,7 +45,7 @@ func main() {
 	progressRepo := repository.NewProgressRepository(db)
 	libraryRepo := repository.NewLibraryRepository(db)
 
-	opStore := services.NewOTPStore(time.Duration(cfg.Auth.CodeExpiry) * time.Second)
+	opStore := services.NewOTPStore(time.Duration(cfg.Auth.CodeExpiry)*time.Second, cfg.Auth.CodeLength)
 	jwtService := services.NewJWTService(cfg.Auth.JWTSecret, 24*time.Hour)
 	smtpClient := email.NewSMTPClient(email.SMTPConfig{
 		Host:     cfg.Auth.SMTP.Host,
@@ -51,7 +55,7 @@ func main() {
 		From:     cfg.Auth.SMTP.From,
 	})
 	scanner := services.NewScannerService(libraryRepo, mediaRepo, cfg)
-	streamer := services.NewStreamerService()
+	streamer := services.NewStreamerService(libraryRepo)
 
 	authHandler := handlers.NewAuthHandler(userRepo, opStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
@@ -59,6 +63,13 @@ func main() {
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 
 	app := fiber.New()
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "*",
+		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowCredentials: true,
+	}))
 
 	auth := app.Group("/api/auth")
 	auth.Post("/request-code", authHandler.RequestCode)
@@ -93,6 +104,25 @@ func main() {
 		port = 8080
 	}
 
-	log.Printf("Flux Media Server starting on port %d", port)
-	log.Fatal(app.Listen(fmt.Sprintf(":%d", port)))
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Flux Media Server starting on port %d", port)
+		if err := app.Listen(fmt.Sprintf(":%d", port)); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	<-quit
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := app.ShutdownWithContext(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server stopped")
 }

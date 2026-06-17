@@ -8,13 +8,13 @@ import (
 )
 
 func TestGenerateOTP(t *testing.T) {
-	store := NewOTPStore(5 * time.Minute)
+	store := NewOTPStore(5*time.Minute, 6)
 	code := store.Generate("test@example.com")
 	assert.Len(t, code, 6)
 }
 
 func TestVerifyOTP(t *testing.T) {
-	store := NewOTPStore(5 * time.Minute)
+	store := NewOTPStore(5*time.Minute, 6)
 	code := store.Generate("test@example.com")
 
 	valid := store.Verify("test@example.com", code)
@@ -26,7 +26,7 @@ func TestVerifyOTP(t *testing.T) {
 }
 
 func TestVerifyOTPExpired(t *testing.T) {
-	store := NewOTPStore(0 * time.Millisecond)
+	store := NewOTPStore(0*time.Millisecond, 6)
 	code := store.Generate("test@example.com")
 
 	time.Sleep(10 * time.Millisecond)

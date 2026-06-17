@@ -5,10 +5,8 @@ import (
 )
 
 type User struct {
-	ID          uint      `gorm:"primaryKey"`
-	Email       string    `gorm:"uniqueIndex"`
-	DisplayName string
-	AvatarURL   string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID        uint      `gorm:"primaryKey"`
+	Email     string    `gorm:"uniqueIndex"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

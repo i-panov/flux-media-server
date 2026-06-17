@@ -4,19 +4,60 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+
+	"flux/internal/repository"
 )
 
-type StreamerService struct{}
+type StreamerService struct {
+	libraryRepo *repository.LibraryRepository
+}
 
-func NewStreamerService() *StreamerService {
-	return &StreamerService{}
+func NewStreamerService(libraryRepo *repository.LibraryRepository) *StreamerService {
+	return &StreamerService{libraryRepo: libraryRepo}
+}
+
+func (s *StreamerService) isPathAllowed(filePath string) (bool, error) {
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return false, err
+	}
+
+	libraries, err := s.libraryRepo.FindAll()
+	if err != nil {
+		return false, err
+	}
+
+	for _, lib := range libraries {
+		absLibPath, err := filepath.Abs(lib.Path)
+		if err != nil {
+			continue
+		}
+		if strings.HasPrefix(absPath, absLibPath+string(filepath.Separator)) || absPath == absLibPath {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
+	allowed, err := s.isPathAllowed(filePath)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to validate file path",
+		})
+	}
+	if !allowed {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Access denied",
+		})
+	}
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -59,6 +100,12 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 		end := fileSize - 1
 		if len(parts) > 1 && parts[1] != "" {
 			end, _ = strconv.ParseInt(parts[1], 10, 64)
+		}
+
+		if start < 0 || start >= fileSize || end < start || end >= fileSize {
+			return c.Status(fiber.StatusRequestedRangeNotSatisfiable).JSON(fiber.Map{
+				"error": "Range not satisfiable",
+			})
 		}
 
 		contentLength := end - start + 1

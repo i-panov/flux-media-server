@@ -1,6 +1,9 @@
 package services
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -47,6 +50,21 @@ func (s *ScannerService) ScanAll() error {
 	return nil
 }
 
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 func (s *ScannerService) ScanLibrary(library *models.MediaLibrary) error {
 	return filepath.Walk(library.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -71,9 +89,23 @@ func (s *ScannerService) ScanLibrary(library *models.MediaLibrary) error {
 			return nil
 		}
 
-		// Check if file already exists in database
+		// Check if file already exists in database by path
 		existing, _ := s.mediaRepo.FindByPath(path)
 		if existing != nil {
+			return nil
+		}
+
+		// Compute file hash
+		hash, err := hashFile(path)
+		if err != nil {
+			log.Printf("Error hashing file %s: %v", path, err)
+			return nil
+		}
+
+		// Check if file with same hash already exists
+		duplicate, _ := s.mediaRepo.FindByHash(hash)
+		if duplicate != nil {
+			log.Printf("Skipping duplicate: %s (same hash as %s)", path, duplicate.FilePath)
 			return nil
 		}
 
@@ -99,6 +131,7 @@ func (s *ScannerService) ScanLibrary(library *models.MediaLibrary) error {
 			Type:     mediaType,
 			FilePath: path,
 			FileSize: fileInfo.Size(),
+			FileHash: hash,
 		}
 
 		if err := s.mediaRepo.Create(media); err != nil {

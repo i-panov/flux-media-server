@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -71,6 +72,11 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Auth.CodeExpiry == 0 {
 		cfg.Auth.CodeExpiry = 300
+	}
+
+	// Validate JWT secret
+	if len(cfg.Auth.JWTSecret) < 32 {
+		return nil, errors.New("jwt_secret must be at least 32 characters")
 	}
 
 	return cfg, nil

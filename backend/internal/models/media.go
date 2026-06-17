@@ -13,6 +13,7 @@ type Media struct {
 	Duration     int       // в секундах
 	FilePath     string    `gorm:"uniqueIndex"`
 	FileSize     int64
+	FileHash     string    `gorm:"index"`
 	ThumbnailURL string
 	MetadataID   *uint
 	Metadata     *Metadata

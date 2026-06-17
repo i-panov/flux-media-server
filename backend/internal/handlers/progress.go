@@ -24,7 +24,12 @@ type UpdateProgressRequest struct {
 }
 
 func (h *ProgressHandler) List(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(uint)
+	userID, ok := c.Locals("user_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
+	}
 
 	progress, err := h.progressRepo.FindByUser(userID)
 	if err != nil {
@@ -37,7 +42,12 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *ProgressHandler) Update(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(uint)
+	userID, ok := c.Locals("user_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
+	}
 	mediaID, err := c.ParamsInt("mediaId")
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -74,7 +84,12 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 }
 
 func (h *ProgressHandler) Delete(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(uint)
+	userID, ok := c.Locals("user_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
+	}
 	mediaID, err := c.ParamsInt("mediaId")
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

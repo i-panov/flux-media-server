@@ -22,7 +22,7 @@ database:
   path: "./test.db"
 
 auth:
-  jwt_secret: "test-secret"
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
   code_length: 6
   code_expiry: 300
   allowed_emails:
@@ -53,7 +53,7 @@ media:
 	assert.Equal(t, 9090, cfg.Server.Port)
 	assert.Equal(t, true, cfg.Server.Debug)
 	assert.Equal(t, "./test.db", cfg.Database.Path)
-	assert.Equal(t, "test-secret", cfg.Auth.JWTSecret)
+	assert.Equal(t, "test-secret-that-is-at-least-32-chars", cfg.Auth.JWTSecret)
 	assert.Equal(t, []string{"test@example.com"}, cfg.Auth.AllowedEmails)
 	assert.Equal(t, false, cfg.Auth.AllowUnknownEmail)
 }

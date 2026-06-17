@@ -15,6 +15,7 @@ func TestMediaFields(t *testing.T) {
 		Duration:     3600,
 		FilePath:     "/test.mkv",
 		FileSize:     1024,
+		FileHash:     "abc123",
 		ThumbnailURL: "http://thumb",
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -42,12 +43,10 @@ func TestMetadataFields(t *testing.T) {
 
 func TestUserFields(t *testing.T) {
 	u := User{
-		ID:          1,
-		Email:       "test@test.com",
-		DisplayName: "Test User",
-		AvatarURL:   "http://avatar",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		ID:        1,
+		Email:     "test@test.com",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	if u.Email != "test@test.com" {
 		t.Errorf("User fields not properly set: %+v", u)

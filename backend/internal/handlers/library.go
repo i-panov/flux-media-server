@@ -32,6 +32,7 @@ type CreateLibraryRequest struct {
 func (h *LibraryHandler) List(c *fiber.Ctx) error {
 	libraries, err := h.libraryRepo.FindAll()
 	if err != nil {
+		log.Printf("FindAll: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to fetch libraries",
 		})
@@ -48,6 +49,17 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	if req.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Name is required",
+		})
+	}
+	if req.Path == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Path is required",
+		})
+	}
+
 	library := &models.MediaLibrary{
 		Name:         req.Name,
 		Path:         req.Path,
@@ -57,6 +69,7 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 	}
 
 	if err := h.libraryRepo.Create(library); err != nil {
+		log.Printf("Create: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to create library",
 		})
@@ -87,12 +100,24 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 		})
 	}
 
+	if req.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Name is required",
+		})
+	}
+	if req.Path == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Path is required",
+		})
+	}
+
 	library.Name = req.Name
 	library.Path = req.Path
 	library.Type = req.Type
 	library.ScanInterval = req.ScanInterval
 
 	if err := h.libraryRepo.Update(library); err != nil {
+		log.Printf("Update: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update library",
 		})
@@ -110,6 +135,7 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 	}
 
 	if err := h.libraryRepo.Delete(uint(id)); err != nil {
+		log.Printf("Delete: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to delete library",
 		})

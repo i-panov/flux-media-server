@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 
 	"flux/internal/config"
@@ -51,9 +53,11 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 		})
 	}
 
+	req.Email = strings.ToLower(req.Email)
+
 	allowed := false
 	for _, email := range h.config.Auth.AllowedEmails {
-		if email == req.Email {
+		if strings.ToLower(email) == req.Email {
 			allowed = true
 			break
 		}
@@ -85,6 +89,8 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 		})
 	}
 
+	req.Email = strings.ToLower(req.Email)
+
 	if !h.otpStore.Verify(req.Email, req.Code) {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid or expired code",
@@ -94,8 +100,7 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 	user, err := h.userRepo.FindByEmail(req.Email)
 	if err != nil {
 		user = &models.User{
-			Email:       req.Email,
-			DisplayName: req.Email,
+			Email: req.Email,
 		}
 		if err := h.userRepo.Create(user); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -114,15 +119,19 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"token": token,
 		"user": fiber.Map{
-			"id":           user.ID,
-			"email":        user.Email,
-			"display_name": user.DisplayName,
+			"id":    user.ID,
+			"email": user.Email,
 		},
 	})
 }
 
 func (h *AuthHandler) Me(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(uint)
+	userID, ok := c.Locals("user_id").(uint)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
+	}
 
 	user, err := h.userRepo.FindByID(userID)
 	if err != nil {
@@ -132,9 +141,7 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"id":           user.ID,
-		"email":        user.Email,
-		"display_name": user.DisplayName,
-		"avatar_url":   user.AvatarURL,
+		"id":    user.ID,
+		"email": user.Email,
 	})
 }
