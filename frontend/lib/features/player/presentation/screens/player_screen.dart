@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -10,6 +11,7 @@ final videoControllerProvider = Provider<VideoController>((ref) {
   return VideoController(datasource.player);
 });
 
+@RoutePage()
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key, required this.media});
 

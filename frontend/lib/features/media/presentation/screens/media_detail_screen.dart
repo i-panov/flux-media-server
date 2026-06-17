@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -16,6 +17,7 @@ final getMediaDetailUseCase = Provider<GetMediaDetail>((ref) {
   );
 });
 
+@RoutePage()
 class MediaDetailScreen extends ConsumerStatefulWidget {
   const MediaDetailScreen({super.key, required this.mediaId});
 

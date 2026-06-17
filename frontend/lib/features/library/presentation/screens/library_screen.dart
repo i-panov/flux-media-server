@@ -1,7 +1,9 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
 
+@RoutePage()
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 

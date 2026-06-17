@@ -1,7 +1,9 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 
+@RoutePage()
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
