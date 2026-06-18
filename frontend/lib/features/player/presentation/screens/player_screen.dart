@@ -1,7 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:media_kit/media_kit.dart';
+import 'package:media_kit/media_kit.dart' as mk;
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -27,7 +27,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    MediaKit.ensureInitialized();
+    mk.MediaKit.ensureInitialized();
     ref.read(playerProvider.notifier).play(widget.media);
   }
 

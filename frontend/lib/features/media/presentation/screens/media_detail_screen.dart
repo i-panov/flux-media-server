@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
-import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class MediaDetailScreen extends ConsumerStatefulWidget {

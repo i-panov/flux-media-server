@@ -1,6 +1,6 @@
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
-import 'package:flux_media_server/core/utils/either.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flux_media_server/shared/models/user.dart';

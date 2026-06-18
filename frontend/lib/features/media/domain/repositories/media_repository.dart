@@ -1,5 +1,5 @@
 import 'package:flux_media_server/core/error/failures.dart';
-import 'package:flux_media_server/core/utils/either.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 abstract class MediaRepository {

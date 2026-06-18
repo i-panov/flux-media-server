@@ -1,13 +1,14 @@
-import "package:auto_route/auto_route.dart";
-import "package:flutter/material.dart";
+import 'package:auto_route/auto_route.dart';
+import 'package:flutter/material.dart';
 
-import "../../features/auth/presentation/screens/code_screen.dart";
-import "../../features/auth/presentation/screens/login_screen.dart";
-import "../../features/library/presentation/screens/library_screen.dart";
-import "../../features/media/presentation/screens/media_detail_screen.dart";
-import "../../features/media/presentation/screens/media_list_screen.dart";
-import "../../features/player/presentation/screens/player_screen.dart";
-import "../../features/settings/presentation/screens/settings_screen.dart";
+import '../../features/auth/presentation/screens/code_screen.dart';
+import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/library/presentation/screens/library_screen.dart';
+import '../../features/media/presentation/screens/media_detail_screen.dart';
+import '../../features/media/presentation/screens/media_list_screen.dart';
+import '../../features/player/presentation/screens/player_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../shared/models/media.dart';
 
 part "app_router.gr.dart";
 

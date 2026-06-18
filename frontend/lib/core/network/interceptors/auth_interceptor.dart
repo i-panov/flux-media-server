@@ -1,27 +1,23 @@
+import 'dart:async';
+
 import 'package:chopper/chopper.dart';
 
-class AuthInterceptor implements Interceptor {
+/// Adds Bearer token to outgoing requests.
+// ignore: must_be_immutable
+class AuthInterceptor implements RequestInterceptor {
   String? _token;
 
-  void setToken(String token) {
-    _token = token;
-  }
+  /// Sets the authentication token.
+  void setToken(String token) => _token = token;
 
-  void clearToken() {
-    _token = null;
-  }
+  /// Clears the authentication token.
+  void clearToken() => _token = null;
 
+  /// Current token value.
   String? get token => _token;
 
   @override
-  Future<Response<BodyType>> intercept<BodyType>(
-    Chain<BodyType> chain,
-  ) async {
-    final request = _addToken(chain.request);
-    return chain.proceed(request);
-  }
-
-  Request _addToken(Request request) {
+  FutureOr<Request> onRequest(Request request) {
     if (_token == null) return request;
     return request.copyWith(
       headers: {

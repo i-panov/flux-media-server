@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
-import 'package:flux_media_server/core/utils/either.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';

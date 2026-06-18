@@ -20,44 +20,50 @@ class PlayerNotifierState with _$PlayerNotifierState {
       PlayerNotifierError;
 }
 
+/// Notifier controlling video playback state.
 class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
+  /// Creates a [PlayerNotifier] with the given [datasource] and [baseUrl].
   PlayerNotifier(this._datasource, this._baseUrl)
       : super(const PlayerNotifierState.initial());
 
   final VideoPlayerDatasource _datasource;
   final String _baseUrl;
 
+  /// Starts playback of [media].
   Future<void> play(Media media) async {
     state = PlayerNotifierState.playing(media: media, isPaused: true);
     try {
-      await _datasource.open(
-        '$_baseUrl/media/${media.id}/stream',
-      );
+      await _datasource.open('$_baseUrl/media/${media.id}/stream');
       await _datasource.play();
-      state = state.copyWith(isPaused: false);
+      if (state is PlayerNotifierPlaying) {
+        state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+      }
 
       _datasource.positionStream.listen((position) {
         if (state is PlayerNotifierPlaying) {
-          state = (state as PlayerNotifierPlaying).copyWith(position: position);
+          state =
+              (state as PlayerNotifierPlaying).copyWith(position: position);
         }
       });
 
       _datasource.durationStream.listen((duration) {
-        if (state is PlayerNotifierPlaying && duration != null) {
-          state = (state as PlayerNotifierPlaying).copyWith(duration: duration);
+        if (state is PlayerNotifierPlaying) {
+          state =
+              (state as PlayerNotifierPlaying).copyWith(duration: duration);
         }
       });
 
-      _datasource.playerStateStream.listen((playerState) {
-        if (playerState.completed) {
+      _datasource.completedStream.listen((completed) {
+        if (completed) {
           complete();
         }
       });
-    } catch (e) {
+    } on Exception catch (e) {
       state = PlayerNotifierState.error(message: e.toString());
     }
   }
 
+  /// Pauses the current playback.
   Future<void> pause() async {
     if (state is PlayerNotifierPlaying) {
       await _datasource.pause();
@@ -65,6 +71,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
     }
   }
 
+  /// Resumes the current playback.
   Future<void> resume() async {
     if (state is PlayerNotifierPlaying) {
       await _datasource.play();
@@ -72,28 +79,26 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
     }
   }
 
-  Future<void> seek(Duration position) async {
-    await _datasource.seek(position);
-  }
+  /// Seeks to the given [position].
+  Future<void> seek(Duration position) async => _datasource.seek(position);
 
+  /// Updates the duration of the current media.
   void updateDuration(Duration duration) {
     if (state is PlayerNotifierPlaying) {
       state = (state as PlayerNotifierPlaying).copyWith(duration: duration);
     }
   }
 
-  void complete() {
-    state = const PlayerNotifierState.completed();
-  }
+  /// Marks playback as completed.
+  void complete() => state = const PlayerNotifierState.completed();
 
-  void reset() {
-    state = const PlayerNotifierState.initial();
-  }
+  /// Resets the player to initial state.
+  void reset() => state = const PlayerNotifierState.initial();
 }
 
 final videoPlayerDatasourceProvider = Provider<VideoPlayerDatasource>((ref) {
   final ds = VideoPlayerDatasource();
-  ref.onDispose(() => ds.dispose());
+  ref.onDispose(ds.dispose);
   return ds;
 });
 

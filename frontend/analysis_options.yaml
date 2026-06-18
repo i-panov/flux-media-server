@@ -1,0 +1,17 @@
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.chopper.dart"
+    - "**/*.gr.dart"
+    - "build/**"
+    - ".dart_tool/**"
+
+linter:
+  rules:
+    - public_member_api_docs: false
+    - lines_longer_than_80_chars: false
+    - require_trailing_commas: false
+    - avoid_print: false
+    - comment_references: false
