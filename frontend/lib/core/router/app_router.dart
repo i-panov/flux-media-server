@@ -13,7 +13,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 part 'app_router.gr.dart';
 
 @AutoRouterConfig()
-class AppRouter extends RootStackRouter {
+class AppRouter extends _$AppRouter {
   @override
   List<AutoRoute> get routes => [
         AutoRoute(page: LoginRoute.page, initial: true),
