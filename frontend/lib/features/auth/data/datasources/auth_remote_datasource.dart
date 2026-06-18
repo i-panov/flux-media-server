@@ -12,7 +12,8 @@ class AuthRemoteDataSource {
   final ApiClient apiClient;
 
   /// Requests a verification code to be sent to [email].
-  Future<void> requestCode(String email) async {
+  /// Returns the debug code if server is in debug mode, null otherwise.
+  Future<String?> requestCode(String email) async {
     final Response<Map<String, dynamic>> response =
         await apiClient.requestCode({'email': email});
     if (response.statusCode != 200) {
@@ -20,6 +21,7 @@ class AuthRemoteDataSource {
         message: response.body?['error'] as String? ?? 'Failed to send code',
       );
     }
+    return response.body?['code'] as String?;
   }
 
   /// Verifies the code sent to [email] and returns the auth token and user.

@@ -22,6 +22,7 @@ abstract class _$AppRouter extends RootStackRouter {
         child: CodeScreen(
           key: args.key,
           email: args.email,
+          debugCode: args.debugCode,
         ),
       );
     },
@@ -90,12 +91,14 @@ class CodeRoute extends PageRouteInfo<CodeRouteArgs> {
   CodeRoute({
     Key? key,
     required String email,
+    String? debugCode,
     List<PageRouteInfo>? children,
   }) : super(
           CodeRoute.name,
           args: CodeRouteArgs(
             key: key,
             email: email,
+            debugCode: debugCode,
           ),
           initialChildren: children,
         );
@@ -109,15 +112,18 @@ class CodeRouteArgs {
   const CodeRouteArgs({
     this.key,
     required this.email,
+    this.debugCode,
   });
 
   final Key? key;
 
   final String email;
 
+  final String? debugCode;
+
   @override
   String toString() {
-    return 'CodeRouteArgs{key: $key, email: $email}';
+    return 'CodeRouteArgs{key: $key, email: $email, debugCode: $debugCode}';
   }
 }
 

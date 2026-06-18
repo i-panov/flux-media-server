@@ -24,13 +24,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _requestCode() {
     if (_formKey.currentState!.validate()) {
-      ref.read(authProvider.notifier).requestCode(_emailController.text.trim());
+      ref
+          .read(authProvider.notifier)
+          .requestCode(_emailController.text.trim());
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+
+    if (authState is AuthCodeSent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.router.push(CodeRoute(
+          email: authState.email,
+          debugCode: authState.debugCode,
+        ));
+      });
+    }
 
     return Scaffold(
       body: Center(
@@ -69,7 +80,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    if (!RegExp(r'^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,4}$')
+                        .hasMatch(value)) {
                       return 'Please enter a valid email';
                     }
                     return null;

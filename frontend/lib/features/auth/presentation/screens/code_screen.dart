@@ -8,9 +8,11 @@ class CodeScreen extends ConsumerStatefulWidget {
   const CodeScreen({
     super.key,
     required this.email,
+    this.debugCode,
   });
 
   final String email;
+  final String? debugCode;
 
   @override
   ConsumerState<CodeScreen> createState() => _CodeScreenState();
@@ -19,6 +21,14 @@ class CodeScreen extends ConsumerStatefulWidget {
 class _CodeScreenState extends ConsumerState<CodeScreen> {
   final _codeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.debugCode != null) {
+      _codeController.text = widget.debugCode!;
+    }
+  }
 
   @override
   void dispose() {
@@ -67,6 +77,31 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
+                if (widget.debugCode != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bug_report, color: Colors.orange.shade700),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Debug code: ${widget.debugCode}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _codeController,
@@ -112,7 +147,9 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
-                    ref.read(authProvider.notifier).requestCode(widget.email);
+                    ref
+                        .read(authProvider.notifier)
+                        .requestCode(widget.email);
                   },
                   child: const Text('Resend Code'),
                 ),

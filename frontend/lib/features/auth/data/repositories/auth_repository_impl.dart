@@ -11,10 +11,10 @@ class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
 
   @override
-  Future<Either<Failure, void>> requestCode(String email) async {
+  Future<Either<Failure, String?>> requestCode(String email) async {
     try {
-      await remoteDataSource.requestCode(email);
-      return const Right(null);
+      final debugCode = await remoteDataSource.requestCode(email);
+      return Right(debugCode);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {

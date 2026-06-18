@@ -15,8 +15,12 @@ part 'auth_provider.freezed.dart';
 class AuthState with _$AuthState {
   const factory AuthState.initial() = AuthInitial;
   const factory AuthState.loading() = AuthLoading;
-  const factory AuthState.codeSent({required String email}) = AuthCodeSent;
-  const factory AuthState.authenticated({required User user}) = AuthAuthenticated;
+  const factory AuthState.codeSent({
+    required String email,
+    String? debugCode,
+  }) = AuthCodeSent;
+  const factory AuthState.authenticated({required User user}) =
+      AuthAuthenticated;
   const factory AuthState.error({required String message}) = AuthError;
 }
 
@@ -39,13 +43,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _requestCode(email);
     result.fold(
       (failure) => state = AuthState.error(message: failure.message),
-      (_) => state = AuthState.codeSent(email: email),
+      (debugCode) => state = AuthState.codeSent(
+        email: email,
+        debugCode: debugCode,
+      ),
     );
   }
 
   Future<void> verifyCode(String email, String code) async {
     state = const AuthState.loading();
-    final result = await _verifyCode(VerifyCodeParams(email: email, code: code));
+    final result =
+        await _verifyCode(VerifyCodeParams(email: email, code: code));
     result.fold(
       (failure) => state = AuthState.error(message: failure.message),
       (data) => state = AuthState.authenticated(user: data.user),
