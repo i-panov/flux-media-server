@@ -7,6 +7,24 @@ import 'package:flux_media_server/features/settings/domain/entities/app_settings
 
 part 'settings_provider.freezed.dart';
 
+/// Provider for SharedPreferences instance.
+/// Overridden in main() with pre-initialized instance.
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError(
+    'sharedPreferencesProvider must be overridden in main()',
+  );
+});
+
+final settingsLocalDataSourceProvider = Provider<SettingsLocalDataSource>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return SettingsLocalDataSource(prefs);
+});
+
+final settingsRepositoryProvider = Provider<SettingsRepositoryImpl>((ref) {
+  final ds = ref.watch(settingsLocalDataSourceProvider);
+  return SettingsRepositoryImpl(ds);
+});
+
 @freezed
 class SettingsState with _$SettingsState {
   const factory SettingsState({
@@ -14,25 +32,9 @@ class SettingsState with _$SettingsState {
   }) = _SettingsState;
 }
 
-final settingsLocalDataSourceProvider = FutureProvider<SettingsLocalDataSource>(
-  (ref) async {
-    final prefs = await SharedPreferences.getInstance();
-    return SettingsLocalDataSource(prefs);
-  },
-);
-
-final settingsRepositoryProvider = FutureProvider<SettingsRepositoryImpl>(
-  (ref) async {
-    final ds = await ref.watch(settingsLocalDataSourceProvider.future);
-    return SettingsRepositoryImpl(ds);
-  },
-);
-
 class SettingsNotifier extends StateNotifier<SettingsState> {
   SettingsNotifier(this._repository)
-      : super(
-          const SettingsState(settings: AppSettings()),
-        );
+      : super(const SettingsState(settings: AppSettings()));
 
   final SettingsRepositoryImpl _repository;
 
@@ -56,9 +58,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  final notifier = SettingsNotifier(
-    ref.watch(settingsRepositoryProvider).requireValue,
-  );
+  final notifier = SettingsNotifier(ref.watch(settingsRepositoryProvider));
   notifier.init();
   return notifier;
 });
