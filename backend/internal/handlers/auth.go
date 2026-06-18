@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -70,6 +71,8 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 	}
 
 	code := h.otpStore.Generate(req.Email)
+
+	log.Printf("[DEBUG] debug=%v, email=%s, code=%s", h.config.Server.Debug, req.Email, code)
 
 	resp := fiber.Map{"message": "Code sent successfully"}
 
