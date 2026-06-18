@@ -70,15 +70,20 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 	}
 
 	code := h.otpStore.Generate(req.Email)
-	if err := h.smtpClient.SendCode(req.Email, code); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to send code",
-		})
+
+	resp := fiber.Map{"message": "Code sent successfully"}
+
+	if h.config.Server.Debug {
+		resp["code"] = code
+	} else {
+		if err := h.smtpClient.SendCode(req.Email, code); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to send code",
+			})
+		}
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Code sent successfully",
-	})
+	return c.JSON(resp)
 }
 
 func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
