@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -20,15 +21,33 @@ import (
 	"flux/internal/services"
 )
 
+var version = "dev"
+
 func main() {
-	configPath := os.Getenv("CONFIG_PATH")
+	var (
+		configPath string
+		showVer    bool
+	)
+
+	flag.StringVar(&configPath, "config", "", "path to config file (default: $CONFIG_PATH or configs/config.yaml)")
+	flag.BoolVar(&showVer, "version", false, "print version and exit")
+	flag.Parse()
+
+	if showVer {
+		fmt.Printf("flux-media-server %s\n", version)
+		os.Exit(0)
+	}
+
+	if configPath == "" {
+		configPath = os.Getenv("CONFIG_PATH")
+	}
 	if configPath == "" {
 		configPath = "configs/config.yaml"
 	}
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Failed to load config %s: %v", configPath, err)
 	}
 
 	db, err := repository.InitDB(cfg.Database.Path)
@@ -108,7 +127,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Flux Media Server starting on port %d", port)
+		log.Printf("Flux Media Server %s starting on port %d (config: %s)", version, port, configPath)
 		if err := app.Listen(fmt.Sprintf(":%d", port)); err != nil {
 			log.Fatalf("Server error: %v", err)
 		}
