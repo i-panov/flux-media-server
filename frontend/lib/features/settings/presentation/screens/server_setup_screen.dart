@@ -2,36 +2,38 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
-import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 
 @RoutePage()
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class ServerSetupScreen extends ConsumerStatefulWidget {
+  const ServerSetupScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<ServerSetupScreen> createState() => _ServerSetupScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController();
+class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
+  final _controller = TextEditingController(text: 'http://localhost:8080');
   final _formKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _requestCode() {
+  void _save() {
     if (_formKey.currentState!.validate()) {
-      ref.read(authProvider.notifier).requestCode(_emailController.text.trim());
+      final url = _controller.text.trim();
+      ref.read(settingsProvider.notifier).setServerUrl(
+            url.endsWith('/') ? url.substring(0, url.length - 1) : url,
+          );
+      context.router.replace(const LoginRoute());
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -42,7 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(
-                  Icons.lock_outline,
+                  Icons.dns_outlined,
                   size: 64,
                   color: Colors.deepPurple,
                 ),
@@ -53,51 +55,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter your email to sign in',
+                  'Enter the server address to connect',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
+                  controller: _controller,
+                  keyboardType: TextInputType.url,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
+                    labelText: 'Server URL',
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
+                    prefixIcon: Icon(Icons.link),
+                    hintText: 'http://localhost:8080',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
+                      return 'Please enter the server URL';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                      return 'Please enter a valid email';
+                    final trimmed = value.trim();
+                    if (!trimmed.startsWith('http://') &&
+                        !trimmed.startsWith('https://')) {
+                      return 'URL must start with http:// or https://';
                     }
                     return null;
                   },
+                  onFieldSubmitted: (_) => _save(),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: authState is AuthLoading ? null : _requestCode,
-                    child: authState is AuthLoading
-                        ? const CircularProgressIndicator()
-                        : const Text('Get Code'),
+                    onPressed: _save,
+                    child: const Text('Connect'),
                   ),
-                ),
-                if (authState is AuthError) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    authState.message,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                TextButton(
-                  onPressed: () =>
-                      context.router.replace(const ServerSetupRoute()),
-                  child: const Text('Change server'),
                 ),
               ],
             ),

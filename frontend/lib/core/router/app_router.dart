@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flux_media_server/features/auth/presentation/screens/code_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/login_screen.dart';
@@ -7,6 +8,7 @@ import 'package:flux_media_server/features/library/presentation/screens/library_
 import 'package:flux_media_server/features/media/presentation/screens/media_detail_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/media_list_screen.dart';
 import 'package:flux_media_server/features/player/presentation/screens/player_screen.dart';
+import 'package:flux_media_server/features/settings/presentation/screens/server_setup_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/settings_screen.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -16,7 +18,8 @@ part 'app_router.gr.dart';
 class AppRouter extends _$AppRouter {
   @override
   List<AutoRoute> get routes => [
-        AutoRoute(page: LoginRoute.page, initial: true),
+        AutoRoute(page: ServerSetupRoute.page, initial: true),
+        AutoRoute(page: LoginRoute.page),
         AutoRoute(page: CodeRoute.page),
         AutoRoute(
           page: MainRoute.page,

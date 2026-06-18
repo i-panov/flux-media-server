@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,28 +9,48 @@ import 'features/settings/presentation/providers/settings_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  final serverUrl = prefs.getString('server_url');
+
+  final router = AppRouter();
+
   runApp(ProviderScope(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
     ],
-    child: const MyApp(),
+    child: FluxApp(router: router, hasServerUrl: serverUrl != null),
   ));
 }
 
-class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
+class FluxApp extends ConsumerStatefulWidget {
+  const FluxApp({required this.router, required this.hasServerUrl, super.key});
+
+  final AppRouter router;
+  final bool hasServerUrl;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = AppRouter();
+  ConsumerState<FluxApp> createState() => _FluxAppState();
+}
 
+class _FluxAppState extends ConsumerState<FluxApp> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.hasServerUrl) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.router.replace(const LoginRoute());
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Flux Media Server',
       theme: ThemeData(
         colorSchemeSeed: Colors.deepPurple,
         useMaterial3: true,
       ),
-      routerConfig: router.config(),
+      routerConfig: widget.router.config(),
     );
   }
 }

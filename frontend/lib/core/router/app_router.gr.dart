@@ -69,6 +69,12 @@ abstract class _$AppRouter extends RootStackRouter {
         ),
       );
     },
+    ServerSetupRoute.name: (routeData) {
+      return AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: const ServerSetupScreen(),
+      );
+    },
     SettingsRoute.name: (routeData) {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
@@ -244,6 +250,20 @@ class PlayerRouteArgs {
   String toString() {
     return 'PlayerRouteArgs{key: $key, media: $media}';
   }
+}
+
+/// generated route for
+/// [ServerSetupScreen]
+class ServerSetupRoute extends PageRouteInfo<void> {
+  const ServerSetupRoute({List<PageRouteInfo>? children})
+      : super(
+          ServerSetupRoute.name,
+          initialChildren: children,
+        );
+
+  static const String name = 'ServerSetupRoute';
+
+  static const PageInfo<void> page = PageInfo<void>(name);
 }
 
 /// generated route for
