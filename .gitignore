@@ -1,0 +1,8 @@
+
+# Binaries
+backend/flux-server
+*.exe
+
+# Database
+backend/data/
+*.db
