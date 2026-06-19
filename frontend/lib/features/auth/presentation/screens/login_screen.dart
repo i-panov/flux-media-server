@@ -32,16 +32,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
+    ref.listen(authProvider, (previous, next) {
+      if (next is AuthCodeSent && previous is! AuthCodeSent) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          context.router.push(CodeRoute(
+            email: next.email,
+            debugCode: next.debugCode,
+          ));
+        });
+      }
+    });
 
-    if (authState is AuthCodeSent) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.router.push(CodeRoute(
-          email: authState.email,
-          debugCode: authState.debugCode,
-        ));
-      });
-    }
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       body: Center(

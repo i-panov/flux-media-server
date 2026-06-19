@@ -1,7 +1,8 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:media_kit/media_kit.dart' as mk;
+import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -23,12 +24,30 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _showControls = true;
+  bool _isDragging = false;
+  double _dragPosition = 0;
 
   @override
   void initState() {
     super.initState();
-    mk.MediaKit.ensureInitialized();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     ref.read(playerProvider.notifier).play(widget.media);
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    super.dispose();
   }
 
   @override
@@ -43,6 +62,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           child: CircularProgressIndicator(color: Colors.white),
         ),
         playing: (media, isPaused, position, duration) {
+          final sliderValue = _isDragging
+              ? _dragPosition
+              : position.inSeconds.toDouble().clamp(
+                  0.0, (duration ?? position).inSeconds.toDouble());
+          final sliderMax =
+              (duration ?? position).inSeconds.toDouble().clamp(1.0, double.infinity);
+
           return Stack(
             alignment: Alignment.center,
             children: [
@@ -68,11 +94,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Slider(
-                          value: position.inSeconds
-                              .toDouble()
-                              .clamp(0.0, (duration ?? position).inSeconds.toDouble()),
-                          max: (duration ?? position).inSeconds.toDouble().clamp(1.0, double.infinity),
-                          onChanged: (value) {
+                          value: sliderValue,
+                          max: sliderMax,
+                          onChangeStart: (_) => setState(() => _isDragging = true),
+                          onChanged: (value) => setState(() => _dragPosition = value),
+                          onChangeEnd: (value) {
+                            setState(() => _isDragging = false);
                             ref
                                 .read(playerProvider.notifier)
                                 .seek(Duration(seconds: value.toInt()));
@@ -82,7 +109,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              _formatDuration(position),
+                              position.formatted,
                               style: const TextStyle(color: Colors.white),
                             ),
                             const SizedBox(width: 16),
@@ -102,7 +129,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             ),
                             const SizedBox(width: 16),
                             Text(
-                              duration != null ? _formatDuration(duration) : '--:--',
+                              duration != null ? duration.formatted : '--:--',
                               style: const TextStyle(color: Colors.white),
                             ),
                           ],
@@ -159,14 +186,5 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ),
       ),
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    if (duration.inHours > 0) {
-      return '${duration.inHours}:$minutes:$seconds';
-    }
-    return '$minutes:$seconds';
   }
 }

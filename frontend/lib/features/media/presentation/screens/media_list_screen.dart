@@ -44,41 +44,48 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
       appBar: AppBar(title: const Text('Media Library')),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        loaded: (items, total, hasReachedMax) => RefreshIndicator(
-          onRefresh: () => ref.read(mediaListProvider.notifier).load(),
-          child: GridView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.all(8),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.7,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
+        data: (result) {
+          final hasReachedMax = result.items.length >= result.total;
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(mediaListProvider.future),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = (constraints.maxWidth / 180).floor().clamp(2, 6);
+                return GridView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: 0.7,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: result.items.length + (hasReachedMax ? 0 : 1),
+                  itemBuilder: (context, index) {
+                    if (index == result.items.length) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final media = result.items[index];
+                    return MediaCard(
+                      media: media,
+                      onTap: () {
+                        context.router.push(MediaDetailRoute(mediaId: media.id));
+                      },
+                    );
+                  },
+                );
+              },
             ),
-            itemCount: items.length + (hasReachedMax ? 0 : 1),
-            itemBuilder: (context, index) {
-              if (index == items.length) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final media = items[index];
-              return MediaCard(
-                media: media,
-                onTap: () {
-                  context.router.push(MediaDetailRoute(mediaId: media.id));
-                },
-              );
-            },
-          ),
-        ),
-        error: (message) => Center(
+          );
+        },
+        error: (error, stackTrace) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(message),
+              Text(error.toString()),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () =>
-                    ref.read(mediaListProvider.notifier).load(),
+                onPressed: () => ref.read(mediaListProvider.notifier).refresh(),
                 child: const Text('Retry'),
               ),
             ],

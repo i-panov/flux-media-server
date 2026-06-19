@@ -7,6 +7,7 @@ import 'package:flux_media_server/features/auth/data/repositories/auth_repositor
 import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/user.dart';
 
 part 'auth_provider.freezed.dart';
@@ -26,14 +27,17 @@ class AuthState with _$AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier({
+    required Ref ref,
     required RequestCode requestCode,
     required VerifyCode verifyCode,
     required GetCurrentUser getCurrentUser,
-  })  : _requestCode = requestCode,
+  })  : _ref = ref,
+        _requestCode = requestCode,
         _verifyCode = verifyCode,
         _getCurrentUser = getCurrentUser,
         super(const AuthState.initial());
 
+  final Ref _ref;
   final RequestCode _requestCode;
   final VerifyCode _verifyCode;
   final GetCurrentUser _getCurrentUser;
@@ -54,19 +58,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState.loading();
     final result =
         await _verifyCode(VerifyCodeParams(email: email, code: code));
-    result.fold(
-      (failure) => state = AuthState.error(message: failure.message),
-      (data) => state = AuthState.authenticated(user: data.user),
+    await result.fold<Future<void>>(
+      (failure) async => state = AuthState.error(message: failure.message),
+      (data) async {
+        await _ref.read(settingsProvider.notifier).setAuthToken(data.token);
+        state = AuthState.authenticated(user: data.user);
+      },
     );
   }
 
   Future<void> checkAuthStatus() async {
     state = const AuthState.loading();
     final result = await _getCurrentUser(const NoParams());
-    result.fold(
-      (failure) => state = const AuthState.initial(),
-      (user) => state = AuthState.authenticated(user: user),
+    await result.fold<Future<void>>(
+      (failure) async {
+        await _ref.read(settingsProvider.notifier).logout();
+        state = const AuthState.initial();
+      },
+      (user) async => state = AuthState.authenticated(user: user),
     );
+  }
+
+  Future<void> logout() async {
+    await _ref.read(settingsProvider.notifier).logout();
+    state = const AuthState.initial();
   }
 }
 
@@ -92,6 +107,7 @@ final getCurrentUserProvider = Provider<GetCurrentUser>((ref) {
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(
+    ref: ref,
     requestCode: ref.watch(requestCodeProvider),
     verifyCode: ref.watch(verifyCodeProvider),
     getCurrentUser: ref.watch(getCurrentUserProvider),

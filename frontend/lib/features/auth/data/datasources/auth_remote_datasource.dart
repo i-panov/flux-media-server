@@ -3,6 +3,17 @@ import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/network/api_client.dart';
 import 'package:flux_media_server/shared/models/user.dart';
 
+void _checkStatus(Response<dynamic> response, String defaultMessage) {
+  if (response.statusCode == 401) {
+    throw const AuthException(message: 'Session expired');
+  }
+  if (response.statusCode != 200) {
+    throw ServerException(
+      message: response.body?['error'] as String? ?? defaultMessage,
+    );
+  }
+}
+
 /// Remote data source for authentication API calls.
 class AuthRemoteDataSource {
   /// Creates an [AuthRemoteDataSource] with the given [apiClient].
@@ -16,11 +27,7 @@ class AuthRemoteDataSource {
   Future<String?> requestCode(String email) async {
     final Response<Map<String, dynamic>> response =
         await apiClient.requestCode({'email': email});
-    if (response.statusCode != 200) {
-      throw ServerException(
-        message: response.body?['error'] as String? ?? 'Failed to send code',
-      );
-    }
+    _checkStatus(response, 'Failed to send code');
     return response.body?['code'] as String?;
   }
 
@@ -33,11 +40,7 @@ class AuthRemoteDataSource {
       'email': email,
       'code': code,
     });
-    if (response.statusCode != 200) {
-      throw ServerException(
-        message: response.body?['error'] as String? ?? 'Failed to verify code',
-      );
-    }
+    _checkStatus(response, 'Failed to verify code');
     final body = response.body!;
     return (
       token: body['token'] as String,
@@ -48,11 +51,7 @@ class AuthRemoteDataSource {
   /// Gets the currently authenticated user.
   Future<User> getCurrentUser() async {
     final Response<Map<String, dynamic>> response = await apiClient.getMe();
-    if (response.statusCode != 200) {
-      throw ServerException(
-        message: response.body?['error'] as String? ?? 'Failed to get user',
-      );
-    }
+    _checkStatus(response, 'Failed to get user');
     return User.fromJson(response.body!);
   }
 }

@@ -15,6 +15,8 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final debugCode = await remoteDataSource.requestCode(email);
       return Right(debugCode);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {
@@ -30,6 +32,8 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final result = await remoteDataSource.verifyCode(email, code);
       return Right(result);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {
@@ -42,6 +46,8 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final user = await remoteDataSource.getCurrentUser();
       return Right(user);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {

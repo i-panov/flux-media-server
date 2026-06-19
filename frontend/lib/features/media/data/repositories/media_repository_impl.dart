@@ -27,6 +27,8 @@ class MediaRepositoryImpl implements MediaRepository {
       final mediaList =
           result.items.map((json) => Media.fromJson(json)).toList();
       return Right((items: mediaList, total: result.total));
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {
@@ -39,6 +41,8 @@ class MediaRepositoryImpl implements MediaRepository {
     try {
       final json = await remoteDataSource.getMedia(id);
       return Right(Media.fromJson(json));
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {

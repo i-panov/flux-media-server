@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 
 @RoutePage()
@@ -32,24 +33,33 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     final state = ref.watch(mediaDetailProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Media Detail')),
+      appBar: AppBar(
+        title: state.when(
+          loading: () => const Text('Media Detail'),
+          loaded: (media) => Text(media.title),
+          error: (_) => const Text('Media Detail'),
+        ),
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         loaded: (media) => SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CachedNetworkImage(
-                imageUrl: _thumbnailUrl(),
-                fit: BoxFit.cover,
-                height: 300,
-                placeholder: (_, __) => const SizedBox(
+              Hero(
+                tag: 'media-thumb-${media.id}',
+                child: CachedNetworkImage(
+                  imageUrl: _thumbnailUrl(),
+                  fit: BoxFit.cover,
                   height: 300,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (_, __, ___) => const SizedBox(
-                  height: 300,
-                  child: Center(child: Icon(Icons.broken_image, size: 64)),
+                  placeholder: (_, __) => const SizedBox(
+                    height: 300,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox(
+                    height: 300,
+                    child: Center(child: Icon(Icons.broken_image, size: 64)),
+                  ),
                 ),
               ),
               Padding(
@@ -75,7 +85,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                     if (media.duration != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Duration: ${Duration(seconds: media.duration!)}',
+                        'Duration: ${Duration(seconds: media.duration!).formatted}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -84,7 +94,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                       width: double.infinity,
                       child: FilledButton.icon(
                         onPressed: () {
-                          // TODO: implement playback
+                          context.router.push(PlayerRoute(media: media));
                         },
                         icon: const Icon(Icons.play_arrow),
                         label: const Text('Play'),

@@ -4,17 +4,24 @@ import 'package:flux_media_server/core/network/interceptors/auth_interceptor.dar
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 
 final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
-  return AuthInterceptor();
+  return AuthInterceptor(ref);
 });
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final settings = ref.watch(settingsProvider);
-  final baseUrl = settings.settings.serverUrl ?? 'http://localhost:8080/api';
+  var baseUrl = settings.settings.serverUrl ?? 'http://localhost:8080';
+  if (!baseUrl.endsWith('/api')) {
+    baseUrl = '$baseUrl/api';
+  }
   final authInterceptor = ref.watch(authInterceptorProvider);
   return ApiClient.create(baseUrl: baseUrl, authInterceptor: authInterceptor);
 });
 
 final baseUrlProvider = Provider<String>((ref) {
   final settings = ref.watch(settingsProvider);
-  return settings.settings.serverUrl ?? 'http://localhost:8080/api';
+  var baseUrl = settings.settings.serverUrl ?? 'http://localhost:8080';
+  if (!baseUrl.endsWith('/api')) {
+    baseUrl = '$baseUrl/api';
+  }
+  return baseUrl;
 });

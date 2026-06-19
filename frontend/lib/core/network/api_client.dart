@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:chopper/chopper.dart';
 
 import 'interceptors/auth_interceptor.dart';
+import 'interceptors/safe_logging_interceptor.dart';
 
 part 'api_client.chopper.dart';
 
@@ -15,7 +16,7 @@ abstract class ApiClient extends ChopperService {
       converter: JsonConverter(),
       interceptors: [
         if (authInterceptor != null) authInterceptor,
-        CurlInterceptor(),
+        SafeLoggingInterceptor(),
       ],
     );
     return _$ApiClient(client);

@@ -16,6 +16,10 @@ part 'app_router.gr.dart';
 
 @AutoRouterConfig()
 class AppRouter extends _$AppRouter {
+  AppRouter({required this.authGuard});
+
+  final AutoRouteGuard authGuard;
+
   @override
   List<AutoRoute> get routes => [
         AutoRoute(page: ServerSetupRoute.page, initial: true),
@@ -23,6 +27,7 @@ class AppRouter extends _$AppRouter {
         AutoRoute(page: CodeRoute.page),
         AutoRoute(
           page: MainRoute.page,
+          guards: [authGuard],
           children: [
             AutoRoute(page: MediaListRoute.page, initial: true),
             AutoRoute(page: LibraryRoute.page),

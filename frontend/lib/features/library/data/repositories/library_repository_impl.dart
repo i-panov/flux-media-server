@@ -17,6 +17,8 @@ class LibraryRepositoryImpl implements LibraryRepository {
       final libraries =
           jsonList.map((json) => MediaLibrary.fromJson(json)).toList();
       return Right(libraries);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {
@@ -29,6 +31,8 @@ class LibraryRepositoryImpl implements LibraryRepository {
     try {
       final json = await remoteDataSource.scanLibrary(id);
       return Right(MediaLibrary.fromJson(json));
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } on NetworkException catch (e) {

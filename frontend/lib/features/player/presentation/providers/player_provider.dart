@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
@@ -28,9 +30,24 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
 
   final VideoPlayerDatasource _datasource;
   final String _baseUrl;
+  final List<StreamSubscription> _subscriptions = [];
+
+  Future<void> _cancelSubscriptions() async {
+    for (final sub in _subscriptions) {
+      await sub.cancel();
+    }
+    _subscriptions.clear();
+  }
+
+  @override
+  void dispose() {
+    _cancelSubscriptions();
+    super.dispose();
+  }
 
   /// Starts playback of [media].
   Future<void> play(Media media) async {
+    await _cancelSubscriptions();
     state = PlayerNotifierState.playing(media: media, isPaused: true);
     try {
       await _datasource.open('$_baseUrl/media/${media.id}/stream');
@@ -39,25 +56,25 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
         state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
       }
 
-      _datasource.positionStream.listen((position) {
+      _subscriptions.add(_datasource.positionStream.listen((position) {
         if (state is PlayerNotifierPlaying) {
           state =
               (state as PlayerNotifierPlaying).copyWith(position: position);
         }
-      });
+      }));
 
-      _datasource.durationStream.listen((duration) {
+      _subscriptions.add(_datasource.durationStream.listen((duration) {
         if (state is PlayerNotifierPlaying) {
           state =
               (state as PlayerNotifierPlaying).copyWith(duration: duration);
         }
-      });
+      }));
 
-      _datasource.completedStream.listen((completed) {
+      _subscriptions.add(_datasource.completedStream.listen((completed) {
         if (completed) {
           complete();
         }
-      });
+      }));
     } on Exception catch (e) {
       state = PlayerNotifierState.error(message: e.toString());
     }
@@ -93,7 +110,10 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   void complete() => state = const PlayerNotifierState.completed();
 
   /// Resets the player to initial state.
-  void reset() => state = const PlayerNotifierState.initial();
+  Future<void> reset() async {
+    await _cancelSubscriptions();
+    state = const PlayerNotifierState.initial();
+  }
 }
 
 final videoPlayerDatasourceProvider = Provider<VideoPlayerDatasource>((ref) {

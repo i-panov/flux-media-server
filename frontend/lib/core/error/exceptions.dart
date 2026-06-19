@@ -10,6 +10,12 @@ class CacheException implements Exception {
   final String message;
 }
 
+class AuthException implements Exception {
+  const AuthException({required this.message});
+
+  final String message;
+}
+
 class NetworkException implements Exception {
   const NetworkException({required this.message});
 

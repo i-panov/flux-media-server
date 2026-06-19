@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 
 @RoutePage()
@@ -13,13 +14,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _serverUrlController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    final settings = ref.read(settingsProvider).settings;
-    _serverUrlController.text = settings.serverUrl ?? '';
-  }
 
   @override
   void dispose() {
@@ -38,7 +32,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _logout() {
-    ref.read(settingsProvider.notifier).logout();
+    ref.read(authProvider.notifier).logout();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Logged out')),
     );
@@ -47,6 +41,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsState = ref.watch(settingsProvider);
+
+    ref.listen(settingsProvider, (previous, next) {
+      final url = next.settings.serverUrl ?? '';
+      if (_serverUrlController.text != url) {
+        _serverUrlController.text = url;
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(

@@ -1,93 +1,56 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
+import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
-part 'media_list_provider.freezed.dart';
+class MediaListResult {
+  const MediaListResult({required this.items, required this.total});
 
-@freezed
-class MediaListState with _$MediaListState {
-  const factory MediaListState.loading() = MediaListLoading;
-  const factory MediaListState.loaded({
-    required List<Media> items,
-    required int total,
-    required bool hasReachedMax,
-  }) = MediaListLoaded;
-  const factory MediaListState.error({required String message}) = MediaListError;
-}
-
-class MediaListNotifier extends StateNotifier<MediaListState> {
-  MediaListNotifier({
-    required GetMediaList getMediaList,
-    String? type,
-    int? year,
-  })  : _getMediaList = getMediaList,
-        _type = type,
-        _year = year,
-        super(const MediaListState.loading());
-
-  final GetMediaList _getMediaList;
-  final String? _type;
-  final int? _year;
-  static const _pageSize = 20;
-
-  Future<void> load() async {
-    state = const MediaListState.loading();
-    final result = await _getMediaList(
-      GetMediaListParams(type: _type, year: _year, limit: _pageSize, offset: 0),
-    );
-    result.fold(
-      (failure) => state = MediaListState.error(message: failure.message),
-      (data) => state = MediaListState.loaded(
-        items: data.items,
-        total: data.total,
-        hasReachedMax: data.items.length >= data.total,
-      ),
-    );
-  }
-
-  Future<void> loadMore() async {
-    final currentState = state;
-    if (currentState is! MediaListLoaded || currentState.hasReachedMax) return;
-
-    final offset = currentState.items.length;
-    final result = await _getMediaList(
-      GetMediaListParams(
-        type: _type,
-        year: _year,
-        limit: _pageSize,
-        offset: offset,
-      ),
-    );
-    result.fold(
-      (failure) => state = MediaListState.error(message: failure.message),
-      (data) => state = MediaListState.loaded(
-        items: [...currentState.items, ...data.items],
-        total: data.total,
-        hasReachedMax: offset + data.items.length >= data.total,
-      ),
-    );
-  }
+  final List<Media> items;
+  final int total;
 }
 
 final mediaRemoteDataSourceProvider = Provider<MediaRemoteDataSource>((ref) {
   return MediaRemoteDataSource(ref.watch(apiClientProvider));
 });
 
-final mediaRepositoryProvider = Provider<MediaRepositoryImpl>((ref) {
+final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
   return MediaRepositoryImpl(ref.watch(mediaRemoteDataSourceProvider));
 });
 
-final getMediaListUseCaseProvider = Provider<GetMediaList>((ref) {
-  return GetMediaList(ref.watch(mediaRepositoryProvider));
-});
+final mediaListProvider = AsyncNotifierProvider<MediaListNotifier, MediaListResult>(MediaListNotifier.new);
 
-final mediaListProvider =
-    StateNotifierProvider<MediaListNotifier, MediaListState>((ref) {
-  return MediaListNotifier(
-    getMediaList: ref.watch(getMediaListUseCaseProvider),
-  );
-});
+class MediaListNotifier extends AsyncNotifier<MediaListResult> {
+  static const _pageSize = 20;
+
+  @override
+  Future<MediaListResult> build() async {
+    final repo = ref.watch(mediaRepositoryProvider);
+    final result = await repo.getMediaList(limit: _pageSize, offset: 0);
+    return result.fold(
+      (failure) => throw Exception(failure.message),
+      (data) => MediaListResult(items: data.items, total: data.total),
+    );
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || current.items.length >= current.total) return;
+    final repo = ref.read(mediaRepositoryProvider);
+    final result = await repo.getMediaList(
+      limit: _pageSize,
+      offset: current.items.length,
+    );
+    result.fold(
+      (failure) => state = AsyncError(Exception(failure.message), StackTrace.current),
+      (data) => state = AsyncValue.data(
+        MediaListResult(
+          items: [...current.items, ...data.items],
+          total: data.total,
+        ),
+      ),
+    );
+  }
+}

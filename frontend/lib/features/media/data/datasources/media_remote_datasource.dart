@@ -2,6 +2,17 @@ import 'package:chopper/chopper.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/network/api_client.dart';
 
+void _checkStatus(Response<dynamic> response, String defaultMessage) {
+  if (response.statusCode == 401) {
+    throw const AuthException(message: 'Session expired');
+  }
+  if (response.statusCode != 200) {
+    throw ServerException(
+      message: response.body?['error'] as String? ?? defaultMessage,
+    );
+  }
+}
+
 /// Remote data source for media API calls.
 class MediaRemoteDataSource {
   /// Creates a [MediaRemoteDataSource] with the given [apiClient].
@@ -23,11 +34,7 @@ class MediaRemoteDataSource {
       limit: limit,
       offset: offset,
     );
-    if (response.statusCode != 200) {
-      throw ServerException(
-        message: response.body?['error'] as String? ?? 'Failed to fetch media',
-      );
-    }
+    _checkStatus(response, 'Failed to fetch media');
     final body = response.body!;
     return (
       items: (body['items'] as List).cast<Map<String, dynamic>>(),
@@ -38,11 +45,7 @@ class MediaRemoteDataSource {
   /// Fetches a single media item by [id].
   Future<Map<String, dynamic>> getMedia(int id) async {
     final Response<Map<String, dynamic>> response = await apiClient.getMedia(id);
-    if (response.statusCode != 200) {
-      throw ServerException(
-        message: response.body?['error'] as String? ?? 'Failed to fetch media',
-      );
-    }
+    _checkStatus(response, 'Failed to fetch media');
     return response.body!;
   }
 }

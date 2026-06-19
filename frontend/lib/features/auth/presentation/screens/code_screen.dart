@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 
@@ -106,6 +107,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                 TextFormField(
                   controller: _codeController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 24,

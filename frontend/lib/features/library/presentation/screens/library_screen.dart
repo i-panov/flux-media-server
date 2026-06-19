@@ -13,12 +13,6 @@ class LibraryScreen extends ConsumerStatefulWidget {
 
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => ref.read(libraryProvider.notifier).load());
-  }
-
-  @override
   Widget build(BuildContext context) {
     final state = ref.watch(libraryProvider);
 
@@ -26,8 +20,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       appBar: AppBar(title: const Text('Libraries')),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        loaded: (libraries) => RefreshIndicator(
-          onRefresh: () => ref.read(libraryProvider.notifier).load(),
+        data: (libraries) => RefreshIndicator(
+          onRefresh: () => ref.refresh(libraryProvider.future),
           child: ListView.builder(
             padding: const EdgeInsets.all(8),
             itemCount: libraries.length,
@@ -42,7 +36,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     children: [
                       Switch(
                         value: library.enabled,
-                        onChanged: null,
+                        onChanged: null, // Read-only for now
                       ),
                       IconButton(
                         icon: const Icon(Icons.sync),
@@ -57,15 +51,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             },
           ),
         ),
-        error: (message) => Center(
+        error: (error, stackTrace) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(message),
+              Text(error.toString()),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () =>
-                    ref.read(libraryProvider.notifier).load(),
+                onPressed: () => ref.read(libraryProvider.notifier).refresh(),
                 child: const Text('Retry'),
               ),
             ],

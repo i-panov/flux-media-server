@@ -1,7 +1,11 @@
+import 'package:characters/characters.dart';
+
 extension StringExtensions on String {
   String get capitalize {
     if (isEmpty) return this;
-    return "${this[0].toUpperCase()}${substring(1)}";
+    final chars = Characters(this);
+    final first = chars.first;
+    return '$first${chars.skip(1)}'.replaceFirst(first, first.toUpperCase());
   }
 }
 
