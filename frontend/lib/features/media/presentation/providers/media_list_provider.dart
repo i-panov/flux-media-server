@@ -20,6 +20,9 @@ final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
   return MediaRepositoryImpl(ref.watch(mediaRemoteDataSourceProvider));
 });
 
+/// Current search query. Empty string means no search.
+final searchQueryProvider = StateProvider<String>((ref) => '');
+
 final mediaListProvider = AsyncNotifierProvider<MediaListNotifier, MediaListResult>(MediaListNotifier.new);
 
 class MediaListNotifier extends AsyncNotifier<MediaListResult> {
@@ -28,7 +31,12 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
   @override
   Future<MediaListResult> build() async {
     final repo = ref.watch(mediaRepositoryProvider);
-    final result = await repo.getMediaList(limit: _pageSize, offset: 0);
+    final q = ref.watch(searchQueryProvider);
+    final result = await repo.getMediaList(
+      limit: _pageSize,
+      offset: 0,
+      q: q.isEmpty ? null : q,
+    );
     return result.fold(
       (failure) => throw Exception(failure.message),
       (data) => MediaListResult(items: data.items, total: data.total),
@@ -39,9 +47,11 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
     final current = state.value;
     if (current == null || current.items.length >= current.total) return;
     final repo = ref.read(mediaRepositoryProvider);
+    final q = ref.read(searchQueryProvider);
     final result = await repo.getMediaList(
       limit: _pageSize,
       offset: current.items.length,
+      q: q.isEmpty ? null : q,
     );
     result.fold(
       (failure) => state = AsyncError(Exception(failure.message), StackTrace.current),

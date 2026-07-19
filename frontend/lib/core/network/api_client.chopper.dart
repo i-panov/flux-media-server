@@ -59,6 +59,7 @@ final class _$ApiClient extends ApiClient {
   Future<Response<Map<String, dynamic>>> getMediaList({
     String? type,
     int? year,
+    String? q,
     int? limit,
     int? offset,
   }) {
@@ -66,6 +67,7 @@ final class _$ApiClient extends ApiClient {
     final Map<String, dynamic> $params = <String, dynamic>{
       'type': type,
       'year': year,
+      'q': q,
       'limit': limit,
       'offset': offset,
     };

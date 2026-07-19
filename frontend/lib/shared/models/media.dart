@@ -17,6 +17,9 @@ class Media with _$Media {
     String? description,
     int? duration,
     String? thumbnailUrl,
+    String? artist,
+    String? album,
+    String? genre,
     Metadata? metadata,
     @Default('') String fileHash,
   }) = _Media;

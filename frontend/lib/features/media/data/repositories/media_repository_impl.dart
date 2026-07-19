@@ -14,6 +14,7 @@ class MediaRepositoryImpl implements MediaRepository {
   Future<Either<Failure, ({List<Media> items, int total})>> getMediaList({
     String? type,
     int? year,
+    String? q,
     int? limit,
     int? offset,
   }) async {
@@ -21,6 +22,7 @@ class MediaRepositoryImpl implements MediaRepository {
       final result = await remoteDataSource.getMediaList(
         type: type,
         year: year,
+        q: q,
         limit: limit,
         offset: offset,
       );

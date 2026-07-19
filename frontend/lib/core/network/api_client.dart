@@ -41,6 +41,7 @@ abstract class ApiClient extends ChopperService {
   Future<Response<Map<String, dynamic>>> getMediaList({
     @Query('type') String? type,
     @Query('year') int? year,
+    @Query('q') String? q,
     @Query('limit') int? limit,
     @Query('offset') int? offset,
   });

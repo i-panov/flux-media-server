@@ -48,6 +48,17 @@ class MediaCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
+                    if (media.artist != null && media.artist!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        media.artist!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Text(
                       '${media.year}',

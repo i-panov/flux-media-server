@@ -14,12 +14,14 @@ class MediaRemoteDataSource {
   Future<({List<Map<String, dynamic>> items, int total})> getMediaList({
     String? type,
     int? year,
+    String? q,
     int? limit,
     int? offset,
   }) async {
     final Response<Map<String, dynamic>> response = await apiClient.getMediaList(
       type: type,
       year: year,
+      q: q,
       limit: limit,
       offset: offset,
     );

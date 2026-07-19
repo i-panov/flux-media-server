@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +17,8 @@ class MediaListScreen extends ConsumerStatefulWidget {
 
 class _MediaListScreenState extends ConsumerState<MediaListScreen> {
   final _scrollController = ScrollController();
+  final _searchController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -26,6 +30,8 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -36,16 +42,80 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
     }
   }
 
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(Duration(milliseconds: 300), () {
+      ref.read(searchQueryProvider.notifier).state = value;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(mediaListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Media Library')),
+      appBar: AppBar(
+        title: const Text('Media Library'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Search media...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          ref.read(searchQueryProvider.notifier).state = '';
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                isDense: true,
+              ),
+            ),
+          ),
+        ),
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         data: (result) {
           final hasReachedMax = result.items.length >= result.total;
+          if (result.items.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _searchController.text.isNotEmpty
+                        ? Icons.search_off
+                        : Icons.video_library_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _searchController.text.isNotEmpty
+                        ? 'No results found'
+                        : 'No media found',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.grey,
+                        ),
+                  ),
+                ],
+              ),
+            );
+          }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(mediaListProvider.future),
             child: LayoutBuilder(

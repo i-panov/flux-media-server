@@ -6,6 +6,7 @@ abstract class MediaRepository {
   Future<Either<Failure, ({List<Media> items, int total})>> getMediaList({
     String? type,
     int? year,
+    String? q,
     int? limit,
     int? offset,
   });

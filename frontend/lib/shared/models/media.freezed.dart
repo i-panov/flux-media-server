@@ -29,6 +29,9 @@ mixin _$Media {
   String? get description => throw _privateConstructorUsedError;
   int? get duration => throw _privateConstructorUsedError;
   String? get thumbnailUrl => throw _privateConstructorUsedError;
+  String? get artist => throw _privateConstructorUsedError;
+  String? get album => throw _privateConstructorUsedError;
+  String? get genre => throw _privateConstructorUsedError;
   Metadata? get metadata => throw _privateConstructorUsedError;
   String get fileHash => throw _privateConstructorUsedError;
 
@@ -52,6 +55,9 @@ abstract class $MediaCopyWith<$Res> {
       String? description,
       int? duration,
       String? thumbnailUrl,
+      String? artist,
+      String? album,
+      String? genre,
       Metadata? metadata,
       String fileHash});
 
@@ -80,6 +86,9 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
     Object? description = freezed,
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
+    Object? artist = freezed,
+    Object? album = freezed,
+    Object? genre = freezed,
     Object? metadata = freezed,
     Object? fileHash = null,
   }) {
@@ -119,6 +128,18 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
       thumbnailUrl: freezed == thumbnailUrl
           ? _value.thumbnailUrl
           : thumbnailUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      artist: freezed == artist
+          ? _value.artist
+          : artist // ignore: cast_nullable_to_non_nullable
+              as String?,
+      album: freezed == album
+          ? _value.album
+          : album // ignore: cast_nullable_to_non_nullable
+              as String?,
+      genre: freezed == genre
+          ? _value.genre
+          : genre // ignore: cast_nullable_to_non_nullable
               as String?,
       metadata: freezed == metadata
           ? _value.metadata
@@ -161,6 +182,9 @@ abstract class _$$MediaImplCopyWith<$Res> implements $MediaCopyWith<$Res> {
       String? description,
       int? duration,
       String? thumbnailUrl,
+      String? artist,
+      String? album,
+      String? genre,
       Metadata? metadata,
       String fileHash});
 
@@ -188,6 +212,9 @@ class __$$MediaImplCopyWithImpl<$Res>
     Object? description = freezed,
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
+    Object? artist = freezed,
+    Object? album = freezed,
+    Object? genre = freezed,
     Object? metadata = freezed,
     Object? fileHash = null,
   }) {
@@ -228,6 +255,18 @@ class __$$MediaImplCopyWithImpl<$Res>
           ? _value.thumbnailUrl
           : thumbnailUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      artist: freezed == artist
+          ? _value.artist
+          : artist // ignore: cast_nullable_to_non_nullable
+              as String?,
+      album: freezed == album
+          ? _value.album
+          : album // ignore: cast_nullable_to_non_nullable
+              as String?,
+      genre: freezed == genre
+          ? _value.genre
+          : genre // ignore: cast_nullable_to_non_nullable
+              as String?,
       metadata: freezed == metadata
           ? _value.metadata
           : metadata // ignore: cast_nullable_to_non_nullable
@@ -253,6 +292,9 @@ class _$MediaImpl implements _Media {
       this.description,
       this.duration,
       this.thumbnailUrl,
+      this.artist,
+      this.album,
+      this.genre,
       this.metadata,
       this.fileHash = ''});
 
@@ -278,6 +320,12 @@ class _$MediaImpl implements _Media {
   @override
   final String? thumbnailUrl;
   @override
+  final String? artist;
+  @override
+  final String? album;
+  @override
+  final String? genre;
+  @override
   final Metadata? metadata;
   @override
   @JsonKey()
@@ -285,7 +333,7 @@ class _$MediaImpl implements _Media {
 
   @override
   String toString() {
-    return 'Media(id: $id, title: $title, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, metadata: $metadata, fileHash: $fileHash)';
+    return 'Media(id: $id, title: $title, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, artist: $artist, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash)';
   }
 
   @override
@@ -307,6 +355,9 @@ class _$MediaImpl implements _Media {
                 other.duration == duration) &&
             (identical(other.thumbnailUrl, thumbnailUrl) ||
                 other.thumbnailUrl == thumbnailUrl) &&
+            (identical(other.artist, artist) || other.artist == artist) &&
+            (identical(other.album, album) || other.album == album) &&
+            (identical(other.genre, genre) || other.genre == genre) &&
             (identical(other.metadata, metadata) ||
                 other.metadata == metadata) &&
             (identical(other.fileHash, fileHash) ||
@@ -315,8 +366,22 @@ class _$MediaImpl implements _Media {
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, title, year, type, filePath,
-      fileSize, description, duration, thumbnailUrl, metadata, fileHash);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      title,
+      year,
+      type,
+      filePath,
+      fileSize,
+      description,
+      duration,
+      thumbnailUrl,
+      artist,
+      album,
+      genre,
+      metadata,
+      fileHash);
 
   @JsonKey(ignore: true)
   @override
@@ -343,6 +408,9 @@ abstract class _Media implements Media {
       final String? description,
       final int? duration,
       final String? thumbnailUrl,
+      final String? artist,
+      final String? album,
+      final String? genre,
       final Metadata? metadata,
       final String fileHash}) = _$MediaImpl;
 
@@ -366,6 +434,12 @@ abstract class _Media implements Media {
   int? get duration;
   @override
   String? get thumbnailUrl;
+  @override
+  String? get artist;
+  @override
+  String? get album;
+  @override
+  String? get genre;
   @override
   Metadata? get metadata;
   @override

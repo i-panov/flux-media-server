@@ -79,6 +79,31 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                             color: Colors.grey,
                           ),
                     ),
+                    if (media.artist != null && media.artist!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        media.artist!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
+                    if (media.album != null && media.album!.isNotEmpty) ...[
+                      Text(
+                        media.album!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey,
+                            ),
+                      ),
+                    ],
+                    if (media.genre != null && media.genre!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Chip(
+                        label: Text(media.genre!),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                      ),
+                    ],
                     if (media.description != null) ...[
                       const SizedBox(height: 16),
                       Text(media.description!),
