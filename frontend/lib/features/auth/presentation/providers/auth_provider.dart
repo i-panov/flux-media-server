@@ -72,6 +72,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _getCurrentUser(const NoParams());
     await result.fold<Future<void>>(
       (failure) async {
+        // Token is invalid — clear it to prevent infinite 401 loop
         await _ref.read(settingsProvider.notifier).logout();
         state = const AuthState.initial();
       },

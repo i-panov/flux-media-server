@@ -205,6 +205,17 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> getScanStatus(int id) {
+    final Uri $url = Uri.parse('/libraries/${id}/scan-status');
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<List<dynamic>>> getProgress() {
     final Uri $url = Uri.parse('/progress');
     final Request $request = Request(

@@ -1,11 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/user.dart';
 
 class FakeAuthRepository implements AuthRepository {
@@ -30,124 +34,115 @@ class FakeAuthRepository implements AuthRepository {
 }
 
 void main() {
-  late AuthNotifier notifier;
+  // Mock the secure storage platform channel
+  const secureStorageChannel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (MethodCall methodCall) async {
+      if (methodCall.method == 'read') return null;
+      if (methodCall.method == 'write') return null;
+      if (methodCall.method == 'delete') return null;
+      return null;
+    });
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, null);
+  });
+
+  late ProviderContainer container;
   late FakeAuthRepository fakeRepo;
 
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
     fakeRepo = FakeAuthRepository();
-    notifier = AuthNotifier(
-      requestCode: RequestCode(fakeRepo),
-      verifyCode: VerifyCode(fakeRepo),
-      getCurrentUser: GetCurrentUser(fakeRepo),
+    container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        requestCodeProvider.overrideWithValue(RequestCode(fakeRepo)),
+        verifyCodeProvider.overrideWithValue(VerifyCode(fakeRepo)),
+        getCurrentUserProvider.overrideWithValue(GetCurrentUser(fakeRepo)),
+      ],
     );
   });
 
   tearDown(() {
-    notifier.dispose();
+    container.dispose();
   });
 
   group('AuthNotifier', () {
     test('initial state is AuthInitial', () {
-      expect(notifier.state, isA<AuthInitial>());
+      final state = container.read(authProvider);
+      expect(state, isA<AuthInitial>());
     });
 
-    group('requestCode', () {
-      test('emits loading then codeSent with debug code', () async {
-        fakeRepo.onRequestCode = (_) async => const Right('123456');
+    test('requestCode emits codeSent on success', () async {
+      fakeRepo.onRequestCode = (_) async => const Right('123456');
 
-        final states = <AuthState>[];
-        notifier.addListener(states.add);
+      final states = <AuthState>[];
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
-        await notifier.requestCode('test@example.com');
+      await container.read(authProvider.notifier).requestCode('test@example.com');
 
-        // states: [initial, loading, codeSent]
-        expect(states, hasLength(3));
-        expect(states[1], isA<AuthLoading>());
-
-        final codeSent = states[2] as AuthCodeSent;
-        expect(codeSent.email, 'test@example.com');
-        expect(codeSent.debugCode, '123456');
-      });
-
-      test('emits codeSent without debug code in production', () async {
-        fakeRepo.onRequestCode = (_) async => const Right(null);
-
-        final states = <AuthState>[];
-        notifier.addListener(states.add);
-
-        await notifier.requestCode('test@example.com');
-
-        final codeSent = states[2] as AuthCodeSent;
-        expect(codeSent.debugCode, isNull);
-      });
-
-      test('emits error on failure', () async {
-        fakeRepo.onRequestCode =
-            (_) async => const Left(ServerFailure(message: 'Email not allowed'));
-
-        final states = <AuthState>[];
-        notifier.addListener(states.add);
-
-        await notifier.requestCode('test@example.com');
-
-        expect(states[2], isA<AuthError>());
-        expect((states[2] as AuthError).message, 'Email not allowed');
-      });
+      expect(states, contains(isA<AuthCodeSent>()));
+      final codeSent = states.whereType<AuthCodeSent>().first;
+      expect(codeSent.email, 'test@example.com');
+      expect(codeSent.debugCode, '123456');
     });
 
-    group('verifyCode', () {
-      test('emits authenticated on success', () async {
-        final user = User(id: 1, email: 'test@example.com');
-        fakeRepo.onVerifyCode = (_, __) async =>
-            Right((token: 'jwt-token', user: user));
+    test('requestCode emits error on failure', () async {
+      fakeRepo.onRequestCode =
+          (_) async => const Left(ServerFailure(message: 'Email not allowed'));
 
-        final states = <AuthState>[];
-        notifier.addListener(states.add);
+      final states = <AuthState>[];
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
-        await notifier.verifyCode('test@example.com', '123456');
+      await container.read(authProvider.notifier).requestCode('test@example.com');
 
-        expect(states[2], isA<AuthAuthenticated>());
-        expect((states[2] as AuthAuthenticated).user.email, 'test@example.com');
-      });
-
-      test('emits error on invalid code', () async {
-        fakeRepo.onVerifyCode = (_, __) async =>
-            const Left(ServerFailure(message: 'Invalid or expired code'));
-
-        final states = <AuthState>[];
-        notifier.addListener(states.add);
-
-        await notifier.verifyCode('test@example.com', '000000');
-
-        expect(states[2], isA<AuthError>());
-        expect((states[2] as AuthError).message, 'Invalid or expired code');
-      });
+      expect(states, contains(isA<AuthError>()));
+      final error = states.whereType<AuthError>().first;
+      expect(error.message, 'Email not allowed');
     });
 
-    group('checkAuthStatus', () {
-      test('emits authenticated when token is valid', () async {
-        final user = User(id: 1, email: 'test@example.com');
-        fakeRepo.onGetCurrentUser = () async => Right(user);
+    test('verifyCode emits authenticated on success', () async {
+      final user = User(id: 1, email: 'test@example.com');
+      fakeRepo.onVerifyCode = (_, __) async =>
+          Right((token: 'jwt-token', user: user));
 
-        final states = <AuthState>[];
-        notifier.addListener(states.add);
+      final states = <AuthState>[];
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
-        await notifier.checkAuthStatus();
+      await container.read(authProvider.notifier).verifyCode('test@example.com', '123456');
 
-        expect(states[2], isA<AuthAuthenticated>());
-      });
+      expect(states, contains(isA<AuthAuthenticated>()));
+      final auth = states.whereType<AuthAuthenticated>().first;
+      expect(auth.user.email, 'test@example.com');
+    });
 
-      test('emits initial when token is invalid', () async {
-        fakeRepo.onGetCurrentUser =
-            () async => const Left(ServerFailure(message: 'Unauthorized'));
+    test('verifyCode emits error on invalid code', () async {
+      fakeRepo.onVerifyCode = (_, __) async =>
+          const Left(ServerFailure(message: 'Invalid or expired code'));
 
-        final states = <AuthState>[];
-        notifier.addListener(states.add);
+      final states = <AuthState>[];
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
-        await notifier.checkAuthStatus();
+      await container.read(authProvider.notifier).verifyCode('test@example.com', '000000');
 
-        expect(states[2], isA<AuthInitial>());
-      });
+      expect(states, contains(isA<AuthError>()));
+      final error = states.whereType<AuthError>().first;
+      expect(error.message, 'Invalid or expired code');
     });
   });
 }

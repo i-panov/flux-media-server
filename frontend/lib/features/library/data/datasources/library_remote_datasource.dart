@@ -1,17 +1,6 @@
 import 'package:chopper/chopper.dart';
-import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/network/api_client.dart';
-
-void _checkStatus(Response<dynamic> response, String defaultMessage) {
-  if (response.statusCode == 401) {
-    throw const AuthException(message: 'Session expired');
-  }
-  if (response.statusCode != 200) {
-    throw ServerException(
-      message: response.body?['error'] as String? ?? defaultMessage,
-    );
-  }
-}
+import 'package:flux_media_server/core/network/response_handler.dart';
 
 /// Remote data source for library API calls.
 class LibraryRemoteDataSource {
@@ -24,15 +13,24 @@ class LibraryRemoteDataSource {
   /// Fetches all libraries from the server.
   Future<List<Map<String, dynamic>>> getLibraries() async {
     final Response<List<dynamic>> response = await apiClient.getLibraries();
-    _checkStatus(response, 'Failed to fetch libraries');
+    checkResponse(response, 'Failed to fetch libraries');
     return response.body!.cast<Map<String, dynamic>>().toList();
   }
 
   /// Triggers a scan of the library with the given [id].
-  Future<Map<String, dynamic>> scanLibrary(int id) async {
+  /// Returns the response message.
+  Future<String> scanLibrary(int id) async {
     final Response<Map<String, dynamic>> response =
         await apiClient.scanLibrary(id);
-    _checkStatus(response, 'Failed to scan library');
+    checkResponse(response, 'Failed to scan library');
+    return response.body!['message'] as String? ?? 'Scan started';
+  }
+
+  /// Gets the scan status for the library with the given [id].
+  Future<Map<String, dynamic>> getScanStatus(int id) async {
+    final Response<Map<String, dynamic>> response =
+        await apiClient.getScanStatus(id);
+    checkResponse(response, 'Failed to get scan status');
     return response.body!;
   }
 }

@@ -1,18 +1,7 @@
 import 'package:chopper/chopper.dart';
-import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/network/api_client.dart';
+import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/user.dart';
-
-void _checkStatus(Response<dynamic> response, String defaultMessage) {
-  if (response.statusCode == 401) {
-    throw const AuthException(message: 'Session expired');
-  }
-  if (response.statusCode != 200) {
-    throw ServerException(
-      message: response.body?['error'] as String? ?? defaultMessage,
-    );
-  }
-}
 
 /// Remote data source for authentication API calls.
 class AuthRemoteDataSource {
@@ -27,7 +16,7 @@ class AuthRemoteDataSource {
   Future<String?> requestCode(String email) async {
     final Response<Map<String, dynamic>> response =
         await apiClient.requestCode({'email': email});
-    _checkStatus(response, 'Failed to send code');
+    checkResponse(response, 'Failed to send code');
     return response.body?['code'] as String?;
   }
 
@@ -40,7 +29,7 @@ class AuthRemoteDataSource {
       'email': email,
       'code': code,
     });
-    _checkStatus(response, 'Failed to verify code');
+    checkResponse(response, 'Failed to verify code');
     final body = response.body!;
     return (
       token: body['token'] as String,
@@ -51,7 +40,7 @@ class AuthRemoteDataSource {
   /// Gets the currently authenticated user.
   Future<User> getCurrentUser() async {
     final Response<Map<String, dynamic>> response = await apiClient.getMe();
-    _checkStatus(response, 'Failed to get user');
+    checkResponse(response, 'Failed to get user');
     return User.fromJson(response.body!);
   }
 }

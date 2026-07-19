@@ -4,6 +4,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/library/data/datasources/library_remote_datasource.dart';
 import 'package:flux_media_server/features/library/domain/repositories/library_repository.dart';
 import 'package:flux_media_server/shared/models/library.dart';
+import 'package:flux_media_server/shared/models/scan_status.dart';
 
 class LibraryRepositoryImpl implements LibraryRepository {
   LibraryRepositoryImpl(this.remoteDataSource);
@@ -21,22 +22,30 @@ class LibraryRepositoryImpl implements LibraryRepository {
       return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
     }
   }
 
   @override
-  Future<Either<Failure, MediaLibrary>> scanLibrary(int id) async {
+  Future<Either<Failure, String>> scanLibrary(int id) async {
     try {
-      final json = await remoteDataSource.scanLibrary(id);
-      return Right(MediaLibrary.fromJson(json));
+      final message = await remoteDataSource.scanLibrary(id);
+      return Right(message);
     } on AuthException catch (e) {
       return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ScanStatus>> getScanStatus(int id) async {
+    try {
+      final json = await remoteDataSource.getScanStatus(id);
+      return Right(ScanStatus.fromJson(json));
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
     }
   }
 }

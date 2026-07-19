@@ -86,6 +86,9 @@ abstract class ApiClient extends ChopperService {
   @Post(path: '/libraries/{id}/scan')
   Future<Response<Map<String, dynamic>>> scanLibrary(@Path('id') int id);
 
+  @Get(path: '/libraries/{id}/scan-status')
+  Future<Response<Map<String, dynamic>>> getScanStatus(@Path('id') int id);
+
   // Progress
   @Get(path: '/progress')
   Future<Response<List<dynamic>>> getProgress();

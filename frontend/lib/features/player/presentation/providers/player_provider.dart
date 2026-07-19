@@ -32,9 +32,9 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   final String _baseUrl;
   final List<StreamSubscription> _subscriptions = [];
 
-  Future<void> _cancelSubscriptions() async {
+  void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
-      await sub.cancel();
+      sub.cancel();
     }
     _subscriptions.clear();
   }
@@ -47,7 +47,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
 
   /// Starts playback of [media].
   Future<void> play(Media media) async {
-    await _cancelSubscriptions();
+    _cancelSubscriptions();
     state = PlayerNotifierState.playing(media: media, isPaused: true);
     try {
       await _datasource.open('$_baseUrl/media/${media.id}/stream');
@@ -111,7 +111,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
 
   /// Resets the player to initial state.
   Future<void> reset() async {
-    await _cancelSubscriptions();
+    _cancelSubscriptions();
     state = const PlayerNotifierState.initial();
   }
 }

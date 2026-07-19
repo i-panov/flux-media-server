@@ -1,25 +1,24 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:chopper/chopper.dart';
 
 /// Logs HTTP requests and responses, masking the Authorization header.
-class SafeLoggingInterceptor implements Interceptor {
+class SafeLoggingInterceptor implements RequestInterceptor, ResponseInterceptor {
   @override
-  FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) async {
-    final request = chain.request;
+  FutureOr<Request> onRequest(Request request) {
     final safeHeaders = Map<String, String>.from(request.headers);
     if (safeHeaders.containsKey('Authorization')) {
       safeHeaders['Authorization'] = 'Bearer ***';
     }
-    // ignore: avoid_print
-    print('--> ${request.method} ${request.url}');
-    // ignore: avoid_print
-    print('Headers: $safeHeaders');
+    developer.log('--> ${request.method} ${request.url}');
+    developer.log('Headers: $safeHeaders');
+    return request;
+  }
 
-    final response = await chain.proceed(request);
-
-    // ignore: avoid_print
-    print('<-- ${response.statusCode} ${request.url}');
+  @override
+  FutureOr<Response> onResponse(Response response) {
+    developer.log('<-- ${response.statusCode} ${response.base.request?.url}');
     return response;
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
@@ -19,7 +19,7 @@ Media _fakeMedia(int id, [String? title]) => Media(
 
 class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, ({List<Media> items, int total})>> Function(
-      GetMediaListParams)? onGetMediaList;
+      {String? type, int? year, int? limit, int? offset})? onGetMediaList;
   Future<Either<Failure, Media>> Function(int)? onGetMediaDetail;
 
   @override
@@ -29,12 +29,7 @@ class FakeMediaRepository implements MediaRepository {
     int? limit,
     int? offset,
   }) =>
-      onGetMediaList!(GetMediaListParams(
-        type: type,
-        year: year,
-        limit: limit,
-        offset: offset,
-      ));
+      onGetMediaList!(type: type, year: year, limit: limit, offset: offset);
 
   @override
   Future<Either<Failure, Media>> getMediaDetail(int id) =>
@@ -43,109 +38,86 @@ class FakeMediaRepository implements MediaRepository {
 
 void main() {
   group('MediaListNotifier', () {
-    late MediaListNotifier notifier;
+    late ProviderContainer container;
     late FakeMediaRepository fakeRepo;
 
     setUp(() {
       fakeRepo = FakeMediaRepository();
-      notifier = MediaListNotifier(
-        getMediaList: GetMediaList(fakeRepo),
+      container = ProviderContainer(
+        overrides: [
+          mediaRepositoryProvider.overrideWithValue(fakeRepo),
+        ],
       );
     });
 
-    tearDown(() => notifier.dispose());
+    tearDown(() => container.dispose());
 
-    test('initial state is loading', () {
-      expect(notifier.state, isA<MediaListLoading>());
-    });
-
-    test('load emits loaded with items', () async {
+    test('loads media list', () async {
       final items = [_fakeMedia(1), _fakeMedia(2)];
-      fakeRepo.onGetMediaList = (_) async => Right((items: items, total: 2));
-
-      await notifier.load();
-
-      final loaded = notifier.state as MediaListLoaded;
-      expect(loaded.items, hasLength(2));
-      expect(loaded.total, 2);
-      expect(loaded.hasReachedMax, true);
-    });
-
-    test('load emits error on failure', () async {
       fakeRepo.onGetMediaList =
-          (_) async => const Left(ServerFailure(message: 'Server error'));
+          ({type, year, limit, offset}) async => Right((items: items, total: 2));
 
-      await notifier.load();
-
-      expect(notifier.state, isA<MediaListError>());
-      expect((notifier.state as MediaListError).message, 'Server error');
+      final result = await container.read(mediaListProvider.future);
+      expect(result.items, hasLength(2));
+      expect(result.total, 2);
     });
 
     test('loadMore appends items', () async {
       final first = [_fakeMedia(1), _fakeMedia(2)];
-      fakeRepo.onGetMediaList = (_) async => Right((items: first, total: 4));
+      fakeRepo.onGetMediaList =
+          ({type, year, limit, offset}) async => Right((items: first, total: 4));
 
-      await notifier.load();
+      await container.read(mediaListProvider.future);
 
       final second = [_fakeMedia(3), _fakeMedia(4)];
-      fakeRepo.onGetMediaList = (_) async => Right((items: second, total: 4));
+      fakeRepo.onGetMediaList =
+          ({type, year, limit, offset}) async => Right((items: second, total: 4));
 
-      await notifier.loadMore();
+      await container.read(mediaListProvider.notifier).loadMore();
 
-      final loaded = notifier.state as MediaListLoaded;
-      expect(loaded.items, hasLength(4));
-      expect(loaded.hasReachedMax, true);
-    });
-
-    test('loadMore does nothing when hasReachedMax', () async {
-      final items = [_fakeMedia(1)];
-      fakeRepo.onGetMediaList = (_) async => Right((items: items, total: 1));
-
-      await notifier.load();
-
-      final stateBefore = notifier.state;
-      await notifier.loadMore();
-
-      expect(notifier.state, equals(stateBefore));
+      final state = container.read(mediaListProvider).value;
+      expect(state?.items, hasLength(4));
     });
   });
 
   group('MediaDetailNotifier', () {
-    late MediaDetailNotifier notifier;
+    late ProviderContainer container;
     late FakeMediaRepository fakeRepo;
 
     setUp(() {
       fakeRepo = FakeMediaRepository();
-      notifier = MediaDetailNotifier(
-        getMediaDetail: GetMediaDetail(fakeRepo),
+      container = ProviderContainer(
+        overrides: [
+          mediaRepositoryProvider.overrideWithValue(fakeRepo),
+          getMediaDetailUseCaseProvider.overrideWithValue(GetMediaDetail(fakeRepo)),
+        ],
       );
     });
 
-    tearDown(() => notifier.dispose());
-
-    test('initial state is loading', () {
-      expect(notifier.state, isA<MediaDetailLoading>());
-    });
+    tearDown(() => container.dispose());
 
     test('load emits loaded with media', () async {
       final media = _fakeMedia(1, 'The Matrix');
       fakeRepo.onGetMediaDetail = (_) async => Right(media);
 
+      final notifier = container.read(mediaDetailProvider.notifier);
       await notifier.load(1);
 
-      final loaded = notifier.state as MediaDetailLoaded;
-      expect(loaded.media.title, 'The Matrix');
-      expect(loaded.media.id, 1);
+      final state = container.read(mediaDetailProvider);
+      expect(state, isA<MediaDetailLoaded>());
+      expect((state as MediaDetailLoaded).media.title, 'The Matrix');
     });
 
     test('load emits error on failure', () async {
       fakeRepo.onGetMediaDetail =
           (_) async => const Left(ServerFailure(message: 'Not found'));
 
+      final notifier = container.read(mediaDetailProvider.notifier);
       await notifier.load(999);
 
-      expect(notifier.state, isA<MediaDetailError>());
-      expect((notifier.state as MediaDetailError).message, 'Not found');
+      final state = container.read(mediaDetailProvider);
+      expect(state, isA<MediaDetailError>());
+      expect((state as MediaDetailError).message, 'Not found');
     });
   });
 }

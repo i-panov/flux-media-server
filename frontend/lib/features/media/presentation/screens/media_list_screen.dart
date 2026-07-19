@@ -85,7 +85,7 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
               Text(error.toString()),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => ref.read(mediaListProvider.notifier).refresh(),
+                onPressed: () => ref.invalidate(mediaListProvider),
                 child: const Text('Retry'),
               ),
             ],
