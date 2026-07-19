@@ -27,6 +27,7 @@ auth:
 scanner:
     enabled: true
     interval: 30
+    watch_enabled: true
 
 media:
     thumbnail_path: "./data/thumbnails"

@@ -142,7 +142,7 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 			}
 
 			// File changed — recompute full hash and update
-			fullHash, err := hashFile(path)
+			fullHash, err := HashFile(path)
 			if err != nil {
 				log.Printf("Error hashing changed file %s: %v", path, err)
 				return nil
@@ -191,7 +191,7 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 			return nil
 		}
 
-		hash, err := hashFile(path)
+		hash, err := HashFile(path)
 		if err != nil {
 			log.Printf("Error hashing file %s: %v", path, err)
 			return nil
@@ -208,7 +208,7 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 		title, year := metadata.ParseFilename(filepath.Base(path))
 
 		// Determine media type based on file extension.
-		mediaType := determineMediaType(path, library.Type)
+		mediaType := DetermineMediaType(path, library.Type)
 
 		media := &models.Media{
 			Title:    title,
@@ -264,8 +264,8 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 	})
 }
 
-// hashFile computes full SHA-256 of a file.
-func hashFile(path string) (string, error) {
+// HashFile computes full SHA-256 of a file.
+func HashFile(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -327,8 +327,8 @@ func quickHashFile(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// determineMediaType returns the media type based on file extension and library type.
-func determineMediaType(filePath string, libraryType string) string {
+// DetermineMediaType returns the media type based on file extension and library type.
+func DetermineMediaType(filePath string, libraryType string) string {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	audioExts := map[string]bool{

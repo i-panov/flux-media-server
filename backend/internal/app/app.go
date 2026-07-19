@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -24,6 +25,7 @@ type App struct {
 	Fiber      *fiber.App
 	Config     *config.Config
 	OTPStore   *services.OTPStore
+	Watcher    *services.WatcherService
 	Version    string
 }
 
@@ -69,11 +71,23 @@ func New(cfg *config.Config, version string) (*App, error) {
 	streamer := services.NewStreamerService(libraryRepo)
 	thumbSvc := services.NewThumbnailService(cfg.Media.ThumbnailPath)
 
+	// File watcher for automatic library monitoring.
+	var watcherService *services.WatcherService
+	var watcherInterface services.WatcherInterface
+	if cfg.Scanner.WatchEnabled {
+		watcherService = services.NewWatcherService(scanner)
+		watcherInterface = watcherService
+	}
+
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
-	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner)
+	uploadHandler := handlers.NewUploadHandler(libraryRepo, mediaRepo, scanner, handlers.UploadConfig{
+		AllowedExtensions: cfg.Media.AllowedExtensions,
+		MaxFileSize:       2 << 30, // 2GB
+	})
+	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner, watcherInterface)
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
 
@@ -126,6 +140,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Get("", mediaHandler.List)
 	media.Get("/:id", mediaHandler.Get)
 	media.Post("", mediaHandler.Create)
+	media.Post("/upload", uploadHandler.Upload)
 	media.Put("/:id", mediaHandler.Update)
 	media.Delete("/:id", mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)
@@ -149,10 +164,29 @@ func New(cfg *config.Config, version string) (*App, error) {
 	metadataGroup.Post("/:mediaId/refresh", metadataHandler.Refresh)
 	metadataGroup.Put("/:mediaId", metadataHandler.Update)
 
+	// Start file watcher if enabled.
+	if watcherService != nil {
+		libraries, err := libraryRepo.FindAll(context.Background())
+		if err == nil {
+			var paths []string
+			for _, lib := range libraries {
+				if lib.Enabled {
+					paths = append(paths, lib.Path)
+				}
+			}
+			if len(paths) > 0 {
+				if err := watcherService.StartWithPaths(paths); err != nil {
+					log.Printf("Warning: failed to start file watcher: %v", err)
+				}
+			}
+		}
+	}
+
 	return &App{
 		Fiber:    fiberApp,
 		Config:   cfg,
 		OTPStore: otpStore,
+		Watcher:  watcherService,
 		Version:  version,
 	}, nil
 }
@@ -169,5 +203,8 @@ func (a *App) Listen() error {
 
 // Shutdown gracefully stops the application.
 func (a *App) Shutdown() {
+	if a.Watcher != nil {
+		a.Watcher.Stop()
+	}
 	a.OTPStore.Stop()
 }

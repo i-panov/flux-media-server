@@ -15,12 +15,14 @@ import (
 type LibraryHandler struct {
 	libraryRepo repository.LibraryRepository
 	scanner     services.ScannerInterface
+	watcher     services.WatcherInterface
 }
 
-func NewLibraryHandler(libraryRepo repository.LibraryRepository, scanner services.ScannerInterface) *LibraryHandler {
+func NewLibraryHandler(libraryRepo repository.LibraryRepository, scanner services.ScannerInterface, watcher services.WatcherInterface) *LibraryHandler {
 	return &LibraryHandler{
 		libraryRepo: libraryRepo,
 		scanner:     scanner,
+		watcher:     watcher,
 	}
 }
 
@@ -67,6 +69,11 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 	if err := h.libraryRepo.Create(ctx, library); err != nil {
 		log.Printf("Create: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create library")
+	}
+
+	// Start watching this library path.
+	if h.watcher != nil {
+		h.watcher.AddPath(library.Path)
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(library)
@@ -116,9 +123,21 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 	}
 
 	ctx := c.UserContext()
+
+	// Get library before deleting to know the path for watcher.
+	library, err := h.libraryRepo.FindByID(ctx, uint(id))
+	if err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Library not found")
+	}
+
 	if err := h.libraryRepo.Delete(ctx, uint(id)); err != nil {
 		log.Printf("Delete: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete library")
+	}
+
+	// Stop watching this library path.
+	if h.watcher != nil {
+		h.watcher.RemovePath(library.Path)
 	}
 
 	return c.JSON(fiber.Map{"message": "Library deleted successfully"})

@@ -46,8 +46,9 @@ type SMTPConfig struct {
 }
 
 type ScannerConfig struct {
-	Enabled  bool `yaml:"enabled"`
-	Interval int  `yaml:"interval"`
+	Enabled     bool `yaml:"enabled"`
+	Interval    int  `yaml:"interval"`
+	WatchEnabled bool `yaml:"watch_enabled"`
 }
 
 type MediaConfig struct {

@@ -39,3 +39,11 @@ type StreamerInterface interface {
 	IsPathAllowed(ctx context.Context, filePath string) (bool, error)
 	Stream(c *fiber.Ctx, filePath string) error
 }
+
+// WatcherInterface defines the interface for file system watching operations.
+type WatcherInterface interface {
+	StartWithPaths(paths []string) error
+	AddPath(path string)
+	RemovePath(path string)
+	Stop()
+}

@@ -12,6 +12,11 @@ var (
 	episodePattern  = regexp.MustCompile(`^(.+)\.S(\d{2})E(\d{2})\..+$`)
 )
 
+// ParseFilenameUpload parses a filename (without directory path) to extract title and year.
+func ParseFilenameUpload(filename string) (string, int) {
+	return ParseFilename(filename)
+}
+
 func ParseFilename(filename string) (string, int) {
 	if matches := dotPattern.FindStringSubmatch(filename); matches != nil {
 		title := strings.ReplaceAll(matches[1], ".", " ")
