@@ -7,6 +7,7 @@ import 'package:flux_media_server/features/auth/presentation/screens/login_scree
 import 'package:flux_media_server/features/library/presentation/screens/library_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/media_detail_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/media_list_screen.dart';
+import 'package:flux_media_server/features/media/presentation/screens/upload_screen.dart';
 import 'package:flux_media_server/features/player/presentation/screens/player_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/server_setup_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/settings_screen.dart';
@@ -36,6 +37,7 @@ class AppRouter extends _$AppRouter {
         ),
         AutoRoute(page: MediaDetailRoute.page),
         AutoRoute(page: PlayerRoute.page),
+        AutoRoute(page: UploadRoute.page),
       ];
 }
 

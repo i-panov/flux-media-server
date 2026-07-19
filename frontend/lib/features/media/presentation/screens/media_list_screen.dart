@@ -54,6 +54,10 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
     final state = ref.watch(mediaListProvider);
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.router.push(const UploadRoute()),
+        child: const Icon(Icons.add),
+      ),
       appBar: AppBar(
         title: const Text('Media Library'),
         bottom: PreferredSize(

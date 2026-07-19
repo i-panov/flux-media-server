@@ -82,6 +82,12 @@ abstract class _$AppRouter extends RootStackRouter {
         child: const SettingsScreen(),
       );
     },
+    UploadRoute.name: (routeData) {
+      return AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: const UploadScreen(),
+      );
+    },
   };
 }
 
@@ -282,6 +288,20 @@ class SettingsRoute extends PageRouteInfo<void> {
         );
 
   static const String name = 'SettingsRoute';
+
+  static const PageInfo<void> page = PageInfo<void>(name);
+}
+
+/// generated route for
+/// [UploadScreen]
+class UploadRoute extends PageRouteInfo<void> {
+  const UploadRoute({List<PageRouteInfo>? children})
+      : super(
+          UploadRoute.name,
+          initialChildren: children,
+        );
+
+  static const String name = 'UploadRoute';
 
   static const PageInfo<void> page = PageInfo<void>(name);
 }
