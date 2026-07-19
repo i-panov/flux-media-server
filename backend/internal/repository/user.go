@@ -1,39 +1,41 @@
 package repository
 
 import (
+	"context"
+
 	"flux/internal/models"
 
 	"gorm.io/gorm"
 )
 
-type UserRepository struct {
+type UserStore struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(db *gorm.DB) *UserStore {
+	return &UserStore{db: db}
 }
 
-func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
+func (r *UserStore) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
-	err := r.db.Where("email = ?", email).First(&user).Error
+	err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
 	return &user, err
 }
 
-func (r *UserRepository) FindByID(id uint) (*models.User, error) {
+func (r *UserStore) FindByID(ctx context.Context, id uint) (*models.User, error) {
 	var user models.User
-	err := r.db.First(&user, id).Error
+	err := r.db.WithContext(ctx).First(&user, id).Error
 	return &user, err
 }
 
-func (r *UserRepository) Create(user *models.User) error {
-	return r.db.Create(user).Error
+func (r *UserStore) Create(ctx context.Context, user *models.User) error {
+	return r.db.WithContext(ctx).Create(user).Error
 }
 
-func (r *UserRepository) Update(user *models.User) error {
-	return r.db.Save(user).Error
+func (r *UserStore) Update(ctx context.Context, user *models.User) error {
+	return r.db.WithContext(ctx).Save(user).Error
 }
 
-func (r *UserRepository) Delete(id uint) error {
-	return r.db.Delete(&models.User{}, id).Error
+func (r *UserStore) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&models.User{}, id).Error
 }

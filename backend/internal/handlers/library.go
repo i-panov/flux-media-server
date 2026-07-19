@@ -1,21 +1,23 @@
 package handlers
 
 import (
+	"context"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
 
 	"flux/internal/models"
 	"flux/internal/repository"
+	"flux/internal/response"
 	"flux/internal/services"
 )
 
 type LibraryHandler struct {
-	libraryRepo *repository.LibraryRepository
-	scanner     *services.ScannerService
+	libraryRepo repository.LibraryRepository
+	scanner     services.ScannerInterface
 }
 
-func NewLibraryHandler(libraryRepo *repository.LibraryRepository, scanner *services.ScannerService) *LibraryHandler {
+func NewLibraryHandler(libraryRepo repository.LibraryRepository, scanner services.ScannerInterface) *LibraryHandler {
 	return &LibraryHandler{
 		libraryRepo: libraryRepo,
 		scanner:     scanner,
@@ -30,12 +32,11 @@ type CreateLibraryRequest struct {
 }
 
 func (h *LibraryHandler) List(c *fiber.Ctx) error {
-	libraries, err := h.libraryRepo.FindAll()
+	ctx := c.UserContext()
+	libraries, err := h.libraryRepo.FindAll(ctx)
 	if err != nil {
 		log.Printf("FindAll: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch libraries",
-		})
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch libraries")
 	}
 
 	return c.JSON(libraries)
@@ -44,20 +45,14 @@ func (h *LibraryHandler) List(c *fiber.Ctx) error {
 func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 	var req CreateLibraryRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
 	if req.Name == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Name is required",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Name is required")
 	}
 	if req.Path == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Path is required",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Path is required")
 	}
 
 	library := &models.MediaLibrary{
@@ -68,11 +63,10 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		ScanInterval: req.ScanInterval,
 	}
 
-	if err := h.libraryRepo.Create(library); err != nil {
+	ctx := c.UserContext()
+	if err := h.libraryRepo.Create(ctx, library); err != nil {
 		log.Printf("Create: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create library",
-		})
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to create library")
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(library)
@@ -81,34 +75,25 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid library ID",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid library ID")
 	}
 
-	library, err := h.libraryRepo.FindByID(uint(id))
+	ctx := c.UserContext()
+	library, err := h.libraryRepo.FindByID(ctx, uint(id))
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Library not found",
-		})
+		return response.Error(c, fiber.StatusNotFound, "Library not found")
 	}
 
 	var req CreateLibraryRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
 	if req.Name == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Name is required",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Name is required")
 	}
 	if req.Path == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Path is required",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Path is required")
 	}
 
 	library.Name = req.Name
@@ -116,11 +101,9 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 	library.Type = req.Type
 	library.ScanInterval = req.ScanInterval
 
-	if err := h.libraryRepo.Update(library); err != nil {
+	if err := h.libraryRepo.Update(ctx, library); err != nil {
 		log.Printf("Update: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update library",
-		})
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to update library")
 	}
 
 	return c.JSON(library)
@@ -129,45 +112,49 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid library ID",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid library ID")
 	}
 
-	if err := h.libraryRepo.Delete(uint(id)); err != nil {
+	ctx := c.UserContext()
+	if err := h.libraryRepo.Delete(ctx, uint(id)); err != nil {
 		log.Printf("Delete: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to delete library",
-		})
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete library")
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Library deleted successfully",
-	})
+	return c.JSON(fiber.Map{"message": "Library deleted successfully"})
 }
 
 func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid library ID",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid library ID")
 	}
 
-	library, err := h.libraryRepo.FindByID(uint(id))
+	ctx := c.UserContext()
+	library, err := h.libraryRepo.FindByID(ctx, uint(id))
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Library not found",
-		})
+		return response.Error(c, fiber.StatusNotFound, "Library not found")
 	}
 
 	go func() {
-		if err := h.scanner.ScanLibrary(library); err != nil {
+		scanCtx := context.Background()
+		if err := h.scanner.ScanLibrary(scanCtx, library.ID); err != nil {
 			log.Printf("Error scanning library %s: %v", library.Name, err)
+		} else {
+			log.Printf("Scan completed for library %s", library.Name)
 		}
 	}()
 
-	return c.JSON(fiber.Map{
-		"message": "Scan started",
-	})
+	return c.JSON(fiber.Map{"message": "Scan started"})
+}
+
+// ScanStatus returns the current scan status for a library.
+func (h *LibraryHandler) ScanStatus(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid library ID")
+	}
+
+	status := h.scanner.GetScanStatus(uint(id))
+	return c.JSON(status)
 }

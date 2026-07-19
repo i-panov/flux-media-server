@@ -1,30 +1,33 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 
 	"flux/internal/config"
 	"flux/internal/email"
 	"flux/internal/models"
 	"flux/internal/repository"
+	"flux/internal/response"
 	"flux/internal/services"
 )
 
 type AuthHandler struct {
-	userRepo   *repository.UserRepository
-	otpStore   *services.OTPStore
-	jwtService *services.JWTService
+	userRepo   repository.UserRepository
+	otpStore   services.OTPStoreInterface
+	jwtService services.JWTService
 	smtpClient *email.SMTPClient
 	config     *config.Config
 }
 
 func NewAuthHandler(
-	userRepo *repository.UserRepository,
-	otpStore *services.OTPStore,
-	jwtService *services.JWTService,
+	userRepo repository.UserRepository,
+	otpStore services.OTPStoreInterface,
+	jwtService services.JWTService,
 	smtpClient *email.SMTPClient,
 	config *config.Config,
 ) *AuthHandler {
@@ -49,30 +52,37 @@ type VerifyCodeRequest struct {
 func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 	var req RequestCodeRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	req.Email = strings.ToLower(req.Email)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if req.Email == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Email is required")
+	}
 
 	allowed := false
-	for _, email := range h.config.Auth.AllowedEmails {
-		if strings.ToLower(email) == req.Email {
+	for _, e := range h.config.Auth.AllowedEmails {
+		if strings.ToLower(e) == req.Email {
 			allowed = true
 			break
 		}
 	}
 
 	if !allowed && !h.config.Auth.AllowUnknownEmail {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Email not allowed",
-		})
+		return response.Error(c, fiber.StatusForbidden, "Email not allowed")
 	}
 
-	code := h.otpStore.Generate(req.Email)
+	code, err := h.otpStore.Generate(req.Email)
+	if err != nil {
+		if errors.Is(err, services.ErrOTPStoreFull) {
+			return response.Error(c, fiber.StatusTooManyRequests, "Too many pending codes, please try again later")
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate code")
+	}
 
-	log.Printf("[DEBUG] debug=%v, email=%s, code=%s", h.config.Server.Debug, req.Email, code)
+	if h.config.Server.Debug {
+		log.Printf("[DEBUG] email=%s, code=%s", req.Email, code)
+	}
 
 	resp := fiber.Map{"message": "Code sent successfully"}
 
@@ -80,9 +90,7 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 		resp["code"] = code
 	} else {
 		if err := h.smtpClient.SendCode(req.Email, code); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to send code",
-			})
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to send code")
 		}
 	}
 
@@ -92,36 +100,33 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 	var req VerifyCodeRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	req.Email = strings.ToLower(req.Email)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	if !h.otpStore.Verify(req.Email, req.Code) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid or expired code",
-		})
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired code")
 	}
 
-	user, err := h.userRepo.FindByEmail(req.Email)
+	ctx := c.UserContext()
+	user, err := h.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("FindByEmail error: %v", err)
+			return response.Error(c, fiber.StatusInternalServerError, "Internal server error")
+		}
 		user = &models.User{
 			Email: req.Email,
 		}
-		if err := h.userRepo.Create(user); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to create user",
-			})
+		if err := h.userRepo.Create(ctx, user); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to create user")
 		}
 	}
 
 	token, err := h.jwtService.GenerateToken(user.ID, user.Email)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate token",
-		})
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate token")
 	}
 
 	return c.JSON(fiber.Map{
@@ -136,16 +141,13 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	userID, ok := c.Locals("user_id").(uint)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Unauthorized",
-		})
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	user, err := h.userRepo.FindByID(userID)
+	ctx := c.UserContext()
+	user, err := h.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "User not found",
-		})
+		return response.Error(c, fiber.StatusNotFound, "User not found")
 	}
 
 	return c.JSON(fiber.Map{

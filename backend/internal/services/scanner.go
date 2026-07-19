@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"flux/internal/config"
 	"flux/internal/metadata"
@@ -15,33 +18,39 @@ import (
 	"flux/internal/repository"
 )
 
+const quickHashChunk = 1024 * 1024 // 1MB head/tail for quick hash
+
 type ScannerService struct {
-	libraryRepo *repository.LibraryRepository
-	mediaRepo   *repository.MediaRepository
+	libraryRepo repository.LibraryRepository
+	mediaRepo   repository.MediaRepository
 	config      *config.Config
+
+	mu       sync.RWMutex
+	statuses map[uint]*ScanStatus
 }
 
 func NewScannerService(
-	libraryRepo *repository.LibraryRepository,
-	mediaRepo *repository.MediaRepository,
+	libraryRepo repository.LibraryRepository,
+	mediaRepo repository.MediaRepository,
 	config *config.Config,
 ) *ScannerService {
 	return &ScannerService{
 		libraryRepo: libraryRepo,
 		mediaRepo:   mediaRepo,
 		config:      config,
+		statuses:    make(map[uint]*ScanStatus),
 	}
 }
 
-func (s *ScannerService) ScanAll() error {
-	libraries, err := s.libraryRepo.FindAll()
+func (s *ScannerService) ScanAll(ctx context.Context) error {
+	libraries, err := s.libraryRepo.FindAll(ctx)
 	if err != nil {
 		return err
 	}
 
 	for _, lib := range libraries {
 		if lib.Enabled {
-			if err := s.ScanLibrary(&lib); err != nil {
+			if err := s.ScanLibrary(ctx, lib.ID); err != nil {
 				log.Printf("Error scanning library %s: %v", lib.Name, err)
 			}
 		}
@@ -50,25 +59,50 @@ func (s *ScannerService) ScanAll() error {
 	return nil
 }
 
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
+func (s *ScannerService) GetScanStatus(libraryID uint) *ScanStatus {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if st, ok := s.statuses[libraryID]; ok {
+		cp := *st
+		return &cp
 	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return &ScanStatus{LibraryID: libraryID, Running: false}
 }
 
-func (s *ScannerService) ScanLibrary(library *models.MediaLibrary) error {
+func (s *ScannerService) ScanLibrary(ctx context.Context, libraryID uint) error {
+	library, err := s.libraryRepo.FindByID(ctx, libraryID)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.statuses[libraryID] = &ScanStatus{
+		LibraryID: libraryID,
+		Running:   true,
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	s.mu.Unlock()
+
+	scanErr := s.scanLibraryWalk(ctx, library)
+
+	s.mu.Lock()
+	st := s.statuses[libraryID]
+	st.Running = false
+	if scanErr != nil {
+		st.Error = scanErr.Error()
+	} else {
+		st.Error = ""
+	}
+	s.mu.Unlock()
+
+	return scanErr
+}
+
+func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.MediaLibrary) error {
 	return filepath.Walk(library.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			log.Printf("Walk error for %s: %v", path, err)
+			return nil
 		}
 
 		if info.IsDir() {
@@ -90,12 +124,48 @@ func (s *ScannerService) ScanLibrary(library *models.MediaLibrary) error {
 		}
 
 		// Check if file already exists in database by path
-		existing, _ := s.mediaRepo.FindByPath(path)
-		if existing != nil {
+		existing, err := s.mediaRepo.FindByPath(ctx, path)
+		if err == nil && existing != nil {
+			// File exists — check if it changed using quick hash
+			qh, err := quickHashFile(path)
+			if err != nil {
+				log.Printf("Error quick-hashing file %s: %v", path, err)
+				return nil
+			}
+
+			if existing.QuickHash == qh {
+				return nil // unchanged
+			}
+
+			// File changed — recompute full hash and update
+			fullHash, err := hashFile(path)
+			if err != nil {
+				log.Printf("Error hashing changed file %s: %v", path, err)
+				return nil
+			}
+
+			title, year := metadata.ParseFilename(filepath.Base(path))
+			existing.Title = title
+			existing.Year = year
+			existing.FileSize = info.Size()
+			existing.FileHash = fullHash
+			existing.QuickHash = qh
+
+			if err := s.mediaRepo.Update(ctx, existing); err != nil {
+				log.Printf("Error updating changed file %s: %v", path, err)
+			} else {
+				log.Printf("Updated changed file: %s", path)
+			}
 			return nil
 		}
 
-		// Compute file hash
+		// New file — compute both hashes
+		qh, err := quickHashFile(path)
+		if err != nil {
+			log.Printf("Error quick-hashing file %s: %v", path, err)
+			return nil
+		}
+
 		hash, err := hashFile(path)
 		if err != nil {
 			log.Printf("Error hashing file %s: %v", path, err)
@@ -103,8 +173,8 @@ func (s *ScannerService) ScanLibrary(library *models.MediaLibrary) error {
 		}
 
 		// Check if file with same hash already exists
-		duplicate, _ := s.mediaRepo.FindByHash(hash)
-		if duplicate != nil {
+		duplicate, err := s.mediaRepo.FindByHash(ctx, hash)
+		if err == nil && duplicate != nil {
 			log.Printf("Skipping duplicate: %s (same hash as %s)", path, duplicate.FilePath)
 			return nil
 		}
@@ -118,26 +188,83 @@ func (s *ScannerService) ScanLibrary(library *models.MediaLibrary) error {
 			mediaType = "episode"
 		}
 
-		// Get file info
-		fileInfo, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-
-		// Create media record
 		media := &models.Media{
 			Title:    title,
 			Year:     year,
 			Type:     mediaType,
 			FilePath: path,
-			FileSize: fileInfo.Size(),
+			FileSize: info.Size(),
 			FileHash: hash,
+			QuickHash: qh,
 		}
 
-		if err := s.mediaRepo.Create(media); err != nil {
+		if err := s.mediaRepo.Create(ctx, media); err != nil {
 			log.Printf("Error creating media record for %s: %v", path, err)
 		}
 
 		return nil
 	})
+}
+
+// hashFile computes full SHA-256 of a file.
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// quickHashFile computes a fast hash from the first and last 1MB of a file
+// plus the file size. This is sufficient for detecting file changes without
+// reading the entire file.
+func quickHashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	h := sha256.New()
+
+	// Hash file size
+	sizeBuf := make([]byte, 8)
+	size := stat.Size()
+	for i := 7; i >= 0; i-- {
+		sizeBuf[i] = byte(size)
+		size >>= 8
+	}
+	h.Write(sizeBuf)
+
+	// Hash first chunk
+	head := make([]byte, quickHashChunk)
+	n, _ := io.ReadFull(f, head)
+	if n > 0 {
+		h.Write(head[:n])
+	}
+
+	// Hash last chunk (if file is larger than 2x chunk)
+	fileSize := stat.Size()
+	if fileSize > int64(quickHashChunk*2) {
+		f.Seek(-int64(quickHashChunk), io.SeekEnd)
+		tail := make([]byte, quickHashChunk)
+		n, _ := io.ReadFull(f, tail)
+		if n > 0 {
+			h.Write(tail[:n])
+		}
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

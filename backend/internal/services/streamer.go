@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -14,20 +15,27 @@ import (
 )
 
 type StreamerService struct {
-	libraryRepo *repository.LibraryRepository
+	libraryRepo repository.LibraryRepository
 }
 
-func NewStreamerService(libraryRepo *repository.LibraryRepository) *StreamerService {
+func NewStreamerService(libraryRepo repository.LibraryRepository) *StreamerService {
 	return &StreamerService{libraryRepo: libraryRepo}
 }
 
-func (s *StreamerService) isPathAllowed(filePath string) (bool, error) {
+func (s *StreamerService) IsPathAllowed(ctx context.Context, filePath string) (bool, error) {
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return false, err
 	}
 
-	libraries, err := s.libraryRepo.FindAll()
+	// Resolve symlinks to prevent traversal via symlinks
+	resolvedPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		// File might not exist yet; fall back to abs path
+		resolvedPath = absPath
+	}
+
+	libraries, err := s.libraryRepo.FindAll(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -37,7 +45,12 @@ func (s *StreamerService) isPathAllowed(filePath string) (bool, error) {
 		if err != nil {
 			continue
 		}
-		if strings.HasPrefix(absPath, absLibPath+string(filepath.Separator)) || absPath == absLibPath {
+		// Also resolve symlinks for library path
+		resolvedLibPath, err := filepath.EvalSymlinks(absLibPath)
+		if err != nil {
+			resolvedLibPath = absLibPath
+		}
+		if strings.HasPrefix(resolvedPath, resolvedLibPath+string(filepath.Separator)) || resolvedPath == resolvedLibPath {
 			return true, nil
 		}
 	}
@@ -46,7 +59,9 @@ func (s *StreamerService) isPathAllowed(filePath string) (bool, error) {
 }
 
 func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
-	allowed, err := s.isPathAllowed(filePath)
+	ctx := c.UserContext()
+
+	allowed, err := s.IsPathAllowed(ctx, filePath)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to validate file path",
@@ -60,13 +75,17 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 
 	file, err := os.Open(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "File not found",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to open file",
 		})
 	}
 	defer file.Close()
 
-	// Get file size
 	stat, err := file.Stat()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -77,7 +96,7 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 	fileSize := stat.Size()
 
 	// Set content type based on extension
-	ext := strings.ToLower(filePath[strings.LastIndex(filePath, "."):])
+	ext := strings.ToLower(filepath.Ext(filePath))
 	contentType := "application/octet-stream"
 	switch ext {
 	case ".mp4":
@@ -88,21 +107,25 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 		contentType = "video/x-msvideo"
 	case ".mov":
 		contentType = "video/quicktime"
+	case ".wmv":
+		contentType = "video/x-ms-wmv"
+	case ".webm":
+		contentType = "video/webm"
+	case ".flv":
+		contentType = "video/x-flv"
+	case ".ts":
+		contentType = "video/mp2t"
 	}
+
+	// Set Content-Type before writing body
+	c.Set("Content-Type", contentType)
+	c.Set("Accept-Ranges", "bytes")
 
 	// Handle Range request
 	rangeHeader := c.Get("Range")
 	if rangeHeader != "" {
-		ranges := strings.Replace(rangeHeader, "bytes=", "", 1)
-		parts := strings.Split(ranges, "-")
-
-		start, _ := strconv.ParseInt(parts[0], 10, 64)
-		end := fileSize - 1
-		if len(parts) > 1 && parts[1] != "" {
-			end, _ = strconv.ParseInt(parts[1], 10, 64)
-		}
-
-		if start < 0 || start >= fileSize || end < start || end >= fileSize {
+		start, end, err := parseRangeHeader(rangeHeader, fileSize)
+		if err != nil {
 			return c.Status(fiber.StatusRequestedRangeNotSatisfiable).JSON(fiber.Map{
 				"error": "Range not satisfiable",
 			})
@@ -112,17 +135,62 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 
 		c.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileSize))
 		c.Set("Content-Length", strconv.FormatInt(contentLength, 10))
-		c.Set("Accept-Ranges", "bytes")
 		c.Status(fiber.StatusPartialContent)
 
 		file.Seek(start, io.SeekStart)
-		io.CopyN(c.Response().BodyWriter(), file, contentLength)
+		if _, err := io.CopyN(c.Response().BodyWriter(), file, contentLength); err != nil {
+			// Client disconnected or write error — not a server error
+			return nil
+		}
 	} else {
 		c.Set("Content-Length", strconv.FormatInt(fileSize, 10))
-		c.Set("Accept-Ranges", "bytes")
-		io.Copy(c.Response().BodyWriter(), file)
+		if _, err := io.Copy(c.Response().BodyWriter(), file); err != nil {
+			return nil
+		}
 	}
 
-	c.Set("Content-Type", contentType)
 	return nil
 }
+
+// parseRangeHeader parses a Range header value like "bytes=0-499" and returns
+// validated start and end byte positions.
+func parseRangeHeader(rangeHeader string, fileSize int64) (start, end int64, err error) {
+	if !strings.HasPrefix(rangeHeader, "bytes=") {
+		return 0, 0, fmt.Errorf("invalid range unit")
+	}
+
+	ranges := strings.TrimPrefix(rangeHeader, "bytes=")
+	parts := strings.SplitN(ranges, "-", 2)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("invalid range format")
+	}
+
+	if parts[0] == "" {
+		// Suffix range: "-500" means last 500 bytes
+		suffixLen, parseErr := strconv.ParseInt(parts[1], 10, 64)
+		if parseErr != nil || suffixLen <= 0 {
+			return 0, 0, fmt.Errorf("invalid suffix range")
+		}
+		if suffixLen > fileSize {
+			suffixLen = fileSize
+		}
+		return fileSize - suffixLen, fileSize - 1, nil
+	}
+
+	start, err = strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || start < 0 || start >= fileSize {
+		return 0, 0, fmt.Errorf("invalid range start")
+	}
+
+	if parts[1] == "" {
+		end = fileSize - 1
+	} else {
+		end, err = strconv.ParseInt(parts[1], 10, 64)
+		if err != nil || end < start || end >= fileSize {
+			return 0, 0, fmt.Errorf("invalid range end")
+		}
+	}
+
+	return start, end, nil
+}
+

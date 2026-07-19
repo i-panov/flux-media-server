@@ -10,6 +10,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+var ErrOTPStoreFull = errors.New("otp store is full")
+
 type OTPEntry struct {
 	Code      string
 	ExpiresAt time.Time
@@ -20,14 +22,19 @@ type OTPStore struct {
 	entries    map[string]*OTPEntry
 	ttl        time.Duration
 	codeLength int
+	maxEntries int
 	stopChan   chan struct{}
 }
 
-func NewOTPStore(ttl time.Duration, codeLength int) *OTPStore {
+func NewOTPStore(ttl time.Duration, codeLength int, maxEntries int) *OTPStore {
+	if maxEntries <= 0 {
+		maxEntries = 10000
+	}
 	s := &OTPStore{
 		entries:    make(map[string]*OTPEntry),
 		ttl:        ttl,
 		codeLength: codeLength,
+		maxEntries: maxEntries,
 		stopChan:   make(chan struct{}),
 	}
 	go s.cleanupLoop()
@@ -64,18 +71,23 @@ func (s *OTPStore) Stop() {
 	close(s.stopChan)
 }
 
-func (s *OTPStore) Generate(addr string) string {
+func (s *OTPStore) Generate(addr string) (string, error) {
 	code := email.GenerateCode(s.codeLength)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Allow overwriting existing entry for the same address
+	if _, exists := s.entries[addr]; !exists && len(s.entries) >= s.maxEntries {
+		return "", ErrOTPStoreFull
+	}
 
 	s.entries[addr] = &OTPEntry{
 		Code:      code,
 		ExpiresAt: time.Now().Add(s.ttl),
 	}
 
-	return code
+	return code, nil
 }
 
 func (s *OTPStore) Verify(email, code string) bool {
@@ -100,7 +112,7 @@ func (s *OTPStore) Verify(email, code string) bool {
 	return true
 }
 
-type JWTService struct {
+type JWTManager struct {
 	secret []byte
 	expiry time.Duration
 }
@@ -111,14 +123,14 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewJWTService(secret string, expiry time.Duration) *JWTService {
-	return &JWTService{
+func NewJWTService(secret string, expiry time.Duration) *JWTManager {
+	return &JWTManager{
 		secret: []byte(secret),
 		expiry: expiry,
 	}
 }
 
-func (s *JWTService) GenerateToken(userID uint, email string) (string, error) {
+func (s *JWTManager) GenerateToken(userID uint, email string) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
@@ -132,7 +144,7 @@ func (s *JWTService) GenerateToken(userID uint, email string) (string, error) {
 	return token.SignedString(s.secret)
 }
 
-func (s *JWTService) ValidateToken(tokenString string) (*Claims, error) {
+func (s *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return s.secret, nil
 	})

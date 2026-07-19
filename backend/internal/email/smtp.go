@@ -3,6 +3,7 @@ package email
 import (
 	"crypto/rand"
 	"fmt"
+	"log"
 	"math/big"
 	"net/smtp"
 )
@@ -26,7 +27,12 @@ func NewSMTPClient(config SMTPConfig) *SMTPClient {
 func GenerateCode(length int) string {
 	code := ""
 	for i := 0; i < length; i++ {
-		n, _ := rand.Int(rand.Reader, big.NewInt(10))
+		n, err := rand.Int(rand.Reader, big.NewInt(10))
+		if err != nil {
+			log.Printf("Warning: crypto/rand failed, falling back to 0: %v", err)
+			code += "0"
+			continue
+		}
 		code += fmt.Sprintf("%d", n.Int64())
 	}
 	return code
@@ -40,5 +46,11 @@ func (c *SMTPClient) SendCode(to string, code string) error {
 	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
 	auth := smtp.PlainAuth("", c.config.Username, c.config.Password, c.config.Host)
 
-	return smtp.SendMail(addr, auth, c.config.Username, []string{to}, []byte(msg))
+	// Use From address as envelope sender (not Username)
+	fromAddr := c.config.From
+	if fromAddr == "" {
+		fromAddr = c.config.Username
+	}
+
+	return smtp.SendMail(addr, auth, fromAddr, []string{to}, []byte(msg))
 }

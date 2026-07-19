@@ -2,14 +2,17 @@ server:
   host: "0.0.0.0"
   port: 8080
   debug: false
+  cors_origins: "*"  # Set to your frontend domain in production
 
 database:
   path: "./data/flux.db"
 
 auth:
-  jwt_secret: "change-me-in-production"
+  jwt_secret: "change-me-in-production-please-use-32-chars-min"
+  jwt_expiry: 24  # hours
   code_length: 6
-  code_expiry: 300
+  code_expiry: 300  # seconds
+  max_otp_entries: 10000
   allowed_emails:
     - user1@example.com
     - user2@example.com
@@ -33,3 +36,6 @@ media:
     - .avi
     - .mov
     - .wmv
+    - .webm
+    - .flv
+    - .ts
