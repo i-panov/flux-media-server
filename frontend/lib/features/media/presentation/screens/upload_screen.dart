@@ -142,7 +142,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: _isUploading ? null : _pickFiles,
-                icon: const Icon(Icons.add_file),
+                icon: const Icon(Icons.attach_file),
                 label: const Text('Select Files'),
               ),
             ),
