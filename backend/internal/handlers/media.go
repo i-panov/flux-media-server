@@ -40,6 +40,9 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 	if year := c.Query("year"); year != "" {
 		filters["year"] = year
 	}
+	if q := c.Query("q"); q != "" {
+		filters["q"] = q
+	}
 
 	limit := c.QueryInt("limit", 20)
 	offset := c.QueryInt("offset", 0)

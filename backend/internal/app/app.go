@@ -67,10 +67,12 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	scanner := services.NewScannerService(libraryRepo, mediaRepo, cfg)
 	streamer := services.NewStreamerService(libraryRepo)
+	thumbSvc := services.NewThumbnailService(cfg.Media.ThumbnailPath)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
+	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
 	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner)
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
@@ -127,6 +129,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Put("/:id", mediaHandler.Update)
 	media.Delete("/:id", mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)
+	media.Get("/:id/thumb", thumbHandler.Get)
 
 	library := api.Group("/libraries")
 	library.Get("", libraryHandler.List)

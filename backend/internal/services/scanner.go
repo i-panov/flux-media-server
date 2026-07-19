@@ -21,9 +21,11 @@ import (
 const quickHashChunk = 1024 * 1024 // 1MB head/tail for quick hash
 
 type ScannerService struct {
-	libraryRepo repository.LibraryRepository
-	mediaRepo   repository.MediaRepository
-	config      *config.Config
+	libraryRepo    repository.LibraryRepository
+	mediaRepo      repository.MediaRepository
+	config         *config.Config
+	metaExtractor  *MetadataExtractor
+	thumbService   *ThumbnailService
 
 	mu       sync.RWMutex
 	statuses map[uint]*ScanStatus
@@ -35,10 +37,12 @@ func NewScannerService(
 	config *config.Config,
 ) *ScannerService {
 	return &ScannerService{
-		libraryRepo: libraryRepo,
-		mediaRepo:   mediaRepo,
-		config:      config,
-		statuses:    make(map[uint]*ScanStatus),
+		libraryRepo:   libraryRepo,
+		mediaRepo:     mediaRepo,
+		config:        config,
+		metaExtractor: NewMetadataExtractor(),
+		thumbService:  NewThumbnailService(config.Media.ThumbnailPath),
+		statuses:      make(map[uint]*ScanStatus),
 	}
 }
 
@@ -151,6 +155,27 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 			existing.FileHash = fullHash
 			existing.QuickHash = qh
 
+			// Re-extract metadata from changed file.
+			if fileMeta := s.metaExtractor.ExtractFromFile(path); fileMeta != nil {
+				if fileMeta.Duration > 0 {
+					existing.Duration = fileMeta.Duration
+				}
+				if fileMeta.Artist != "" {
+					existing.Artist = fileMeta.Artist
+				}
+				if fileMeta.Album != "" {
+					existing.Album = fileMeta.Album
+				}
+				if fileMeta.Genre != "" {
+					existing.Genre = fileMeta.Genre
+				}
+			}
+
+			// Regenerate thumbnail for changed file.
+			if thumbPath := s.thumbService.Generate(existing.ID, path); thumbPath != "" {
+				existing.ThumbnailURL = thumbPath
+			}
+
 			if err := s.mediaRepo.Update(ctx, existing); err != nil {
 				log.Printf("Error updating changed file %s: %v", path, err)
 			} else {
@@ -182,11 +207,8 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 		// Parse filename for metadata
 		title, year := metadata.ParseFilename(filepath.Base(path))
 
-		// Determine media type
-		mediaType := "movie"
-		if library.Type == "tv" {
-			mediaType = "episode"
-		}
+		// Determine media type based on file extension.
+		mediaType := determineMediaType(path, library.Type)
 
 		media := &models.Media{
 			Title:    title,
@@ -200,6 +222,42 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 
 		if err := s.mediaRepo.Create(ctx, media); err != nil {
 			log.Printf("Error creating media record for %s: %v", path, err)
+			return nil
+		}
+
+		// Extract metadata from file (duration, tags, etc.)
+		if fileMeta := s.metaExtractor.ExtractFromFile(path); fileMeta != nil {
+			if media.Duration == 0 && fileMeta.Duration > 0 {
+				media.Duration = fileMeta.Duration
+			}
+			if media.Artist == "" && fileMeta.Artist != "" {
+				media.Artist = fileMeta.Artist
+			}
+			if media.Album == "" && fileMeta.Album != "" {
+				media.Album = fileMeta.Album
+			}
+			if media.Genre == "" && fileMeta.Genre != "" {
+				media.Genre = fileMeta.Genre
+			}
+			// Use file-extracted title if filename parsing gave a generic result.
+			if media.Title == filepath.Base(path) && fileMeta.Title != "" {
+				media.Title = fileMeta.Title
+			}
+			// Build description from artist/album for audio.
+			if mediaType == "audio" && media.Artist != "" {
+				desc := media.Artist
+				if media.Album != "" {
+					desc += " — " + media.Album
+				}
+				media.Description = desc
+			}
+			s.mediaRepo.Update(ctx, media)
+		}
+
+		// Generate thumbnail.
+		if thumbPath := s.thumbService.Generate(media.ID, path); thumbPath != "" {
+			media.ThumbnailURL = thumbPath
+			s.mediaRepo.Update(ctx, media)
 		}
 
 		return nil
@@ -267,4 +325,30 @@ func quickHashFile(path string) (string, error) {
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// determineMediaType returns the media type based on file extension and library type.
+func determineMediaType(filePath string, libraryType string) string {
+	ext := strings.ToLower(filepath.Ext(filePath))
+
+	audioExts := map[string]bool{
+		".mp3": true, ".flac": true, ".ogg": true,
+		".m4a": true, ".aac": true, ".wav": true,
+	}
+	if audioExts[ext] {
+		return "audio"
+	}
+
+	imageExts := map[string]bool{
+		".jpg": true, ".jpeg": true, ".png": true,
+		".gif": true, ".webp": true,
+	}
+	if imageExts[ext] {
+		return "image"
+	}
+
+	if libraryType == "tv" {
+		return "episode"
+	}
+	return "movie"
 }

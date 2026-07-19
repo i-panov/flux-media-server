@@ -14,7 +14,7 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /build/flux-server ./cmd/server
 # Runtime stage
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata ffmpeg
 
 WORKDIR /app
 

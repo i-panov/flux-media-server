@@ -9,8 +9,11 @@ type Media struct {
 	Title        string    `gorm:"index" json:"title"`
 	Year         int       `json:"year"`
 	Description  string    `json:"description"`
-	Type         string    `gorm:"index" json:"type"` // movie, episode
-	Duration     int       `json:"duration"`           // в секундах
+	Type         string    `gorm:"index" json:"type"` // movie, episode, audio
+	Artist       string    `gorm:"index" json:"artist"`
+	Album        string    `json:"album"`
+	Genre        string    `json:"genre"`
+	Duration     int       `json:"duration"` // seconds
 	FilePath     string    `gorm:"uniqueIndex" json:"file_path"`
 	FileSize     int64     `json:"file_size"`
 	FileHash     string    `gorm:"index" json:"file_hash"`

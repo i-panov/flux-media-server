@@ -27,6 +27,15 @@ func (r *MediaStore) FindAll(ctx context.Context, filters map[string]interface{}
 	if year, ok := filters["year"]; ok {
 		query = query.Where("year = ?", year)
 	}
+	if q, ok := filters["q"]; ok {
+		if searchTerm, ok := q.(string); ok && searchTerm != "" {
+			like := "%" + searchTerm + "%"
+			query = query.Where(
+				"title LIKE ? OR artist LIKE ? OR album LIKE ? OR description LIKE ?",
+				like, like, like, like,
+			)
+		}
+	}
 
 	if err := query.Model(&models.Media{}).Count(&total).Error; err != nil {
 		return nil, 0, err
