@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/usecases/usecase.dart';
 import 'package:flux_media_server/features/library/data/datasources/library_remote_datasource.dart';
 import 'package:flux_media_server/features/library/data/repositories/library_repository_impl.dart';
 import 'package:flux_media_server/features/library/domain/repositories/library_repository.dart';
+import 'package:flux_media_server/features/library/domain/usecases/get_libraries.dart';
 import 'package:flux_media_server/shared/models/library.dart';
 import 'package:flux_media_server/shared/models/scan_status.dart';
 
@@ -16,19 +19,24 @@ final libraryRepositoryProvider = Provider<LibraryRepository>((ref) {
   return LibraryRepositoryImpl(ref.watch(libraryRemoteDataSourceProvider));
 });
 
-final libraryProvider = AsyncNotifierProvider<LibraryNotifier, List<MediaLibrary>>(LibraryNotifier.new);
+final getLibrariesProvider = Provider<GetLibraries>((ref) {
+  return GetLibraries(ref.watch(libraryRepositoryProvider));
+});
 
-class LibraryNotifier extends AsyncNotifier<List<MediaLibrary>> {
+final libraryProvider = AsyncNotifierProvider<LibraryNotifier, IList<MediaLibrary>>(LibraryNotifier.new);
+
+class LibraryNotifier extends AsyncNotifier<IList<MediaLibrary>> {
   Timer? _pollTimer;
   int? _scanningLibraryId;
 
   @override
-  Future<List<MediaLibrary>> build() async {
-    final repo = ref.watch(libraryRepositoryProvider);
-    final result = await repo.getLibraries();
+  Future<IList<MediaLibrary>> build() async {
+    ref.onDispose(_stopPolling);
+    final getLibraries = ref.watch(getLibrariesProvider);
+    final result = await getLibraries(const NoParams());
     return result.fold(
       (failure) => throw Exception(failure.message),
-      (libraries) => libraries,
+      (libraries) => libraries.toIList(),
     );
   }
 
@@ -81,14 +89,6 @@ class LibraryNotifier extends AsyncNotifier<List<MediaLibrary>> {
     _pollTimer = null;
   }
 
-  /// Returns the current scan status for a library, or null if not scanning.
-  /// This triggers a rebuild when scan status changes.
-  ScanStatus? getScanStatus(int libraryId) {
-    // This is called from the UI; the actual status is fetched async.
-    // Return null — the UI should use [scanStatusProvider] for real-time status.
-    return null;
-  }
-
   /// Whether a scan is currently in progress.
   bool get isScanning => _scanningLibraryId != null;
 
@@ -128,9 +128,6 @@ class LibraryNotifier extends AsyncNotifier<List<MediaLibrary>> {
       },
     );
   }
-
-  // Note: AsyncNotifier doesn't have dispose(). Cleanup is handled
-  // by the provider framework via ref.onDispose if needed.
 }
 
 /// Provides real-time scan status by polling.

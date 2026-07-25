@@ -25,6 +25,7 @@ mixin _$MediaLibrary {
   String get path => throw _privateConstructorUsedError;
   String get type => throw _privateConstructorUsedError;
   bool get enabled => throw _privateConstructorUsedError;
+  @JsonKey(name: 'scan_interval')
   int? get scanInterval => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -45,7 +46,7 @@ abstract class $MediaLibraryCopyWith<$Res> {
       String path,
       String type,
       bool enabled,
-      int? scanInterval});
+      @JsonKey(name: 'scan_interval') int? scanInterval});
 }
 
 /// @nodoc
@@ -111,7 +112,7 @@ abstract class _$$MediaLibraryImplCopyWith<$Res>
       String path,
       String type,
       bool enabled,
-      int? scanInterval});
+      @JsonKey(name: 'scan_interval') int? scanInterval});
 }
 
 /// @nodoc
@@ -170,7 +171,7 @@ class _$MediaLibraryImpl implements _MediaLibrary {
       this.path = '',
       required this.type,
       required this.enabled,
-      this.scanInterval});
+      @JsonKey(name: 'scan_interval') this.scanInterval});
 
   factory _$MediaLibraryImpl.fromJson(Map<String, dynamic> json) =>
       _$$MediaLibraryImplFromJson(json);
@@ -187,6 +188,7 @@ class _$MediaLibraryImpl implements _MediaLibrary {
   @override
   final bool enabled;
   @override
+  @JsonKey(name: 'scan_interval')
   final int? scanInterval;
 
   @override
@@ -229,12 +231,13 @@ class _$MediaLibraryImpl implements _MediaLibrary {
 
 abstract class _MediaLibrary implements MediaLibrary {
   const factory _MediaLibrary(
-      {required final int id,
-      required final String name,
-      final String path,
-      required final String type,
-      required final bool enabled,
-      final int? scanInterval}) = _$MediaLibraryImpl;
+          {required final int id,
+          required final String name,
+          final String path,
+          required final String type,
+          required final bool enabled,
+          @JsonKey(name: 'scan_interval') final int? scanInterval}) =
+      _$MediaLibraryImpl;
 
   factory _MediaLibrary.fromJson(Map<String, dynamic> json) =
       _$MediaLibraryImpl.fromJson;
@@ -250,6 +253,7 @@ abstract class _MediaLibrary implements MediaLibrary {
   @override
   bool get enabled;
   @override
+  @JsonKey(name: 'scan_interval')
   int? get scanInterval;
   @override
   @JsonKey(ignore: true)

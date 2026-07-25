@@ -12,4 +12,14 @@ abstract class MediaRepository {
   });
 
   Future<Either<Failure, Media>> getMediaDetail(int id);
+
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>> checkHash(
+    String hash,
+  );
+
+  Future<Either<Failure, Media>> uploadFile({
+    required String filePath,
+    required int libraryId,
+    required String fileName,
+  });
 }

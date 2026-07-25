@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
@@ -7,7 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
-import 'package:flux_media_server/features/media/data/datasources/upload_service.dart';
+import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/shared/models/library.dart';
 
 @RoutePage()
@@ -35,7 +35,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     if (result == null || result.files.isEmpty) return;
 
-    final uploadService = ref.read(uploadServiceProvider);
+    final checkMediaHash = ref.read(checkMediaHashProvider);
 
     for (final file in result.files) {
       if (file.path == null) continue;
@@ -47,9 +47,18 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       final hash = await _computeHash(File(file.path!));
 
       // Check if file already exists on server.
-      final check = await uploadService.checkHash(hash);
+      final checkResult = await checkMediaHash(hash);
 
-      if (check.exists) {
+      final exists = checkResult.fold(
+        (failure) {
+          // On hash-check error, treat as non-existent so the server
+          // will reject duplicates during upload.
+          return false;
+        },
+        (data) => data.exists,
+      );
+
+      if (exists) {
         setState(() => _skippedCount++);
       } else {
         _selectedFiles.add(_FileInfo(
@@ -81,16 +90,23 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       _statusText = 'Uploading...';
     });
 
-    final uploadService = ref.read(uploadServiceProvider);
-    int successCount = 0;
+    final uploadMedia = ref.read(uploadMediaProvider);
+    var successCount = 0;
+    String? firstError;
 
     for (final fileInfo in _selectedFiles) {
-      final result = await uploadService.uploadFile(
-        file: File(fileInfo.path),
-        libraryId: _selectedLibrary!.id,
+      final result = await uploadMedia(
+        UploadMediaParams(
+          filePath: fileInfo.path,
+          libraryId: _selectedLibrary!.id,
+          fileName: fileInfo.name,
+        ),
       );
 
-      if (result.success) successCount++;
+      result.fold(
+        (failure) => firstError ??= failure.message,
+        (_) => successCount++,
+      );
 
       setState(() => _uploadedCount++);
     }
@@ -101,14 +117,20 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     });
 
     if (mounted) {
-      final msg = StringBuffer('Uploaded $successCount of $_totalCount files');
+      final buffer = StringBuffer('Uploaded $successCount of $_totalCount files');
       if (_skippedCount > 0) {
-        msg.write(' ($_skippedCount skipped - already exists)');
+        buffer.write(' ($_skippedCount skipped - already exists)');
       }
+      if (firstError != null) {
+        buffer.write('\nError: $firstError');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(msg.toString()),
-          backgroundColor: successCount == _totalCount ? Colors.green : Colors.orange,
+          content: Text(buffer.toString()),
+          backgroundColor: firstError == null && successCount == _totalCount
+              ? Colors.green
+              : Colors.orange,
         ),
       );
 

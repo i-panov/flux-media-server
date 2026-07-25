@@ -19,6 +19,9 @@ class VideoPlayerDatasource {
   /// Pauses playback.
   Future<void> pause() async => player.pause();
 
+  /// Stops playback.
+  Future<void> stop() async => player.stop();
+
   /// Seeks to the given [position].
   Future<void> seek(Duration position) async => player.seek(position);
 

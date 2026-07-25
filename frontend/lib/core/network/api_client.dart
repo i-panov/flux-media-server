@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:chopper/chopper.dart';
+import 'package:http/http.dart' show MultipartFile;
 
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/safe_logging_interceptor.dart';
@@ -49,24 +50,17 @@ abstract class ApiClient extends ChopperService {
   @Get(path: '/media/{id}')
   Future<Response<Map<String, dynamic>>> getMedia(@Path('id') int id);
 
-  @Post(path: '/media')
-  Future<Response<Map<String, dynamic>>> createMedia(
-    @Body() Map<String, dynamic> body,
-  );
-
   @Post(path: '/media/check-hash')
   Future<Response<Map<String, dynamic>>> checkHash(
     @Body() Map<String, dynamic> body,
   );
 
-  @Put(path: '/media/{id}')
-  Future<Response<Map<String, dynamic>>> updateMedia(
-    @Path('id') int id,
-    @Body() Map<String, dynamic> body,
+  @Post(path: '/media/upload')
+  @multipart
+  Future<Response<Map<String, dynamic>>> uploadMedia(
+    @Part('library_id') int libraryId,
+    @PartFile('file') MultipartFile file,
   );
-
-  @Delete(path: '/media/{id}')
-  Future<Response<Map<String, dynamic>>> deleteMedia(@Path('id') int id);
 
   @Get(path: '/media/{id}/thumb')
   Future<Response<Uint8List>> getThumbnail(@Path('id') int id);
@@ -89,35 +83,9 @@ abstract class ApiClient extends ChopperService {
   @Delete(path: '/libraries/{id}')
   Future<Response<Map<String, dynamic>>> deleteLibrary(@Path('id') int id);
 
-  @Post(path: '/libraries/{id}/scan')
+  @Post(path: '/libraries/{id}/scan', optionalBody: true)
   Future<Response<Map<String, dynamic>>> scanLibrary(@Path('id') int id);
 
   @Get(path: '/libraries/{id}/scan-status')
   Future<Response<Map<String, dynamic>>> getScanStatus(@Path('id') int id);
-
-  // Progress
-  @Get(path: '/progress')
-  Future<Response<List<dynamic>>> getProgress();
-
-  @Put(path: '/progress/{mediaId}')
-  Future<Response<Map<String, dynamic>>> updateProgress(
-    @Path('mediaId') int mediaId,
-    @Body() Map<String, dynamic> body,
-  );
-
-  @Delete(path: '/progress/{mediaId}')
-  Future<Response<Map<String, dynamic>>> deleteProgress(@Path('mediaId') int mediaId);
-
-  // Metadata
-  @Get(path: '/metadata/search')
-  Future<Response<Map<String, dynamic>>> searchMetadata(@Query('q') String query);
-
-  @Post(path: '/metadata/{mediaId}/refresh')
-  Future<Response<Map<String, dynamic>>> refreshMetadata(@Path('mediaId') int mediaId);
-
-  @Put(path: '/metadata/{mediaId}')
-  Future<Response<Map<String, dynamic>>> updateMetadata(
-    @Path('mediaId') int mediaId,
-    @Body() Map<String, dynamic> body,
-  );
 }

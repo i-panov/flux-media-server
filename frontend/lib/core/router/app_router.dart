@@ -1,6 +1,5 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flux_media_server/features/auth/presentation/screens/code_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/login_screen.dart';
@@ -48,10 +47,10 @@ class MainScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AutoTabsScaffold(
-      routes: [
-        const MediaListRoute(),
-        const LibraryRoute(),
-        const SettingsRoute(),
+      routes: const [
+        MediaListRoute(),
+        LibraryRoute(),
+        SettingsRoute(),
       ],
       bottomNavigationBuilder: (context, tabsRouter) {
         return NavigationBar(
@@ -79,3 +78,4 @@ class MainScreen extends StatelessWidget {
     );
   }
 }
+

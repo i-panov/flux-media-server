@@ -11,18 +11,18 @@ _$MediaImpl _$$MediaImplFromJson(Map<String, dynamic> json) => _$MediaImpl(
       title: json['title'] as String,
       year: (json['year'] as num).toInt(),
       type: json['type'] as String,
-      filePath: json['filePath'] as String? ?? '',
-      fileSize: (json['fileSize'] as num).toInt(),
+      filePath: json['file_path'] as String? ?? '',
+      fileSize: (json['file_size'] as num).toInt(),
       description: json['description'] as String?,
       duration: (json['duration'] as num?)?.toInt(),
-      thumbnailUrl: json['thumbnailUrl'] as String?,
+      thumbnailUrl: json['thumbnail_url'] as String?,
       artist: json['artist'] as String?,
       album: json['album'] as String?,
       genre: json['genre'] as String?,
       metadata: json['metadata'] == null
           ? null
           : Metadata.fromJson(json['metadata'] as Map<String, dynamic>),
-      fileHash: json['fileHash'] as String? ?? '',
+      fileHash: json['file_hash'] as String? ?? '',
     );
 
 Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
@@ -31,14 +31,14 @@ Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
       'title': instance.title,
       'year': instance.year,
       'type': instance.type,
-      'filePath': instance.filePath,
-      'fileSize': instance.fileSize,
+      'file_path': instance.filePath,
+      'file_size': instance.fileSize,
       'description': instance.description,
       'duration': instance.duration,
-      'thumbnailUrl': instance.thumbnailUrl,
+      'thumbnail_url': instance.thumbnailUrl,
       'artist': instance.artist,
       'album': instance.album,
       'genre': instance.genre,
       'metadata': instance.metadata,
-      'fileHash': instance.fileHash,
+      'file_hash': instance.fileHash,
     };

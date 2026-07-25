@@ -7,18 +7,18 @@ import 'package:flux_media_server/shared/models/metadata.dart';
 
 void main() {
   group('Media', () {
-    test('fromJson parses correctly with camelCase keys', () {
+    test('fromJson parses correctly with snake_case keys', () {
       final json = {
         'id': 1,
         'title': 'The Matrix',
         'year': 1999,
         'type': 'movie',
-        'filePath': '/movies/matrix.mkv',
-        'fileSize': 1024000,
+        'file_path': '/movies/matrix.mkv',
+        'file_size': 1024000,
         'description': 'A sci-fi classic',
         'duration': 8100,
-        'thumbnailUrl': 'http://example.com/thumb.jpg',
-        'fileHash': 'abc123',
+        'thumbnail_url': 'http://example.com/thumb.jpg',
+        'file_hash': 'abc123',
       };
 
       final media = Media.fromJson(json);
@@ -41,8 +41,8 @@ void main() {
         'title': 'Test',
         'year': 2024,
         'type': 'episode',
-        'filePath': '/test.mp4',
-        'fileSize': 512,
+        'file_path': '/test.mp4',
+        'file_size': 512,
       };
 
       final media = Media.fromJson(json);
@@ -91,7 +91,7 @@ void main() {
         'path': '/media/movies',
         'type': 'movie',
         'enabled': true,
-        'scanInterval': 30,
+        'scan_interval': 30,
       };
 
       final lib = MediaLibrary.fromJson(json);
@@ -109,8 +109,8 @@ void main() {
     test('fromJson parses correctly', () {
       final json = {
         'id': 1,
-        'userId': 1,
-        'mediaId': 1,
+        'user_id': 1,
+        'media_id': 1,
         'position': 3600,
         'duration': 7200,
         'completed': false,
@@ -128,19 +128,19 @@ void main() {
   });
 
   group('Metadata', () {
-    test('fromJson parses correctly', () {
+    test('fromJson parses correctly with string-encoded lists', () {
       final json = {
         'id': 1,
-        'externalId': 'tmdb-123',
+        'external_id': 'tmdb-123',
         'source': 'tmdb',
         'title': 'The Matrix',
         'year': 1999,
         'description': 'Sci-fi',
-        'posterUrl': 'http://example.com/poster.jpg',
-        'backdropUrl': 'http://example.com/backdrop.jpg',
+        'poster_url': 'http://example.com/poster.jpg',
+        'backdrop_url': 'http://example.com/backdrop.jpg',
         'rating': 8.7,
-        'genres': ['Action', 'Sci-Fi'],
-        'cast': ['Keanu Reeves'],
+        'genres': '["Action","Sci-Fi"]',
+        'cast': '["Keanu Reeves"]',
       };
 
       final meta = Metadata.fromJson(json);
@@ -152,6 +152,27 @@ void main() {
       expect(meta.rating, 8.7);
       expect(meta.genres, ['Action', 'Sci-Fi']);
       expect(meta.cast, ['Keanu Reeves']);
+    });
+
+    test('fromJson parses correctly with regular lists', () {
+      final json = {
+        'id': 2,
+        'external_id': 'tmdb-456',
+        'source': 'tmdb',
+        'title': 'Inception',
+        'year': 2010,
+        'poster_url': 'http://example.com/poster2.jpg',
+        'backdrop_url': 'http://example.com/backdrop2.jpg',
+        'rating': 8.8,
+        'genres': ['Action', 'Sci-Fi', 'Adventure'],
+        'cast': ['Leonardo DiCaprio', 'Joseph Gordon-Levitt'],
+      };
+
+      final meta = Metadata.fromJson(json);
+
+      expect(meta.id, 2);
+      expect(meta.genres, ['Action', 'Sci-Fi', 'Adventure']);
+      expect(meta.cast, ['Leonardo DiCaprio', 'Joseph Gordon-Levitt']);
     });
   });
 }

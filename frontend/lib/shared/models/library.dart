@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+// ignore_for_file: invalid_annotation_target
+
 part 'library.freezed.dart';
 part 'library.g.dart';
 
@@ -11,7 +13,7 @@ class MediaLibrary with _$MediaLibrary {
     @Default('') String path,
     required String type,
     required bool enabled,
-    int? scanInterval,
+    @JsonKey(name: 'scan_interval') int? scanInterval,
   }) = _MediaLibrary;
 
   factory MediaLibrary.fromJson(Map<String, dynamic> json) => _$MediaLibraryFromJson(json);

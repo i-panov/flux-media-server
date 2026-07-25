@@ -13,7 +13,7 @@ _$MediaLibraryImpl _$$MediaLibraryImplFromJson(Map<String, dynamic> json) =>
       path: json['path'] as String? ?? '',
       type: json['type'] as String,
       enabled: json['enabled'] as bool,
-      scanInterval: (json['scanInterval'] as num?)?.toInt(),
+      scanInterval: (json['scan_interval'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$MediaLibraryImplToJson(_$MediaLibraryImpl instance) =>
@@ -23,5 +23,5 @@ Map<String, dynamic> _$$MediaLibraryImplToJson(_$MediaLibraryImpl instance) =>
       'path': instance.path,
       'type': instance.type,
       'enabled': instance.enabled,
-      'scanInterval': instance.scanInterval,
+      'scan_interval': instance.scanInterval,
     };

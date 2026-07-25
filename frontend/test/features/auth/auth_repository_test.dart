@@ -35,31 +35,31 @@ void main() {
   group('requestCode', () {
     test('returns Right(null) when not in debug mode', () async {
       (repository as FakeAuthRepository).onRequestCode = (_) async =>
-          const Right(null);
+          const Right<Failure, String?>(null);
 
       final result = await repository.requestCode('test@example.com');
 
-      expect(result, isA<Right>());
+      expect(result, isA<Right<Failure, String?>>());
       expect(result.getOrElse((_) => null), isNull);
     });
 
     test('returns Right(debugCode) when in debug mode', () async {
       (repository as FakeAuthRepository).onRequestCode = (_) async =>
-          const Right('123456');
+          const Right<Failure, String>('123456');
 
       final result = await repository.requestCode('test@example.com');
 
-      expect(result, isA<Right>());
-      expect(result.getOrElse((_) => null), '123456');
+      expect(result, isA<Right<Failure, String>>());
+      expect(result.getOrElse((_) => ''), '123456');
     });
 
     test('returns Left(ServerFailure) on error', () async {
       (repository as FakeAuthRepository).onRequestCode = (_) async =>
-          const Left(ServerFailure(message: 'Email not allowed'));
+          const Left<Failure, String?>(ServerFailure(message: 'Email not allowed'));
 
       final result = await repository.requestCode('test@example.com');
 
-      expect(result, isA<Left>());
+      expect(result, isA<Left<Failure, String?>>());
       expect(
         result.fold((l) => l.message, (_) => ''),
         'Email not allowed',
@@ -71,13 +71,15 @@ void main() {
     test('returns Right(token, user) on success', () async {
       final user = User(id: 1, email: 'test@example.com');
       (repository as FakeAuthRepository).onVerifyCode = (_, __) async =>
-          Right((token: 'jwt-123', user: user));
+          Right<Failure, ({String token, User user})>(
+            (token: 'jwt-123', user: user),
+          );
 
       final result = await repository.verifyCode('test@example.com', '123456');
 
-      expect(result, isA<Right>());
+      expect(result, isA<Right<Failure, ({String token, User user})>>());
       final data = result.getOrElse(
-        (_) => (token: '', user: User(id: 0, email: '')),
+        (_) => (token: '', user: const User(id: 0, email: '')),
       );
       expect(data.token, 'jwt-123');
       expect(data.user.email, 'test@example.com');
@@ -85,11 +87,13 @@ void main() {
 
     test('returns Left(ServerFailure) on invalid code', () async {
       (repository as FakeAuthRepository).onVerifyCode = (_, __) async =>
-          const Left(ServerFailure(message: 'Invalid or expired code'));
+          const Left<Failure, ({String token, User user})>(
+            ServerFailure(message: 'Invalid or expired code'),
+          );
 
       final result = await repository.verifyCode('test@example.com', '000000');
 
-      expect(result, isA<Left>());
+      expect(result, isA<Left<Failure, ({String token, User user})>>());
       expect(
         result.fold((l) => l.message, (_) => ''),
         'Invalid or expired code',
@@ -101,24 +105,24 @@ void main() {
     test('returns Right(user) on success', () async {
       final user = User(id: 1, email: 'test@example.com');
       (repository as FakeAuthRepository).onGetCurrentUser = () async =>
-          Right(user);
+          Right<Failure, User>(user);
 
       final result = await repository.getCurrentUser();
 
-      expect(result, isA<Right>());
+      expect(result, isA<Right<Failure, User>>());
       expect(
-        result.getOrElse((_) => User(id: 0, email: '')).email,
+        result.getOrElse((_) => const User(id: 0, email: '')).email,
         'test@example.com',
       );
     });
 
     test('returns Left(ServerFailure) on unauthorized', () async {
       (repository as FakeAuthRepository).onGetCurrentUser = () async =>
-          const Left(ServerFailure(message: 'Unauthorized'));
+          const Left<Failure, User>(ServerFailure(message: 'Unauthorized'));
 
       final result = await repository.getCurrentUser();
 
-      expect(result, isA<Left>());
+      expect(result, isA<Left<Failure, User>>());
       expect(
         result.fold((l) => l.message, (_) => ''),
         'Unauthorized',

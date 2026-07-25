@@ -92,20 +92,6 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
-  Future<Response<Map<String, dynamic>>> createMedia(
-      Map<String, dynamic> body) {
-    final Uri $url = Uri.parse('/media');
-    final $body = body;
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
   Future<Response<Map<String, dynamic>>> checkHash(Map<String, dynamic> body) {
     final Uri $url = Uri.parse('/media/check-hash');
     final $body = body;
@@ -119,28 +105,27 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
-  Future<Response<Map<String, dynamic>>> updateMedia(
-    int id,
-    Map<String, dynamic> body,
+  Future<Response<Map<String, dynamic>>> uploadMedia(
+    int libraryId,
+    MultipartFile file,
   ) {
-    final Uri $url = Uri.parse('/media/${id}');
-    final $body = body;
+    final Uri $url = Uri.parse('/media/upload');
+    final List<PartValue> $parts = <PartValue>[
+      PartValue<int>(
+        'library_id',
+        libraryId,
+      ),
+      PartValueFile<MultipartFile>(
+        'file',
+        file,
+      ),
+    ];
     final Request $request = Request(
-      'PUT',
+      'POST',
       $url,
       client.baseUrl,
-      body: $body,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> deleteMedia(int id) {
-    final Uri $url = Uri.parse('/media/${id}');
-    final Request $request = Request(
-      'DELETE',
-      $url,
-      client.baseUrl,
+      parts: $parts,
+      multipart: true,
     );
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
@@ -226,84 +211,6 @@ final class _$ApiClient extends ApiClient {
       'GET',
       $url,
       client.baseUrl,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<List<dynamic>>> getProgress() {
-    final Uri $url = Uri.parse('/progress');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
-    return client.send<List<dynamic>, List<dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> updateProgress(
-    int mediaId,
-    Map<String, dynamic> body,
-  ) {
-    final Uri $url = Uri.parse('/progress/${mediaId}');
-    final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> deleteProgress(int mediaId) {
-    final Uri $url = Uri.parse('/progress/${mediaId}');
-    final Request $request = Request(
-      'DELETE',
-      $url,
-      client.baseUrl,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> searchMetadata(String query) {
-    final Uri $url = Uri.parse('/metadata/search');
-    final Map<String, dynamic> $params = <String, dynamic>{'q': query};
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-      parameters: $params,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> refreshMetadata(int mediaId) {
-    final Uri $url = Uri.parse('/metadata/${mediaId}/refresh');
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> updateMetadata(
-    int mediaId,
-    Map<String, dynamic> body,
-  ) {
-    final Uri $url = Uri.parse('/metadata/${mediaId}');
-    final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
     );
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }

@@ -51,4 +51,42 @@ class MediaRepositoryImpl implements MediaRepository {
       return Left(NetworkFailure(message: e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>> checkHash(
+    String hash,
+  ) async {
+    try {
+      final result = await remoteDataSource.checkHash(hash);
+      return Right(result);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Media>> uploadFile({
+    required String filePath,
+    required int libraryId,
+    required String fileName,
+  }) async {
+    try {
+      final media = await remoteDataSource.uploadFile(
+        filePath: filePath,
+        libraryId: libraryId,
+        fileName: fileName,
+      );
+      return Right(media);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    }
+  }
 }

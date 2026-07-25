@@ -9,29 +9,28 @@ part of 'metadata.dart';
 _$MetadataImpl _$$MetadataImplFromJson(Map<String, dynamic> json) =>
     _$MetadataImpl(
       id: (json['id'] as num).toInt(),
-      externalId: json['externalId'] as String?,
+      externalId: json['external_id'] as String?,
       source: json['source'] as String?,
       title: json['title'] as String?,
       year: (json['year'] as num?)?.toInt(),
       description: json['description'] as String?,
-      posterUrl: json['posterUrl'] as String?,
-      backdropUrl: json['backdropUrl'] as String?,
+      posterUrl: json['poster_url'] as String?,
+      backdropUrl: json['backdrop_url'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
-      genres:
-          (json['genres'] as List<dynamic>?)?.map((e) => e as String).toList(),
-      cast: (json['cast'] as List<dynamic>?)?.map((e) => e as String).toList(),
+      genres: _stringListFromJson(json['genres']),
+      cast: _stringListFromJson(json['cast']),
     );
 
 Map<String, dynamic> _$$MetadataImplToJson(_$MetadataImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'externalId': instance.externalId,
+      'external_id': instance.externalId,
       'source': instance.source,
       'title': instance.title,
       'year': instance.year,
       'description': instance.description,
-      'posterUrl': instance.posterUrl,
-      'backdropUrl': instance.backdropUrl,
+      'poster_url': instance.posterUrl,
+      'backdrop_url': instance.backdropUrl,
       'rating': instance.rating,
       'genres': instance.genres,
       'cast': instance.cast,

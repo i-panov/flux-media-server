@@ -2,6 +2,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'metadata.dart';
 
+// ignore_for_file: invalid_annotation_target
+
 part 'media.freezed.dart';
 part 'media.g.dart';
 
@@ -12,16 +14,16 @@ class Media with _$Media {
     required String title,
     required int year,
     required String type,
-    @Default('') String filePath,
-    required int fileSize,
+    @JsonKey(name: 'file_path') @Default('') String filePath,
+    @JsonKey(name: 'file_size') required int fileSize,
     String? description,
     int? duration,
-    String? thumbnailUrl,
+    @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
     String? artist,
     String? album,
     String? genre,
     Metadata? metadata,
-    @Default('') String fileHash,
+    @JsonKey(name: 'file_hash') @Default('') String fileHash,
   }) = _Media;
 
   factory Media.fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);

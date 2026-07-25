@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+// ignore_for_file: invalid_annotation_target
+
 part 'progress.freezed.dart';
 part 'progress.g.dart';
 
@@ -7,8 +9,8 @@ part 'progress.g.dart';
 class WatchProgress with _$WatchProgress {
   const factory WatchProgress({
     required int id,
-    required int userId,
-    required int mediaId,
+    @JsonKey(name: 'user_id') required int userId,
+    @JsonKey(name: 'media_id') required int mediaId,
     required int position,
     required int duration,
     required bool completed,

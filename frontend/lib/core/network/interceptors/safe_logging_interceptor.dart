@@ -17,7 +17,7 @@ class SafeLoggingInterceptor implements RequestInterceptor, ResponseInterceptor 
   }
 
   @override
-  FutureOr<Response> onResponse(Response response) {
+  FutureOr<Response<dynamic>> onResponse(Response<dynamic> response) {
     developer.log('<-- ${response.statusCode} ${response.base.request?.url}');
     return response;
   }

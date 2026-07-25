@@ -9,8 +9,8 @@ part of 'progress.dart';
 _$WatchProgressImpl _$$WatchProgressImplFromJson(Map<String, dynamic> json) =>
     _$WatchProgressImpl(
       id: (json['id'] as num).toInt(),
-      userId: (json['userId'] as num).toInt(),
-      mediaId: (json['mediaId'] as num).toInt(),
+      userId: (json['user_id'] as num).toInt(),
+      mediaId: (json['media_id'] as num).toInt(),
       position: (json['position'] as num).toInt(),
       duration: (json['duration'] as num).toInt(),
       completed: json['completed'] as bool,
@@ -19,8 +19,8 @@ _$WatchProgressImpl _$$WatchProgressImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$WatchProgressImplToJson(_$WatchProgressImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'userId': instance.userId,
-      'mediaId': instance.mediaId,
+      'user_id': instance.userId,
+      'media_id': instance.mediaId,
       'position': instance.position,
       'duration': instance.duration,
       'completed': instance.completed,

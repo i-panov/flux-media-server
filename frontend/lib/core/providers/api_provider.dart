@@ -11,11 +11,13 @@ final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
 /// Only changes when serverUrl actually changes.
 final baseUrlProvider = Provider<String>((ref) {
   final settings = ref.watch(settingsProvider);
-  var baseUrl = settings.settings.serverUrl ?? 'http://localhost:8080';
-  if (!baseUrl.endsWith('/api')) {
-    baseUrl = '$baseUrl/api';
+  final raw = settings.settings.serverUrl ?? 'http://localhost:8080';
+  final uri = Uri.parse(raw);
+  final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (segments.isEmpty || segments.last != 'api') {
+    segments.add('api');
   }
-  return baseUrl;
+  return uri.replace(pathSegments: segments).toString();
 });
 
 /// Provides the API client. Only recreates when baseUrl changes,

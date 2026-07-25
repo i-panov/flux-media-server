@@ -30,7 +30,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
 
   final VideoPlayerDatasource _datasource;
   final String _baseUrl;
-  final List<StreamSubscription> _subscriptions = [];
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
@@ -109,10 +109,16 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   /// Marks playback as completed.
   void complete() => state = const PlayerNotifierState.completed();
 
+  /// Stops playback and resets to initial state.
+  Future<void> stop() async {
+    _cancelSubscriptions();
+    await _datasource.stop();
+    state = const PlayerNotifierState.initial();
+  }
+
   /// Resets the player to initial state.
   Future<void> reset() async {
-    _cancelSubscriptions();
-    state = const PlayerNotifierState.initial();
+    await stop();
   }
 }
 

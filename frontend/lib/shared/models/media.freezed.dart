@@ -24,15 +24,19 @@ mixin _$Media {
   String get title => throw _privateConstructorUsedError;
   int get year => throw _privateConstructorUsedError;
   String get type => throw _privateConstructorUsedError;
+  @JsonKey(name: 'file_path')
   String get filePath => throw _privateConstructorUsedError;
+  @JsonKey(name: 'file_size')
   int get fileSize => throw _privateConstructorUsedError;
   String? get description => throw _privateConstructorUsedError;
   int? get duration => throw _privateConstructorUsedError;
+  @JsonKey(name: 'thumbnail_url')
   String? get thumbnailUrl => throw _privateConstructorUsedError;
   String? get artist => throw _privateConstructorUsedError;
   String? get album => throw _privateConstructorUsedError;
   String? get genre => throw _privateConstructorUsedError;
   Metadata? get metadata => throw _privateConstructorUsedError;
+  @JsonKey(name: 'file_hash')
   String get fileHash => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -50,16 +54,16 @@ abstract class $MediaCopyWith<$Res> {
       String title,
       int year,
       String type,
-      String filePath,
-      int fileSize,
+      @JsonKey(name: 'file_path') String filePath,
+      @JsonKey(name: 'file_size') int fileSize,
       String? description,
       int? duration,
-      String? thumbnailUrl,
+      @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
       String? artist,
       String? album,
       String? genre,
       Metadata? metadata,
-      String fileHash});
+      @JsonKey(name: 'file_hash') String fileHash});
 
   $MetadataCopyWith<$Res>? get metadata;
 }
@@ -177,16 +181,16 @@ abstract class _$$MediaImplCopyWith<$Res> implements $MediaCopyWith<$Res> {
       String title,
       int year,
       String type,
-      String filePath,
-      int fileSize,
+      @JsonKey(name: 'file_path') String filePath,
+      @JsonKey(name: 'file_size') int fileSize,
       String? description,
       int? duration,
-      String? thumbnailUrl,
+      @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
       String? artist,
       String? album,
       String? genre,
       Metadata? metadata,
-      String fileHash});
+      @JsonKey(name: 'file_hash') String fileHash});
 
   @override
   $MetadataCopyWith<$Res>? get metadata;
@@ -287,16 +291,16 @@ class _$MediaImpl implements _Media {
       required this.title,
       required this.year,
       required this.type,
-      this.filePath = '',
-      required this.fileSize,
+      @JsonKey(name: 'file_path') this.filePath = '',
+      @JsonKey(name: 'file_size') required this.fileSize,
       this.description,
       this.duration,
-      this.thumbnailUrl,
+      @JsonKey(name: 'thumbnail_url') this.thumbnailUrl,
       this.artist,
       this.album,
       this.genre,
       this.metadata,
-      this.fileHash = ''});
+      @JsonKey(name: 'file_hash') this.fileHash = ''});
 
   factory _$MediaImpl.fromJson(Map<String, dynamic> json) =>
       _$$MediaImplFromJson(json);
@@ -310,15 +314,17 @@ class _$MediaImpl implements _Media {
   @override
   final String type;
   @override
-  @JsonKey()
+  @JsonKey(name: 'file_path')
   final String filePath;
   @override
+  @JsonKey(name: 'file_size')
   final int fileSize;
   @override
   final String? description;
   @override
   final int? duration;
   @override
+  @JsonKey(name: 'thumbnail_url')
   final String? thumbnailUrl;
   @override
   final String? artist;
@@ -329,7 +335,7 @@ class _$MediaImpl implements _Media {
   @override
   final Metadata? metadata;
   @override
-  @JsonKey()
+  @JsonKey(name: 'file_hash')
   final String fileHash;
 
   @override
@@ -404,16 +410,16 @@ abstract class _Media implements Media {
       required final String title,
       required final int year,
       required final String type,
-      final String filePath,
-      required final int fileSize,
+      @JsonKey(name: 'file_path') final String filePath,
+      @JsonKey(name: 'file_size') required final int fileSize,
       final String? description,
       final int? duration,
-      final String? thumbnailUrl,
+      @JsonKey(name: 'thumbnail_url') final String? thumbnailUrl,
       final String? artist,
       final String? album,
       final String? genre,
       final Metadata? metadata,
-      final String fileHash}) = _$MediaImpl;
+      @JsonKey(name: 'file_hash') final String fileHash}) = _$MediaImpl;
 
   factory _Media.fromJson(Map<String, dynamic> json) = _$MediaImpl.fromJson;
 
@@ -426,14 +432,17 @@ abstract class _Media implements Media {
   @override
   String get type;
   @override
+  @JsonKey(name: 'file_path')
   String get filePath;
   @override
+  @JsonKey(name: 'file_size')
   int get fileSize;
   @override
   String? get description;
   @override
   int? get duration;
   @override
+  @JsonKey(name: 'thumbnail_url')
   String? get thumbnailUrl;
   @override
   String? get artist;
@@ -444,6 +453,7 @@ abstract class _Media implements Media {
   @override
   Metadata? get metadata;
   @override
+  @JsonKey(name: 'file_hash')
   String get fileHash;
   @override
   @JsonKey(ignore: true)

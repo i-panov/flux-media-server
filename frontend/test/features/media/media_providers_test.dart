@@ -35,6 +35,19 @@ class FakeMediaRepository implements MediaRepository {
   @override
   Future<Either<Failure, Media>> getMediaDetail(int id) =>
       onGetMediaDetail!(id);
+
+  @override
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+      checkHash(String hash) async =>
+          const Right((exists: false, mediaId: null, title: null));
+
+  @override
+  Future<Either<Failure, Media>> uploadFile({
+    required String filePath,
+    required int libraryId,
+    required String fileName,
+  }) async =>
+      Right(_fakeMedia(0, fileName));
 }
 
 void main() {

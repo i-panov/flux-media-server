@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+// ignore_for_file: invalid_annotation_target
+
 part 'scan_status.freezed.dart';
 part 'scan_status.g.dart';
 

@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
@@ -14,9 +15,9 @@ class LibraryScreen extends ConsumerStatefulWidget {
 }
 
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
-  Widget _buildGroupedList(List<MediaLibrary> libraries, LibraryNotifier notifier) {
-    final videoLibs = libraries.where((l) => l.type == 'video').toList();
-    final audioLibs = libraries.where((l) => l.type == 'audio').toList();
+  Widget _buildGroupedList(IList<MediaLibrary> libraries, LibraryNotifier notifier) {
+    final videoLibs = libraries.where((l) => l.type == 'video').toIList();
+    final audioLibs = libraries.where((l) => l.type == 'audio').toIList();
 
     return RefreshIndicator(
       onRefresh: () async => notifier.refresh(),
@@ -60,7 +61,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       onDelete: () async {
         final confirm = await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: const Text('Delete Library'),
             content: Text('Delete "${library.name}"? Files on disk will not be removed.'),
             actions: [
@@ -85,7 +86,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final nameController = TextEditingController();
     String type = 'video';
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -155,6 +156,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Libraries')),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'library_fab',
         onPressed: _showCreateDialog,
         child: const Icon(Icons.add),
       ),

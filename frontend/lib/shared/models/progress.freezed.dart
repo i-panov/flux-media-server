@@ -21,7 +21,9 @@ WatchProgress _$WatchProgressFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$WatchProgress {
   int get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'user_id')
   int get userId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'media_id')
   int get mediaId => throw _privateConstructorUsedError;
   int get position => throw _privateConstructorUsedError;
   int get duration => throw _privateConstructorUsedError;
@@ -41,8 +43,8 @@ abstract class $WatchProgressCopyWith<$Res> {
   @useResult
   $Res call(
       {int id,
-      int userId,
-      int mediaId,
+      @JsonKey(name: 'user_id') int userId,
+      @JsonKey(name: 'media_id') int mediaId,
       int position,
       int duration,
       bool completed});
@@ -107,8 +109,8 @@ abstract class _$$WatchProgressImplCopyWith<$Res>
   @useResult
   $Res call(
       {int id,
-      int userId,
-      int mediaId,
+      @JsonKey(name: 'user_id') int userId,
+      @JsonKey(name: 'media_id') int mediaId,
       int position,
       int duration,
       bool completed});
@@ -166,8 +168,8 @@ class __$$WatchProgressImplCopyWithImpl<$Res>
 class _$WatchProgressImpl implements _WatchProgress {
   const _$WatchProgressImpl(
       {required this.id,
-      required this.userId,
-      required this.mediaId,
+      @JsonKey(name: 'user_id') required this.userId,
+      @JsonKey(name: 'media_id') required this.mediaId,
       required this.position,
       required this.duration,
       required this.completed});
@@ -178,8 +180,10 @@ class _$WatchProgressImpl implements _WatchProgress {
   @override
   final int id;
   @override
+  @JsonKey(name: 'user_id')
   final int userId;
   @override
+  @JsonKey(name: 'media_id')
   final int mediaId;
   @override
   final int position;
@@ -231,8 +235,8 @@ class _$WatchProgressImpl implements _WatchProgress {
 abstract class _WatchProgress implements WatchProgress {
   const factory _WatchProgress(
       {required final int id,
-      required final int userId,
-      required final int mediaId,
+      @JsonKey(name: 'user_id') required final int userId,
+      @JsonKey(name: 'media_id') required final int mediaId,
       required final int position,
       required final int duration,
       required final bool completed}) = _$WatchProgressImpl;
@@ -243,8 +247,10 @@ abstract class _WatchProgress implements WatchProgress {
   @override
   int get id;
   @override
+  @JsonKey(name: 'user_id')
   int get userId;
   @override
+  @JsonKey(name: 'media_id')
   int get mediaId;
   @override
   int get position;

@@ -1,4 +1,3 @@
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -20,6 +19,15 @@ void main() async {
       sharedPreferencesProvider.overrideWithValue(prefs),
     ],
   );
+
+  // Auto-login: if a token exists, verify it before showing UI.
+  if (serverUrl != null) {
+    await container.read(settingsProvider.notifier).init();
+    final settings = container.read(settingsProvider).settings;
+    if (settings.authToken != null) {
+      await container.read(authProvider.notifier).checkAuthStatus();
+    }
+  }
 
   final router = AppRouter(authGuard: AuthGuard(container));
 
@@ -45,11 +53,14 @@ class _FluxAppState extends ConsumerState<FluxApp> {
   @override
   void initState() {
     super.initState();
-    if (widget.hasServerUrl) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = ref.read(authProvider);
+      if (authState is AuthAuthenticated) {
+        widget.router.replace(const MainRoute());
+      } else if (widget.hasServerUrl) {
         widget.router.replace(const LoginRoute());
-      });
-    }
+      }
+    });
   }
 
   @override

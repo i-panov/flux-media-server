@@ -6,3 +6,4 @@ backend/flux-server
 # Database
 backend/data/
 *.db
+.zcode/

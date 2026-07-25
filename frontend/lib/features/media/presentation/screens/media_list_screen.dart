@@ -55,6 +55,7 @@ class _MediaListScreenState extends ConsumerState<MediaListScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
+        heroTag: 'media_fab',
         onPressed: () => context.router.push(const UploadRoute()),
         child: const Icon(Icons.add),
       ),
