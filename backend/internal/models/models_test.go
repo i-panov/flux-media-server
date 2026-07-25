@@ -136,3 +136,19 @@ func TestCollectionItemFields(t *testing.T) {
 		t.Errorf("CollectionItem fields not properly set: %+v", ci)
 	}
 }
+
+func TestLyricsFields(t *testing.T) {
+	l := Lyrics{
+		ID:          1,
+		MediaID:     1,
+		LyricsText:  "La la la",
+		Translation: "Ля ля ля",
+		SyncData:    `[{"t":0,"text":"La la la"}]`,
+		Source:      "id3",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	if l.MediaID != 1 || l.LyricsText != "La la la" || l.Translation != "Ля ля ля" {
+		t.Errorf("Lyrics fields not properly set: %+v", l)
+	}
+}
