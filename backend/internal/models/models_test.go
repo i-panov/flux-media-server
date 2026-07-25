@@ -110,3 +110,29 @@ func TestFavoriteFields(t *testing.T) {
 		t.Errorf("Artist favorite fields not properly set: %+v", f2)
 	}
 }
+
+func TestCollectionFields(t *testing.T) {
+	c := Collection{
+		ID:        1,
+		UserID:    1,
+		Name:      "Want to Watch",
+		Type:      "video",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if c.Name != "Want to Watch" || c.Type != "video" {
+		t.Errorf("Collection fields not properly set: %+v", c)
+	}
+}
+
+func TestCollectionItemFields(t *testing.T) {
+	ci := CollectionItem{
+		ID:           1,
+		CollectionID: 1,
+		MediaID:      5,
+		AddedAt:      time.Now(),
+	}
+	if ci.CollectionID != 1 || ci.MediaID != 5 {
+		t.Errorf("CollectionItem fields not properly set: %+v", ci)
+	}
+}
