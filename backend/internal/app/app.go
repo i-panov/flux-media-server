@@ -47,6 +47,10 @@ func New(cfg *config.Config, version string) (*App, error) {
 	mediaRepo := repository.NewMediaRepository(db)
 	progressRepo := repository.NewProgressRepository(db)
 	libraryRepo := repository.NewLibraryRepository(db)
+	favRepo := repository.NewFavoriteRepository(db)
+	colRepo := repository.NewCollectionRepository(db)
+	colItemRepo := repository.NewCollectionItemRepository(db)
+	lyricsRepo := repository.NewLyricsRepository(db)
 
 	// Services
 	otpStore := services.NewOTPStore(
@@ -111,6 +115,9 @@ func New(cfg *config.Config, version string) (*App, error) {
 	}
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
+	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo)
+	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
+	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo)
 
 	// Fiber app
 	fiberApp := fiber.New()
@@ -185,6 +192,26 @@ func New(cfg *config.Config, version string) (*App, error) {
 	metadataGroup.Get("/search", metadataHandler.Search)
 	metadataGroup.Post("/:mediaId/refresh", metadataHandler.Refresh)
 	metadataGroup.Put("/:mediaId", metadataHandler.Update)
+
+	// Favorites
+	api.Post("/media/:id/favorite", favoriteHandler.AddFavorite)
+	api.Delete("/media/:id/favorite", favoriteHandler.RemoveFavorite)
+	api.Get("/favorites", favoriteHandler.ListFavorites)
+	api.Post("/favorites/artist", favoriteHandler.AddArtistFavorite)
+	api.Delete("/favorites/artist", favoriteHandler.RemoveArtistFavorite)
+
+	// Collections
+	api.Post("/collections", collectionHandler.Create)
+	api.Get("/collections", collectionHandler.List)
+	api.Put("/collections/:id", collectionHandler.Update)
+	api.Delete("/collections/:id", collectionHandler.Delete)
+	api.Post("/collections/:id/items", collectionHandler.AddItem)
+	api.Delete("/collections/:id/items/:mediaId", collectionHandler.RemoveItem)
+	api.Get("/collections/:id/items", collectionHandler.ListItems)
+
+	// Lyrics
+	api.Get("/media/:id/lyrics", lyricsHandler.GetLyrics)
+	api.Put("/media/:id/lyrics", lyricsHandler.UpsertLyrics)
 
 	// Start file watcher if enabled.
 	if watcherService != nil {
