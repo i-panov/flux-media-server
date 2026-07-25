@@ -43,3 +43,38 @@ type ProgressRepository interface {
 	Upsert(ctx context.Context, progress *models.WatchProgress) error
 	Delete(ctx context.Context, userID, mediaID uint) error
 }
+
+// FavoriteRepository defines data access methods for Favorite entities.
+type FavoriteRepository interface {
+	FindByUser(ctx context.Context, userID uint, favType string) ([]models.Favorite, error)
+	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error)
+	FindByUserAndArtist(ctx context.Context, userID uint, artistName string) (*models.Favorite, error)
+	IsFavorited(ctx context.Context, userID, mediaID uint) (bool, error)
+	IsArtistFavorited(ctx context.Context, userID uint, artistName string) (bool, error)
+	Create(ctx context.Context, favorite *models.Favorite) error
+	Delete(ctx context.Context, userID, mediaID uint) error
+	DeleteArtist(ctx context.Context, userID uint, artistName string) error
+}
+
+// CollectionRepository defines data access methods for Collection entities.
+type CollectionRepository interface {
+	FindByUser(ctx context.Context, userID uint) ([]models.Collection, error)
+	FindByID(ctx context.Context, id uint) (*models.Collection, error)
+	Create(ctx context.Context, collection *models.Collection) error
+	Update(ctx context.Context, collection *models.Collection) error
+	Delete(ctx context.Context, id uint) error
+}
+
+// CollectionItemRepository defines data access methods for CollectionItem entities.
+type CollectionItemRepository interface {
+	FindByCollection(ctx context.Context, collectionID uint) ([]models.CollectionItem, error)
+	Add(ctx context.Context, item *models.CollectionItem) error
+	Remove(ctx context.Context, collectionID, mediaID uint) error
+}
+
+// LyricsRepository defines data access methods for Lyrics entities.
+type LyricsRepository interface {
+	FindByMediaID(ctx context.Context, mediaID uint) (*models.Lyrics, error)
+	Upsert(ctx context.Context, lyrics *models.Lyrics) error
+	Delete(ctx context.Context, mediaID uint) error
+}

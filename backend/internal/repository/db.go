@@ -26,5 +26,9 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.User{},
 		&models.WatchProgress{},
 		&models.MediaLibrary{},
+		&models.Favorite{},
+		&models.Collection{},
+		&models.CollectionItem{},
+		&models.Lyrics{},
 	)
 }

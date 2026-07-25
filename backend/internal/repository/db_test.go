@@ -40,4 +40,8 @@ func TestAutoMigrate(t *testing.T) {
 	assert.True(t, tableSet["users"])
 	assert.True(t, tableSet["watch_progresses"])
 	assert.True(t, tableSet["media_libraries"])
+	assert.True(t, tableSet["favorites"])
+	assert.True(t, tableSet["collections"])
+	assert.True(t, tableSet["collection_items"])
+	assert.True(t, tableSet["lyrics"])
 }
