@@ -1,0 +1,122 @@
+package handlers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"flux/internal/models"
+	"flux/internal/repository"
+)
+
+func setupFavoriteTestApp(t *testing.T) *fiber.App {
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+
+	favRepo := repository.NewFavoriteRepository(db)
+	mediaRepo := repository.NewMediaRepository(db)
+
+	// Create a test media item
+	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
+		Title:    "Test Movie",
+		Type:     "video",
+		FilePath: "/test.mkv",
+	}))
+
+	handler := NewFavoriteHandler(favRepo, mediaRepo)
+	app := fiber.New()
+
+	// Simulate authenticated user
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user_id", uint(1))
+		return c.Next()
+	})
+
+	app.Post("/api/media/:id/favorite", handler.AddFavorite)
+	app.Delete("/api/media/:id/favorite", handler.RemoveFavorite)
+	app.Get("/api/favorites", handler.ListFavorites)
+	app.Post("/api/favorites/artist", handler.AddArtistFavorite)
+	app.Delete("/api/favorites/artist", handler.RemoveArtistFavorite)
+
+	return app
+}
+
+func TestFavoriteHandler_AddFavorite(t *testing.T) {
+	app := setupFavoriteTestApp(t)
+
+	req := httptest.NewRequest("POST", "/api/media/1/favorite", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+}
+
+func TestFavoriteHandler_RemoveFavorite(t *testing.T) {
+	app := setupFavoriteTestApp(t)
+
+	// Add first
+	req := httptest.NewRequest("POST", "/api/media/1/favorite", nil)
+	_, err := app.Test(req)
+	require.NoError(t, err)
+
+	// Remove
+	req = httptest.NewRequest("DELETE", "/api/media/1/favorite", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
+func TestFavoriteHandler_ListFavorites(t *testing.T) {
+	app := setupFavoriteTestApp(t)
+
+	// Add a favorite
+	req := httptest.NewRequest("POST", "/api/media/1/favorite", nil)
+	_, err := app.Test(req)
+	require.NoError(t, err)
+
+	// List
+	req = httptest.NewRequest("GET", "/api/favorites?type=video", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var favs []models.Favorite
+	body := bytes.Buffer{}
+	body.ReadFrom(resp.Body)
+	json.Unmarshal(body.Bytes(), &favs)
+	assert.Len(t, favs, 1)
+}
+
+func TestFavoriteHandler_AddArtistFavorite(t *testing.T) {
+	app := setupFavoriteTestApp(t)
+
+	body, _ := json.Marshal(map[string]string{"artist": "Pink Floyd"})
+	req := httptest.NewRequest("POST", "/api/favorites/artist", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+}
+
+func TestFavoriteHandler_RemoveArtistFavorite(t *testing.T) {
+	app := setupFavoriteTestApp(t)
+
+	// Add artist favorite
+	body, _ := json.Marshal(map[string]string{"artist": "Pink Floyd"})
+	req := httptest.NewRequest("POST", "/api/favorites/artist", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	_, err := app.Test(req)
+	require.NoError(t, err)
+
+	// Remove
+	req = httptest.NewRequest("DELETE", "/api/favorites/artist?artist=Pink+Floyd", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
