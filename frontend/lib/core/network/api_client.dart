@@ -88,4 +88,69 @@ abstract class ApiClient extends ChopperService {
 
   @Get(path: '/libraries/{id}/scan-status')
   Future<Response<Map<String, dynamic>>> getScanStatus(@Path('id') int id);
+
+  // Favorites
+  @Post(path: '/media/{id}/favorite', optionalBody: true)
+  Future<Response<Map<String, dynamic>>> addFavorite(@Path('id') int id);
+
+  @Delete(path: '/media/{id}/favorite')
+  Future<Response<Map<String, dynamic>>> removeFavorite(@Path('id') int id);
+
+  @Get(path: '/favorites')
+  Future<Response<List<dynamic>>> getFavorites({
+    @Query('type') String? type,
+  });
+
+  @Post(path: '/favorites/artist')
+  Future<Response<Map<String, dynamic>>> addArtistFavorite(
+    @Body() Map<String, dynamic> body,
+  );
+
+  @Delete(path: '/favorites/artist')
+  Future<Response<Map<String, dynamic>>> removeArtistFavorite(
+    @Query('artist') String artist,
+  );
+
+  // Collections
+  @Post(path: '/collections')
+  Future<Response<Map<String, dynamic>>> createCollection(
+    @Body() Map<String, dynamic> body,
+  );
+
+  @Get(path: '/collections')
+  Future<Response<List<dynamic>>> getCollections();
+
+  @Put(path: '/collections/{id}')
+  Future<Response<Map<String, dynamic>>> updateCollection(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @Delete(path: '/collections/{id}')
+  Future<Response<Map<String, dynamic>>> deleteCollection(@Path('id') int id);
+
+  @Post(path: '/collections/{id}/items')
+  Future<Response<Map<String, dynamic>>> addCollectionItem(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @Delete(path: '/collections/{id}/items/{mediaId}')
+  Future<Response<Map<String, dynamic>>> removeCollectionItem(
+    @Path('id') int id,
+    @Path('mediaId') int mediaId,
+  );
+
+  @Get(path: '/collections/{id}/items')
+  Future<Response<List<dynamic>>> getCollectionItems(@Path('id') int id);
+
+  // Lyrics
+  @Get(path: '/media/{id}/lyrics')
+  Future<Response<Map<String, dynamic>>> getLyrics(@Path('id') int id);
+
+  @Put(path: '/media/{id}/lyrics')
+  Future<Response<Map<String, dynamic>>> upsertLyrics(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
 }

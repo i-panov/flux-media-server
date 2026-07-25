@@ -1,0 +1,35 @@
+import 'package:flux_media_server/core/network/api_client.dart';
+import 'package:flux_media_server/core/network/response_handler.dart';
+import 'package:flux_media_server/shared/models/lyrics.dart';
+
+class LyricsRemoteDataSource {
+  LyricsRemoteDataSource(this.apiClient);
+
+  final ApiClient apiClient;
+
+  Future<Lyrics?> getLyrics(int mediaId) async {
+    final response = await apiClient.getLyrics(mediaId);
+    if (response.statusCode == 404) {
+      return null;
+    }
+    checkResponse(response, 'Failed to fetch lyrics');
+    return Lyrics.fromJson(response.body!);
+  }
+
+  Future<Lyrics> upsertLyrics(
+    int mediaId, {
+    required String lyricsText,
+    String? translation,
+    String? syncData,
+    required String source,
+  }) async {
+    final response = await apiClient.upsertLyrics(mediaId, {
+      'lyrics_text': lyricsText,
+      'translation': translation ?? '',
+      'sync_data': syncData ?? '',
+      'source': source,
+    });
+    checkResponse(response, 'Failed to save lyrics');
+    return Lyrics.fromJson(response.body!);
+  }
+}
