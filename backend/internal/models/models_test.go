@@ -83,3 +83,30 @@ func TestMediaLibraryFields(t *testing.T) {
 		t.Errorf("MediaLibrary fields not properly set: %+v", ml)
 	}
 }
+
+func TestFavoriteFields(t *testing.T) {
+	mediaID := uint(5)
+	f := Favorite{
+		ID:         1,
+		UserID:     1,
+		Type:       "video",
+		MediaID:    &mediaID,
+		ArtistName: "",
+		CreatedAt:  time.Now(),
+	}
+	if f.ID != 1 || f.Type != "video" || *f.MediaID != 5 {
+		t.Errorf("Favorite fields not properly set: %+v", f)
+	}
+
+	f2 := Favorite{
+		ID:         2,
+		UserID:     1,
+		Type:       "artist",
+		MediaID:    nil,
+		ArtistName: "Pink Floyd",
+		CreatedAt:  time.Now(),
+	}
+	if f2.ArtistName != "Pink Floyd" || f2.MediaID != nil {
+		t.Errorf("Artist favorite fields not properly set: %+v", f2)
+	}
+}
