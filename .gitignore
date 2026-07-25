@@ -7,3 +7,4 @@ backend/flux-server
 backend/data/
 *.db
 .zcode/
+.superpowers/
