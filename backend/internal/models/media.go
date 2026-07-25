@@ -14,7 +14,7 @@ type Media struct {
 	Album        string    `json:"album"`
 	Genre        string    `json:"genre"`
 	Duration     int       `json:"duration"` // seconds
-	FilePath     string    `gorm:"uniqueIndex" json:"file_path"`
+	FilePath     string    `gorm:"uniqueIndex" json:"-"`
 	FileSize     int64     `json:"file_size"`
 	FileHash     string    `gorm:"index" json:"file_hash"`
 	QuickHash    string    `gorm:"index" json:"quick_hash"`

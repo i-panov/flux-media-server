@@ -178,6 +178,32 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Media deleted successfully"})
 }
 
+func (h *MediaHandler) CheckHash(c *fiber.Ctx) error {
+	var req struct {
+		Hash string `json:"hash"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if req.Hash == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Hash is required")
+	}
+
+	ctx := c.UserContext()
+	existing, err := h.mediaRepo.FindByHash(ctx, req.Hash)
+	if err == nil && existing != nil {
+		return c.JSON(fiber.Map{
+			"exists": true,
+			"media": fiber.Map{
+				"id":    existing.ID,
+				"title": existing.Title,
+			},
+		})
+	}
+
+	return c.JSON(fiber.Map{"exists": false})
+}
+
 func (h *MediaHandler) Stream(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil {

@@ -33,4 +33,25 @@ class LibraryRemoteDataSource {
     checkResponse(response, 'Failed to get scan status');
     return response.body!;
   }
+
+  /// Creates a new library.
+  Future<Map<String, dynamic>> createLibrary({
+    required String name,
+    required String type,
+  }) async {
+    final Response<Map<String, dynamic>> response =
+        await apiClient.createLibrary({
+      'name': name,
+      'type': type,
+    });
+    checkResponse(response, 'Failed to create library');
+    return response.body!;
+  }
+
+  /// Deletes a library.
+  Future<void> deleteLibrary(int id) async {
+    final Response<Map<String, dynamic>> response =
+        await apiClient.deleteLibrary(id);
+    checkResponse(response, 'Failed to delete library');
+  }
 }

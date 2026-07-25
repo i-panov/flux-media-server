@@ -287,7 +287,7 @@ class _$MediaImpl implements _Media {
       required this.title,
       required this.year,
       required this.type,
-      required this.filePath,
+      this.filePath = '',
       required this.fileSize,
       this.description,
       this.duration,
@@ -310,6 +310,7 @@ class _$MediaImpl implements _Media {
   @override
   final String type;
   @override
+  @JsonKey()
   final String filePath;
   @override
   final int fileSize;
@@ -403,7 +404,7 @@ abstract class _Media implements Media {
       required final String title,
       required final int year,
       required final String type,
-      required final String filePath,
+      final String filePath,
       required final int fileSize,
       final String? description,
       final int? duration,

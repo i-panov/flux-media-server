@@ -35,6 +35,29 @@ class UploadService {
 
   final Dio _dio;
 
+  /// Checks if a file with the given hash already exists on the server.
+  Future<({bool exists, int? mediaId, String? title})> checkHash(String hash) async {
+    try {
+      final response = await _dio.post('/media/check-hash', data: {'hash': hash});
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        if (data['exists'] == true) {
+          final media = data['media'] as Map<String, dynamic>?;
+          return (
+            exists: true,
+            mediaId: media?['id'] as int?,
+            title: media?['title'] as String?,
+          );
+        }
+        return (exists: false, mediaId: null, title: null);
+      }
+      return (exists: false, mediaId: null, title: null);
+    } catch (_) {
+      // On error, assume not exists (will be caught server-side anyway).
+      return (exists: false, mediaId: null, title: null);
+    }
+  }
+
   /// Uploads a file to the specified library.
   /// Returns an [UploadResult] with the created media info.
   Future<UploadResult> uploadFile({

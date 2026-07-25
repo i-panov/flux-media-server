@@ -31,23 +31,5 @@ scanner:
 
 media:
     thumbnail_path: "./data/thumbnails"
-    allowed_extensions:
-        - .mp4
-        - .mkv
-        - .avi
-        - .mov
-        - .wmv
-        - .webm
-        - .flv
-        - .ts
-        - .mp3
-        - .flac
-        - .ogg
-        - .m4a
-        - .aac
-        - .wav
-        - .jpg
-        - .jpeg
-        - .png
-        - .gif
-        - .webp
+    video_path: "./data/video"
+    audio_path: "./data/audio"

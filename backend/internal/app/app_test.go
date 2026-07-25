@@ -30,7 +30,7 @@ func newTestApp(t *testing.T) *App {
 			MaxOTPEntries:    1000,
 			AllowUnknownEmail: true,
 		},
-		Media: config.MediaConfig{AllowedExtensions: []string{".mp4", ".mkv"}},
+		Media: config.MediaConfig{VideoPath: t.TempDir() + "/video", AudioPath: t.TempDir() + "/audio"},
 	}
 	application, err := New(cfg, "test")
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ func TestAuthRequestCodeForbidden(t *testing.T) {
 			AllowedEmails:    []string{"admin@example.com"},
 			AllowUnknownEmail: false,
 		},
-		Media: config.MediaConfig{AllowedExtensions: []string{".mp4"}},
+		Media: config.MediaConfig{VideoPath: t.TempDir() + "/video", AudioPath: t.TempDir() + "/audio"},
 	}
 	application, err := New(cfg, "test")
 	require.NoError(t, err)
@@ -234,7 +234,7 @@ func TestLibraryCRUD(t *testing.T) {
 	token := getAuthToken(t, application, "lib@example.com")
 
 	// Create
-	b, _ := json.Marshal(map[string]interface{}{"name": "Movies", "path": "/media/movies", "type": "movie"})
+	b, _ := json.Marshal(map[string]interface{}{"name": "Movies", "type": "video"})
 	req := testReq("POST", "/api/libraries", bytes.NewReader(b))
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -253,8 +253,15 @@ func TestLibraryCRUD(t *testing.T) {
 
 	var list []map[string]interface{}
 	parseResp(t, resp2, &list)
-	assert.Len(t, list, 1)
-	assert.Equal(t, "Movies", list[0]["name"])
+	assert.GreaterOrEqual(t, len(list), 1)
+	found := false
+	for _, l := range list {
+		if l["name"] == "Movies" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected to find 'Movies' in library list")
 }
 
 // --- Scan status ---
@@ -264,7 +271,7 @@ func TestScanStatus(t *testing.T) {
 	token := getAuthToken(t, application, "scan@example.com")
 
 	// Create library
-	b, _ := json.Marshal(map[string]interface{}{"name": "TV", "path": "/tmp/nonexistent", "type": "tv"})
+	b, _ := json.Marshal(map[string]interface{}{"name": "TV", "type": "video"})
 	req := testReq("POST", "/api/libraries", bytes.NewReader(b))
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -294,7 +301,7 @@ func TestOTPStoreFull(t *testing.T) {
 			CodeExpiry:    300,
 			MaxOTPEntries: 2,
 		},
-		Media: config.MediaConfig{AllowedExtensions: []string{".mp4"}},
+		Media: config.MediaConfig{VideoPath: t.TempDir() + "/video", AudioPath: t.TempDir() + "/audio"},
 	}
 	application, err := New(cfg, "test")
 	require.NoError(t, err)

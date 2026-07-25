@@ -167,7 +167,7 @@ class _$MediaLibraryImpl implements _MediaLibrary {
   const _$MediaLibraryImpl(
       {required this.id,
       required this.name,
-      required this.path,
+      this.path = '',
       required this.type,
       required this.enabled,
       this.scanInterval});
@@ -180,6 +180,7 @@ class _$MediaLibraryImpl implements _MediaLibrary {
   @override
   final String name;
   @override
+  @JsonKey()
   final String path;
   @override
   final String type;
@@ -230,7 +231,7 @@ abstract class _MediaLibrary implements MediaLibrary {
   const factory _MediaLibrary(
       {required final int id,
       required final String name,
-      required final String path,
+      final String path,
       required final String type,
       required final bool enabled,
       final int? scanInterval}) = _$MediaLibraryImpl;

@@ -12,7 +12,7 @@ class Media with _$Media {
     required String title,
     required int year,
     required String type,
-    required String filePath,
+    @Default('') String filePath,
     required int fileSize,
     String? description,
     int? duration,

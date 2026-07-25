@@ -10,7 +10,7 @@ _$MediaLibraryImpl _$$MediaLibraryImplFromJson(Map<String, dynamic> json) =>
     _$MediaLibraryImpl(
       id: (json['id'] as num).toInt(),
       name: json['name'] as String,
-      path: json['path'] as String,
+      path: json['path'] as String? ?? '',
       type: json['type'] as String,
       enabled: json['enabled'] as bool,
       scanInterval: (json['scanInterval'] as num?)?.toInt(),

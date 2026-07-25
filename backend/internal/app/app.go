@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,6 +17,7 @@ import (
 	"flux/internal/email"
 	"flux/internal/handlers"
 	"flux/internal/middleware"
+	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/services"
 )
@@ -84,10 +86,29 @@ func New(cfg *config.Config, version string) (*App, error) {
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
 	uploadHandler := handlers.NewUploadHandler(libraryRepo, mediaRepo, scanner, handlers.UploadConfig{
-		AllowedExtensions: cfg.Media.AllowedExtensions,
-		MaxFileSize:       2 << 30, // 2GB
+		MaxFileSize: 2 << 30, // 2GB
 	})
-	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner, watcherInterface)
+	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner, watcherInterface, cfg)
+
+	// Auto-create default libraries if they don't exist.
+	if _, err := libraryRepo.FindByPath(context.Background(), cfg.Media.VideoPath); err != nil {
+		libraryRepo.Create(context.Background(), &models.MediaLibrary{
+			Name:    "Video",
+			Path:    cfg.Media.VideoPath,
+			Type:    "video",
+			Enabled: true,
+		})
+		os.MkdirAll(cfg.Media.VideoPath, 0755)
+	}
+	if _, err := libraryRepo.FindByPath(context.Background(), cfg.Media.AudioPath); err != nil {
+		libraryRepo.Create(context.Background(), &models.MediaLibrary{
+			Name:    "Audio",
+			Path:    cfg.Media.AudioPath,
+			Type:    "audio",
+			Enabled: true,
+		})
+		os.MkdirAll(cfg.Media.AudioPath, 0755)
+	}
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
 
@@ -141,6 +162,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Get("/:id", mediaHandler.Get)
 	media.Post("", mediaHandler.Create)
 	media.Post("/upload", uploadHandler.Upload)
+	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Put("/:id", mediaHandler.Update)
 	media.Delete("/:id", mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)

@@ -11,7 +11,7 @@ _$MediaImpl _$$MediaImplFromJson(Map<String, dynamic> json) => _$MediaImpl(
       title: json['title'] as String,
       year: (json['year'] as num).toInt(),
       type: json['type'] as String,
-      filePath: json['filePath'] as String,
+      filePath: json['filePath'] as String? ?? '',
       fileSize: (json['fileSize'] as num).toInt(),
       description: json['description'] as String?,
       duration: (json['duration'] as num?)?.toInt(),

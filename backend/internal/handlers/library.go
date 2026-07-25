@@ -3,9 +3,13 @@ package handlers
 import (
 	"context"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
+	"flux/internal/config"
 	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -16,21 +20,21 @@ type LibraryHandler struct {
 	libraryRepo repository.LibraryRepository
 	scanner     services.ScannerInterface
 	watcher     services.WatcherInterface
+	config      *config.Config
 }
 
-func NewLibraryHandler(libraryRepo repository.LibraryRepository, scanner services.ScannerInterface, watcher services.WatcherInterface) *LibraryHandler {
+func NewLibraryHandler(libraryRepo repository.LibraryRepository, scanner services.ScannerInterface, watcher services.WatcherInterface, cfg *config.Config) *LibraryHandler {
 	return &LibraryHandler{
 		libraryRepo: libraryRepo,
 		scanner:     scanner,
 		watcher:     watcher,
+		config:      cfg,
 	}
 }
 
 type CreateLibraryRequest struct {
-	Name         string `json:"name"`
-	Path         string `json:"path"`
-	Type         string `json:"type"`
-	ScanInterval int    `json:"scan_interval"`
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 func (h *LibraryHandler) List(c *fiber.Ctx) error {
@@ -50,19 +54,28 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		return response.Error(c, fiber.StatusBadRequest, "Name is required")
 	}
-	if req.Path == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Path is required")
+
+	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
+	if req.Type != "video" && req.Type != "audio" {
+		return response.Error(c, fiber.StatusBadRequest, "Type must be 'video' or 'audio'")
 	}
 
+	// Generate path from config based on type.
+	basePath := h.config.Media.VideoPath
+	if req.Type == "audio" {
+		basePath = h.config.Media.AudioPath
+	}
+	libPath := filepath.Join(basePath, strings.ReplaceAll(req.Name, " ", "_"))
+
 	library := &models.MediaLibrary{
-		Name:         req.Name,
-		Path:         req.Path,
-		Type:         req.Type,
-		Enabled:      true,
-		ScanInterval: req.ScanInterval,
+		Name:    req.Name,
+		Path:    libPath,
+		Type:    req.Type,
+		Enabled: true,
 	}
 
 	ctx := c.UserContext()
@@ -71,7 +84,8 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create library")
 	}
 
-	// Start watching this library path.
+	// Create the directory and start watching.
+	os.MkdirAll(libPath, 0755)
 	if h.watcher != nil {
 		h.watcher.AddPath(library.Path)
 	}
@@ -96,17 +110,22 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	if req.Name == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Name is required")
+	if req.Name != "" {
+		library.Name = strings.TrimSpace(req.Name)
+		basePath := h.config.Media.VideoPath
+		if library.Type == "audio" {
+			basePath = h.config.Media.AudioPath
+		}
+		library.Path = filepath.Join(basePath, strings.ReplaceAll(library.Name, " ", "_"))
 	}
-	if req.Path == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Path is required")
+	if req.Type != "" {
+		library.Type = strings.ToLower(strings.TrimSpace(req.Type))
+		basePath := h.config.Media.VideoPath
+		if library.Type == "audio" {
+			basePath = h.config.Media.AudioPath
+		}
+		library.Path = filepath.Join(basePath, strings.ReplaceAll(library.Name, " ", "_"))
 	}
-
-	library.Name = req.Name
-	library.Path = req.Path
-	library.Type = req.Type
-	library.ScanInterval = req.ScanInterval
 
 	if err := h.libraryRepo.Update(ctx, library); err != nil {
 		log.Printf("Update: %v", err)

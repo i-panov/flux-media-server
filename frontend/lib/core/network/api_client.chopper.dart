@@ -106,6 +106,19 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> checkHash(Map<String, dynamic> body) {
+    final Uri $url = Uri.parse('/media/check-hash');
+    final $body = body;
+    final Request $request = Request(
+      'POST',
+      $url,
+      client.baseUrl,
+      body: $body,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> updateMedia(
     int id,
     Map<String, dynamic> body,

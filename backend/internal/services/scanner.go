@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/vansante/go-ffprobe.v2"
+
 	"flux/internal/config"
 	"flux/internal/metadata"
 	"flux/internal/models"
@@ -19,6 +21,17 @@ import (
 )
 
 const quickHashChunk = 1024 * 1024 // 1MB head/tail for quick hash
+
+var allowedExtensions = map[string]bool{
+	".mp4": true, ".mkv": true, ".avi": true, ".mov": true,
+	".wmv": true, ".webm": true, ".flv": true, ".ts": true,
+	".mp3": true, ".flac": true, ".ogg": true,
+	".m4a": true, ".aac": true, ".wav": true,
+}
+
+func IsAllowedExtension(ext string) bool {
+	return allowedExtensions[ext]
+}
 
 type ScannerService struct {
 	libraryRepo    repository.LibraryRepository
@@ -113,17 +126,14 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 			return nil
 		}
 
-		// Check file extension
-		ext := strings.ToLower(filepath.Ext(path))
-		allowed := false
-		for _, e := range s.config.Media.AllowedExtensions {
-			if ext == e {
-				allowed = true
-				break
-			}
+		// Skip empty files.
+		if info.Size() == 0 {
+			return nil
 		}
 
-		if !allowed {
+		// Check file extension
+		ext := strings.ToLower(filepath.Ext(path))
+		if !IsAllowedExtension(ext) {
 			return nil
 		}
 
@@ -208,7 +218,7 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 		title, year := metadata.ParseFilename(filepath.Base(path))
 
 		// Determine media type based on file extension.
-		mediaType := DetermineMediaType(path, library.Type)
+		mediaType := DetermineMediaType(path)
 
 		media := &models.Media{
 			Title:    title,
@@ -327,28 +337,41 @@ func quickHashFile(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// DetermineMediaType returns the media type based on file extension and library type.
-func DetermineMediaType(filePath string, libraryType string) string {
-	ext := strings.ToLower(filepath.Ext(filePath))
+// DetermineMediaType probes the file with ffprobe to detect its real type.
+func DetermineMediaType(filePath string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	audioExts := map[string]bool{
-		".mp3": true, ".flac": true, ".ogg": true,
-		".m4a": true, ".aac": true, ".wav": true,
+	data, err := ffprobe.ProbeURL(ctx, filePath)
+	if err != nil {
+		// Fallback to extension-based detection.
+		log.Printf("DetermineMediaType: ffprobe %s: %v, using extension fallback", filePath, err)
+		return determineMediaTypeByExt(filePath)
 	}
-	if audioExts[ext] {
+
+	hasVideo := false
+	hasAudio := false
+	for _, s := range data.Streams {
+		switch s.CodecType {
+		case "video":
+			hasVideo = true
+		case "audio":
+			hasAudio = true
+		}
+	}
+
+	if hasAudio && !hasVideo {
 		return "audio"
 	}
+	return "video"
+}
 
-	imageExts := map[string]bool{
-		".jpg": true, ".jpeg": true, ".png": true,
-		".gif": true, ".webp": true,
+// determineMediaTypeByExt is the fallback when ffprobe is unavailable.
+func determineMediaTypeByExt(filePath string) string {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	if ext == ".mp3" || ext == ".flac" || ext == ".ogg" ||
+		ext == ".m4a" || ext == ".aac" || ext == ".wav" {
+		return "audio"
 	}
-	if imageExts[ext] {
-		return "image"
-	}
-
-	if libraryType == "tv" {
-		return "episode"
-	}
-	return "movie"
+	return "video"
 }

@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 
 @RoutePage()
@@ -49,6 +50,14 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+
+    ref.listen(authProvider, (previous, next) {
+      if (next is AuthAuthenticated) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          context.router.replaceAll([MainRoute()]);
+        });
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(

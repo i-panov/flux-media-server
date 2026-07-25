@@ -11,4 +11,13 @@ abstract class LibraryRepository {
 
   /// Gets the current scan status for a library.
   Future<Either<Failure, ScanStatus>> getScanStatus(int id);
+
+  /// Creates a new library.
+  Future<Either<Failure, MediaLibrary>> createLibrary({
+    required String name,
+    required String type,
+  });
+
+  /// Deletes a library.
+  Future<Either<Failure, void>> deleteLibrary(int id);
 }

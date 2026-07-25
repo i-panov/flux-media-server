@@ -52,8 +52,9 @@ type ScannerConfig struct {
 }
 
 type MediaConfig struct {
-	ThumbnailPath     string   `yaml:"thumbnail_path"`
-	AllowedExtensions []string `yaml:"allowed_extensions"`
+	ThumbnailPath string `yaml:"thumbnail_path"`
+	VideoPath     string `yaml:"video_path"`
+	AudioPath     string `yaml:"audio_path"`
 }
 
 func Load(path string) (*Config, error) {

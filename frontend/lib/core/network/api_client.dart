@@ -54,6 +54,11 @@ abstract class ApiClient extends ChopperService {
     @Body() Map<String, dynamic> body,
   );
 
+  @Post(path: '/media/check-hash')
+  Future<Response<Map<String, dynamic>>> checkHash(
+    @Body() Map<String, dynamic> body,
+  );
+
   @Put(path: '/media/{id}')
   Future<Response<Map<String, dynamic>>> updateMedia(
     @Path('id') int id,

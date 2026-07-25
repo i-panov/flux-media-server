@@ -19,6 +19,8 @@ class FakeLibraryRepository implements LibraryRepository {
   Future<Either<Failure, List<MediaLibrary>>> Function()? onGetLibraries;
   Future<Either<Failure, String>> Function(int)? onScanLibrary;
   Future<Either<Failure, ScanStatus>> Function(int)? onGetScanStatus;
+  Future<Either<Failure, MediaLibrary>> Function({required String name, required String type})? onCreateLibrary;
+  Future<Either<Failure, void>> Function(int)? onDeleteLibrary;
 
   @override
   Future<Either<Failure, List<MediaLibrary>>> getLibraries() =>
@@ -31,6 +33,14 @@ class FakeLibraryRepository implements LibraryRepository {
   @override
   Future<Either<Failure, ScanStatus>> getScanStatus(int id) =>
       onGetScanStatus!(id);
+
+  @override
+  Future<Either<Failure, MediaLibrary>> createLibrary({required String name, required String type}) =>
+      onCreateLibrary!(name: name, type: type);
+
+  @override
+  Future<Either<Failure, void>> deleteLibrary(int id) =>
+      onDeleteLibrary!(id);
 }
 
 void main() {

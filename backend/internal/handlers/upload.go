@@ -27,8 +27,7 @@ type UploadHandler struct {
 
 // UploadConfig holds upload-specific configuration.
 type UploadConfig struct {
-	AllowedExtensions []string
-	MaxFileSize       int64
+	MaxFileSize int64
 }
 
 // NewUploadHandler creates a new UploadHandler.
@@ -69,6 +68,11 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "File is required")
+	}
+
+	// Check file is not empty.
+	if fileHeader.Size == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "File is empty")
 	}
 
 	// Check file size.
@@ -133,7 +137,7 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 	title, year := metadata.ParseFilenameUpload(filename)
 
 	// Determine media type.
-	mediaType := services.DetermineMediaType(filePath, library.Type)
+	mediaType := services.DetermineMediaType(filePath)
 
 	info, _ := os.Stat(filePath)
 	fileSize := int64(0)
@@ -186,10 +190,5 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 }
 
 func (h *UploadHandler) isAllowedExtension(ext string) bool {
-	for _, e := range h.config.AllowedExtensions {
-		if ext == e {
-			return true
-		}
-	}
-	return false
+	return services.IsAllowedExtension(ext)
 }

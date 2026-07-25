@@ -100,6 +100,35 @@ class LibraryNotifier extends AsyncNotifier<List<MediaLibrary>> {
     ref.invalidateSelf();
   }
 
+  /// Creates a new library.
+  Future<String?> createLibrary({
+    required String name,
+    required String type,
+  }) async {
+    final repo = ref.read(libraryRepositoryProvider);
+    final result = await repo.createLibrary(name: name, type: type);
+    return result.fold(
+      (failure) => failure.message,
+      (_) {
+        ref.invalidateSelf();
+        return null;
+      },
+    );
+  }
+
+  /// Deletes a library.
+  Future<String?> deleteLibrary(int id) async {
+    final repo = ref.read(libraryRepositoryProvider);
+    final result = await repo.deleteLibrary(id);
+    return result.fold(
+      (failure) => failure.message,
+      (_) {
+        ref.invalidateSelf();
+        return null;
+      },
+    );
+  }
+
   // Note: AsyncNotifier doesn't have dispose(). Cleanup is handled
   // by the provider framework via ref.onDispose if needed.
 }

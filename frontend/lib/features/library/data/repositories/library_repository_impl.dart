@@ -48,4 +48,34 @@ class LibraryRepositoryImpl implements LibraryRepository {
       return Left(ServerFailure(message: e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, MediaLibrary>> createLibrary({
+    required String name,
+    required String type,
+  }) async {
+    try {
+      final json = await remoteDataSource.createLibrary(
+        name: name,
+        type: type,
+      );
+      return Right(MediaLibrary.fromJson(json));
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteLibrary(int id) async {
+    try {
+      await remoteDataSource.deleteLibrary(id);
+      return const Right(null);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    }
+  }
 }
