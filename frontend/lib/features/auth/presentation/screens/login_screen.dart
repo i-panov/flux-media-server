@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class LoginScreen extends ConsumerStatefulWidget {
@@ -32,6 +33,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     ref.listen(authProvider, (previous, next) {
       if (next is AuthCodeSent && previous is! AuthCodeSent) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -61,30 +63,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Flux Media Server',
+                  l.appTitle,
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter your email to sign in',
+                  l.enterEmailToSignIn,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
+                  decoration: InputDecoration(
+                    labelText: l.email,
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.email),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
+                      return l.pleaseEnterEmail;
                     }
                     if (!RegExp(r'^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,4}$')
                         .hasMatch(value)) {
-                      return 'Please enter a valid email';
+                      return l.pleaseEnterValidEmail;
                     }
                     return null;
                   },
@@ -97,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: authState is AuthLoading ? null : _requestCode,
                     child: authState is AuthLoading
                         ? const CircularProgressIndicator()
-                        : const Text('Get Code'),
+                        : Text(l.getCode),
                   ),
                 ),
                 if (authState is AuthError) ...[
@@ -111,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextButton(
                   onPressed: () =>
                       context.router.replace(const ServerSetupRoute()),
-                  child: const Text('Change server'),
+                  child: Text(l.changeServer),
                 ),
               ],
             ),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 
 import 'core/router/app_router.dart';
 import 'core/router/auth_guard.dart';
@@ -20,7 +22,6 @@ void main() async {
     ],
   );
 
-  // Auto-login: if a token exists, verify it before showing UI.
   if (serverUrl != null) {
     await container.read(settingsProvider.notifier).init();
     final settings = container.read(settingsProvider).settings;
@@ -65,6 +66,8 @@ class _FluxAppState extends ConsumerState<FluxApp> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider).settings;
+
     ref.listen(authProvider, (previous, next) {
       if (previous is AuthAuthenticated && next is AuthInitial) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -86,6 +89,14 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         brightness: Brightness.dark,
       ),
       themeMode: ThemeMode.system,
+      locale: Locale(settings.locale),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       routerConfig: widget.router.config(),
     );
   }

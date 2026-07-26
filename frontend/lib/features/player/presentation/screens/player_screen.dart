@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
+import 'package:flux_media_server/features/player/presentation/widgets/pip_manager.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 final videoControllerProvider = Provider<VideoController>((ref) {
@@ -41,6 +43,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     ref.read(playerProvider.notifier).stop();
+    if (PipManager.isActive) {
+      PipManager.exitPip();
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -53,6 +58,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final state = ref.watch(playerProvider);
     final videoController = ref.watch(videoControllerProvider);
 
@@ -107,13 +113,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           },
                         ),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            // Left: position time
                             Text(
                               position.formatted,
                               style: const TextStyle(color: Colors.white),
                             ),
-                            const SizedBox(width: 16),
+                            // Center: play/pause
                             IconButton(
                               iconSize: 48,
                               color: Colors.white,
@@ -128,10 +135,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 }
                               },
                             ),
-                            const SizedBox(width: 16),
-                            Text(
-                              duration != null ? duration.formatted : '--:--',
-                              style: const TextStyle(color: Colors.white),
+                            // Right: duration + PiP
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  duration != null ? duration.formatted : '--:--',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  color: Colors.white,
+                                  icon: const Icon(Icons.picture_in_picture_alt),
+                                  tooltip: l.pictureInPicture,
+                                  onPressed: () {
+                                    PipManager.enterPip(
+                                      context: context,
+                                      videoController: videoController,
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -148,9 +172,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             children: [
               const Icon(Icons.replay, size: 64, color: Colors.white),
               const SizedBox(height: 16),
-              const Text(
-                'Playback completed',
-                style: TextStyle(color: Colors.white, fontSize: 18),
+              Text(
+                l.playbackCompleted,
+                style: const TextStyle(color: Colors.white, fontSize: 18),
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -158,7 +182,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ref.read(playerProvider.notifier).reset();
                   ref.read(playerProvider.notifier).play(widget.media);
                 },
-                child: const Text('Replay'),
+                child: Text(l.replay),
               ),
             ],
           ),
@@ -180,7 +204,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ref.read(playerProvider.notifier).reset();
                   ref.read(playerProvider.notifier).play(widget.media);
                 },
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),

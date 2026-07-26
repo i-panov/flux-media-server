@@ -6,6 +6,11 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
+import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class MediaDetailScreen extends ConsumerStatefulWidget {
@@ -29,108 +34,250 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     return '$baseUrl/media/${widget.mediaId}/thumb';
   }
 
+  Future<void> _toggleFavorite() async {
+    final media = ref.read(mediaDetailProvider).maybeWhen(
+      loaded: (m) => m,
+      orElse: () => null,
+    );
+    if (media == null) return;
+
+    final type = media.type; // 'video' or 'audio'
+    await ref.read(favoriteToggleProvider(widget.mediaId).notifier).toggle(
+          widget.mediaId,
+          type,
+        );
+  }
+
+  Future<void> _addToCollection() async {
+    await showAddToCollectionDialog(context, ref, widget.mediaId);
+  }
+
+  Future<void> _download() async {
+    final media = ref.read(mediaDetailProvider).maybeWhen(
+      loaded: (m) => m,
+      orElse: () => null,
+    );
+    if (media == null) return;
+
+    final downloadState = ref.read(downloadNotifierProvider(widget.mediaId));
+
+    if (downloadState is DownloadDownloaded) {
+      await ref.read(downloadNotifierProvider(widget.mediaId).notifier).remove(widget.mediaId);
+    } else if (downloadState is! DownloadDownloading) {
+      await ref.read(downloadNotifierProvider(widget.mediaId).notifier).download(media);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final state = ref.watch(mediaDetailProvider);
+    final favoriteState = ref.watch(favoriteToggleProvider(widget.mediaId));
+    final downloadState = ref.watch(downloadNotifierProvider(widget.mediaId));
+
+    // Initialize favorite toggle state
+    final isFavorite = favoriteState.valueOrNull ?? false;
+    final favoritesAsync = ref.watch(favoritesProvider(null));
+    favoritesAsync.whenData((favorites) {
+      final isFav = favorites.any((f) => f.mediaId == widget.mediaId);
+      ref.read(favoriteToggleProvider(widget.mediaId).notifier).init(isFav);
+    });
+
+    final downloadProgress = switch (downloadState) {
+      DownloadDownloading(:final progress) => progress,
+      _ => 0.0,
+    };
+    final isDownloading = downloadState is DownloadDownloading;
 
     return Scaffold(
-      appBar: AppBar(
-        title: state.when(
-          loading: () => const Text('Media Detail'),
-          loaded: (media) => Text(media.title),
-          error: (_) => const Text('Media Detail'),
-        ),
-      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        loaded: (media) => SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Hero(
-                tag: 'media-thumb-${media.id}',
-                child: CachedNetworkImage(
-                  imageUrl: _thumbnailUrl(),
-                  fit: BoxFit.cover,
+        loaded: (media) => Stack(
+          children: [
+            // Backdrop image
+            Hero(
+              tag: 'media-thumb-${media.id}',
+              child: CachedNetworkImage(
+                imageUrl: _thumbnailUrl(),
+                fit: BoxFit.cover,
+                height: 300,
+                width: double.infinity,
+                placeholder: (_, __) => const SizedBox(
                   height: 300,
-                  placeholder: (_, __) => const SizedBox(
-                    height: 300,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (_, __, ___) => const SizedBox(
-                    height: 300,
-                    child: Center(child: Icon(Icons.broken_image, size: 64)),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (_, __, ___) => const SizedBox(
+                  height: 300,
+                  child: Center(child: Icon(Icons.broken_image, size: 64)),
+                ),
+              ),
+            ),
+            // Gradient overlay
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black87,
+                    ],
+                    stops: [0.5, 1.0],
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      media.title,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${media.year} · ${media.type}',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Colors.grey,
+            ),
+            // Content
+            SingleChildScrollView(
+              padding: const EdgeInsets.only(top: 200, bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          media.title,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${media.year} · ${media.type}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                        if (media.artist != null &&
+                            media.artist!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            media.artist!,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                           ),
-                    ),
-                    if (media.artist != null && media.artist!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        media.artist!,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
+                        ],
+                        if (media.album != null &&
+                            media.album!.isNotEmpty) ...[
+                          Text(
+                            media.album!,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Colors.grey),
+                          ),
+                        ],
+                        if (media.genre != null &&
+                            media.genre!.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Chip(
+                            label: Text(media.genre!),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                        if (media.description != null) ...[
+                          const SizedBox(height: 16),
+                          Text(media.description!),
+                        ],
+                        if (media.duration != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '${l.duration}: ${Duration(seconds: media.duration!).formatted}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        // Play button
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              context.router
+                                  .push(PlayerRoute(media: media));
+                            },
+                            icon: const Icon(Icons.play_arrow),
+                            label: Text(l.play),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Action buttons row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _toggleFavorite,
+                                icon: Icon(
+                                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  color: isFavorite ? Colors.red : null,
+                                ),
+                                label: Text(l.favorites),
+                              ),
                             ),
-                      ),
-                    ],
-                    if (media.album != null && media.album!.isNotEmpty) ...[
-                      Text(
-                        media.album!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _addToCollection,
+                                icon: const Icon(Icons.add_to_queue),
+                                label: Text(l.myCollections),
+                              ),
                             ),
-                      ),
-                    ],
-                    if (media.genre != null && media.genre!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Chip(
-                        label: Text(media.genre!),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                    if (media.description != null) ...[
-                      const SizedBox(height: 16),
-                      Text(media.description!),
-                    ],
-                    if (media.duration != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Duration: ${Duration(seconds: media.duration!).formatted}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          context.router.push(PlayerRoute(media: media));
-                        },
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Play'),
-                      ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: isDownloading
+                                    ? null
+                                    : _download,
+                                icon: isDownloading
+                                    ? SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          value: downloadProgress > 0 ? downloadProgress : null,
+                                        ),
+                                      )
+                                    : Icon(
+                                        downloadState is DownloadDownloaded
+                                            ? Icons.check_circle
+                                            : Icons.cloud_download,
+                                        color: downloadState is DownloadDownloaded
+                                            ? Theme.of(context).colorScheme.primary
+                                            : null,
+                                      ),
+                                label: Text(
+                                  switch (downloadState) {
+                                    DownloadDownloading(:final progress) =>
+                                        progress > 0 ? '${(progress * 100).toInt()}%' : l.downloading,
+                                    DownloadDownloaded() => l.downloaded,
+                                    DownloadError() => l.errorLabel,
+                                    _ => l.download,
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         error: (message) => Center(
           child: Column(
@@ -139,9 +286,10 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
               Text(message),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () =>
-                    ref.read(mediaDetailProvider.notifier).load(widget.mediaId),
-                child: const Text('Retry'),
+                onPressed: () => ref
+                    .read(mediaDetailProvider.notifier)
+                    .load(widget.mediaId),
+                child: Text(l.retry),
               ),
             ],
           ),

@@ -45,7 +45,7 @@ final favoritesProvider =
 /// Tracks favorite media IDs for quick lookup.
 final favoriteMediaIdsProvider =
     FutureProvider.autoDispose.family<Set<int>, String>((ref, type) async {
-  final favorites = await ref.watch(favoritesProvider(type));
+  final favorites = await ref.watch(favoritesProvider(type).future);
   return favorites
       .where((f) => f.mediaId != null)
       .map((f) => f.mediaId!)

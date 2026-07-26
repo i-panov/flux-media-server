@@ -1,0 +1,215 @@
+{
+  "@@locale": "ru",
+  "appTitle": "Flux Media Server",
+  "videoTab": "Видео",
+  "audioTab": "Аудио",
+  "settings": "Настройки",
+  "upload": "Загрузка",
+  "search": "Поиск",
+  "searchMedia": "Поиск медиа...",
+  "noMediaFound": "Медиа не найдено",
+  "noResultsFound": "Ничего не найдено",
+  "retry": "Повторить",
+  "server": "Сервер",
+  "serverUrl": "URL сервера",
+  "save": "Сохранить",
+  "serverUrlSaved": "URL сервера сохранён",
+  "account": "Аккаунт",
+  "logout": "Выйти",
+  "loggedOut": "Вы вышли из системы",
+  "language": "Язык",
+  "downloads": "Загрузки",
+  "clearCache": "Очистить кэш",
+  "about": "О приложении",
+  "version": "Версия",
+  "play": "Воспроизвести",
+  "duration": "Длительность",
+  "mediaDetail": "Детали медиа",
+  "continueWatching": "Продолжить просмотр",
+  "recentlyAdded": "Недавно добавлено",
+  "favorites": "Избранное",
+  "myCollections": "Мои коллекции",
+  "allMovies": "Все фильмы",
+  "likedTracks": "Любимые треки",
+  "artists": "Артисты",
+  "libraries": "Библиотеки",
+  "noLibrariesYet": "Библиотек пока нет",
+  "createLibrary": "Создать библиотеку",
+  "newLibrary": "Новая библиотека",
+  "name": "Название",
+  "type": "Тип",
+  "cancel": "Отмена",
+  "create": "Создать",
+  "delete": "Удалить",
+  "deleteLibrary": "Удалить библиотеку",
+  "scanning": "Сканирование...",
+  "scanLibrary": "Сканировать библиотеку",
+  "deleteLibraryConfirm": "Удалить \"{name}\"? Файлы на диске не будут удалены.",
+  "@deleteLibraryConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "scanCompleted": "Сканирование завершено",
+  "playbackCompleted": "Воспроизведение завершено",
+  "replay": "Повторить",
+  "edit": "Изменить",
+  "download": "Скачать",
+  "addToCollection": "Добавить в коллекцию",
+  "@addToCollection": {},
+  "connect": "Подключиться",
+  "@connect": {},
+  "enterServerAddress": "Введите адрес сервера для подключения",
+  "@enterServerAddress": {},
+  "pleaseEnterServerUrl": "Пожалуйста, введите URL сервера",
+  "@pleaseEnterServerUrl": {},
+  "urlMustStartWithHttp": "URL должен начинаться с http:// или https://",
+  "@urlMustStartWithHttp": {},
+  "enterEmailToSignIn": "Введите email для входа",
+  "@enterEmailToSignIn": {},
+  "email": "Email",
+  "@email": {},
+  "pleaseEnterEmail": "Пожалуйста, введите email",
+  "@pleaseEnterEmail": {},
+  "pleaseEnterValidEmail": "Пожалуйста, введите корректный email",
+  "@pleaseEnterValidEmail": {},
+  "getCode": "Получить код",
+  "@getCode": {},
+  "changeServer": "Сменить сервер",
+  "@changeServer": {},
+  "enterCode": "Введите код",
+  "@enterCode": {},
+  "checkYourEmail": "Проверьте почту",
+  "@checkYourEmail": {},
+  "sentCodeTo": "Мы отправили код на {email}",
+  "@sentCodeTo": {
+    "placeholders": {
+      "email": { "type": "String" }
+    }
+  },
+  "debugCodeLabel": "Отладочный код: {code}",
+  "@debugCodeLabel": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "code": "Код",
+  "@code": {},
+  "pleaseEnterCode": "Пожалуйста, введите код",
+  "@pleaseEnterCode": {},
+  "codeMustBe6Digits": "Код должен состоять из 6 цифр",
+  "@codeMustBe6Digits": {},
+  "verify": "Проверить",
+  "@verify": {},
+  "resendCode": "Отправить снова",
+  "@resendCode": {},
+  "uploadMedia": "Загрузка медиа",
+  "@uploadMedia": {},
+  "selectFiles": "Выбрать файлы",
+  "@selectFiles": {},
+  "noFilesSelected": "Файлы не выбраны",
+  "@noFilesSelected": {},
+  "uploading": "Загрузка...",
+  "@uploading": {},
+  "errorLoadingLibraries": "Ошибка загрузки библиотек",
+  "@errorLoadingLibraries": {},
+  "uploadedOfTotal": "Загружено {success} из {total} файлов",
+  "@uploadedOfTotal": {
+    "placeholders": {
+      "success": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "skippedAlreadyExists": "{count} пропущено — уже существует",
+  "@skippedAlreadyExists": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "checkingFile": "Проверка {name}...",
+  "@checkingFile": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "ofTotal": "{current} из {total}",
+  "@ofTotal": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "filesSkippedOnServer": "{count} файл(ов) пропущено (уже на сервере)",
+  "@filesSkippedOnServer": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "errorLoadingLyrics": "Ошибка загрузки текста",
+  "@errorLoadingLyrics": {},
+  "noLyricsAvailable": "Текст отсутствует",
+  "@noLyricsAvailable": {},
+  "errorLoadingTranslation": "Ошибка загрузки перевода",
+  "@errorLoadingTranslation": {},
+  "noTranslationAvailable": "Перевод отсутствует",
+  "@noTranslationAvailable": {},
+  "queueIsEmpty": "Очередь пуста",
+  "@queueIsEmpty": {},
+  "lyrics": "Текст",
+  "@lyrics": {},
+  "translation": "Перевод",
+  "@translation": {},
+  "queue": "Очередь",
+  "@queue": {},
+  "pictureInPicture": "Картинка в картинке",
+  "@pictureInPicture": {},
+  "deleteCollection": "Удалить коллекцию",
+  "@deleteCollection": {},
+  "deleteCollectionConfirm": "Вы уверены, что хотите удалить \"{name}\"?",
+  "@deleteCollectionConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "thisCollectionIsEmpty": "Эта коллекция пуста",
+  "@thisCollectionIsEmpty": {},
+  "noCollectionsYetCreate": "Коллекций пока нет. Создайте первую.",
+  "@noCollectionsYetCreate": {},
+  "addedToCollection": "Добавлено в \"{name}\"",
+  "@addedToCollection": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "failedToAdd": "Не удалось добавить: {error}",
+  "@failedToAdd": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "allTracks": "Все треки",
+  "@allTracks": {},
+  "downloadedOfTotalTracks": "Загружено {done}/{total} треков",
+  "@downloadedOfTotalTracks": {
+    "placeholders": {
+      "done": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "noTracksFoundForArtist": "Треки не найдены для \"{name}\"",
+  "@noTracksFoundForArtist": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "done": "Готово",
+  "@done": {},
+  "downloading": "Загрузка...",
+  "@downloading": {},
+  "downloaded": "Загружено",
+  "@downloaded": {},
+  "errorLabel": "Ошибка",
+  "@errorLabel": {}
+}

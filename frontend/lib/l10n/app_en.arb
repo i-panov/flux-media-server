@@ -1,0 +1,264 @@
+{
+  "@@locale": "en",
+  "appTitle": "Flux Media Server",
+  "@appTitle": {},
+  "videoTab": "Video",
+  "@videoTab": {},
+  "audioTab": "Audio",
+  "@audioTab": {},
+  "settings": "Settings",
+  "@settings": {},
+  "upload": "Upload",
+  "@upload": {},
+  "search": "Search",
+  "@search": {},
+  "searchMedia": "Search media...",
+  "@searchMedia": {},
+  "noMediaFound": "No media found",
+  "@noMediaFound": {},
+  "noResultsFound": "No results found",
+  "@noResultsFound": {},
+  "retry": "Retry",
+  "@retry": {},
+  "server": "Server",
+  "@server": {},
+  "serverUrl": "Server URL",
+  "@serverUrl": {},
+  "save": "Save",
+  "@save": {},
+  "serverUrlSaved": "Server URL saved",
+  "@serverUrlSaved": {},
+  "account": "Account",
+  "@account": {},
+  "logout": "Logout",
+  "@logout": {},
+  "loggedOut": "Logged out",
+  "@loggedOut": {},
+  "language": "Language",
+  "@language": {},
+  "downloads": "Downloads",
+  "@downloads": {},
+  "clearCache": "Clear cache",
+  "@clearCache": {},
+  "about": "About",
+  "@about": {},
+  "version": "Version",
+  "@version": {},
+  "play": "Play",
+  "@play": {},
+  "duration": "Duration",
+  "@duration": {},
+  "mediaDetail": "Media Detail",
+  "@mediaDetail": {},
+  "continueWatching": "Continue Watching",
+  "@continueWatching": {},
+  "recentlyAdded": "Recently Added",
+  "@recentlyAdded": {},
+  "favorites": "Favorites",
+  "@favorites": {},
+  "myCollections": "My Collections",
+  "@myCollections": {},
+  "allMovies": "All Movies",
+  "@allMovies": {},
+  "likedTracks": "Liked Tracks",
+  "@likedTracks": {},
+  "artists": "Artists",
+  "@artists": {},
+  "libraries": "Libraries",
+  "@libraries": {},
+  "noLibrariesYet": "No libraries yet",
+  "@noLibrariesYet": {},
+  "createLibrary": "Create Library",
+  "@createLibrary": {},
+  "newLibrary": "New Library",
+  "@newLibrary": {},
+  "name": "Name",
+  "@name": {},
+  "type": "Type",
+  "@type": {},
+  "cancel": "Cancel",
+  "@cancel": {},
+  "create": "Create",
+  "@create": {},
+  "delete": "Delete",
+  "@delete": {},
+  "deleteLibrary": "Delete Library",
+  "@deleteLibrary": {},
+  "scanning": "Scanning...",
+  "@scanning": {},
+  "scanLibrary": "Scan library",
+  "@scanLibrary": {},
+  "deleteLibraryConfirm": "Delete \"{name}\"? Files on disk will not be removed.",
+  "@deleteLibraryConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "scanCompleted": "Scan completed",
+  "@scanCompleted": {},
+  "playbackCompleted": "Playback completed",
+  "@playbackCompleted": {},
+  "replay": "Replay",
+  "@replay": {},
+  "edit": "Edit",
+  "@edit": {},
+  "download": "Download",
+  "@download": {},
+  "addToCollection": "Add to Collection",
+  "@addToCollection": {},
+  "connect": "Connect",
+  "@connect": {},
+  "enterServerAddress": "Enter the server address to connect",
+  "@enterServerAddress": {},
+  "pleaseEnterServerUrl": "Please enter the server URL",
+  "@pleaseEnterServerUrl": {},
+  "urlMustStartWithHttp": "URL must start with http:// or https://",
+  "@urlMustStartWithHttp": {},
+  "enterEmailToSignIn": "Enter your email to sign in",
+  "@enterEmailToSignIn": {},
+  "email": "Email",
+  "@email": {},
+  "pleaseEnterEmail": "Please enter your email",
+  "@pleaseEnterEmail": {},
+  "pleaseEnterValidEmail": "Please enter a valid email",
+  "@pleaseEnterValidEmail": {},
+  "getCode": "Get Code",
+  "@getCode": {},
+  "changeServer": "Change server",
+  "@changeServer": {},
+  "enterCode": "Enter Code",
+  "@enterCode": {},
+  "checkYourEmail": "Check your email",
+  "@checkYourEmail": {},
+  "sentCodeTo": "We sent a code to {email}",
+  "@sentCodeTo": {
+    "placeholders": {
+      "email": { "type": "String" }
+    }
+  },
+  "debugCodeLabel": "Debug code: {code}",
+  "@debugCodeLabel": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "code": "Code",
+  "@code": {},
+  "pleaseEnterCode": "Please enter the code",
+  "@pleaseEnterCode": {},
+  "codeMustBe6Digits": "Code must be 6 digits",
+  "@codeMustBe6Digits": {},
+  "verify": "Verify",
+  "@verify": {},
+  "resendCode": "Resend Code",
+  "@resendCode": {},
+  "uploadMedia": "Upload Media",
+  "@uploadMedia": {},
+  "selectFiles": "Select Files",
+  "@selectFiles": {},
+  "noFilesSelected": "No files selected",
+  "@noFilesSelected": {},
+  "uploading": "Uploading...",
+  "@uploading": {},
+  "errorLoadingLibraries": "Error loading libraries",
+  "@errorLoadingLibraries": {},
+  "uploadedOfTotal": "Uploaded {success} of {total} files",
+  "@uploadedOfTotal": {
+    "placeholders": {
+      "success": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "skippedAlreadyExists": "{count} skipped - already exists",
+  "@skippedAlreadyExists": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "checkingFile": "Checking {name}...",
+  "@checkingFile": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "ofTotal": "{current} of {total}",
+  "@ofTotal": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "filesSkippedOnServer": "{count} file(s) skipped (already on server)",
+  "@filesSkippedOnServer": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "errorLoadingLyrics": "Error loading lyrics",
+  "@errorLoadingLyrics": {},
+  "noLyricsAvailable": "No lyrics available",
+  "@noLyricsAvailable": {},
+  "errorLoadingTranslation": "Error loading translation",
+  "@errorLoadingTranslation": {},
+  "noTranslationAvailable": "No translation available",
+  "@noTranslationAvailable": {},
+  "queueIsEmpty": "Queue is empty",
+  "@queueIsEmpty": {},
+  "lyrics": "Lyrics",
+  "@lyrics": {},
+  "translation": "Translation",
+  "@translation": {},
+  "queue": "Queue",
+  "@queue": {},
+  "pictureInPicture": "Picture in Picture",
+  "@pictureInPicture": {},
+  "deleteCollection": "Delete Collection",
+  "@deleteCollection": {},
+  "deleteCollectionConfirm": "Are you sure you want to delete \"{name}\"?",
+  "@deleteCollectionConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "thisCollectionIsEmpty": "This collection is empty",
+  "@thisCollectionIsEmpty": {},
+  "noCollectionsYetCreate": "No collections yet. Create one first.",
+  "@noCollectionsYetCreate": {},
+  "addedToCollection": "Added to \"{name}\"",
+  "@addedToCollection": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "failedToAdd": "Failed to add: {error}",
+  "@failedToAdd": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "allTracks": "All Tracks",
+  "@allTracks": {},
+  "downloadedOfTotalTracks": "Downloaded {done}/{total} tracks",
+  "@downloadedOfTotalTracks": {
+    "placeholders": {
+      "done": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "noTracksFoundForArtist": "No tracks found for \"{name}\"",
+  "@noTracksFoundForArtist": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "done": "Done",
+  "@done": {},
+  "downloading": "Downloading...",
+  "@downloading": {},
+  "downloaded": "Downloaded",
+  "@downloaded": {},
+  "errorLabel": "Error",
+  "@errorLabel": {}
+}

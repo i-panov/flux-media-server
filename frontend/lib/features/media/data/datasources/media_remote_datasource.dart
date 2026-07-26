@@ -4,6 +4,7 @@ import 'package:http/http.dart' show MultipartFile;
 import 'package:flux_media_server/core/network/api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:flux_media_server/shared/models/progress.dart';
 
 /// Remote data source for media API calls.
 class MediaRemoteDataSource {
@@ -79,5 +80,29 @@ class MediaRemoteDataSource {
     );
     checkResponse(response, 'Failed to upload file');
     return Media.fromJson(response.body!);
+  }
+
+  /// Fetches watch progress for all media.
+  Future<List<WatchProgress>> getProgress() async {
+    final Response<List<dynamic>> response = await apiClient.getProgress();
+    checkResponse(response, 'Failed to fetch progress');
+    return response.body!
+        .map((e) => WatchProgress.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Updates watch progress for a media item.
+  Future<WatchProgress> updateProgress(
+    int mediaId, {
+    int? position,
+    int? duration,
+    bool? completed,
+  }) async {
+    final Response<Map<String, dynamic>> response = await apiClient.updateProgress(
+      mediaId,
+      {'position': position, 'duration': duration, 'completed': completed},
+    );
+    checkResponse(response, 'Failed to update progress');
+    return WatchProgress.fromJson(response.body!);
   }
 }

@@ -7,6 +7,7 @@ import 'package:flux_media_server/features/media/domain/usecases/get_media_detai
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:flux_media_server/shared/models/progress.dart';
 
 Media _fakeMedia(int id, [String? title]) => Media(
       id: id,
@@ -48,6 +49,26 @@ class FakeMediaRepository implements MediaRepository {
     required String fileName,
   }) async =>
       Right(_fakeMedia(0, fileName));
+
+  @override
+  Future<Either<Failure, List<WatchProgress>>> getProgress() async =>
+      const Right([]);
+
+  @override
+  Future<Either<Failure, WatchProgress>> updateProgress(
+    int mediaId, {
+    int? position,
+    int? duration,
+    bool? completed,
+  }) async =>
+      const Right(WatchProgress(
+        id: 0,
+        userId: 0,
+        mediaId: 0,
+        position: 0,
+        duration: 0,
+        completed: false,
+      ));
 }
 
 void main() {

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class CodeScreen extends ConsumerStatefulWidget {
@@ -49,6 +50,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final authState = ref.watch(authProvider);
 
     ref.listen(authProvider, (previous, next) {
@@ -61,7 +63,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Enter Code'),
+        title: Text(l.enterCode),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -78,12 +80,12 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Check your email',
+                  l.checkYourEmail,
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'We sent a code to ${widget.email}',
+                  l.sentCodeTo(widget.email),
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -102,7 +104,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                         Icon(Icons.bug_report, color: Colors.orange.shade700),
                         const SizedBox(width: 8),
                         Text(
-                          'Debug code: ${widget.debugCode}',
+                          l.debugCodeLabel(widget.debugCode!),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.orange.shade900,
@@ -122,17 +124,17 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                     fontSize: 24,
                     letterSpacing: 8,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Code',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l.code,
+                    border: const OutlineInputBorder(),
                     hintText: '000000',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter the code';
+                      return l.pleaseEnterCode;
                     }
                     if (value.length != 6) {
-                      return 'Code must be 6 digits';
+                      return l.codeMustBe6Digits;
                     }
                     return null;
                   },
@@ -145,7 +147,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                     onPressed: authState is AuthLoading ? null : _verifyCode,
                     child: authState is AuthLoading
                         ? const CircularProgressIndicator()
-                        : const Text('Verify'),
+                        : Text(l.verify),
                   ),
                 ),
                 if (authState is AuthError) ...[
@@ -162,7 +164,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                         .read(authProvider.notifier)
                         .requestCode(widget.email);
                   },
-                  child: const Text('Resend Code'),
+                  child: Text(l.resendCode),
                 ),
               ],
             ),

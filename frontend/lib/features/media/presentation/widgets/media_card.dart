@@ -5,70 +5,142 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 class MediaCard extends ConsumerWidget {
-  const MediaCard({super.key, required this.media, this.onTap});
+  const MediaCard({
+    super.key,
+    required this.media,
+    this.onTap,
+    this.isFavorite = false,
+    this.onFavorite,
+    this.isDownloaded = false,
+    this.onDownload,
+  });
 
   final Media media;
   final VoidCallback? onTap;
+  final bool isFavorite;
+  final VoidCallback? onFavorite;
+  final bool isDownloaded;
+  final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final baseUrl = ref.watch(baseUrlProvider);
     final thumbnailUrl = '$baseUrl/media/${media.id}/thumb';
+    final colorScheme = Theme.of(context).colorScheme;
+
     return RepaintBoundary(
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
             children: [
-              Expanded(
-                child: Hero(
-                  tag: 'media-thumb-${media.id}',
-                  child: CachedNetworkImage(
-                    imageUrl: thumbnailUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => const Center(
-                      child: CircularProgressIndicator(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Hero(
+                      tag: 'media-thumb-${media.id}',
+                      child: CachedNetworkImage(
+                        imageUrl: thumbnailUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                        errorWidget: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image, size: 48),
+                        ),
+                      ),
                     ),
-                    errorWidget: (_, __, ___) => const Center(
-                      child: Icon(Icons.broken_image, size: 48),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          media.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        if (media.artist != null && media.artist!.isNotEmpty)
+                          ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              media.artist!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.primary,
+                                  ),
+                            ),
+                          ],
+                        const SizedBox(height: 2),
+                        Text(
+                          '${media.year}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              // Favorite overlay
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Material(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: onFavorite,
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        size: 16,
+                        color: isFavorite ? Colors.red : Colors.white,
+                      ),
                     ),
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      media.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    if (media.artist != null && media.artist!.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        media.artist!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
+              // Download overlay
+              if (onDownload != null)
+                Positioned(
+                  bottom: 4,
+                  right: 4,
+                  child: Material(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: onDownload,
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Icon(
+                          isDownloaded
+                              ? Icons.check_circle
+                              : Icons.cloud_download_outlined,
+                          size: 16,
+                          color: isDownloaded
+                              ? colorScheme.primary
+                              : Colors.white,
+                        ),
                       ),
-                    ],
-                    const SizedBox(height: 2),
-                    Text(
-                      '${media.year}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
-                          ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

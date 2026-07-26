@@ -64,6 +64,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     final settings = await _repository.getSettings();
     state = SettingsState(settings: settings);
   }
+
+  Future<void> setLocale(String locale) async {
+    await _repository.setLocale(locale);
+    final settings = await _repository.getSettings();
+    state = SettingsState(settings: settings);
+  }
 }
 
 final settingsProvider =

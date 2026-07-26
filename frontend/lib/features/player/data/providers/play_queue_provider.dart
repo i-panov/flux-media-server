@@ -1,0 +1,106 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/shared/models/media.dart';
+
+/// Manages a play queue: ordered list of media items with current index.
+/// Supports next/previous, add, remove, and reorder.
+class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
+  PlayQueueNotifier(this._coordinator) : super(const PlayQueueState());
+
+  final PlaybackCoordinator _coordinator;
+
+  /// Sets the queue to [items], starting playback from [startIndex].
+  Future<void> setQueue(List<Media> items, {int startIndex = 0}) async {
+    state = PlayQueueState(items: items, currentIndex: startIndex);
+    if (items.isNotEmpty && startIndex < items.length) {
+      await _coordinator.play(items[startIndex]);
+    }
+  }
+
+  /// Adds a single item to the end of the queue.
+  void enqueue(Media item) {
+    state = state.copyWith(items: [...state.items, item]);
+  }
+
+  /// Adds multiple items to the queue.
+  void enqueueAll(List<Media> items) {
+    state = state.copyWith(items: [...state.items, ...items]);
+  }
+
+  /// Plays the next track in the queue.
+  /// Returns false if there is no next track.
+  Future<bool> next() async {
+    if (state.currentIndex + 1 >= state.items.length) return false;
+    final newIndex = state.currentIndex + 1;
+    state = state.copyWith(currentIndex: newIndex);
+    await _coordinator.play(state.items[newIndex]);
+    return true;
+  }
+
+  /// Plays the previous track in the queue.
+  /// Returns false if there is no previous track.
+  Future<bool> previous() async {
+    if (state.currentIndex <= 0) return false;
+    final newIndex = state.currentIndex - 1;
+    state = state.copyWith(currentIndex: newIndex);
+    await _coordinator.play(state.items[newIndex]);
+    return true;
+  }
+
+  /// Removes item at [index] from the queue.
+  void removeAt(int index) {
+    final items = List<Media>.from(state.items)..removeAt(index);
+    final newIndex = index <= state.currentIndex
+        ? (state.currentIndex - 1).clamp(0, items.length - 1)
+        : state.currentIndex;
+    state = PlayQueueState(items: items, currentIndex: items.isEmpty ? -1 : newIndex);
+  }
+
+  /// Clears the queue.
+  void clear() {
+    state = const PlayQueueState();
+  }
+
+  /// Returns the current media item, or null if queue is empty.
+  Media? get current => state.currentIndex >= 0 && state.currentIndex < state.items.length
+      ? state.items[state.currentIndex]
+      : null;
+
+  /// Returns upcoming items after the current one.
+  List<Media> get upcoming =>
+      state.currentIndex + 1 < state.items.length
+          ? state.items.sublist(state.currentIndex + 1)
+          : [];
+}
+
+/// State of the play queue.
+class PlayQueueState {
+  const PlayQueueState({
+    this.items = const [],
+    this.currentIndex = -1,
+  });
+
+  final List<Media> items;
+  final int currentIndex;
+
+  bool get isEmpty => items.isEmpty;
+  bool get isNotEmpty => items.isNotEmpty;
+  bool get hasNext => currentIndex + 1 < items.length;
+  bool get hasPrevious => currentIndex > 0;
+
+  PlayQueueState copyWith({
+    List<Media>? items,
+    int? currentIndex,
+  }) {
+    return PlayQueueState(
+      items: items ?? this.items,
+      currentIndex: currentIndex ?? this.currentIndex,
+    );
+  }
+}
+
+/// Provider for the play queue.
+final playQueueProvider =
+    StateNotifierProvider<PlayQueueNotifier, PlayQueueState>((ref) {
+  return PlayQueueNotifier(ref.watch(playbackCoordinatorProvider.notifier));
+});

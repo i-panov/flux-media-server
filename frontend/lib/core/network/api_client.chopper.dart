@@ -371,6 +371,33 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
+  Future<Response<List<dynamic>>> getProgress() {
+    final Uri $url = Uri.parse('/progress');
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
+    );
+    return client.send<List<dynamic>, List<dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> updateProgress(
+    int mediaId,
+    Map<String, dynamic> body,
+  ) {
+    final Uri $url = Uri.parse('/progress/${mediaId}');
+    final $body = body;
+    final Request $request = Request(
+      'PUT',
+      $url,
+      client.baseUrl,
+      body: $body,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> getLyrics(int id) {
     final Uri $url = Uri.parse('/media/${id}/lyrics');
     final Request $request = Request(

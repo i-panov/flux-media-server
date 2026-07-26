@@ -12,10 +12,15 @@ class SettingsLocalDataSource {
   static const _keyServerUrl = 'server_url';
   static const _keyAuthToken = 'auth_token';
   static const _keyAuthTokenFallback = 'auth_token_insecure';
+  static const _keyLocale = 'locale';
 
   String? getServerUrl() => _prefs.getString(_keyServerUrl);
 
   Future<void> setServerUrl(String url) => _prefs.setString(_keyServerUrl, url);
+
+  String getLocale() => _prefs.getString(_keyLocale) ?? 'en';
+
+  Future<void> setLocale(String locale) => _prefs.setString(_keyLocale, locale);
 
   Future<String?> getAuthToken() async {
     try {

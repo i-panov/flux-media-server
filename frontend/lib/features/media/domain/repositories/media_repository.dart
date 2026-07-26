@@ -1,6 +1,7 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:flux_media_server/shared/models/progress.dart';
 
 abstract class MediaRepository {
   Future<Either<Failure, ({List<Media> items, int total})>> getMediaList({
@@ -21,5 +22,14 @@ abstract class MediaRepository {
     required String filePath,
     required int libraryId,
     required String fileName,
+  });
+
+  Future<Either<Failure, List<WatchProgress>>> getProgress();
+
+  Future<Either<Failure, WatchProgress>> updateProgress(
+    int mediaId, {
+    int? position,
+    int? duration,
+    bool? completed,
   });
 }

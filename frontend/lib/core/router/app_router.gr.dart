@@ -15,6 +15,32 @@ abstract class _$AppRouter extends RootStackRouter {
 
   @override
   final Map<String, PageFactory> pagesMap = {
+    ArtistRoute.name: (routeData) {
+      final args = routeData.argsAs<ArtistRouteArgs>();
+      return AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: ArtistPage(
+          key: args.key,
+          artistName: args.artistName,
+        ),
+      );
+    },
+    AudioPlayerRoute.name: (routeData) {
+      final args = routeData.argsAs<AudioPlayerRouteArgs>();
+      return AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: AudioPlayerScreen(
+          key: args.key,
+          media: args.media,
+        ),
+      );
+    },
+    AudioRoute.name: (routeData) {
+      return AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: const AudioScreen(),
+      );
+    },
     CodeRoute.name: (routeData) {
       final args = routeData.argsAs<CodeRouteArgs>();
       return AutoRoutePage<dynamic>(
@@ -26,10 +52,14 @@ abstract class _$AppRouter extends RootStackRouter {
         ),
       );
     },
-    LibraryRoute.name: (routeData) {
+    CollectionDetailRoute.name: (routeData) {
+      final args = routeData.argsAs<CollectionDetailRouteArgs>();
       return AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: const LibraryScreen(),
+        child: CollectionDetailScreen(
+          key: args.key,
+          collection: args.collection,
+        ),
       );
     },
     LoginRoute.name: (routeData) {
@@ -52,12 +82,6 @@ abstract class _$AppRouter extends RootStackRouter {
           key: args.key,
           mediaId: args.mediaId,
         ),
-      );
-    },
-    MediaListRoute.name: (routeData) {
-      return AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: const MediaListScreen(),
       );
     },
     PlayerRoute.name: (routeData) {
@@ -83,12 +107,111 @@ abstract class _$AppRouter extends RootStackRouter {
       );
     },
     UploadRoute.name: (routeData) {
+      final args = routeData.argsAs<UploadRouteArgs>();
       return AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: const UploadScreen(),
+        child: UploadScreen(
+          key: args.key,
+          mediaType: args.mediaType,
+        ),
+      );
+    },
+    VideoRoute.name: (routeData) {
+      return AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: const VideoScreen(),
       );
     },
   };
+}
+
+/// generated route for
+/// [ArtistPage]
+class ArtistRoute extends PageRouteInfo<ArtistRouteArgs> {
+  ArtistRoute({
+    Key? key,
+    required String artistName,
+    List<PageRouteInfo>? children,
+  }) : super(
+          ArtistRoute.name,
+          args: ArtistRouteArgs(
+            key: key,
+            artistName: artistName,
+          ),
+          initialChildren: children,
+        );
+
+  static const String name = 'ArtistRoute';
+
+  static const PageInfo<ArtistRouteArgs> page = PageInfo<ArtistRouteArgs>(name);
+}
+
+class ArtistRouteArgs {
+  const ArtistRouteArgs({
+    this.key,
+    required this.artistName,
+  });
+
+  final Key? key;
+
+  final String artistName;
+
+  @override
+  String toString() {
+    return 'ArtistRouteArgs{key: $key, artistName: $artistName}';
+  }
+}
+
+/// generated route for
+/// [AudioPlayerScreen]
+class AudioPlayerRoute extends PageRouteInfo<AudioPlayerRouteArgs> {
+  AudioPlayerRoute({
+    Key? key,
+    required Media media,
+    List<PageRouteInfo>? children,
+  }) : super(
+          AudioPlayerRoute.name,
+          args: AudioPlayerRouteArgs(
+            key: key,
+            media: media,
+          ),
+          initialChildren: children,
+        );
+
+  static const String name = 'AudioPlayerRoute';
+
+  static const PageInfo<AudioPlayerRouteArgs> page =
+      PageInfo<AudioPlayerRouteArgs>(name);
+}
+
+class AudioPlayerRouteArgs {
+  const AudioPlayerRouteArgs({
+    this.key,
+    required this.media,
+  });
+
+  final Key? key;
+
+  final Media media;
+
+  @override
+  String toString() {
+    return 'AudioPlayerRouteArgs{key: $key, media: $media}';
+  }
+}
+
+/// generated route for
+/// [AudioScreen]
+class AudioRoute extends PageRouteInfo<void> {
+  const AudioRoute({List<PageRouteInfo>? children})
+      : super(
+          AudioRoute.name,
+          initialChildren: children,
+        );
+
+  static const String name = 'AudioRoute';
+
+  static const PageInfo<void> page = PageInfo<void>(name);
 }
 
 /// generated route for
@@ -134,17 +257,41 @@ class CodeRouteArgs {
 }
 
 /// generated route for
-/// [LibraryScreen]
-class LibraryRoute extends PageRouteInfo<void> {
-  const LibraryRoute({List<PageRouteInfo>? children})
-      : super(
-          LibraryRoute.name,
+/// [CollectionDetailScreen]
+class CollectionDetailRoute extends PageRouteInfo<CollectionDetailRouteArgs> {
+  CollectionDetailRoute({
+    Key? key,
+    required Collection collection,
+    List<PageRouteInfo>? children,
+  }) : super(
+          CollectionDetailRoute.name,
+          args: CollectionDetailRouteArgs(
+            key: key,
+            collection: collection,
+          ),
           initialChildren: children,
         );
 
-  static const String name = 'LibraryRoute';
+  static const String name = 'CollectionDetailRoute';
 
-  static const PageInfo<void> page = PageInfo<void>(name);
+  static const PageInfo<CollectionDetailRouteArgs> page =
+      PageInfo<CollectionDetailRouteArgs>(name);
+}
+
+class CollectionDetailRouteArgs {
+  const CollectionDetailRouteArgs({
+    this.key,
+    required this.collection,
+  });
+
+  final Key? key;
+
+  final Collection collection;
+
+  @override
+  String toString() {
+    return 'CollectionDetailRouteArgs{key: $key, collection: $collection}';
+  }
 }
 
 /// generated route for
@@ -214,20 +361,6 @@ class MediaDetailRouteArgs {
 }
 
 /// generated route for
-/// [MediaListScreen]
-class MediaListRoute extends PageRouteInfo<void> {
-  const MediaListRoute({List<PageRouteInfo>? children})
-      : super(
-          MediaListRoute.name,
-          initialChildren: children,
-        );
-
-  static const String name = 'MediaListRoute';
-
-  static const PageInfo<void> page = PageInfo<void>(name);
-}
-
-/// generated route for
 /// [PlayerScreen]
 class PlayerRoute extends PageRouteInfo<PlayerRouteArgs> {
   PlayerRoute({
@@ -294,14 +427,51 @@ class SettingsRoute extends PageRouteInfo<void> {
 
 /// generated route for
 /// [UploadScreen]
-class UploadRoute extends PageRouteInfo<void> {
-  const UploadRoute({List<PageRouteInfo>? children})
-      : super(
+class UploadRoute extends PageRouteInfo<UploadRouteArgs> {
+  UploadRoute({
+    Key? key,
+    required String mediaType,
+    List<PageRouteInfo>? children,
+  }) : super(
           UploadRoute.name,
+          args: UploadRouteArgs(
+            key: key,
+            mediaType: mediaType,
+          ),
           initialChildren: children,
         );
 
   static const String name = 'UploadRoute';
+
+  static const PageInfo<UploadRouteArgs> page = PageInfo<UploadRouteArgs>(name);
+}
+
+class UploadRouteArgs {
+  const UploadRouteArgs({
+    this.key,
+    required this.mediaType,
+  });
+
+  final Key? key;
+
+  final String mediaType;
+
+  @override
+  String toString() {
+    return 'UploadRouteArgs{key: $key, mediaType: $mediaType}';
+  }
+}
+
+/// generated route for
+/// [VideoScreen]
+class VideoRoute extends PageRouteInfo<void> {
+  const VideoRoute({List<PageRouteInfo>? children})
+      : super(
+          VideoRoute.name,
+          initialChildren: children,
+        );
+
+  static const String name = 'VideoRoute';
 
   static const PageInfo<void> page = PageInfo<void>(name);
 }

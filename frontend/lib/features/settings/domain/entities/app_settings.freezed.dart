@@ -18,6 +18,7 @@ final _privateConstructorUsedError = UnsupportedError(
 mixin _$AppSettings {
   String? get serverUrl => throw _privateConstructorUsedError;
   String? get authToken => throw _privateConstructorUsedError;
+  String get locale => throw _privateConstructorUsedError;
 
   @JsonKey(ignore: true)
   $AppSettingsCopyWith<AppSettings> get copyWith =>
@@ -30,7 +31,7 @@ abstract class $AppSettingsCopyWith<$Res> {
           AppSettings value, $Res Function(AppSettings) then) =
       _$AppSettingsCopyWithImpl<$Res, AppSettings>;
   @useResult
-  $Res call({String? serverUrl, String? authToken});
+  $Res call({String? serverUrl, String? authToken, String locale});
 }
 
 /// @nodoc
@@ -48,6 +49,7 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
   $Res call({
     Object? serverUrl = freezed,
     Object? authToken = freezed,
+    Object? locale = null,
   }) {
     return _then(_value.copyWith(
       serverUrl: freezed == serverUrl
@@ -58,6 +60,10 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
           ? _value.authToken
           : authToken // ignore: cast_nullable_to_non_nullable
               as String?,
+      locale: null == locale
+          ? _value.locale
+          : locale // ignore: cast_nullable_to_non_nullable
+              as String,
     ) as $Val);
   }
 }
@@ -70,7 +76,7 @@ abstract class _$$AppSettingsImplCopyWith<$Res>
       __$$AppSettingsImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String? serverUrl, String? authToken});
+  $Res call({String? serverUrl, String? authToken, String locale});
 }
 
 /// @nodoc
@@ -86,6 +92,7 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
   $Res call({
     Object? serverUrl = freezed,
     Object? authToken = freezed,
+    Object? locale = null,
   }) {
     return _then(_$AppSettingsImpl(
       serverUrl: freezed == serverUrl
@@ -96,6 +103,10 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
           ? _value.authToken
           : authToken // ignore: cast_nullable_to_non_nullable
               as String?,
+      locale: null == locale
+          ? _value.locale
+          : locale // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -103,16 +114,19 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$AppSettingsImpl implements _AppSettings {
-  const _$AppSettingsImpl({this.serverUrl, this.authToken});
+  const _$AppSettingsImpl({this.serverUrl, this.authToken, this.locale = 'en'});
 
   @override
   final String? serverUrl;
   @override
   final String? authToken;
+  @override
+  @JsonKey()
+  final String locale;
 
   @override
   String toString() {
-    return 'AppSettings(serverUrl: $serverUrl, authToken: $authToken)';
+    return 'AppSettings(serverUrl: $serverUrl, authToken: $authToken, locale: $locale)';
   }
 
   @override
@@ -123,11 +137,12 @@ class _$AppSettingsImpl implements _AppSettings {
             (identical(other.serverUrl, serverUrl) ||
                 other.serverUrl == serverUrl) &&
             (identical(other.authToken, authToken) ||
-                other.authToken == authToken));
+                other.authToken == authToken) &&
+            (identical(other.locale, locale) || other.locale == locale));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, serverUrl, authToken);
+  int get hashCode => Object.hash(runtimeType, serverUrl, authToken, locale);
 
   @JsonKey(ignore: true)
   @override
@@ -138,12 +153,16 @@ class _$AppSettingsImpl implements _AppSettings {
 
 abstract class _AppSettings implements AppSettings {
   const factory _AppSettings(
-      {final String? serverUrl, final String? authToken}) = _$AppSettingsImpl;
+      {final String? serverUrl,
+      final String? authToken,
+      final String locale}) = _$AppSettingsImpl;
 
   @override
   String? get serverUrl;
   @override
   String? get authToken;
+  @override
+  String get locale;
   @override
   @JsonKey(ignore: true)
   _$$AppSettingsImplCopyWith<_$AppSettingsImpl> get copyWith =>

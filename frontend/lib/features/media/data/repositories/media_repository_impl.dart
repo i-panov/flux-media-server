@@ -4,6 +4,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:flux_media_server/shared/models/progress.dart';
 
 class MediaRepositoryImpl implements MediaRepository {
   MediaRepositoryImpl(this.remoteDataSource);
@@ -81,6 +82,44 @@ class MediaRepositoryImpl implements MediaRepository {
         fileName: fileName,
       );
       return Right(media);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<WatchProgress>>> getProgress() async {
+    try {
+      final progress = await remoteDataSource.getProgress();
+      return Right(progress);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, WatchProgress>> updateProgress(
+    int mediaId, {
+    int? position,
+    int? duration,
+    bool? completed,
+  }) async {
+    try {
+      final progress = await remoteDataSource.updateProgress(
+        mediaId,
+        position: position,
+        duration: duration,
+        completed: completed,
+      );
+      return Right(progress);
     } on AuthException catch (e) {
       return Left(AuthFailure(message: e.message));
     } on ServerException catch (e) {

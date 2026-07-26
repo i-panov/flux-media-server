@@ -144,6 +144,16 @@ abstract class ApiClient extends ChopperService {
   @Get(path: '/collections/{id}/items')
   Future<Response<List<dynamic>>> getCollectionItems(@Path('id') int id);
 
+  // Progress
+  @Get(path: '/progress')
+  Future<Response<List<dynamic>>> getProgress();
+
+  @Put(path: '/progress/{mediaId}')
+  Future<Response<Map<String, dynamic>>> updateProgress(
+    @Path('mediaId') int mediaId,
+    @Body() Map<String, dynamic> body,
+  );
+
   // Lyrics
   @Get(path: '/media/{id}/lyrics')
   Future<Response<Map<String, dynamic>>> getLyrics(@Path('id') int id);

@@ -13,6 +13,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
     return AppSettings(
       serverUrl: _localDataSource.getServerUrl(),
       authToken: token,
+      locale: _localDataSource.getLocale(),
     );
   }
 
@@ -25,4 +26,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   Future<void> clearAuthToken() => _localDataSource.clearAuthToken();
+
+  @override
+  String getLocale() => _localDataSource.getLocale();
+
+  @override
+  Future<void> setLocale(String locale) => _localDataSource.setLocale(locale);
 }

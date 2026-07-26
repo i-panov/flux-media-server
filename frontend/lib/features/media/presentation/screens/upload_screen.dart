@@ -8,11 +8,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/library.dart';
 
 @RoutePage()
 class UploadScreen extends ConsumerStatefulWidget {
-  const UploadScreen({super.key});
+  const UploadScreen({super.key, required this.mediaType});
+
+  final String mediaType;
 
   @override
   ConsumerState<UploadScreen> createState() => _UploadScreenState();
@@ -35,13 +38,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     if (result == null || result.files.isEmpty) return;
 
+    final l = AppLocalizations.of(context)!;
     final checkMediaHash = ref.read(checkMediaHashProvider);
 
     for (final file in result.files) {
       if (file.path == null) continue;
       if (file.size == 0) continue; // skip empty files
 
-      setState(() => _statusText = 'Checking ${file.name}...');
+      setState(() => _statusText = l.checkingFile(file.name));
 
       // Compute SHA-256 hash.
       final hash = await _computeHash(File(file.path!));
@@ -83,11 +87,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   Future<void> _startUpload() async {
     if (_selectedFiles.isEmpty || _selectedLibrary == null) return;
 
+    final l = AppLocalizations.of(context)!;
+
     setState(() {
       _isUploading = true;
       _uploadedCount = 0;
       _totalCount = _selectedFiles.length;
-      _statusText = 'Uploading...';
+      _statusText = l.uploading;
     });
 
     final uploadMedia = ref.read(uploadMediaProvider);
@@ -117,12 +123,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     });
 
     if (mounted) {
-      final buffer = StringBuffer('Uploaded $successCount of $_totalCount files');
+      final buffer = StringBuffer(l.uploadedOfTotal(successCount, _totalCount));
       if (_skippedCount > 0) {
-        buffer.write(' ($_skippedCount skipped - already exists)');
+        buffer.write(' (${l.skippedAlreadyExists(_skippedCount)})');
       }
       if (firstError != null) {
-        buffer.write('\nError: $firstError');
+        buffer.write('\n${l.failedToAdd(firstError!)}');
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,43 +146,72 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final librariesAsync = ref.watch(libraryProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Upload Media'),
+        title: Text(l.uploadMedia),
         actions: [
           if (_selectedFiles.isNotEmpty && !_isUploading)
             TextButton.icon(
               onPressed: _startUpload,
               icon: const Icon(Icons.cloud_upload),
-              label: Text('Upload (${_selectedFiles.length})'),
+              label: Text(l.upload),
             ),
         ],
       ),
       body: Column(
         children: [
+          // Auto-select library based on mediaType.
           librariesAsync.when(
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('Error loading libraries: $e'),
+              child: Text('${l.errorLoadingLibraries}: $e'),
             ),
-            data: (libraries) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: DropdownButtonFormField<MediaLibrary>(
-                value: _selectedLibrary,
-                decoration: const InputDecoration(
-                  labelText: 'Target Library',
-                  border: OutlineInputBorder(),
+            data: (libraries) {
+              // Filter libraries by media type and auto-select first.
+              final filtered = libraries
+                  .where((lib) => lib.type == widget.mediaType)
+                  .toList();
+
+              if (_selectedLibrary == null && filtered.isNotEmpty) {
+                _selectedLibrary = filtered.first;
+              }
+
+              if (filtered.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(l.noLibrariesYet),
+                );
+              }
+
+              // If only one library, no need to show selector.
+              if (filtered.length == 1) {
+                return const SizedBox.shrink();
+              }
+
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: DropdownButtonFormField<MediaLibrary>(
+                  value: _selectedLibrary,
+                  decoration: InputDecoration(
+                    labelText: l.libraries,
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: filtered
+                      .map((lib) => DropdownMenuItem(
+                            value: lib,
+                            child: Text(lib.name),
+                          ))
+                      .toList(),
+                  onChanged: _isUploading
+                      ? null
+                      : (lib) => setState(() => _selectedLibrary = lib),
                 ),
-                items: libraries.map((lib) => DropdownMenuItem(
-                  value: lib,
-                  child: Text(lib.name),
-                )).toList(),
-                onChanged: _isUploading ? null : (lib) => setState(() => _selectedLibrary = lib),
-              ),
-            ),
+              );
+            },
           ),
 
           Padding(
@@ -186,7 +221,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               child: OutlinedButton.icon(
                 onPressed: _isUploading ? null : _pickFiles,
                 icon: const Icon(Icons.attach_file),
-                label: const Text('Select Files'),
+                label: Text(l.selectFiles),
               ),
             ),
           ),
@@ -206,7 +241,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                     value: _totalCount > 0 ? _uploadedCount / _totalCount : 0,
                   ),
                   const SizedBox(height: 4),
-                  Text('$_uploadedCount of $_totalCount'),
+                  Text(l.ofTotal(_uploadedCount, _totalCount)),
                 ],
               ),
             ),
@@ -216,7 +251,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             Padding(
               padding: const EdgeInsets.all(8),
               child: Text(
-                '$_skippedCount file(s) skipped (already on server)',
+                l.filesSkippedOnServer(_skippedCount),
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
               ),
             ),
@@ -253,14 +288,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               ),
             )
           else
-            const Expanded(
+            Expanded(
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cloud_upload_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('No files selected', style: TextStyle(color: Colors.grey)),
+                    const Icon(Icons.cloud_upload_outlined, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text(l.noFilesSelected, style: const TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
