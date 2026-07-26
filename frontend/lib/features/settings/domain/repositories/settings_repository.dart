@@ -6,6 +6,8 @@ abstract class SettingsRepository {
   Future<void> setServerUrl(String url);
   Future<void> setAuthToken(String token);
   Future<void> clearAuthToken();
+  Future<void> setRefreshToken(String token);
+  Future<void> clearRefreshToken();
   String getLocale();
   Future<void> setLocale(String locale);
 }

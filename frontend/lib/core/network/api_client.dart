@@ -5,18 +5,24 @@ import 'package:http/http.dart' show MultipartFile;
 
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/safe_logging_interceptor.dart';
+import 'interceptors/token_refresh_interceptor.dart';
 
 part 'api_client.chopper.dart';
 
 @ChopperApi()
 abstract class ApiClient extends ChopperService {
-  static ApiClient create({String? baseUrl, AuthInterceptor? authInterceptor}) {
+  static ApiClient create({
+    String? baseUrl,
+    AuthInterceptor? authInterceptor,
+    TokenRefreshInterceptor? tokenRefreshInterceptor,
+  }) {
     final client = ChopperClient(
       baseUrl: Uri.parse(baseUrl ?? 'http://localhost:8080/api'),
       services: [_$ApiClient()],
       converter: JsonConverter(),
       interceptors: [
         if (authInterceptor != null) authInterceptor,
+        if (tokenRefreshInterceptor != null) tokenRefreshInterceptor,
         SafeLoggingInterceptor(),
       ],
     );
@@ -31,6 +37,11 @@ abstract class ApiClient extends ChopperService {
 
   @Post(path: '/auth/verify-code')
   Future<Response<Map<String, dynamic>>> verifyCode(
+    @Body() Map<String, dynamic> body,
+  );
+
+  @Post(path: '/auth/refresh')
+  Future<Response<Map<String, dynamic>>> refreshToken(
     @Body() Map<String, dynamic> body,
   );
 

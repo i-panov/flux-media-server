@@ -20,8 +20,8 @@ class AuthRemoteDataSource {
     return response.body?['code'] as String?;
   }
 
-  /// Verifies the code sent to [email] and returns the auth token and user.
-  Future<({String token, User user})> verifyCode(
+  /// Verifies the code sent to [email] and returns the auth token, refresh token, and user.
+  Future<({String token, String refreshToken, User user})> verifyCode(
     String email,
     String code,
   ) async {
@@ -33,7 +33,23 @@ class AuthRemoteDataSource {
     final body = response.body!;
     return (
       token: body['token'] as String,
+      refreshToken: body['refresh_token'] as String,
       user: User.fromJson(body['user'] as Map<String, dynamic>),
+    );
+  }
+
+  /// Refreshes the access token using a refresh token.
+  Future<({String token, String refreshToken})> refreshTokens(
+    String refreshToken,
+  ) async {
+    final Response<Map<String, dynamic>> response = await apiClient.refreshToken({
+      'refresh_token': refreshToken,
+    });
+    checkResponse(response, 'Failed to refresh token');
+    final body = response.body!;
+    return (
+      token: body['token'] as String,
+      refreshToken: body['refresh_token'] as String,
     );
   }
 

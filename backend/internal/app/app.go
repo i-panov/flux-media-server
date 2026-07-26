@@ -51,6 +51,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	colRepo := repository.NewCollectionRepository(db)
 	colItemRepo := repository.NewCollectionItemRepository(db)
 	lyricsRepo := repository.NewLyricsRepository(db)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 
 	// Services
 	otpStore := services.NewOTPStore(
@@ -61,9 +62,13 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	jwtExpiry := time.Duration(cfg.Auth.JWTExpiry) * time.Hour
 	if jwtExpiry == 0 {
-		jwtExpiry = 24 * time.Hour
+		jwtExpiry = 1 * time.Hour
 	}
-	jwtService := services.NewJWTService(cfg.Auth.JWTSecret, jwtExpiry)
+	refreshExpiry := time.Duration(cfg.Auth.RefreshExpiry) * time.Hour
+	if refreshExpiry == 0 {
+		refreshExpiry = 720 * time.Hour // 30 days
+	}
+	jwtService := services.NewJWTService(cfg.Auth.JWTSecret, jwtExpiry, refreshExpiry)
 
 	smtpClient := email.NewSMTPClient(email.SMTPConfig{
 		Host:     cfg.Auth.SMTP.Host,
@@ -86,11 +91,11 @@ func New(cfg *config.Config, version string) (*App, error) {
 	}
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(userRepo, otpStore, jwtService, smtpClient, cfg)
+	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
 	uploadHandler := handlers.NewUploadHandler(libraryRepo, mediaRepo, scanner, handlers.UploadConfig{
-		MaxFileSize: 2 << 30, // 2GB
+		MaxFileSize: cfg.Server.MaxUploadSize,
 	})
 	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner, watcherInterface, cfg)
 
@@ -120,7 +125,23 @@ func New(cfg *config.Config, version string) (*App, error) {
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo)
 
 	// Fiber app
-	fiberApp := fiber.New()
+	fiberApp := fiber.New(fiber.Config{
+		BodyLimit: int(cfg.Server.MaxUploadSize),
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			code := fiber.StatusInternalServerError
+			if e, ok := err.(*fiber.Error); ok {
+				code = e.Code
+			}
+			if code == fiber.StatusRequestEntityTooLarge {
+				return c.Status(code).JSON(fiber.Map{
+					"error": fmt.Sprintf("File too large. Maximum upload size is %d MB", cfg.Server.MaxUploadSize/(1<<20)),
+				})
+			}
+			return c.Status(code).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		},
+	})
 	fiberApp.Use(recover.New())
 	fiberApp.Use(logger.New())
 
@@ -158,6 +179,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	auth := fiberApp.Group("/api/auth")
 	auth.Post("/request-code", authRateLimiter, authHandler.RequestCode)
 	auth.Post("/verify-code", authHandler.VerifyCode)
+	auth.Post("/refresh", authHandler.Refresh)
 
 	// Protected routes
 	api := fiberApp.Group("/api", middleware.AuthMiddleware(jwtService))

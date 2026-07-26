@@ -1,5 +1,6 @@
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
@@ -18,92 +19,47 @@ class MediaRepositoryImpl implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-  }) async {
-    try {
-      final result = await remoteDataSource.getMediaList(
-        type: type,
-        year: year,
-        q: q,
-        limit: limit,
-        offset: offset,
-      );
-      final mediaList =
-          result.items.map((json) => Media.fromJson(json)).toList();
-      return Right((items: mediaList, total: result.total));
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  }) =>
+      safeRepositoryCall(() async {
+        final result = await remoteDataSource.getMediaList(
+          type: type,
+          year: year,
+          q: q,
+          limit: limit,
+          offset: offset,
+        );
+        final mediaList =
+            result.items.map((json) => Media.fromJson(json)).toList();
+        return (items: mediaList, total: result.total);
+      });
 
   @override
-  Future<Either<Failure, Media>> getMediaDetail(int id) async {
-    try {
-      final json = await remoteDataSource.getMedia(id);
-      return Right(Media.fromJson(json));
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  Future<Either<Failure, Media>> getMediaDetail(int id) =>
+      safeRepositoryCall(() async {
+        final json = await remoteDataSource.getMedia(id);
+        return Media.fromJson(json);
+      });
 
   @override
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>> checkHash(
-    String hash,
-  ) async {
-    try {
-      final result = await remoteDataSource.checkHash(hash);
-      return Right(result);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+      checkHash(String hash) =>
+          safeRepositoryCall(() => remoteDataSource.checkHash(hash));
 
   @override
   Future<Either<Failure, Media>> uploadFile({
     required String filePath,
     required int libraryId,
     required String fileName,
-  }) async {
-    try {
-      final media = await remoteDataSource.uploadFile(
-        filePath: filePath,
-        libraryId: libraryId,
-        fileName: fileName,
-      );
-      return Right(media);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  }) =>
+      safeRepositoryCall(() => remoteDataSource.uploadFile(
+            filePath: filePath,
+            libraryId: libraryId,
+            fileName: fileName,
+          ));
 
   @override
-  Future<Either<Failure, List<WatchProgress>>> getProgress() async {
-    try {
-      final progress = await remoteDataSource.getProgress();
-      return Right(progress);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  Future<Either<Failure, List<WatchProgress>>> getProgress() =>
+      safeRepositoryCall(() => remoteDataSource.getProgress());
 
   @override
   Future<Either<Failure, WatchProgress>> updateProgress(
@@ -111,21 +67,11 @@ class MediaRepositoryImpl implements MediaRepository {
     int? position,
     int? duration,
     bool? completed,
-  }) async {
-    try {
-      final progress = await remoteDataSource.updateProgress(
-        mediaId,
-        position: position,
-        duration: duration,
-        completed: completed,
-      );
-      return Right(progress);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  }) =>
+      safeRepositoryCall(() => remoteDataSource.updateProgress(
+            mediaId,
+            position: position,
+            duration: duration,
+            completed: completed,
+          ));
 }

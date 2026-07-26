@@ -9,7 +9,10 @@ import (
 // JWTService defines the interface for JWT token operations.
 type JWTService interface {
 	GenerateToken(userID uint, email string) (string, error)
+	GenerateRefreshToken(userID uint, email string) (string, error)
+	GenerateTokenPair(userID uint, email string) (*TokenPair, error)
 	ValidateToken(tokenString string) (*Claims, error)
+	ValidateRefreshToken(tokenString string) (*Claims, error)
 }
 
 // OTPStoreInterface defines the interface for OTP code operations.

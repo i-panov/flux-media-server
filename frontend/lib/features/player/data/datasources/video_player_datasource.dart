@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:media_kit/media_kit.dart';
 
 /// Data source wrapping media_kit's [Player] for video playback.
@@ -8,9 +10,9 @@ class VideoPlayerDatasource {
   /// The underlying media_kit player.
   final Player player;
 
-  /// Opens a media stream from [url].
-  Future<void> open(String url) async {
-    await player.open(Media(url));
+  /// Opens a media stream from [url] with optional [httpHeaders].
+  Future<void> open(String url, {Map<String, String>? httpHeaders}) async {
+    await player.open(Media(url, httpHeaders: httpHeaders));
   }
 
   /// Starts or resumes playback.

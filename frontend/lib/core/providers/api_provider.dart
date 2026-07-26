@@ -1,10 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/network/api_client.dart';
 import 'package:flux_media_server/core/network/interceptors/auth_interceptor.dart';
+import 'package:flux_media_server/core/network/interceptors/token_refresh_interceptor.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 
 final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
   return AuthInterceptor(ref);
+});
+
+final tokenRefreshInterceptorProvider = Provider<TokenRefreshInterceptor>((ref) {
+  return TokenRefreshInterceptor(ref);
 });
 
 /// Provides the base URL derived from settings.
@@ -25,5 +30,10 @@ final baseUrlProvider = Provider<String>((ref) {
 final apiClientProvider = Provider<ApiClient>((ref) {
   final baseUrl = ref.watch(baseUrlProvider);
   final authInterceptor = ref.watch(authInterceptorProvider);
-  return ApiClient.create(baseUrl: baseUrl, authInterceptor: authInterceptor);
+  final tokenRefreshInterceptor = ref.watch(tokenRefreshInterceptorProvider);
+  return ApiClient.create(
+    baseUrl: baseUrl,
+    authInterceptor: authInterceptor,
+    tokenRefreshInterceptor: tokenRefreshInterceptor,
+  );
 });

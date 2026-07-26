@@ -106,7 +106,7 @@ auth:
 	assert.Equal(t, 8080, cfg.Server.Port)
 	assert.Equal(t, 6, cfg.Auth.CodeLength)
 	assert.Equal(t, 300, cfg.Auth.CodeExpiry)
-	assert.Equal(t, 24, cfg.Auth.JWTExpiry)
+	assert.Equal(t, 1, cfg.Auth.JWTExpiry)
 	assert.Equal(t, 10000, cfg.Auth.MaxOTPEntries)
 }
 

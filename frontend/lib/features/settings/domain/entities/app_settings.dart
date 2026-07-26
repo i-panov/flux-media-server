@@ -7,6 +7,7 @@ class AppSettings with _$AppSettings {
   const factory AppSettings({
     String? serverUrl,
     String? authToken,
+    String? refreshToken,
     @Default('en') String locale,
   }) = _AppSettings;
 }

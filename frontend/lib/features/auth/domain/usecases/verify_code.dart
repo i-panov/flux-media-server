@@ -17,10 +17,12 @@ class VerifyCodeParams {
 class VerifyCodeResult {
   const VerifyCodeResult({
     required this.token,
+    required this.refreshToken,
     required this.user,
   });
 
   final String token;
+  final String refreshToken;
   final User user;
 }
 
@@ -37,6 +39,7 @@ class VerifyCode
       (failure) => Left(failure),
       (data) => Right(VerifyCodeResult(
         token: data.token,
+        refreshToken: data.refreshToken,
         user: data.user,
       )),
     );

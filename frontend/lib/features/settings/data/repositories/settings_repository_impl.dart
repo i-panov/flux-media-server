@@ -10,9 +10,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<AppSettings> getSettings() async {
     final token = await _localDataSource.getAuthToken();
+    final refreshToken = await _localDataSource.getRefreshToken();
     return AppSettings(
       serverUrl: _localDataSource.getServerUrl(),
       authToken: token,
+      refreshToken: refreshToken,
       locale: _localDataSource.getLocale(),
     );
   }
@@ -26,6 +28,13 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   Future<void> clearAuthToken() => _localDataSource.clearAuthToken();
+
+  @override
+  Future<void> setRefreshToken(String token) =>
+      _localDataSource.setRefreshToken(token);
+
+  @override
+  Future<void> clearRefreshToken() => _localDataSource.clearRefreshToken();
 
   @override
   String getLocale() => _localDataSource.getLocale();

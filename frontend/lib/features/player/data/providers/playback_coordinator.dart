@@ -7,6 +7,7 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 part 'playback_coordinator.freezed.dart';
@@ -31,11 +32,13 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     this._audioPlayer,
     this._videoPlayer,
     this._baseUrl,
+    this._authToken,
   ) : super(const PlaybackState.initial());
 
   final AudioPlayerDatasource _audioPlayer;
   final VideoPlayerDatasource _videoPlayer;
   final String _baseUrl;
+  final String? _authToken;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   void _cancelSubscriptions() {
@@ -63,10 +66,13 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     _cancelSubscriptions();
 
     final url = '$_baseUrl/media/${media.id}/stream';
+    final headers = _authToken != null
+        ? <String, String>{'Authorization': 'Bearer $_authToken'}
+        : null;
 
     if (media.type == 'audio') {
       // Start audio playback
-      await _audioPlayer.open(url);
+      await _audioPlayer.open(url, httpHeaders: headers);
       await _audioPlayer.play();
 
       state = PlaybackState.playing(
@@ -92,7 +98,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       });
     } else {
       // Start video playback
-      await _videoPlayer.open(url);
+      await _videoPlayer.open(url, httpHeaders: headers);
       await _videoPlayer.play();
 
       state = PlaybackState.playing(
@@ -165,6 +171,10 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     }
   }
 
+  Future<void> setVolume(double volume) async {
+    await _audioPlayer.setVolume(volume);
+  }
+
   Future<void> stop() async {
     _cancelSubscriptions();
     if (state is PlaybackPlaying) {
@@ -193,9 +203,11 @@ final audioPlayerDatasourceProvider = Provider<AudioPlayerDatasource>((ref) {
 /// Provider for playback coordinator.
 final playbackCoordinatorProvider =
     StateNotifierProvider<PlaybackCoordinator, PlaybackState>((ref) {
+  final settings = ref.watch(settingsProvider).settings;
   return PlaybackCoordinator(
     ref.watch(audioPlayerDatasourceProvider),
     ref.watch(videoPlayerDatasourceProvider),
     ref.watch(baseUrlProvider),
+    settings.authToken,
   );
 });

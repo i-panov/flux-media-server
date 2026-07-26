@@ -33,7 +33,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   Future<void> _pickFiles() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
-      type: FileType.media,
+      type: FileType.custom,
+      allowedExtensions: widget.mediaType == 'audio'
+          ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
+          : ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v'],
     );
 
     if (result == null || result.files.isEmpty) return;
@@ -140,7 +143,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         ),
       );
 
-      if (successCount > 0) context.router.maybePop();
+      if (successCount > 0) {
+        ref.invalidate(mediaListProvider);
+        context.router.maybePop();
+      }
     }
   }
 

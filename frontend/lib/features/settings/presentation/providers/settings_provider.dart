@@ -59,8 +59,22 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     state = SettingsState(settings: settings);
   }
 
+  Future<void> setRefreshToken(String token) async {
+    await _repository.setRefreshToken(token);
+    final settings = await _repository.getSettings();
+    state = SettingsState(settings: settings);
+  }
+
+  Future<void> setTokens(String accessToken, String refreshToken) async {
+    await _repository.setAuthToken(accessToken);
+    await _repository.setRefreshToken(refreshToken);
+    final settings = await _repository.getSettings();
+    state = SettingsState(settings: settings);
+  }
+
   Future<void> logout() async {
     await _repository.clearAuthToken();
+    await _repository.clearRefreshToken();
     final settings = await _repository.getSettings();
     state = SettingsState(settings: settings);
   }

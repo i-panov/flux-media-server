@@ -61,7 +61,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await result.fold<Future<void>>(
       (failure) async => state = AuthState.error(message: failure.message),
       (data) async {
-        await _ref.read(settingsProvider.notifier).setAuthToken(data.token);
+        await _ref
+            .read(settingsProvider.notifier)
+            .setTokens(data.token, data.refreshToken);
         state = AuthState.authenticated(user: data.user);
       },
     );

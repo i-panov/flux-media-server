@@ -75,20 +75,22 @@ class ContinueWatchingRow extends StatelessWidget {
               final remaining = Duration(
                   seconds: item.$2.duration - item.$2.position);
 
-              return Stack(
-                children: [
-                  MediaCard(
-                    media: item.$1,
-                    onTap: () => onItemTapped(item.$1.id),
-                    isFavorite: isFavoriteMap[item.$1.id] ?? false,
-                    onFavorite: onFavoriteToggled != null
-                        ? () => onFavoriteToggled!(item.$1.id)
-                        : null,
-                    isDownloaded: isDownloadedMap[item.$1.id] ?? false,
-                    onDownload: onDownloadToggled != null
-                        ? () => onDownloadToggled!(item.$1.id)
-                        : null,
-                  ),
+              return SizedBox(
+                width: 160,
+                child: Stack(
+                  children: [
+                    MediaCard(
+                      media: item.$1,
+                      onTap: () => onItemTapped(item.$1.id),
+                      isFavorite: isFavoriteMap[item.$1.id] ?? false,
+                      onFavorite: onFavoriteToggled != null
+                          ? () => onFavoriteToggled!(item.$1.id)
+                          : null,
+                      isDownloaded: isDownloadedMap[item.$1.id] ?? false,
+                      onDownload: onDownloadToggled != null
+                          ? () => onDownloadToggled!(item.$1.id)
+                          : null,
+                    ),
                   // Progress bar at bottom
                   Positioned(
                     bottom: 0,
@@ -149,7 +151,8 @@ class ContinueWatchingRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                ],
+                  ],
+                ),
               );
             },
           ),

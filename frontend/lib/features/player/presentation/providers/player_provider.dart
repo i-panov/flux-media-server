@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 part 'player_provider.freezed.dart';
@@ -24,12 +25,13 @@ class PlayerNotifierState with _$PlayerNotifierState {
 
 /// Notifier controlling video playback state.
 class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
-  /// Creates a [PlayerNotifier] with the given [datasource] and [baseUrl].
-  PlayerNotifier(this._datasource, this._baseUrl)
+  /// Creates a [PlayerNotifier] with the given [datasource], [baseUrl] and optional [authToken].
+  PlayerNotifier(this._datasource, this._baseUrl, this._authToken)
       : super(const PlayerNotifierState.initial());
 
   final VideoPlayerDatasource _datasource;
   final String _baseUrl;
+  final String? _authToken;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   void _cancelSubscriptions() {
@@ -50,7 +52,11 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
     _cancelSubscriptions();
     state = PlayerNotifierState.playing(media: media, isPaused: true);
     try {
-      await _datasource.open('$_baseUrl/media/${media.id}/stream');
+      final streamUrl = '$_baseUrl/media/${media.id}/stream';
+      final headers = _authToken != null
+          ? <String, String>{'Authorization': 'Bearer $_authToken'}
+          : null;
+      await _datasource.open(streamUrl, httpHeaders: headers);
       await _datasource.play();
       if (state is PlayerNotifierPlaying) {
         state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
@@ -130,8 +136,10 @@ final videoPlayerDatasourceProvider = Provider<VideoPlayerDatasource>((ref) {
 
 final playerProvider =
     StateNotifierProvider<PlayerNotifier, PlayerNotifierState>((ref) {
+  final settings = ref.watch(settingsProvider).settings;
   return PlayerNotifier(
     ref.watch(videoPlayerDatasourceProvider),
     ref.watch(baseUrlProvider),
+    settings.authToken,
   );
 });

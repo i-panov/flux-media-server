@@ -27,6 +27,15 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   void initState() {
     super.initState();
     ref.read(mediaDetailProvider.notifier).load(widget.mediaId);
+    _initFavoriteState();
+  }
+
+  Future<void> _initFavoriteState() async {
+    final favorites = await ref.read(favoritesProvider(null).future);
+    final isFav = favorites.any((f) => f.mediaId == widget.mediaId);
+    if (mounted) {
+      ref.read(favoriteToggleProvider(widget.mediaId).notifier).init(isFav);
+    }
   }
 
   String _thumbnailUrl() {
@@ -75,13 +84,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     final favoriteState = ref.watch(favoriteToggleProvider(widget.mediaId));
     final downloadState = ref.watch(downloadNotifierProvider(widget.mediaId));
 
-    // Initialize favorite toggle state
     final isFavorite = favoriteState.valueOrNull ?? false;
-    final favoritesAsync = ref.watch(favoritesProvider(null));
-    favoritesAsync.whenData((favorites) {
-      final isFav = favorites.any((f) => f.mediaId == widget.mediaId);
-      ref.read(favoriteToggleProvider(widget.mediaId).notifier).init(isFav);
-    });
 
     final downloadProgress = switch (downloadState) {
       DownloadDownloading(:final progress) => progress,
@@ -206,8 +209,13 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                           width: double.infinity,
                           child: FilledButton.icon(
                             onPressed: () {
-                              context.router
-                                  .push(PlayerRoute(media: media));
+                              if (media.type == 'audio') {
+                                context.router
+                                    .push(AudioPlayerRoute(media: media));
+                              } else {
+                                context.router
+                                    .push(PlayerRoute(media: media));
+                              }
                             },
                             icon: const Icon(Icons.play_arrow),
                             label: Text(l.play),
@@ -275,6 +283,18 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  color: Colors.white,
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.maybePop(),
+                ),
               ),
             ),
           ],

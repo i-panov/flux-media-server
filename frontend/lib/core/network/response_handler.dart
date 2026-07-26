@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:chopper/chopper.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
+import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/network/interceptors/token_refresh_interceptor.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Checks the HTTP response status and throws appropriate exceptions.
 ///
@@ -25,8 +28,12 @@ void checkResponse(Response<dynamic> response, String defaultMessage) {
 
 /// Wraps an async operation, converting low-level exceptions into
 /// domain-level [AuthException], [NetworkException], or [ServerException].
+/// Retries once on [TokenRefreshedException] (token was just refreshed).
 Future<T> safeApiCall<T>(Future<T> Function() call) async {
   try {
+    return await call();
+  } on TokenRefreshedException {
+    // Token was refreshed — retry with the new token
     return await call();
   } on AuthException {
     rethrow;
@@ -34,7 +41,10 @@ Future<T> safeApiCall<T>(Future<T> Function() call) async {
     rethrow;
   } on NetworkException {
     rethrow;
-  } on SocketException {
+  } on SocketException catch (e) {
+    if (e.message.contains('Broken pipe') || e.message.contains('errno = 32')) {
+      throw const ServerException(message: 'File too large for server to accept');
+    }
     throw const NetworkException(message: 'No internet connection');
   } on HttpException {
     throw const NetworkException(message: 'Network error');
@@ -44,5 +54,24 @@ Future<T> safeApiCall<T>(Future<T> Function() call) async {
     throw const NetworkException(message: 'Network error');
   } on Exception catch (e) {
     throw ServerException(message: e.toString());
+  }
+}
+
+/// Wraps a repository call with token-refresh retry logic.
+/// Retries once on [TokenRefreshedException], converts exceptions to [Failure].
+Future<Either<Failure, T>> safeRepositoryCall<T>(
+  Future<T> Function() call,
+) async {
+  try {
+    return Right(await call());
+  } on TokenRefreshedException {
+    // Token was just refreshed — retry with the new token
+    return Right(await call());
+  } on AuthException catch (e) {
+    return Left(AuthFailure(message: e.message));
+  } on ServerException catch (e) {
+    return Left(ServerFailure(message: e.message));
+  } on NetworkException catch (e) {
+    return Left(NetworkFailure(message: e.message));
   }
 }

@@ -51,17 +51,20 @@ class HorizontalVideoRow extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final media = items[index];
-              return MediaCard(
-                media: media,
-                onTap: () => onItemTapped(media.id),
-                isFavorite: isFavoriteMap[media.id] ?? false,
-                onFavorite: onFavoriteToggled != null
-                    ? () => onFavoriteToggled!(media.id)
-                    : null,
-                isDownloaded: isDownloadedMap[media.id] ?? false,
-                onDownload: onDownloadToggled != null
-                    ? () => onDownloadToggled!(media.id)
-                    : null,
+              return SizedBox(
+                width: 160,
+                child: MediaCard(
+                  media: media,
+                  onTap: () => onItemTapped(media.id),
+                  isFavorite: isFavoriteMap[media.id] ?? false,
+                  onFavorite: onFavoriteToggled != null
+                      ? () => onFavoriteToggled!(media.id)
+                      : null,
+                  isDownloaded: isDownloadedMap[media.id] ?? false,
+                  onDownload: onDownloadToggled != null
+                      ? () => onDownloadToggled!(media.id)
+                      : null,
+                ),
               );
             },
           ),

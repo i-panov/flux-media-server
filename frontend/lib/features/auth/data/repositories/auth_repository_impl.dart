@@ -1,5 +1,5 @@
-import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
@@ -11,47 +11,20 @@ class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
 
   @override
-  Future<Either<Failure, String?>> requestCode(String email) async {
-    try {
-      final debugCode = await remoteDataSource.requestCode(email);
-      return Right(debugCode);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  Future<Either<Failure, String?>> requestCode(String email) =>
+      safeRepositoryCall(() => remoteDataSource.requestCode(email));
 
   @override
-  Future<Either<Failure, ({String token, User user})>> verifyCode(
-    String email,
-    String code,
-  ) async {
-    try {
-      final result = await remoteDataSource.verifyCode(email, code);
-      return Right(result);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  Future<Either<Failure, ({String token, String refreshToken, User user})>>
+      verifyCode(String email, String code) =>
+          safeRepositoryCall(() => remoteDataSource.verifyCode(email, code));
 
   @override
-  Future<Either<Failure, User>> getCurrentUser() async {
-    try {
-      final user = await remoteDataSource.getCurrentUser();
-      return Right(user);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    }
-  }
+  Future<Either<Failure, User>> getCurrentUser() =>
+      safeRepositoryCall(() => remoteDataSource.getCurrentUser());
+
+  @override
+  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
+      String refreshToken) =>
+      safeRepositoryCall(() => remoteDataSource.refreshTokens(refreshToken));
 }

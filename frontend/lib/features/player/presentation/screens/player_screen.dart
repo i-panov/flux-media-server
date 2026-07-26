@@ -2,16 +2,21 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
+import 'package:flux_media_server/core/utils/platform_detection.dart';
 import 'package:flux_media_server/features/player/presentation/widgets/pip_manager.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 final videoControllerProvider = Provider<VideoController>((ref) {
   final datasource = ref.watch(videoPlayerDatasourceProvider);
-  return VideoController(datasource.player);
+  return VideoController(
+    datasource.player,
+    configuration: VideoControllerConfiguration(
+      enableHardwareAcceleration: !isRunningInWSL,
+    ),
+  );
 });
 
 @RoutePage()
@@ -25,10 +30,6 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
-  bool _showControls = true;
-  bool _isDragging = false;
-  double _dragPosition = 0;
-
   @override
   void initState() {
     super.initState();
@@ -37,12 +38,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
-    ref.read(playerProvider.notifier).play(widget.media);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(playerProvider.notifier).play(widget.media);
+    });
   }
 
   @override
   void dispose() {
-    ref.read(playerProvider.notifier).stop();
     if (PipManager.isActive) {
       PipManager.exitPip();
     }
@@ -69,100 +71,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           child: CircularProgressIndicator(color: Colors.white),
         ),
         playing: (media, isPaused, position, duration) {
-          final sliderValue = _isDragging
-              ? _dragPosition
-              : position.inSeconds.toDouble().clamp(
-                  0.0, (duration ?? position).inSeconds.toDouble());
-          final sliderMax =
-              (duration ?? position).inSeconds.toDouble().clamp(1.0, double.infinity);
-
           return Stack(
-            alignment: Alignment.center,
             children: [
-              GestureDetector(
-                onTap: () => setState(() => _showControls = !_showControls),
-                child: Video(controller: videoController),
-              ),
-              if (_showControls)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black87],
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Slider(
-                          value: sliderValue,
-                          max: sliderMax,
-                          onChangeStart: (_) => setState(() => _isDragging = true),
-                          onChanged: (value) => setState(() => _dragPosition = value),
-                          onChangeEnd: (value) {
-                            setState(() => _isDragging = false);
-                            ref
-                                .read(playerProvider.notifier)
-                                .seek(Duration(seconds: value.toInt()));
-                          },
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Left: position time
-                            Text(
-                              position.formatted,
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                            // Center: play/pause
-                            IconButton(
-                              iconSize: 48,
-                              color: Colors.white,
-                              icon: Icon(
-                                isPaused ? Icons.play_arrow : Icons.pause,
-                              ),
-                              onPressed: () {
-                                if (isPaused) {
-                                  ref.read(playerProvider.notifier).resume();
-                                } else {
-                                  ref.read(playerProvider.notifier).pause();
-                                }
-                              },
-                            ),
-                            // Right: duration + PiP
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  duration != null ? duration.formatted : '--:--',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  color: Colors.white,
-                                  icon: const Icon(Icons.picture_in_picture_alt),
-                                  tooltip: l.pictureInPicture,
-                                  onPressed: () {
-                                    PipManager.enterPip(
-                                      context: context,
-                                      videoController: videoController,
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+              Positioned.fill(
+                child: Video(
+                  controller: videoController,
+                  controls: MaterialDesktopVideoControls,
                 ),
+              ),
+              Positioned(
+                top: 8,
+                left: 8,
+                child: IconButton(
+                  color: Colors.white,
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () async {
+                    await ref.read(videoPlayerDatasourceProvider).player.pause();
+                    if (context.mounted) context.maybePop();
+                  },
+                ),
+              ),
             ],
           );
         },

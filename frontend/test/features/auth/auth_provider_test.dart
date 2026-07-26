@@ -14,23 +14,27 @@ import 'package:flux_media_server/shared/models/user.dart';
 
 class FakeAuthRepository implements AuthRepository {
   Future<Either<Failure, String?>> Function(String)? onRequestCode;
-  Future<Either<Failure, ({String token, User user})>> Function(String, String)?
-      onVerifyCode;
+  Future<Either<Failure, ({String token, String refreshToken, User user})>>
+      Function(String, String)? onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
+  Future<Either<Failure, ({String token, String refreshToken})>> Function(
+      String)? onRefreshToken;
 
   @override
   Future<Either<Failure, String?>> requestCode(String email) =>
       onRequestCode!(email);
 
   @override
-  Future<Either<Failure, ({String token, User user})>> verifyCode(
-    String email,
-    String code,
-  ) =>
-      onVerifyCode!(email, code);
+  Future<Either<Failure, ({String token, String refreshToken, User user})>>
+      verifyCode(String email, String code) => onVerifyCode!(email, code);
 
   @override
   Future<Either<Failure, User>> getCurrentUser() => onGetCurrentUser!();
+
+  @override
+  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
+          String refreshToken) =>
+      onRefreshToken!(refreshToken);
 }
 
 void main() {
@@ -115,7 +119,7 @@ void main() {
     test('verifyCode emits authenticated on success', () async {
       final user = User(id: 1, email: 'test@example.com');
       fakeRepo.onVerifyCode = (_, __) async =>
-          Right((token: 'jwt-token', user: user));
+          Right((token: 'jwt-token', refreshToken: 'refresh-token', user: user));
 
       final states = <AuthState>[];
       container.listen<AuthState>(authProvider, (prev, next) {

@@ -30,5 +30,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.Collection{},
 		&models.CollectionItem{},
 		&models.Lyrics{},
+		&models.RefreshToken{},
 	)
 }

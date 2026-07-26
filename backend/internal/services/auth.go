@@ -113,8 +113,9 @@ func (s *OTPStore) Verify(email, code string) bool {
 }
 
 type JWTManager struct {
-	secret []byte
-	expiry time.Duration
+	secret        []byte
+	expiry        time.Duration
+	refreshExpiry time.Duration
 }
 
 type Claims struct {
@@ -123,10 +124,16 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewJWTService(secret string, expiry time.Duration) *JWTManager {
+type TokenPair struct {
+	AccessToken  string
+	RefreshToken string
+}
+
+func NewJWTService(secret string, expiry time.Duration, refreshExpiry time.Duration) *JWTManager {
 	return &JWTManager{
-		secret: []byte(secret),
-		expiry: expiry,
+		secret:        []byte(secret),
+		expiry:        expiry,
+		refreshExpiry: refreshExpiry,
 	}
 }
 
@@ -144,6 +151,37 @@ func (s *JWTManager) GenerateToken(userID uint, email string) (string, error) {
 	return token.SignedString(s.secret)
 }
 
+func (s *JWTManager) GenerateRefreshToken(userID uint, email string) (string, error) {
+	claims := Claims{
+		UserID: userID,
+		Email:  email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.refreshExpiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(s.secret)
+}
+
+func (s *JWTManager) GenerateTokenPair(userID uint, email string) (*TokenPair, error) {
+	accessToken, err := s.GenerateToken(userID, email)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.GenerateRefreshToken(userID, email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
 func (s *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return s.secret, nil
@@ -159,4 +197,8 @@ func (s *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+func (s *JWTManager) ValidateRefreshToken(tokenString string) (*Claims, error) {
+	return s.ValidateToken(tokenString)
 }

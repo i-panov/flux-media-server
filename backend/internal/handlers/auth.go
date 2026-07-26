@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -17,26 +18,29 @@ import (
 )
 
 type AuthHandler struct {
-	userRepo   repository.UserRepository
-	otpStore   services.OTPStoreInterface
-	jwtService services.JWTService
-	smtpClient *email.SMTPClient
-	config     *config.Config
+	userRepo       repository.UserRepository
+	refreshTokenDB *repository.RefreshTokenRepository
+	otpStore       services.OTPStoreInterface
+	jwtService     services.JWTService
+	smtpClient     *email.SMTPClient
+	config         *config.Config
 }
 
 func NewAuthHandler(
 	userRepo repository.UserRepository,
+	refreshTokenRepo *repository.RefreshTokenRepository,
 	otpStore services.OTPStoreInterface,
 	jwtService services.JWTService,
 	smtpClient *email.SMTPClient,
 	config *config.Config,
 ) *AuthHandler {
 	return &AuthHandler{
-		userRepo:   userRepo,
-		otpStore:   otpStore,
-		jwtService: jwtService,
-		smtpClient: smtpClient,
-		config:     config,
+		userRepo:       userRepo,
+		refreshTokenDB: refreshTokenRepo,
+		otpStore:       otpStore,
+		jwtService:     jwtService,
+		smtpClient:     smtpClient,
+		config:         config,
 	}
 }
 
@@ -124,13 +128,24 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 		}
 	}
 
-	token, err := h.jwtService.GenerateToken(user.ID, user.Email)
+	tokens, err := h.jwtService.GenerateTokenPair(user.ID, user.Email)
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate token")
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate tokens")
+	}
+
+	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
+	refreshRecord := &models.RefreshToken{
+		UserID:    user.ID,
+		Token:     tokens.RefreshToken,
+		ExpiresAt: time.Now().Add(refreshExpiry),
+	}
+	if err := h.refreshTokenDB.Create(ctx, refreshRecord); err != nil {
+		log.Printf("Failed to store refresh token: %v", err)
 	}
 
 	return c.JSON(fiber.Map{
-		"token": token,
+		"token":         tokens.AccessToken,
+		"refresh_token": tokens.RefreshToken,
 		"user": fiber.Map{
 			"id":    user.ID,
 			"email": user.Email,
@@ -153,5 +168,61 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"id":    user.ID,
 		"email": user.Email,
+	})
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
+	var req RefreshRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	if req.RefreshToken == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Refresh token is required")
+	}
+
+	claims, err := h.jwtService.ValidateRefreshToken(req.RefreshToken)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired refresh token")
+	}
+
+	ctx := c.UserContext()
+
+	// Verify the refresh token exists in the database
+	_, err = h.refreshTokenDB.FindByToken(ctx, req.RefreshToken)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid refresh token")
+	}
+
+	user, err := h.userRepo.FindByID(ctx, claims.UserID)
+	if err != nil {
+		return response.Error(c, fiber.StatusNotFound, "User not found")
+	}
+
+	tokens, err := h.jwtService.GenerateTokenPair(user.ID, user.Email)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate tokens")
+	}
+
+	// Rotate: delete old refresh token, store new one
+	_ = h.refreshTokenDB.DeleteByToken(ctx, req.RefreshToken)
+
+	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
+	refreshRecord := &models.RefreshToken{
+		UserID:    user.ID,
+		Token:     tokens.RefreshToken,
+		ExpiresAt: time.Now().Add(refreshExpiry),
+	}
+	if err := h.refreshTokenDB.Create(ctx, refreshRecord); err != nil {
+		log.Printf("Failed to store refresh token: %v", err)
+	}
+
+	return c.JSON(fiber.Map{
+		"token":         tokens.AccessToken,
+		"refresh_token": tokens.RefreshToken,
 	})
 }

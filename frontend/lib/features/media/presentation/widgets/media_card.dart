@@ -39,17 +39,14 @@ class MediaCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: Hero(
-                      tag: 'media-thumb-${media.id}',
-                      child: CachedNetworkImage(
-                        imageUrl: thumbnailUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                        errorWidget: (_, __, ___) => const Center(
-                          child: Icon(Icons.broken_image, size: 48),
-                        ),
+                    child: CachedNetworkImage(
+                      imageUrl: thumbnailUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      errorWidget: (_, __, ___) => const Center(
+                        child: Icon(Icons.broken_image, size: 48),
                       ),
                     ),
                   ),

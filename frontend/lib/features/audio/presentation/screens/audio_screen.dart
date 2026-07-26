@@ -230,13 +230,16 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
                       final media = recentlyAdded[index];
-                      return MediaCard(
-                        media: media,
-                        onTap: () => context.router.push(MediaDetailRoute(mediaId: media.id)),
-                        isFavorite: favoriteMediaIds.contains(media.id),
-                        onFavorite: () => _toggleFavorite(media.id),
-                        isDownloaded: false,
-                        onDownload: () => _toggleDownload(media.id),
+                      return SizedBox(
+                        width: 160,
+                        child: MediaCard(
+                          media: media,
+                          onTap: () => context.router.push(MediaDetailRoute(mediaId: media.id)),
+                          isFavorite: favoriteMediaIds.contains(media.id),
+                          onFavorite: () => _toggleFavorite(media.id),
+                          isDownloaded: false,
+                          onDownload: () => _toggleDownload(media.id),
+                        ),
                       );
                     },
                   ),

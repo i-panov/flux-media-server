@@ -45,6 +45,20 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> refreshToken(
+      Map<String, dynamic> body) {
+    final Uri $url = Uri.parse('/auth/refresh');
+    final $body = body;
+    final Request $request = Request(
+      'POST',
+      $url,
+      client.baseUrl,
+      body: $body,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> getMe() {
     final Uri $url = Uri.parse('/auth/me');
     final Request $request = Request(

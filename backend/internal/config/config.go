@@ -16,10 +16,11 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
-	Debug       bool   `yaml:"debug"`
-	CORSOrigins string `yaml:"cors_origins"`
+	Host          string `yaml:"host"`
+	Port          int    `yaml:"port"`
+	Debug         bool   `yaml:"debug"`
+	CORSOrigins   string `yaml:"cors_origins"`
+	MaxUploadSize int64  `yaml:"max_upload_size"`
 }
 
 type DatabaseConfig struct {
@@ -27,14 +28,15 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret        string     `yaml:"jwt_secret"`
-	JWTExpiry        int        `yaml:"jwt_expiry"` // in hours
-	CodeLength       int        `yaml:"code_length"`
-	CodeExpiry       int        `yaml:"code_expiry"`
-	MaxOTPEntries    int        `yaml:"max_otp_entries"`
-	AllowedEmails    []string   `yaml:"allowed_emails"`
-	AllowUnknownEmail bool      `yaml:"allow_unknown_email"`
-	SMTP             SMTPConfig `yaml:"smtp"`
+	JWTSecret         string     `yaml:"jwt_secret"`
+	JWTExpiry         int        `yaml:"jwt_expiry"`          // in hours
+	RefreshExpiry     int        `yaml:"refresh_expiry"`      // in hours
+	CodeLength        int        `yaml:"code_length"`
+	CodeExpiry        int        `yaml:"code_expiry"`
+	MaxOTPEntries     int        `yaml:"max_otp_entries"`
+	AllowedEmails     []string   `yaml:"allowed_emails"`
+	AllowUnknownEmail bool       `yaml:"allow_unknown_email"`
+	SMTP              SMTPConfig `yaml:"smtp"`
 }
 
 type SMTPConfig struct {
@@ -72,6 +74,9 @@ func Load(path string) (*Config, error) {
 	if cfg.Server.Port == 0 {
 		cfg.Server.Port = 8080
 	}
+	if cfg.Server.MaxUploadSize == 0 {
+		cfg.Server.MaxUploadSize = 2 << 30 // 2GB
+	}
 	if cfg.Auth.CodeLength == 0 {
 		cfg.Auth.CodeLength = 6
 	}
@@ -79,7 +84,10 @@ func Load(path string) (*Config, error) {
 		cfg.Auth.CodeExpiry = 300
 	}
 	if cfg.Auth.JWTExpiry == 0 {
-		cfg.Auth.JWTExpiry = 24
+		cfg.Auth.JWTExpiry = 1
+	}
+	if cfg.Auth.RefreshExpiry == 0 {
+		cfg.Auth.RefreshExpiry = 720 // 30 days
 	}
 	if cfg.Auth.MaxOTPEntries == 0 {
 		cfg.Auth.MaxOTPEntries = 10000

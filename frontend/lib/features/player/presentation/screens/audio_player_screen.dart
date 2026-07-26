@@ -24,6 +24,15 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Auto-play this media if not already playing
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final playback = ref.read(playbackCoordinatorProvider);
+      final alreadyPlaying = playback is PlaybackPlaying &&
+          playback.media.id == widget.media.id;
+      if (!alreadyPlaying) {
+        ref.read(playbackCoordinatorProvider.notifier).play(widget.media);
+      }
+    });
   }
 
   @override
@@ -266,14 +275,31 @@ class _QueueTab extends ConsumerWidget {
   }
 }
 
-class _PlayerControls extends ConsumerWidget {
+class _PlayerControls extends ConsumerStatefulWidget {
   const _PlayerControls({required this.media});
   final Media media;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PlayerControls> createState() => _PlayerControlsState();
+}
+
+class _PlayerControlsState extends ConsumerState<_PlayerControls> {
+  double _volume = 100.0;
+
+  @override
+  void initState() {
+    super.initState();
+    final audioDs = ref.read(audioPlayerDatasourceProvider);
+    audioDs.volumeStream.listen((v) {
+      if (mounted) setState(() => _volume = v);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final playbackState = ref.watch(playbackCoordinatorProvider);
     final queueState = ref.watch(playQueueProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return playbackState.maybeWhen(
       playing: (m, type, isPaused, position, duration) {
@@ -286,20 +312,50 @@ class _PlayerControls extends ConsumerWidget {
 
         return Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+            color: colorScheme.surfaceContainerHighest,
+            border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
           ),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Slider(
-                value: sliderValue,
-                max: sliderMax,
-                onChanged: (value) {
-                  ref.read(playbackCoordinatorProvider.notifier).seek(Duration(seconds: value.toInt()));
-                },
+              // Seek bar with time labels
+              Row(
+                children: [
+                  Text(
+                    _formatDuration(position),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: colorScheme.primary,
+                        inactiveTrackColor: colorScheme.surfaceContainerHighest,
+                        thumbColor: colorScheme.primary,
+                        overlayColor: colorScheme.primary.withOpacity(0.1),
+                        trackHeight: 4,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      ),
+                      child: Slider(
+                        value: sliderValue,
+                        max: sliderMax,
+                        onChanged: (value) {
+                          ref.read(playbackCoordinatorProvider.notifier).seek(Duration(seconds: value.toInt()));
+                        },
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _formatDuration(duration ?? Duration.zero),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
               ),
+              // Transport controls
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -330,11 +386,52 @@ class _PlayerControls extends ConsumerWidget {
                   ),
                 ],
               ),
+              // Volume control
+              Row(
+                children: [
+                  Icon(
+                    _volume == 0
+                        ? Icons.volume_off
+                        : _volume < 50
+                            ? Icons.volume_down
+                            : Icons.volume_up,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  SizedBox(
+                    width: 120,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: colorScheme.primary,
+                        inactiveTrackColor: colorScheme.surfaceContainerHighest,
+                        thumbColor: colorScheme.primary,
+                        overlayColor: colorScheme.primary.withOpacity(0.1),
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                      ),
+                      child: Slider(
+                        value: _volume,
+                        min: 0,
+                        max: 100,
+                        onChanged: (value) {
+                          ref.read(playbackCoordinatorProvider.notifier).setVolume(value);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         );
       },
       orElse: () => const SizedBox.shrink(),
     );
+  }
+
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 }

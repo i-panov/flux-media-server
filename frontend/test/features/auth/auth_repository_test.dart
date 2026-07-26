@@ -6,23 +6,27 @@ import 'package:flux_media_server/shared/models/user.dart';
 
 class FakeAuthRepository implements AuthRepository {
   Future<Either<Failure, String?>> Function(String)? onRequestCode;
-  Future<Either<Failure, ({String token, User user})>> Function(String, String)?
-      onVerifyCode;
+  Future<Either<Failure, ({String token, String refreshToken, User user})>>
+      Function(String, String)? onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
+  Future<Either<Failure, ({String token, String refreshToken})>> Function(
+      String)? onRefreshToken;
 
   @override
   Future<Either<Failure, String?>> requestCode(String email) =>
       onRequestCode!(email);
 
   @override
-  Future<Either<Failure, ({String token, User user})>> verifyCode(
-    String email,
-    String code,
-  ) =>
-      onVerifyCode!(email, code);
+  Future<Either<Failure, ({String token, String refreshToken, User user})>>
+      verifyCode(String email, String code) => onVerifyCode!(email, code);
 
   @override
   Future<Either<Failure, User>> getCurrentUser() => onGetCurrentUser!();
+
+  @override
+  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
+          String refreshToken) =>
+      onRefreshToken!(refreshToken);
 }
 
 void main() {
@@ -68,32 +72,41 @@ void main() {
   });
 
   group('verifyCode', () {
-    test('returns Right(token, user) on success', () async {
+    test('returns Right(token, refreshToken, user) on success', () async {
       final user = User(id: 1, email: 'test@example.com');
       (repository as FakeAuthRepository).onVerifyCode = (_, __) async =>
-          Right<Failure, ({String token, User user})>(
-            (token: 'jwt-123', user: user),
+          Right<Failure, ({String token, String refreshToken, User user})>(
+            (token: 'jwt-123', refreshToken: 'refresh-456', user: user),
           );
 
       final result = await repository.verifyCode('test@example.com', '123456');
 
-      expect(result, isA<Right<Failure, ({String token, User user})>>());
+      expect(
+          result,
+          isA<
+              Right<Failure,
+                  ({String token, String refreshToken, User user})>>());
       final data = result.getOrElse(
-        (_) => (token: '', user: const User(id: 0, email: '')),
+        (_) => (token: '', refreshToken: '', user: const User(id: 0, email: '')),
       );
       expect(data.token, 'jwt-123');
+      expect(data.refreshToken, 'refresh-456');
       expect(data.user.email, 'test@example.com');
     });
 
     test('returns Left(ServerFailure) on invalid code', () async {
       (repository as FakeAuthRepository).onVerifyCode = (_, __) async =>
-          const Left<Failure, ({String token, User user})>(
+          const Left<Failure, ({String token, String refreshToken, User user})>(
             ServerFailure(message: 'Invalid or expired code'),
           );
 
       final result = await repository.verifyCode('test@example.com', '000000');
 
-      expect(result, isA<Left<Failure, ({String token, User user})>>());
+      expect(
+          result,
+          isA<
+              Left<Failure,
+                  ({String token, String refreshToken, User user})>>());
       expect(
         result.fold((l) => l.message, (_) => ''),
         'Invalid or expired code',
