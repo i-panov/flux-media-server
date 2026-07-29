@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -25,7 +25,7 @@ class OfflineCacheService {
         return file.path;
       }
     } catch (e) {
-      debugPrint('Error checking local path: $e');
+      AppLogger.error('Error checking local path', e);
     }
     return null;
   }
@@ -98,7 +98,7 @@ class OfflineCacheService {
         await file.delete();
       }
     } catch (e) {
-      debugPrint('Error removing cached file: $e');
+      AppLogger.error('Error removing cached file', e);
     }
   }
 
@@ -121,7 +121,7 @@ class OfflineCacheService {
           .whereType<int>()
           .toList();
     } catch (e) {
-      debugPrint('Error listing cached files: $e');
+      AppLogger.error('Error listing cached files', e);
       return [];
     }
   }

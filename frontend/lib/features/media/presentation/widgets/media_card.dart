@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
+import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 class MediaCard extends ConsumerWidget {
@@ -43,7 +44,7 @@ class MediaCard extends ConsumerWidget {
                       imageUrl: thumbnailUrl,
                       fit: BoxFit.cover,
                       placeholder: (_, __) => const Center(
-                        child: CircularProgressIndicator(),
+                        child: SkeletonWidget(width: double.infinity, height: double.infinity),
                       ),
                       errorWidget: (_, __, ___) => const Center(
                         child: Icon(Icons.broken_image, size: 48),

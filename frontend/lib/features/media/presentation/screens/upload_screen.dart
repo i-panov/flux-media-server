@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
@@ -105,20 +106,26 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     String? firstError;
 
     for (final fileInfo in _selectedFiles) {
-      final result = await uploadMedia(
-        UploadMediaParams(
-          filePath: fileInfo.path,
-          libraryId: _selectedLibrary!.id,
-          fileName: fileInfo.name,
-        ),
-      );
+      try {
+        final result = await uploadMedia(
+          UploadMediaParams(
+            filePath: fileInfo.path,
+            libraryId: _selectedLibrary!.id,
+            fileName: fileInfo.name,
+          ),
+        );
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      result.fold(
-        (failure) => firstError ??= failure.message,
-        (_) => successCount++,
-      );
+        result.fold(
+          (failure) => firstError ??= failure.message,
+          (_) => successCount++,
+        );
+      } on TimeoutException {
+        firstError ??= 'Upload timed out. The file may be too large or the connection is too slow.';
+      } catch (e) {
+        firstError ??= e.toString();
+      }
 
       setState(() => _uploadedCount++);
     }

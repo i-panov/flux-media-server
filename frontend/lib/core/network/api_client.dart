@@ -1,13 +1,38 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:chopper/chopper.dart';
+import 'package:http/http.dart' as http;
 import 'package:http/http.dart' show MultipartFile;
+import 'package:http/io_client.dart' show IOClient;
 
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/safe_logging_interceptor.dart';
 import 'interceptors/token_refresh_interceptor.dart';
 
 part 'api_client.chopper.dart';
+
+http.Client _createHttpClient() {
+  return _TimeoutHttpClient();
+}
+
+class _TimeoutHttpClient extends http.BaseClient {
+  _TimeoutHttpClient()
+      : _inner = IOClient(
+          HttpClient()..connectionTimeout = const Duration(seconds: 10),
+        );
+
+  final http.Client _inner;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    if (request is http.MultipartRequest) {
+      return _inner.send(request);
+    }
+    return _inner.send(request).timeout(const Duration(seconds: 30));
+  }
+}
 
 @ChopperApi()
 abstract class ApiClient extends ChopperService {
@@ -19,6 +44,7 @@ abstract class ApiClient extends ChopperService {
     final client = ChopperClient(
       baseUrl: Uri.parse(baseUrl ?? 'http://localhost:8080/api'),
       services: [_$ApiClient()],
+      client: _createHttpClient(),
       converter: JsonConverter(),
       interceptors: [
         if (authInterceptor != null) authInterceptor,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
@@ -89,7 +90,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     required AsyncValue<List<Favorite>> favoritesState,
     required String baseUrl,
   }) {
-    if (mediaListState.isLoading || favoritesState.isLoading) {
+    if (mediaListState.isLoading) {
+      return _buildSkeletonList(context);
+    }
+    if (favoritesState.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -157,9 +161,30 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
 
     final recentlyAdded = mediaList.items.take(10).toList();
 
-    return CustomScrollView(
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(mediaListProvider);
+        ref.invalidate(favoritesProvider);
+        await ref.watch(mediaListProvider.future);
+      },
+      child: CustomScrollView(
       controller: _scrollController,
       slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: SearchBar(
+                hintText: l.searchMedia,
+                leading: const Icon(Icons.search),
+                onChanged: (value) {
+                  if (value.isEmpty) {
+                    ref.read(searchQueryProvider.notifier).state = '';
+                  }
+                },
+                onSubmitted: (value) => ref.read(searchQueryProvider.notifier).state = value,
+              ),
+          ),
+        ),
         if (likedTracks.isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
@@ -268,7 +293,34 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
               ],
             ),
           ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonList(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 6,
+      itemBuilder: (context, index) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            const SkeletonWidget(width: 48, height: 48, borderRadius: 8),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SkeletonWidget(height: 14, width: double.infinity),
+                  const SizedBox(height: 6),
+                  const SkeletonWidget(height: 10, width: 120),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

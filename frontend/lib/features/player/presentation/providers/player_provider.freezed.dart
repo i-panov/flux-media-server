@@ -19,8 +19,8 @@ mixin _$PlayerNotifierState {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() initial,
-    required TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)
+    required TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)
         playing,
     required TResult Function() completed,
     required TResult Function(String message) error,
@@ -29,8 +29,8 @@ mixin _$PlayerNotifierState {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? initial,
-    TResult? Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult? Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult? Function()? completed,
     TResult? Function(String message)? error,
@@ -39,8 +39,8 @@ mixin _$PlayerNotifierState {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult Function()? completed,
     TResult Function(String message)? error,
@@ -133,8 +133,8 @@ class _$PlayerNotifierInitialImpl implements PlayerNotifierInitial {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() initial,
-    required TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)
+    required TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)
         playing,
     required TResult Function() completed,
     required TResult Function(String message) error,
@@ -146,8 +146,8 @@ class _$PlayerNotifierInitialImpl implements PlayerNotifierInitial {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? initial,
-    TResult? Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult? Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult? Function()? completed,
     TResult? Function(String message)? error,
@@ -159,8 +159,8 @@ class _$PlayerNotifierInitialImpl implements PlayerNotifierInitial {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult Function()? completed,
     TResult Function(String message)? error,
@@ -222,7 +222,11 @@ abstract class _$$PlayerNotifierPlayingImplCopyWith<$Res> {
       __$$PlayerNotifierPlayingImplCopyWithImpl<$Res>;
   @useResult
   $Res call(
-      {Media media, bool isPaused, Duration position, Duration? duration});
+      {Media media,
+      bool isPaused,
+      Duration position,
+      Duration? duration,
+      double speed});
 
   $MediaCopyWith<$Res> get media;
 }
@@ -242,6 +246,7 @@ class __$$PlayerNotifierPlayingImplCopyWithImpl<$Res>
     Object? isPaused = null,
     Object? position = null,
     Object? duration = freezed,
+    Object? speed = null,
   }) {
     return _then(_$PlayerNotifierPlayingImpl(
       media: null == media
@@ -260,6 +265,10 @@ class __$$PlayerNotifierPlayingImplCopyWithImpl<$Res>
           ? _value.duration
           : duration // ignore: cast_nullable_to_non_nullable
               as Duration?,
+      speed: null == speed
+          ? _value.speed
+          : speed // ignore: cast_nullable_to_non_nullable
+              as double,
     ));
   }
 
@@ -279,7 +288,8 @@ class _$PlayerNotifierPlayingImpl implements PlayerNotifierPlaying {
       {required this.media,
       this.isPaused = false,
       this.position = Duration.zero,
-      this.duration});
+      this.duration,
+      this.speed = 1.0});
 
   @override
   final Media media;
@@ -291,10 +301,13 @@ class _$PlayerNotifierPlayingImpl implements PlayerNotifierPlaying {
   final Duration position;
   @override
   final Duration? duration;
+  @override
+  @JsonKey()
+  final double speed;
 
   @override
   String toString() {
-    return 'PlayerNotifierState.playing(media: $media, isPaused: $isPaused, position: $position, duration: $duration)';
+    return 'PlayerNotifierState.playing(media: $media, isPaused: $isPaused, position: $position, duration: $duration, speed: $speed)';
   }
 
   @override
@@ -308,12 +321,13 @@ class _$PlayerNotifierPlayingImpl implements PlayerNotifierPlaying {
             (identical(other.position, position) ||
                 other.position == position) &&
             (identical(other.duration, duration) ||
-                other.duration == duration));
+                other.duration == duration) &&
+            (identical(other.speed, speed) || other.speed == speed));
   }
 
   @override
   int get hashCode =>
-      Object.hash(runtimeType, media, isPaused, position, duration);
+      Object.hash(runtimeType, media, isPaused, position, duration, speed);
 
   @JsonKey(ignore: true)
   @override
@@ -326,41 +340,41 @@ class _$PlayerNotifierPlayingImpl implements PlayerNotifierPlaying {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() initial,
-    required TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)
+    required TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)
         playing,
     required TResult Function() completed,
     required TResult Function(String message) error,
   }) {
-    return playing(media, isPaused, position, duration);
+    return playing(media, isPaused, position, duration, speed);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? initial,
-    TResult? Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult? Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult? Function()? completed,
     TResult? Function(String message)? error,
   }) {
-    return playing?.call(media, isPaused, position, duration);
+    return playing?.call(media, isPaused, position, duration, speed);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult Function()? completed,
     TResult Function(String message)? error,
     required TResult orElse(),
   }) {
     if (playing != null) {
-      return playing(media, isPaused, position, duration);
+      return playing(media, isPaused, position, duration, speed);
     }
     return orElse();
   }
@@ -408,12 +422,14 @@ abstract class PlayerNotifierPlaying implements PlayerNotifierState {
       {required final Media media,
       final bool isPaused,
       final Duration position,
-      final Duration? duration}) = _$PlayerNotifierPlayingImpl;
+      final Duration? duration,
+      final double speed}) = _$PlayerNotifierPlayingImpl;
 
   Media get media;
   bool get isPaused;
   Duration get position;
   Duration? get duration;
+  double get speed;
   @JsonKey(ignore: true)
   _$$PlayerNotifierPlayingImplCopyWith<_$PlayerNotifierPlayingImpl>
       get copyWith => throw _privateConstructorUsedError;
@@ -462,8 +478,8 @@ class _$PlayerNotifierCompletedImpl implements PlayerNotifierCompleted {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() initial,
-    required TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)
+    required TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)
         playing,
     required TResult Function() completed,
     required TResult Function(String message) error,
@@ -475,8 +491,8 @@ class _$PlayerNotifierCompletedImpl implements PlayerNotifierCompleted {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? initial,
-    TResult? Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult? Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult? Function()? completed,
     TResult? Function(String message)? error,
@@ -488,8 +504,8 @@ class _$PlayerNotifierCompletedImpl implements PlayerNotifierCompleted {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult Function()? completed,
     TResult Function(String message)? error,
@@ -609,8 +625,8 @@ class _$PlayerNotifierErrorImpl implements PlayerNotifierError {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() initial,
-    required TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)
+    required TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)
         playing,
     required TResult Function() completed,
     required TResult Function(String message) error,
@@ -622,8 +638,8 @@ class _$PlayerNotifierErrorImpl implements PlayerNotifierError {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? initial,
-    TResult? Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult? Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult? Function()? completed,
     TResult? Function(String message)? error,
@@ -635,8 +651,8 @@ class _$PlayerNotifierErrorImpl implements PlayerNotifierError {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(
-            Media media, bool isPaused, Duration position, Duration? duration)?
+    TResult Function(Media media, bool isPaused, Duration position,
+            Duration? duration, double speed)?
         playing,
     TResult Function()? completed,
     TResult Function(String message)? error,

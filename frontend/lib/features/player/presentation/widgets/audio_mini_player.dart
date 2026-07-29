@@ -18,8 +18,14 @@ class AudioMiniPlayer extends ConsumerWidget {
     final playbackInfo =
         ref.watch(playbackCoordinatorProvider.select((state) {
       return switch (state) {
-        PlaybackPlaying(:final media, :final type, :final isPaused) =>
-          (media, type, isPaused),
+        PlaybackPlaying(
+          :final media,
+          :final type,
+          :final isPaused,
+          :final position,
+          :final duration,
+        ) =>
+          (media, type, isPaused, position, duration),
         _ => null,
       };
     }));
@@ -27,10 +33,22 @@ class AudioMiniPlayer extends ConsumerWidget {
 
     final info = playbackInfo;
     if (info == null) return const SizedBox.shrink();
-    final (Media media, String type, bool isPaused) = info;
+    final (Media media, String type, bool isPaused, Duration position,
+          Duration? duration) = info;
     if (type != 'audio') return const SizedBox.shrink();
 
-    return Container(
+    final progress = (duration != null && duration > Duration.zero)
+        ? position.inMicroseconds / duration.inMicroseconds
+        : 0.0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LinearProgressIndicator(
+          value: progress,
+          minHeight: 2,
+        ),
+        Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
@@ -43,7 +61,6 @@ class AudioMiniPlayer extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
                 children: [
-                  // Cover thumbnail 36px
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: AuthNetworkImage(
@@ -65,7 +82,6 @@ class AudioMiniPlayer extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Track info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,7 +104,6 @@ class AudioMiniPlayer extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  // Play/Pause
                   IconButton(
                     icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
                     onPressed: () {
@@ -102,7 +117,6 @@ class AudioMiniPlayer extends ConsumerWidget {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
-                  // Close / dismiss mini-player
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
                     onPressed: () {
@@ -116,6 +130,8 @@ class AudioMiniPlayer extends ConsumerWidget {
               ),
             ),
           ),
+        ),
+      ],
     );
   }
 }

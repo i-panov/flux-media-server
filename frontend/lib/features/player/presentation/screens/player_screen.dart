@@ -73,7 +73,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         initial: () => const Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
-        playing: (media, isPaused, position, duration) {
+        playing: (media, isPaused, position, duration, speed) {
           return Stack(
             children: [
               Positioned.fill(
@@ -92,6 +92,39 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     await ref.read(videoPlayerDatasourceProvider).player.pause();
                     if (context.mounted) context.maybePop();
                   },
+                ),
+              ),
+              Positioned(
+                bottom: 80,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _ControlButton(
+                      icon: Icons.replay_10,
+                      onPressed: () {
+                        final newPos = position - const Duration(seconds: 10);
+                        ref.read(playerProvider.notifier).seek(newPos);
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    _ControlButton(
+                      icon: Icons.forward_10,
+                      onPressed: () {
+                        final newPos = position + const Duration(seconds: 10);
+                        ref.read(playerProvider.notifier).seek(newPos);
+                      },
+                    ),
+                    const SizedBox(width: 24),
+                    _ControlButton(
+                      label: '${speed}x',
+                      onPressed: () {
+                        final next = speed >= 2.0 ? 0.5 : speed + 0.5;
+                        ref.read(playerProvider.notifier).setSpeed(next);
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -139,6 +172,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ControlButton extends StatelessWidget {
+  const _ControlButton({
+    this.icon,
+    this.label,
+    required this.onPressed,
+  });
+
+  final IconData? icon;
+  final String? label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          child: icon != null
+              ? Icon(icon, color: Colors.white, size: 28)
+              : Text(
+                  label ?? '',
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
         ),
       ),
     );

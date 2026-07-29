@@ -19,6 +19,7 @@ class PlayerNotifierState with _$PlayerNotifierState {
     @Default(false) bool isPaused,
     @Default(Duration.zero) Duration position,
     Duration? duration,
+    @Default(1.0) double speed,
   }) = PlayerNotifierPlaying;
   const factory PlayerNotifierState.completed() = PlayerNotifierCompleted;
   const factory PlayerNotifierState.error({required String message}) =
@@ -187,6 +188,15 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
       await _datasource.play();
       if (!mounted) return;
       state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+    }
+  }
+
+  /// Sets playback speed.
+  Future<void> setSpeed(double speed) async {
+    if (state is PlayerNotifierPlaying) {
+      await _datasource.player.setRate(speed);
+      if (!mounted) return;
+      state = (state as PlayerNotifierPlaying).copyWith(speed: speed);
     }
   }
 

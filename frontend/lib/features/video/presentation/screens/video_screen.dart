@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
@@ -100,9 +101,11 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     required AsyncValue<List<Collection>> collectionsState,
     required String baseUrl,
   }) {
-    // Show loading state
-    if (mediaListState.isLoading ||
-        watchProgressState.isLoading ||
+    // Show loading skeleton
+    if (mediaListState.isLoading) {
+      return _buildSkeletonGrid(context);
+    }
+    if (watchProgressState.isLoading ||
         favoritesState.isLoading ||
         collectionsState.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -193,9 +196,34 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
       return (media, p);
     }).toList();
 
-    return CustomScrollView(
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(mediaListProvider);
+        ref.invalidate(watchProgressProvider);
+        ref.invalidate(favoritesProvider);
+        ref.invalidate(collectionsProvider);
+        // Wait for the next stable state
+        await ref.watch(mediaListProvider.future);
+      },
+      child: CustomScrollView(
       controller: _scrollController,
       slivers: [
+        // Search bar
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: SearchBar(
+                hintText: l.searchMedia,
+                leading: const Icon(Icons.search),
+                onChanged: (value) {
+                  if (value.isEmpty) {
+                    ref.read(searchQueryProvider.notifier).state = '';
+                  }
+                },
+                onSubmitted: (value) => ref.read(searchQueryProvider.notifier).state = value,
+              ),
+          ),
+        ),
         // Continue Watching section
         if (continueWatchingItems.isNotEmpty)
           SliverToBoxAdapter(
@@ -310,7 +338,44 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
               ),
             ),
           ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonGrid(BuildContext context) {
+    final crossAxisCount = (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6);
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: 0.7,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: crossAxisCount * 2,
+      itemBuilder: (context, index) => Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SkeletonWidget(width: double.infinity, height: double.infinity),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SkeletonWidget(height: 14, width: double.infinity),
+                  const SizedBox(height: 6),
+                  const SkeletonWidget(height: 10, width: 60),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

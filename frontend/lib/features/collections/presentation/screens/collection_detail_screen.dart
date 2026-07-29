@@ -6,7 +6,6 @@ import 'package:flux_media_server/features/collections/presentation/providers/co
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
-import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class CollectionDetailScreen extends ConsumerStatefulWidget {

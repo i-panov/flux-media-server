@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
+import 'package:flux_media_server/features/collections/domain/usecases/create_collection.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 
@@ -43,15 +44,19 @@ class _AddToCollectionDialogState extends ConsumerState<_AddToCollectionDialog> 
         child: collectionsState.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Text(l.failedToAdd(e.toString())),
-          data: (collections) {
-            if (collections.isEmpty) {
-              return Center(child: Text(l.noCollectionsYetCreate));
-            }
+              data: (collections) {
             return ListView.builder(
               shrinkWrap: true,
-              itemCount: collections.length,
+              itemCount: collections.length + 1,
               itemBuilder: (context, index) {
-                final collection = collections[index];
+                if (index == 0) {
+                  return ListTile(
+                    leading: const Icon(Icons.add),
+                    title: Text(l.create),
+                    onTap: _loading ? null : () => _showCreateDialog(l),
+                  );
+                }
+                final collection = collections[index - 1];
                 return ListTile(
                   leading: const Icon(Icons.folder),
                   title: Text(collection.name),
@@ -97,6 +102,60 @@ class _AddToCollectionDialogState extends ConsumerState<_AddToCollectionDialog> 
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _showCreateDialog(AppLocalizations l) async {
+    final nameController = TextEditingController();
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.create),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(hintText: 'Name'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.create),
+          ),
+        ],
+      ),
+    );
+    if (created == true && nameController.text.isNotEmpty) {
+      setState(() => _loading = true);
+      try {
+        final createCollection = ref.read(createCollectionProvider);
+        final collection = await createCollection(
+          CreateCollectionParams(name: nameController.text, type: 'custom'),
+        );
+        collection.fold(
+          (failure) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l.failedToAdd(failure.message))),
+              );
+            }
+          },
+          (_) {
+            ref.invalidate(collectionsProvider);
+          },
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l.failedToAdd(e.toString()))),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _loading = false);
+      }
     }
   }
 }
