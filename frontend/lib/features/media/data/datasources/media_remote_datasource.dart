@@ -91,6 +91,14 @@ class MediaRemoteDataSource {
         .toList();
   }
 
+  /// Updates metadata for a media item.
+  Future<Media> updateMetadata(int mediaId, Map<String, dynamic> data) async {
+    final Response<Map<String, dynamic>> response =
+        await apiClient.updateMetadata(mediaId, data);
+    checkResponse(response, 'Failed to update metadata');
+    return Media.fromJson(response.body!);
+  }
+
   /// Updates watch progress for a media item.
   Future<WatchProgress> updateProgress(
     int mediaId, {

@@ -200,4 +200,11 @@ abstract class ApiClient extends ChopperService {
     @Path('id') int id,
     @Body() Map<String, dynamic> body,
   );
+
+  // Metadata
+  @Put(path: '/metadata/{mediaId}')
+  Future<Response<Map<String, dynamic>>> updateMetadata(
+    @Path('mediaId') int mediaId,
+    @Body() Map<String, dynamic> body,
+  );
 }

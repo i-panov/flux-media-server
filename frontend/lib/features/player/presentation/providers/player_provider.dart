@@ -20,6 +20,7 @@ class PlayerNotifierState with _$PlayerNotifierState {
     @Default(Duration.zero) Duration position,
     Duration? duration,
     @Default(1.0) double speed,
+    Duration? savedPosition,
   }) = PlayerNotifierPlaying;
   const factory PlayerNotifierState.completed() = PlayerNotifierCompleted;
   const factory PlayerNotifierState.error({required String message}) =
@@ -75,14 +76,24 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
           ? <String, String>{'Authorization': 'Bearer $token'}
           : null;
       await _datasource.open(streamUrl, httpHeaders: headers);
-      // Auto-resume from the saved position, if any.
+      // Load saved position but don't auto-seek if > 5 seconds.
       final resumePosition = await _loadSavedPosition(media.id);
       await _datasource.play();
       if (resumePosition != null && resumePosition > Duration.zero) {
-        await _datasource.seek(resumePosition);
-      }
-      if (state is PlayerNotifierPlaying) {
-        state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+        if (resumePosition > const Duration(seconds: 5)) {
+          // Show resume dialog instead of auto-seeking.
+          state = (state as PlayerNotifierPlaying).copyWith(
+            savedPosition: resumePosition,
+            isPaused: false,
+          );
+        } else {
+          await _datasource.seek(resumePosition);
+          state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+        }
+      } else {
+        if (state is PlayerNotifierPlaying) {
+          state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+        }
       }
       _startProgressTimer();
 
@@ -202,6 +213,25 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
 
   /// Seeks to the given [position].
   Future<void> seek(Duration position) async => _datasource.seek(position);
+
+  /// Seeks to the saved position (from the resume dialog).
+  Future<void> seekToSavedPosition() async {
+    if (state is PlayerNotifierPlaying) {
+      final saved = (state as PlayerNotifierPlaying).savedPosition;
+      if (saved != null) {
+        await _datasource.seek(saved);
+        state = (state as PlayerNotifierPlaying).copyWith(savedPosition: null);
+      }
+    }
+  }
+
+  /// Starts playback from the beginning (from the resume dialog).
+  Future<void> startFromBeginning() async {
+    if (state is PlayerNotifierPlaying) {
+      await _datasource.seek(Duration.zero);
+      state = (state as PlayerNotifierPlaying).copyWith(savedPosition: null);
+    }
+  }
 
   /// Updates the duration of the current media.
   void updateDuration(Duration duration) {

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
+import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/utils/platform_detection.dart';
 import 'package:flux_media_server/features/player/presentation/widgets/pip_manager.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -30,6 +31,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+  bool _resumeDialogShown = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +44,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(playerProvider.notifier).play(widget.media);
     });
+  }
+
+  void _showResumeDialog(Duration savedPosition) {
+    final l = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.continueWatching),
+        content: Text(l.continueFrom(savedPosition.formatted)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref.read(playerProvider.notifier).startFromBeginning();
+            },
+            child: Text(l.startFromBeginning),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref.read(playerProvider.notifier).seekToSavedPosition();
+            },
+            child: Text(l.play),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -67,13 +98,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final state = ref.watch(playerProvider);
     final videoController = ref.watch(videoControllerProvider);
 
+    // Show resume dialog once when savedPosition is set.
+    if (state is PlayerNotifierPlaying &&
+        state.savedPosition != null &&
+        !_resumeDialogShown) {
+      _resumeDialogShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showResumeDialog(state.savedPosition!);
+        }
+      });
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: state.when(
         initial: () => const Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
-        playing: (media, isPaused, position, duration, speed) {
+        playing: (media, isPaused, position, duration, speed, savedPosition) {
           return Stack(
             children: [
               Positioned.fill(
@@ -88,6 +131,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 child: IconButton(
                   color: Colors.white,
                   icon: const Icon(Icons.arrow_back),
+                  tooltip: l.mediaDetail,
                   onPressed: () async {
                     await ref.read(videoPlayerDatasourceProvider).player.pause();
                     if (context.mounted) context.maybePop();
@@ -103,6 +147,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   children: [
                     _ControlButton(
                       icon: Icons.replay_10,
+                      tooltip: '-10s',
                       onPressed: () {
                         final newPos = position - const Duration(seconds: 10);
                         ref.read(playerProvider.notifier).seek(newPos);
@@ -111,6 +156,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     const SizedBox(width: 16),
                     _ControlButton(
                       icon: Icons.forward_10,
+                      tooltip: '+10s',
                       onPressed: () {
                         final newPos = position + const Duration(seconds: 10);
                         ref.read(playerProvider.notifier).seek(newPos);
@@ -119,6 +165,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     const SizedBox(width: 24),
                     _ControlButton(
                       label: '${speed}x',
+                      tooltip: l.play,
                       onPressed: () {
                         final next = speed >= 2.0 ? 0.5 : speed + 0.5;
                         ref.read(playerProvider.notifier).setSpeed(next);
@@ -182,31 +229,36 @@ class _ControlButton extends StatelessWidget {
   const _ControlButton({
     this.icon,
     this.label,
+    this.tooltip,
     required this.onPressed,
   });
 
   final IconData? icon;
   final String? label;
+  final String? tooltip;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black54,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onPressed,
+    return Tooltip(
+      message: tooltip ?? '',
+      child: Material(
+        color: Colors.black54,
         borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: 44,
-          height: 44,
-          alignment: Alignment.center,
-          child: icon != null
-              ? Icon(icon, color: Colors.white, size: 28)
-              : Text(
-                  label ?? '',
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                ),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            child: icon != null
+                ? Icon(icon, color: Colors.white, size: 28)
+                : Text(
+                    label ?? '',
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+          ),
         ),
       ),
     );

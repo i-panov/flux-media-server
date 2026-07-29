@@ -106,6 +106,7 @@ class AudioMiniPlayer extends ConsumerWidget {
                   ),
                   IconButton(
                     icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
+                    tooltip: isPaused ? 'Play' : 'Pause',
                     onPressed: () {
                       if (isPaused) {
                         ref.read(playbackCoordinatorProvider.notifier).resume();
@@ -119,6 +120,7 @@ class AudioMiniPlayer extends ConsumerWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
+                    tooltip: 'Close',
                     onPressed: () {
                       ref.read(playbackCoordinatorProvider.notifier).stop();
                     },

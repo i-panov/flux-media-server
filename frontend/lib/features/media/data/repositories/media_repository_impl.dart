@@ -61,6 +61,13 @@ class MediaRepositoryImpl implements MediaRepository {
       safeRepositoryCall(() => remoteDataSource.getProgress());
 
   @override
+  Future<Either<Failure, Media>> updateMetadata(
+    int mediaId,
+    Map<String, dynamic> data,
+  ) =>
+      safeRepositoryCall(() => remoteDataSource.updateMetadata(mediaId, data));
+
+  @override
   Future<Either<Failure, WatchProgress>> updateProgress(
     int mediaId, {
     int? position,

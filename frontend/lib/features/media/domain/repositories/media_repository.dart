@@ -26,6 +26,11 @@ abstract class MediaRepository {
 
   Future<Either<Failure, List<WatchProgress>>> getProgress();
 
+  Future<Either<Failure, Media>> updateMetadata(
+    int mediaId,
+    Map<String, dynamic> data,
+  );
+
   Future<Either<Failure, WatchProgress>> updateProgress(
     int mediaId, {
     int? position,

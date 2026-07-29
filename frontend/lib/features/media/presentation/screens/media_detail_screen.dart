@@ -9,7 +9,9 @@ import 'package:flux_media_server/features/media/presentation/providers/media_de
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
+import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
@@ -150,7 +152,8 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                           media.title,
                           style: Theme.of(context)
                               .textTheme
-                              .headlineMedium,
+                              .headlineMedium
+                              ?.copyWith(color: Colors.white),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -158,7 +161,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .bodyLarge
-                              ?.copyWith(color: Colors.grey),
+                              ?.copyWith(color: Colors.white70),
                         ),
                         if (media.artist != null &&
                             media.artist!.isNotEmpty) ...[
@@ -168,9 +171,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                                ?.copyWith(color: Colors.white),
                           ),
                         ],
                         if (media.album != null &&
@@ -180,45 +181,58 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
-                                ?.copyWith(color: Colors.grey),
+                                ?.copyWith(color: Colors.white60),
                           ),
                         ],
                         if (media.genre != null &&
                             media.genre!.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Chip(
-                            label: Text(media.genre!),
+                            label: Text(
+                              media.genre!,
+                              style: const TextStyle(color: Colors.white),
+                            ),
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
+                            backgroundColor: Colors.white24,
                           ),
                         ],
                         if (media.description != null) ...[
                           const SizedBox(height: 16),
-                          Text(media.description!),
+                          Text(
+                            media.description!,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
                         ],
                         if (media.duration != null) ...[
                           const SizedBox(height: 8),
                           Text(
                             '${l.duration}: ${Duration(seconds: media.duration!).formatted}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Colors.white60),
                           ),
                         ],
                         const SizedBox(height: 24),
                         // Play button
                         SizedBox(
                           width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              if (media.type == 'audio') {
-                                context.router
-                                    .push(AudioPlayerRoute(media: media));
-                              } else {
-                                context.router
-                                    .push(PlayerRoute(media: media));
-                              }
-                            },
-                            icon: const Icon(Icons.play_arrow),
-                            label: Text(l.play),
+                          child: Tooltip(
+                            message: l.play,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                if (media.type == 'audio') {
+                                  context.router
+                                      .push(AudioPlayerRoute(media: media));
+                                } else {
+                                  context.router
+                                      .push(PlayerRoute(media: media));
+                                }
+                              },
+                              icon: const Icon(Icons.play_arrow),
+                              label: Text(l.play),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -226,58 +240,81 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _toggleFavorite,
-                                icon: Icon(
-                                  isFavorite ? Icons.favorite : Icons.favorite_border,
-                                  color: isFavorite ? Colors.red : null,
+                              child: Tooltip(
+                                message: l.favorites,
+                                child: OutlinedButton.icon(
+                                  onPressed: _toggleFavorite,
+                                  icon: Icon(
+                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: isFavorite ? Colors.red : null,
+                                  ),
+                                  label: Text(l.favorites),
                                 ),
-                                label: Text(l.favorites),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _addToCollection,
-                                icon: const Icon(Icons.add_to_queue),
-                                label: Text(l.myCollections),
+                              child: Tooltip(
+                                message: l.myCollections,
+                                child: OutlinedButton.icon(
+                                  onPressed: _addToCollection,
+                                  icon: const Icon(Icons.add_to_queue),
+                                  label: Text(l.myCollections),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: isDownloading
-                                    ? null
-                                    : _download,
-                                icon: isDownloading
-                                    ? SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          value: downloadProgress > 0 ? downloadProgress : null,
+                              child: Tooltip(
+                                message: l.download,
+                                child: OutlinedButton.icon(
+                                  onPressed: isDownloading
+                                      ? null
+                                      : _download,
+                                  icon: isDownloading
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            value: downloadProgress > 0 ? downloadProgress : null,
+                                          ),
+                                        )
+                                      : Icon(
+                                          downloadState is DownloadDownloaded
+                                              ? Icons.check_circle
+                                              : Icons.cloud_download,
+                                          color: downloadState is DownloadDownloaded
+                                              ? Theme.of(context).colorScheme.primary
+                                              : null,
                                         ),
-                                      )
-                                    : Icon(
-                                        downloadState is DownloadDownloaded
-                                            ? Icons.check_circle
-                                            : Icons.cloud_download,
-                                        color: downloadState is DownloadDownloaded
-                                            ? Theme.of(context).colorScheme.primary
-                                            : null,
-                                      ),
-                                label: Text(
-                                  switch (downloadState) {
-                                    DownloadDownloading(:final progress) =>
-                                        progress > 0 ? '${(progress * 100).toInt()}%' : l.downloading,
-                                    DownloadDownloaded() => l.downloaded,
-                                    DownloadError() => l.errorLabel,
-                                    _ => l.download,
-                                  },
+                                  label: Text(
+                                    switch (downloadState) {
+                                      DownloadDownloading(:final progress) =>
+                                          progress > 0 ? '${(progress * 100).toInt()}%' : l.downloading,
+                                      DownloadDownloaded() => l.downloaded,
+                                      DownloadError() => l.errorLabel,
+                                      _ => l.download,
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Tooltip(
+                            message: l.addToQueue,
+                            child: OutlinedButton.icon(
+                              onPressed: () => ref
+                                  .read(playQueueProvider.notifier)
+                                  .enqueue(media),
+                              icon: const Icon(Icons.queue_music_outlined),
+                              label: Text(l.addToQueue),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -294,6 +331,21 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                   color: Colors.white,
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () => context.maybePop(),
+                  tooltip: l.mediaDetail,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  color: Colors.white,
+                  icon: const Icon(Icons.edit),
+                  onPressed: () =>
+                      showEditMetadataDialog(context, ref, media),
+                  tooltip: l.edit,
                 ),
               ),
             ),

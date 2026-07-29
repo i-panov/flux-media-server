@@ -170,10 +170,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         title: Text(l.uploadMedia),
         actions: [
           if (_selectedFiles.isNotEmpty && !_isUploading)
-            TextButton.icon(
-              onPressed: _startUpload,
-              icon: const Icon(Icons.cloud_upload),
-              label: Text(l.upload),
+            Tooltip(
+              message: l.upload,
+              child: TextButton.icon(
+                onPressed: _startUpload,
+                icon: const Icon(Icons.cloud_upload),
+                label: Text(l.upload),
+              ),
             ),
         ],
       ),
@@ -232,12 +235,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
+            child:             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _isUploading ? null : _pickFiles,
-                icon: const Icon(Icons.attach_file),
-                label: Text(l.selectFiles),
+              child: Tooltip(
+                message: l.selectFiles,
+                child: OutlinedButton.icon(
+                  onPressed: _isUploading ? null : _pickFiles,
+                  icon: const Icon(Icons.attach_file),
+                  label: Text(l.selectFiles),
+                ),
               ),
             ),
           ),
@@ -296,6 +302,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                           ? null
                           : IconButton(
                               icon: const Icon(Icons.remove_circle_outline),
+                              tooltip: l.delete,
                               onPressed: () => setState(() => _selectedFiles.removeAt(index)),
                             ),
                     ),

@@ -437,4 +437,20 @@ final class _$ApiClient extends ApiClient {
     );
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
+
+  @override
+  Future<Response<Map<String, dynamic>>> updateMetadata(
+    int mediaId,
+    Map<String, dynamic> body,
+  ) {
+    final Uri $url = Uri.parse('/metadata/${mediaId}');
+    final $body = body;
+    final Request $request = Request(
+      'PUT',
+      $url,
+      client.baseUrl,
+      body: $body,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
 }

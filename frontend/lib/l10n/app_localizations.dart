@@ -709,6 +709,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error'**
   String get errorLabel;
+
+  /// No description provided for @continueFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue from {time}?'**
+  String continueFrom(String time);
+
+  /// No description provided for @startFromBeginning.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from beginning'**
+  String get startFromBeginning;
+
+  /// No description provided for @addToQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to queue'**
+  String get addToQueue;
+
+  /// No description provided for @editMetadata.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Metadata'**
+  String get editMetadata;
+
+  /// No description provided for @artist.
+  ///
+  /// In en, this message translates to:
+  /// **'Artist'**
+  String get artist;
+
+  /// No description provided for @album.
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get album;
+
+  /// No description provided for @genre.
+  ///
+  /// In en, this message translates to:
+  /// **'Genre'**
+  String get genre;
+
+  /// No description provided for @year.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get year;
 }
 
 class _AppLocalizationsDelegate
