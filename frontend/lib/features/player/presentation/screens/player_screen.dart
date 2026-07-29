@@ -48,6 +48,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (PipManager.isActive) {
       PipManager.exitPip();
     }
+    // Stop playback (also persists watch progress) when leaving the screen,
+    // e.g. via system back button which bypasses the in-app back button.
+    ref.read(playerProvider.notifier).stop();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,

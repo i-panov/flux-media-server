@@ -37,9 +37,13 @@ func (r *CollectionStore) Update(ctx context.Context, collection *models.Collect
 }
 
 func (r *CollectionStore) Delete(ctx context.Context, id uint) error {
-	// Delete items first, then collection
-	r.db.WithContext(ctx).Where("collection_id = ?", id).Delete(&models.CollectionItem{})
-	return r.db.WithContext(ctx).Delete(&models.Collection{}, id).Error
+	// Delete items and the collection atomically to avoid orphaned items.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("collection_id = ?", id).Delete(&models.CollectionItem{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.Collection{}, id).Error
+	})
 }
 
 type CollectionItemStore struct {
@@ -54,6 +58,20 @@ func (r *CollectionItemStore) FindByCollection(ctx context.Context, collectionID
 	var items []models.CollectionItem
 	err := r.db.WithContext(ctx).Where("collection_id = ?", collectionID).Find(&items).Error
 	return items, err
+}
+
+// FindMediaByCollection returns the media items of a collection in insertion
+// order, in a single query (avoids N+1 on the client).
+func (r *CollectionItemStore) FindMediaByCollection(ctx context.Context, collectionID uint) ([]models.Media, error) {
+	var media []models.Media
+	err := r.db.WithContext(ctx).
+		Table("media").
+		Select("media.*").
+		Joins("JOIN collection_items ON collection_items.media_id = media.id").
+		Where("collection_items.collection_id = ?", collectionID).
+		Order("collection_items.added_at ASC").
+		Scan(&media).Error
+	return media, err
 }
 
 func (r *CollectionItemStore) Add(ctx context.Context, item *models.CollectionItem) error {

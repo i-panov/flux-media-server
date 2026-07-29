@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"path/filepath"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -51,7 +52,9 @@ func (h *MetadataHandler) Refresh(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Media not found")
 	}
 
-	title, year := metadata.ParseFilename(media.FilePath)
+	// Parse only the filename, not the full path (otherwise directories
+	// end up in the title).
+	title, year := metadata.ParseFilename(filepath.Base(media.FilePath))
 
 	media.Title = title
 	media.Year = year
@@ -76,12 +79,14 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Media not found")
 	}
 
+	// Pointer fields allow distinguishing "not provided" from "set to empty",
+	// so values can also be cleared.
 	var req struct {
-		Title       string  `json:"title"`
-		Description string  `json:"description"`
-		PosterURL   string  `json:"poster_url"`
-		Rating      float64 `json:"rating"`
-		Genres      string  `json:"genres"`
+		Title       *string  `json:"title"`
+		Description *string  `json:"description"`
+		PosterURL   *string  `json:"poster_url"`
+		Rating      *float64 `json:"rating"`
+		Genres      *string  `json:"genres"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
@@ -91,20 +96,20 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		media.Metadata = &models.Metadata{}
 	}
 
-	if req.Title != "" {
-		media.Metadata.Title = req.Title
+	if req.Title != nil {
+		media.Metadata.Title = *req.Title
 	}
-	if req.Description != "" {
-		media.Metadata.Description = req.Description
+	if req.Description != nil {
+		media.Metadata.Description = *req.Description
 	}
-	if req.PosterURL != "" {
-		media.Metadata.PosterURL = req.PosterURL
+	if req.PosterURL != nil {
+		media.Metadata.PosterURL = *req.PosterURL
 	}
-	if req.Rating != 0 {
-		media.Metadata.Rating = req.Rating
+	if req.Rating != nil {
+		media.Metadata.Rating = *req.Rating
 	}
-	if req.Genres != "" {
-		media.Metadata.Genres = req.Genres
+	if req.Genres != nil {
+		media.Metadata.Genres = *req.Genres
 	}
 
 	if err := h.mediaRepo.Update(ctx, media); err != nil {

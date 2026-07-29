@@ -122,7 +122,7 @@ func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 	fav := &models.Favorite{
 		UserID:     userID,
 		Type:       "artist",
-		ArtistName: req.Artist,
+		ArtistName: &req.Artist,
 	}
 
 	if err := h.favRepo.Create(ctx, fav); err != nil {

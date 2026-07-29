@@ -107,10 +107,11 @@ func TestFavoriteStore_ArtistFavorite(t *testing.T) {
 	store := NewFavoriteRepository(db)
 	ctx := context.Background()
 
+	artist := "Pink Floyd"
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:     1,
 		Type:       "artist",
-		ArtistName: "Pink Floyd",
+		ArtistName: &artist,
 	}))
 
 	found, err := store.FindByUserAndArtist(ctx, 1, "Pink Floyd")

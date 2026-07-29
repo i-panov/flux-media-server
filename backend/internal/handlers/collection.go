@@ -163,6 +163,11 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 
 	ctx := c.UserContext()
 
+	// Only the owner may modify a collection.
+	if _, err := h.getOwnedCollection(c, uint(collectionID)); err != nil {
+		return err
+	}
+
 	// Verify media exists
 	if _, err := h.mediaRepo.FindByID(ctx, req.MediaID); err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Media not found")
@@ -192,6 +197,11 @@ func (h *CollectionHandler) RemoveItem(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
+	// Only the owner may modify a collection.
+	if _, err := h.getOwnedCollection(c, uint(collectionID)); err != nil {
+		return err
+	}
+
 	ctx := c.UserContext()
 
 	if err := h.itemRepo.Remove(ctx, uint(collectionID), uint(mediaID)); err != nil {
@@ -208,12 +218,38 @@ func (h *CollectionHandler) ListItems(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
 
+	// Only the owner may view a collection's contents.
+	if _, err := h.getOwnedCollection(c, uint(collectionID)); err != nil {
+		return err
+	}
+
 	ctx := c.UserContext()
-	items, err := h.itemRepo.FindByCollection(ctx, uint(collectionID))
+	// Return full media objects so clients don't need N+1 requests.
+	media, err := h.itemRepo.FindMediaByCollection(ctx, uint(collectionID))
 	if err != nil {
 		log.Printf("List collection items: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch items")
 	}
 
-	return c.JSON(items)
+	return c.JSON(media)
+}
+
+// getOwnedCollection loads the collection and verifies it belongs to the
+// current user. On failure it writes the appropriate error response.
+func (h *CollectionHandler) getOwnedCollection(c *fiber.Ctx, collectionID uint) (*models.Collection, error) {
+	userID, ok := c.Locals("user_id").(uint)
+	if !ok {
+		return nil, response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	col, err := h.colRepo.FindByID(c.UserContext(), collectionID)
+	if err != nil {
+		return nil, response.Error(c, fiber.StatusNotFound, "Collection not found")
+	}
+
+	if col.UserID != userID {
+		return nil, response.Error(c, fiber.StatusForbidden, "Not your collection")
+	}
+
+	return col, nil
 }

@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	dotPattern      = regexp.MustCompile(`^(.+)\.(\d{4})\.[^.]+$`)
-	parenPattern    = regexp.MustCompile(`^(.+)\s*\((\d{4})\)\.[^.]+$`)
-	episodePattern  = regexp.MustCompile(`^(.+)\.S(\d{2})E(\d{2})\..+$`)
+	dotPattern     = regexp.MustCompile(`^(.+)\.(\d{4})\.[^.]+$`)
+	parenPattern   = regexp.MustCompile(`^(.+)\s*\((\d{4})\)\.[^.]+$`)
+	episodePattern = regexp.MustCompile(`^(.+)\.S(\d{2})E(\d{2})\..+$`)
 )
 
 // ParseFilenameUpload parses a filename (without directory path) to extract title and year.

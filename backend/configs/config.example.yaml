@@ -1,22 +1,33 @@
+# Flux Media Server configuration.
+# Copy this file to config.yaml and adjust. config.yaml is gitignored —
+# never commit real secrets to the repository.
+
 server:
   host: "0.0.0.0"
   port: 8080
+  # debug: true returns OTP codes in API responses and enables verbose SQL
+  # logging (including secrets). NEVER enable outside local development.
   debug: false
-  cors_origins: "*"  # Set to your frontend domain in production
+  cors_origins: "*"  # Set to your frontend origin in production
   max_upload_size: 2147483648  # 2GB in bytes
 
 database:
   path: "./data/flux.db"
 
 auth:
+  # Generate with: openssl rand -base64 48
+  # The server refuses to start with this default value when debug is off.
   jwt_secret: "change-me-in-production-please-use-32-chars-min"
-  jwt_expiry: 24  # hours
+  jwt_expiry: 1        # access token lifetime, hours
+  refresh_expiry: 720  # refresh token lifetime, hours (30 days)
   code_length: 6
   code_expiry: 300  # seconds
   max_otp_entries: 10000
   allowed_emails:
     - user1@example.com
     - user2@example.com
+  # allow_unknown_email: true lets ANYONE register an account. The first
+  # registered user becomes admin. Restrict this in production.
   allow_unknown_email: false
   smtp:
     host: "smtp.gmail.com"
@@ -28,6 +39,7 @@ auth:
 scanner:
   enabled: true
   interval: 30
+  watch_enabled: true  # auto-scan libraries on file system changes
 
 media:
   thumbnail_path: "./data/thumbnails"

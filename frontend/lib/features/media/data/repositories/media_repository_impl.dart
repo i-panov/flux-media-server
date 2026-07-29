@@ -1,4 +1,3 @@
-import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:fpdart/fpdart.dart';

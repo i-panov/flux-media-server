@@ -1,9 +1,9 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
@@ -26,7 +26,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(mediaDetailProvider.notifier).load(widget.mediaId);
+    ref.read(mediaDetailProvider(widget.mediaId).notifier).load(widget.mediaId);
     _initFavoriteState();
   }
 
@@ -44,7 +44,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   }
 
   Future<void> _toggleFavorite() async {
-    final media = ref.read(mediaDetailProvider).maybeWhen(
+    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
       loaded: (m) => m,
       orElse: () => null,
     );
@@ -62,7 +62,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   }
 
   Future<void> _download() async {
-    final media = ref.read(mediaDetailProvider).maybeWhen(
+    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
       loaded: (m) => m,
       orElse: () => null,
     );
@@ -80,7 +80,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final state = ref.watch(mediaDetailProvider);
+    final state = ref.watch(mediaDetailProvider(widget.mediaId));
     final favoriteState = ref.watch(favoriteToggleProvider(widget.mediaId));
     final downloadState = ref.watch(downloadNotifierProvider(widget.mediaId));
 
@@ -100,7 +100,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
             // Backdrop image
             Hero(
               tag: 'media-thumb-${media.id}',
-              child: CachedNetworkImage(
+              child: AuthNetworkImage(
                 imageUrl: _thumbnailUrl(),
                 fit: BoxFit.cover,
                 height: 300,
@@ -307,7 +307,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => ref
-                    .read(mediaDetailProvider.notifier)
+                    .read(mediaDetailProvider(widget.mediaId).notifier)
                     .load(widget.mediaId),
                 child: Text(l.retry),
               ),

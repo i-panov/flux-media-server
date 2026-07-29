@@ -14,16 +14,16 @@ import (
 
 // FileMetadata holds metadata extracted from a media file.
 type FileMetadata struct {
-	Title       string
-	Artist      string
-	Album       string
-	Genre       string
-	Year        int
-	Duration    int  // seconds
-	Width       int  // video only
-	Height      int  // video only
-	Codec       string // video only
-	AlbumArt    []byte // embedded album art (audio only)
+	Title        string
+	Artist       string
+	Album        string
+	Genre        string
+	Year         int
+	Duration     int    // seconds
+	Width        int    // video only
+	Height       int    // video only
+	Codec        string // video only
+	AlbumArt     []byte // embedded album art (audio only)
 	AlbumArtMIME string
 }
 

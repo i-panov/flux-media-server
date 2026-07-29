@@ -15,6 +15,9 @@ class AuthGuard extends AutoRouteGuard {
     if (authState is AuthAuthenticated) {
       resolver.next();
     } else {
+      // Abort the guarded navigation (so the resolver always completes),
+      // then redirect to login.
+      resolver.next(false);
       router.replace(const LoginRoute());
     }
   }

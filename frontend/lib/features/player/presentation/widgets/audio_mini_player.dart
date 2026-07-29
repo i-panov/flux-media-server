@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 /// Mini-player bar shown above the bottom navigation bar during audio playback.
 class AudioMiniPlayer extends ConsumerWidget {
@@ -11,15 +13,24 @@ class AudioMiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playbackState = ref.watch(playbackCoordinatorProvider);
+    // Select only the fields this widget needs so position/duration ticks
+    // don't rebuild the mini-player every second.
+    final playbackInfo =
+        ref.watch(playbackCoordinatorProvider.select((state) {
+      return switch (state) {
+        PlaybackPlaying(:final media, :final type, :final isPaused) =>
+          (media, type, isPaused),
+        _ => null,
+      };
+    }));
     final baseUrl = ref.watch(baseUrlProvider);
 
-    return playbackState.when(
-      initial: () => const SizedBox.shrink(),
-      playing: (media, type, isPaused, position, duration) {
-        if (type != 'audio') return const SizedBox.shrink();
+    final info = playbackInfo;
+    if (info == null) return const SizedBox.shrink();
+    final (Media media, String type, bool isPaused) = info;
+    if (type != 'audio') return const SizedBox.shrink();
 
-        return Container(
+    return Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
@@ -35,12 +46,12 @@ class AudioMiniPlayer extends ConsumerWidget {
                   // Cover thumbnail 36px
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
-                    child: Image.network(
-                      '$baseUrl/media/${media.id}/thumb',
+                    child: AuthNetworkImage(
+                      imageUrl: '$baseUrl/media/${media.id}/thumb',
                       width: 36,
                       height: 36,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorWidget: (_, __, ___) => Container(
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
@@ -105,9 +116,6 @@ class AudioMiniPlayer extends ConsumerWidget {
               ),
             ),
           ),
-        );
-      },
-      completed: () => const SizedBox.shrink(),
     );
   }
 }

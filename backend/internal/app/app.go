@@ -22,20 +22,28 @@ import (
 	"flux/internal/services"
 )
 
+// maxAPIBodySize caps request bodies for all non-upload endpoints (JSON API).
+const maxAPIBodySize = 4 << 20 // 4 MB
+
 // App holds all application dependencies and the Fiber instance.
 type App struct {
-	Fiber      *fiber.App
-	Config     *config.Config
-	OTPStore   *services.OTPStore
-	Watcher    *services.WatcherService
-	Version    string
+	Fiber       *fiber.App
+	Config      *config.Config
+	OTPStore    *services.OTPStore
+	Watcher     *services.WatcherService
+	Version     string
+	cleanupStop chan struct{}
 }
 
 // New creates a new App with all dependencies wired up.
 func New(cfg *config.Config, version string) (*App, error) {
-	db, err := repository.InitDB(cfg.Database.Path)
+	db, err := repository.InitDB(cfg.Database.Path, cfg.Server.Debug)
 	if err != nil {
 		return nil, fmt.Errorf("init database: %w", err)
+	}
+
+	if err := repository.RunMigrations(db); err != nil {
+		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
 	if err := repository.AutoMigrate(db); err != nil {
@@ -60,15 +68,11 @@ func New(cfg *config.Config, version string) (*App, error) {
 		cfg.Auth.MaxOTPEntries,
 	)
 
-	jwtExpiry := time.Duration(cfg.Auth.JWTExpiry) * time.Hour
-	if jwtExpiry == 0 {
-		jwtExpiry = 1 * time.Hour
-	}
-	refreshExpiry := time.Duration(cfg.Auth.RefreshExpiry) * time.Hour
-	if refreshExpiry == 0 {
-		refreshExpiry = 720 * time.Hour // 30 days
-	}
-	jwtService := services.NewJWTService(cfg.Auth.JWTSecret, jwtExpiry, refreshExpiry)
+	jwtService := services.NewJWTService(
+		cfg.Auth.JWTSecret,
+		time.Duration(cfg.Auth.JWTExpiry)*time.Hour,
+		time.Duration(cfg.Auth.RefreshExpiry)*time.Hour,
+	)
 
 	smtpClient := email.NewSMTPClient(email.SMTPConfig{
 		Host:     cfg.Auth.SMTP.Host,
@@ -94,7 +98,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
-	uploadHandler := handlers.NewUploadHandler(libraryRepo, mediaRepo, scanner, handlers.UploadConfig{
+	uploadHandler := handlers.NewUploadHandler(libraryRepo, mediaRepo, scanner, thumbSvc, handlers.UploadConfig{
 		MaxFileSize: cfg.Server.MaxUploadSize,
 	})
 	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner, watcherInterface, cfg)
@@ -137,6 +141,13 @@ func New(cfg *config.Config, version string) (*App, error) {
 					"error": fmt.Sprintf("File too large. Maximum upload size is %d MB", cfg.Server.MaxUploadSize/(1<<20)),
 				})
 			}
+			if code >= fiber.StatusInternalServerError {
+				// Do not leak internal error details (paths, DB errors) to clients.
+				log.Printf("internal error: %v", err)
+				return c.Status(code).JSON(fiber.Map{
+					"error": "Internal server error",
+				})
+			}
 			return c.Status(code).JSON(fiber.Map{
 				"error": err.Error(),
 			})
@@ -144,6 +155,21 @@ func New(cfg *config.Config, version string) (*App, error) {
 	})
 	fiberApp.Use(recover.New())
 	fiberApp.Use(logger.New())
+
+	// fasthttp buffers the whole request body in memory. The global BodyLimit
+	// equals the max upload size (potentially gigabytes), so cap the body size
+	// for all non-upload routes to prevent memory exhaustion.
+	fiberApp.Use(func(c *fiber.Ctx) error {
+		if c.Path() == "/api/media/upload" {
+			return c.Next()
+		}
+		if int64(c.Request().Header.ContentLength()) > maxAPIBodySize {
+			return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{
+				"error": "Request body too large",
+			})
+		}
+		return c.Next()
+	})
 
 	allowOrigins := cfg.Server.CORSOrigins
 	if allowOrigins == "" {
@@ -175,34 +201,39 @@ func New(cfg *config.Config, version string) (*App, error) {
 		},
 	})
 
-	// Public auth routes
+	// Public auth routes. All of them are rate-limited: verify-code without a
+	// limiter would allow brute-forcing the 6-digit OTP within its TTL.
 	auth := fiberApp.Group("/api/auth")
 	auth.Post("/request-code", authRateLimiter, authHandler.RequestCode)
-	auth.Post("/verify-code", authHandler.VerifyCode)
-	auth.Post("/refresh", authHandler.Refresh)
+	auth.Post("/verify-code", authRateLimiter, authHandler.VerifyCode)
+	auth.Post("/refresh", authRateLimiter, authHandler.Refresh)
 
 	// Protected routes
 	api := fiberApp.Group("/api", middleware.AuthMiddleware(jwtService))
 
 	api.Get("/auth/me", authHandler.Me)
+	api.Post("/auth/logout", authHandler.Logout)
+
+	// Admin-only middleware for destructive/administrative operations.
+	requireAdmin := middleware.RequireAdmin(userRepo)
 
 	media := api.Group("/media")
 	media.Get("", mediaHandler.List)
 	media.Get("/:id", mediaHandler.Get)
-	media.Post("", mediaHandler.Create)
-	media.Post("/upload", uploadHandler.Upload)
+	media.Post("", requireAdmin, mediaHandler.Create)
+	media.Post("/upload", requireAdmin, uploadHandler.Upload)
 	media.Post("/check-hash", mediaHandler.CheckHash)
-	media.Put("/:id", mediaHandler.Update)
-	media.Delete("/:id", mediaHandler.Delete)
+	media.Put("/:id", requireAdmin, mediaHandler.Update)
+	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)
 	media.Get("/:id/thumb", thumbHandler.Get)
 
 	library := api.Group("/libraries")
 	library.Get("", libraryHandler.List)
-	library.Post("", libraryHandler.Create)
-	library.Put("/:id", libraryHandler.Update)
-	library.Delete("/:id", libraryHandler.Delete)
-	library.Post("/:id/scan", libraryHandler.Scan)
+	library.Post("", requireAdmin, libraryHandler.Create)
+	library.Put("/:id", requireAdmin, libraryHandler.Update)
+	library.Delete("/:id", requireAdmin, libraryHandler.Delete)
+	library.Post("/:id/scan", requireAdmin, libraryHandler.Scan)
 	library.Get("/:id/scan-status", libraryHandler.ScanStatus)
 
 	progress := api.Group("/progress")
@@ -253,12 +284,31 @@ func New(cfg *config.Config, version string) (*App, error) {
 		}
 	}
 
+	// Periodically purge expired refresh tokens so the table does not grow
+	// unboundedly.
+	cleanupStop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := refreshTokenRepo.DeleteExpired(context.Background()); err != nil {
+					log.Printf("purge expired refresh tokens: %v", err)
+				}
+			case <-cleanupStop:
+				return
+			}
+		}
+	}()
+
 	return &App{
-		Fiber:    fiberApp,
-		Config:   cfg,
-		OTPStore: otpStore,
-		Watcher:  watcherService,
-		Version:  version,
+		Fiber:       fiberApp,
+		Config:      cfg,
+		OTPStore:    otpStore,
+		Watcher:     watcherService,
+		Version:     version,
+		cleanupStop: cleanupStop,
 	}, nil
 }
 
@@ -278,4 +328,7 @@ func (a *App) Shutdown() {
 		a.Watcher.Stop()
 	}
 	a.OTPStore.Stop()
+	if a.cleanupStop != nil {
+		close(a.cleanupStop)
+	}
 }

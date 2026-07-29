@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,6 +23,8 @@ type UploadHandler struct {
 	libraryRepo repository.LibraryRepository
 	mediaRepo   repository.MediaRepository
 	scanner     services.ScannerInterface
+	thumbSvc    *services.ThumbnailService
+	extractor   *services.MetadataExtractor
 	config      UploadConfig
 }
 
@@ -35,12 +38,15 @@ func NewUploadHandler(
 	libraryRepo repository.LibraryRepository,
 	mediaRepo repository.MediaRepository,
 	scanner services.ScannerInterface,
+	thumbSvc *services.ThumbnailService,
 	config UploadConfig,
 ) *UploadHandler {
 	return &UploadHandler{
 		libraryRepo: libraryRepo,
 		mediaRepo:   mediaRepo,
 		scanner:     scanner,
+		thumbSvc:    thumbSvc,
+		extractor:   services.NewMetadataExtractor(),
 		config:      config,
 	}
 }
@@ -80,8 +86,14 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "File too large")
 	}
 
+	// Sanitize the filename to prevent path traversal attacks.
+	filename, err := services.SanitizeFilename(fileHeader.Filename)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid filename")
+	}
+
 	// Check extension.
-	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	ext := strings.ToLower(filepath.Ext(filename))
 	if !h.isAllowedExtension(ext) {
 		return response.Error(c, fiber.StatusBadRequest, "File type not allowed: "+ext)
 	}
@@ -93,7 +105,10 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	}
 
 	// Save file to library path.
-	dstPath := filepath.Join(library.Path, fileHeader.Filename)
+	dstPath := filepath.Join(library.Path, filename)
+	if !services.IsSubPath(library.Path, dstPath) {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid filename")
+	}
 
 	// Check if file already exists.
 	if _, err := os.Stat(dstPath); err == nil {
@@ -106,14 +121,18 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	}
 
 	// Create media record using scanner logic (hash, metadata, thumbnail).
-	media, err := h.createMediaFromUpload(ctx, dstPath, fileHeader.Filename, library)
+	media, err := h.createMediaFromUpload(ctx, dstPath, filename, library)
 	if err != nil {
 		log.Printf("upload: create media: %v", err)
-		// File was saved but media creation failed — still return success with warning.
-		return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-			"message": "File uploaded but media processing failed",
-			"file":    fileHeader.Filename,
-		})
+		// Remove the orphaned file so we don't leave untracked data on disk.
+		if rmErr := os.Remove(dstPath); rmErr != nil {
+			log.Printf("upload: remove orphaned file %s: %v", dstPath, rmErr)
+		}
+		var fiberErr *fiber.Error
+		if errors.As(err, &fiberErr) {
+			return response.Error(c, fiberErr.Code, fiberErr.Message)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to process uploaded file")
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(media)
@@ -159,8 +178,7 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 	}
 
 	// Extract metadata from file.
- extractor := services.NewMetadataExtractor()
-	if fileMeta := extractor.ExtractFromFile(filePath); fileMeta != nil {
+	if fileMeta := h.extractor.ExtractFromFile(filePath); fileMeta != nil {
 		if fileMeta.Duration > 0 {
 			media.Duration = fileMeta.Duration
 		}
@@ -176,14 +194,17 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 		if fileMeta.Title != "" {
 			media.Title = fileMeta.Title
 		}
-		h.mediaRepo.Update(ctx, media)
+		if err := h.mediaRepo.Update(ctx, media); err != nil {
+			log.Printf("upload: update media metadata: %v", err)
+		}
 	}
 
 	// Generate thumbnail.
- thumbSvc := services.NewThumbnailService("")
-	if thumbPath := thumbSvc.Generate(media.ID, filePath); thumbPath != "" {
+	if thumbPath := h.thumbSvc.Generate(media.ID, filePath); thumbPath != "" {
 		media.ThumbnailURL = thumbPath
-		h.mediaRepo.Update(ctx, media)
+		if err := h.mediaRepo.Update(ctx, media); err != nil {
+			log.Printf("upload: update media thumbnail: %v", err)
+		}
 	}
 
 	return media, nil

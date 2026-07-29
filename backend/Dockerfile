@@ -21,7 +21,13 @@ WORKDIR /app
 COPY --from=builder /build/flux-server .
 COPY --from=builder /build/configs/config.example.yaml ./configs/config.yaml
 
-RUN mkdir -p /app/data
+# Run as an unprivileged user: a remote file-write vulnerability must not
+# give root inside the container.
+RUN adduser -D -u 1000 flux \
+	&& mkdir -p /app/data \
+	&& chown -R flux:flux /app/data
+
+USER flux
 
 EXPOSE 8080
 

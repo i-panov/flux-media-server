@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -64,12 +64,12 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Type must be 'video' or 'audio'")
 	}
 
-	// Generate path from config based on type.
-	basePath := h.config.Media.VideoPath
-	if req.Type == "audio" {
-		basePath = h.config.Media.AudioPath
+	// Generate path from config based on type, validating the name to
+	// prevent path traversal outside the media base directory.
+	libPath, err := h.libraryPath(req.Type, req.Name)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid library name")
 	}
-	libPath := filepath.Join(basePath, strings.ReplaceAll(req.Name, " ", "_"))
 
 	library := &models.MediaLibrary{
 		Name:    req.Name,
@@ -110,21 +110,25 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
+	nameChanged := false
 	if req.Name != "" {
 		library.Name = strings.TrimSpace(req.Name)
-		basePath := h.config.Media.VideoPath
-		if library.Type == "audio" {
-			basePath = h.config.Media.AudioPath
-		}
-		library.Path = filepath.Join(basePath, strings.ReplaceAll(library.Name, " ", "_"))
+		nameChanged = true
 	}
 	if req.Type != "" {
-		library.Type = strings.ToLower(strings.TrimSpace(req.Type))
-		basePath := h.config.Media.VideoPath
-		if library.Type == "audio" {
-			basePath = h.config.Media.AudioPath
+		newType := strings.ToLower(strings.TrimSpace(req.Type))
+		if newType != "video" && newType != "audio" {
+			return response.Error(c, fiber.StatusBadRequest, "Type must be 'video' or 'audio'")
 		}
-		library.Path = filepath.Join(basePath, strings.ReplaceAll(library.Name, " ", "_"))
+		library.Type = newType
+		nameChanged = true
+	}
+	if nameChanged {
+		libPath, err := h.libraryPath(library.Type, library.Name)
+		if err != nil {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid library name")
+		}
+		library.Path = libPath
 	}
 
 	if err := h.libraryRepo.Update(ctx, library); err != nil {
@@ -174,9 +178,13 @@ func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Library not found")
 	}
 
+	// Start the scan synchronously in a goroutine, but report conflicts.
 	go func() {
 		scanCtx := context.Background()
 		if err := h.scanner.ScanLibrary(scanCtx, library.ID); err != nil {
+			if errors.Is(err, services.ErrScanInProgress) {
+				return // another scan is already running, nothing to log
+			}
 			log.Printf("Error scanning library %s: %v", library.Name, err)
 		} else {
 			log.Printf("Scan completed for library %s", library.Name)
@@ -195,4 +203,14 @@ func (h *LibraryHandler) ScanStatus(c *fiber.Ctx) error {
 
 	status := h.scanner.GetScanStatus(uint(id))
 	return c.JSON(status)
+}
+
+// libraryPath builds a library directory path from its type and name,
+// ensuring the result stays inside the configured media base directory.
+func (h *LibraryHandler) libraryPath(libType, name string) (string, error) {
+	basePath := h.config.Media.VideoPath
+	if libType == "audio" {
+		basePath = h.config.Media.AudioPath
+	}
+	return services.LibraryPathFromName(basePath, name)
 }

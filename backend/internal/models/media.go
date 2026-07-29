@@ -26,16 +26,19 @@ type Media struct {
 }
 
 type Metadata struct {
-	ID          uint    `gorm:"primaryKey" json:"id"`
-	ExternalID  string  `gorm:"uniqueIndex" json:"external_id"`
-	Source      string  `json:"source"` // tmdb, tvdb
-	Title       string  `json:"title"`
-	Year        int     `json:"year"`
-	Description string  `json:"description"`
-	PosterURL   string  `json:"poster_url"`
-	BackdropURL string  `json:"backdrop_url"`
-	Rating      float64 `json:"rating"`
-	Genres      string  `json:"genres"` // JSON array
-	Cast        string  `json:"cast"`   // JSON array
+	ID uint `gorm:"primaryKey" json:"id"`
+	// ExternalID is the ID in the external source (tmdb, ...). It is a plain
+	// index (not unique): manually edited metadata has no external ID and
+	// would otherwise collide on the empty value.
+	ExternalID  string    `gorm:"index" json:"external_id"`
+	Source      string    `json:"source"` // tmdb, tvdb
+	Title       string    `json:"title"`
+	Year        int       `json:"year"`
+	Description string    `json:"description"`
+	PosterURL   string    `json:"poster_url"`
+	BackdropURL string    `json:"backdrop_url"`
+	Rating      float64   `json:"rating"`
+	Genres      string    `json:"genres"` // JSON array
+	Cast        string    `json:"cast"`   // JSON array
 	CreatedAt   time.Time `json:"created_at"`
 }

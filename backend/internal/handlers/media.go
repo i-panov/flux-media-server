@@ -46,6 +46,17 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 
 	limit := c.QueryInt("limit", 20)
 	offset := c.QueryInt("offset", 0)
+	// Bound the page size: an unbounded limit allows fetching the whole
+	// library in one request (memory/DoS vector on large libraries).
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
 
 	ctx := c.UserContext()
 	media, total, err := h.mediaRepo.FindAll(ctx, filters, limit, offset)

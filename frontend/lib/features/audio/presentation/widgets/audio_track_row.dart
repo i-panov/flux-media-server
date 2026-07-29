@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// A track row for audio listings with cover, title, artist, and actions.
@@ -34,8 +34,18 @@ class AudioTrackRow extends ConsumerWidget {
         leading: CircleAvatar(
           radius: 24,
           backgroundColor: colorScheme.primaryContainer,
-          backgroundImage: CachedNetworkImageProvider(thumbUrl),
-          child: Icon(Icons.music_note, color: colorScheme.primary),
+          child: ClipOval(
+            child: AuthNetworkImage(
+              imageUrl: thumbUrl,
+              width: 48,
+              height: 48,
+              fit: BoxFit.cover,
+              placeholder: (_, __) =>
+                  Icon(Icons.music_note, color: colorScheme.primary),
+              errorWidget: (_, __, ___) =>
+                  Icon(Icons.music_note, color: colorScheme.primary),
+            ),
+          ),
         ),
         title: Text(media.title),
         subtitle: Text(media.artist ?? ''),

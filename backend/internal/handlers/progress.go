@@ -59,6 +59,13 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
+	if req.Position < 0 || req.Duration < 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Position and duration must be non-negative")
+	}
+	if req.Duration > 0 && req.Position > req.Duration {
+		return response.Error(c, fiber.StatusBadRequest, "Position must not exceed duration")
+	}
+
 	ctx := c.UserContext()
 	progress, err := h.progressRepo.FindByUserAndMedia(ctx, userID, uint(mediaID))
 	if err != nil {

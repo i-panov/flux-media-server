@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
@@ -32,14 +33,18 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     this._audioPlayer,
     this._videoPlayer,
     this._baseUrl,
-    this._authToken,
+    this._ref,
   ) : super(const PlaybackState.initial());
 
   final AudioPlayerDatasource _audioPlayer;
   final VideoPlayerDatasource _videoPlayer;
   final String _baseUrl;
-  final String? _authToken;
+
+  /// Used to lazily read the current auth token (so token refreshes don't
+  /// reset the playback state) and to coordinate with the video player.
+  final Ref _ref;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
+  Timer? _progressTimer;
 
   void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
@@ -48,29 +53,40 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     _subscriptions.clear();
   }
 
+  void _cancelProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
+  }
+
   @override
   void dispose() {
     _cancelSubscriptions();
+    _cancelProgressTimer();
     super.dispose();
   }
 
   /// Starts playback of [media]. Stops any current playback first.
   Future<void> play(Media media) async {
-    // Stop current playback and save progress
+    // Save progress of the current playback before switching.
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      // Save progress to backend
-      _saveProgress(current.media.id, current.position, current.duration ?? Duration.zero);
+      await _saveProgress(current.media.id, current.position,
+          current.duration ?? Duration.zero);
     }
 
     _cancelSubscriptions();
+    _cancelProgressTimer();
 
     final url = '$_baseUrl/media/${media.id}/stream';
-    final headers = _authToken != null
-        ? <String, String>{'Authorization': 'Bearer $_authToken'}
+    final token = _ref.read(settingsProvider).settings.authToken;
+    final headers = token != null
+        ? <String, String>{'Authorization': 'Bearer $token'}
         : null;
 
     if (media.type == 'audio') {
+      // Mutual exclusion: stop video playback before starting audio.
+      await _ref.read(playerProvider.notifier).stop();
+
       // Start audio playback
       await _audioPlayer.open(url, httpHeaders: headers);
       await _audioPlayer.play();
@@ -96,7 +112,11 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
           state = (state as PlaybackPlaying).copyWith(isPaused: !playing);
         }
       });
+      _subscribeToStream(_audioPlayer.completedStream, _onCompleted);
     } else {
+      // Mutual exclusion: stop audio playback before starting video.
+      await _audioPlayer.stop();
+
       // Start video playback
       await _videoPlayer.open(url, httpHeaders: headers);
       await _videoPlayer.play();
@@ -122,7 +142,25 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
           state = (state as PlaybackPlaying).copyWith(isPaused: !playing);
         }
       });
+      _subscribeToStream(_videoPlayer.completedStream, _onCompleted);
     }
+
+    _startProgressTimer();
+  }
+
+  void _onCompleted(bool completed) {
+    if (!completed) return;
+    final current = state;
+    if (current is PlaybackPlaying) {
+      unawaited(_saveProgress(
+        current.media.id,
+        current.duration ?? current.position,
+        current.duration ?? Duration.zero,
+        completed: true,
+      ));
+    }
+    _cancelProgressTimer();
+    state = const PlaybackState.completed();
   }
 
   void _subscribeToStream<T>(Stream<T> stream, void Function(T) onNext) {
@@ -130,10 +168,43 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     _subscriptions.add(sub);
   }
 
-  Future<void> _saveProgress(int mediaId, Duration position, Duration duration) async {
-    // Save progress silently in background
-    // In a real app, we'd use a repository here
-    developer.log('Saving progress: media=$mediaId, pos=${position.inSeconds}s, dur=${duration.inSeconds}s');
+  /// Saves watch progress to the backend. Best-effort: errors are logged
+  /// and ignored.
+  Future<void> _saveProgress(
+    int mediaId,
+    Duration position,
+    Duration duration, {
+    bool? completed,
+  }) async {
+    if (position <= Duration.zero && completed != true) return;
+    try {
+      final isCompleted = completed ??
+          (duration.inSeconds > 0 &&
+              position.inSeconds >= duration.inSeconds * 0.9);
+      await _ref.read(mediaRepositoryProvider).updateProgress(
+            mediaId,
+            position: position.inSeconds,
+            duration: duration.inSeconds,
+            completed: isCompleted,
+          );
+    } on Exception catch (e) {
+      developer.log('Failed to save progress: $e');
+    }
+  }
+
+  /// Periodically persists watch progress while playing.
+  void _startProgressTimer() {
+    _cancelProgressTimer();
+    _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      final current = state;
+      if (current is PlaybackPlaying && !current.isPaused) {
+        unawaited(_saveProgress(
+          current.media.id,
+          current.position,
+          current.duration ?? Duration.zero,
+        ));
+      }
+    });
   }
 
   Future<void> pause() async {
@@ -144,7 +215,13 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       } else {
         await _videoPlayer.pause();
       }
-      state = (state as PlaybackPlaying).copyWith(isPaused: true);
+      if (!mounted) return;
+      state = current.copyWith(isPaused: true);
+      await _saveProgress(
+        current.media.id,
+        current.position,
+        current.duration ?? Duration.zero,
+      );
     }
   }
 
@@ -156,7 +233,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       } else {
         await _videoPlayer.play();
       }
-      state = (state as PlaybackPlaying).copyWith(isPaused: false);
+      if (!mounted) return;
+      state = current.copyWith(isPaused: false);
     }
   }
 
@@ -177,14 +255,21 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
 
   Future<void> stop() async {
     _cancelSubscriptions();
+    _cancelProgressTimer();
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
+      await _saveProgress(
+        current.media.id,
+        current.position,
+        current.duration ?? Duration.zero,
+      );
       if (current.media.type == 'audio') {
         await _audioPlayer.stop();
       } else {
         await _videoPlayer.stop();
       }
     }
+    if (!mounted) return;
     state = const PlaybackState.initial();
   }
 
@@ -203,11 +288,10 @@ final audioPlayerDatasourceProvider = Provider<AudioPlayerDatasource>((ref) {
 /// Provider for playback coordinator.
 final playbackCoordinatorProvider =
     StateNotifierProvider<PlaybackCoordinator, PlaybackState>((ref) {
-  final settings = ref.watch(settingsProvider).settings;
   return PlaybackCoordinator(
     ref.watch(audioPlayerDatasourceProvider),
     ref.watch(videoPlayerDatasourceProvider),
     ref.watch(baseUrlProvider),
-    settings.authToken,
+    ref,
   );
 });

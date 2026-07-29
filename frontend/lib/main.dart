@@ -66,7 +66,8 @@ class _FluxAppState extends ConsumerState<FluxApp> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsProvider).settings;
+    // Watch only the locale so token refreshes don't rebuild MaterialApp.
+    final locale = ref.watch(settingsProvider.select((s) => s.settings.locale));
 
     ref.listen(authProvider, (previous, next) {
       if (previous is AuthAuthenticated && next is AuthInitial) {
@@ -89,7 +90,7 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         brightness: Brightness.dark,
       ),
       themeMode: ThemeMode.system,
-      locale: Locale(settings.locale),
+      locale: Locale(locale),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,

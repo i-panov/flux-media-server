@@ -41,6 +41,10 @@ func (s *StreamerService) IsPathAllowed(ctx context.Context, filePath string) (b
 	}
 
 	for _, lib := range libraries {
+		// Disabled libraries must not serve files.
+		if !lib.Enabled {
+			continue
+		}
 		absLibPath, err := filepath.Abs(lib.Path)
 		if err != nil {
 			continue
@@ -97,28 +101,8 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 
 	// Set content type based on extension
 	ext := strings.ToLower(filepath.Ext(filePath))
-	contentType := "application/octet-stream"
-	switch ext {
-	case ".mp4":
-		contentType = "video/mp4"
-	case ".mkv":
-		contentType = "video/x-matroska"
-	case ".avi":
-		contentType = "video/x-msvideo"
-	case ".mov":
-		contentType = "video/quicktime"
-	case ".wmv":
-		contentType = "video/x-ms-wmv"
-	case ".webm":
-		contentType = "video/webm"
-	case ".flv":
-		contentType = "video/x-flv"
-	case ".ts":
-		contentType = "video/mp2t"
-	}
+	contentType := mimeTypeByExt(ext)
 
-	// Set Content-Type before writing body
-	c.Set("Content-Type", contentType)
 	c.Set("Accept-Ranges", "bytes")
 
 	// Handle Range request
@@ -126,10 +110,14 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 	if rangeHeader != "" {
 		start, end, err := parseRangeHeader(rangeHeader, fileSize)
 		if err != nil {
+			// Note: Content-Type is set only after the range is validated,
+			// so the 416 error carries a JSON content type.
 			return c.Status(fiber.StatusRequestedRangeNotSatisfiable).JSON(fiber.Map{
 				"error": "Range not satisfiable",
 			})
 		}
+
+		c.Set("Content-Type", contentType)
 
 		contentLength := end - start + 1
 
@@ -143,6 +131,7 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 			return nil
 		}
 	} else {
+		c.Set("Content-Type", contentType)
 		c.Set("Content-Length", strconv.FormatInt(fileSize, 10))
 		if _, err := io.Copy(c.Response().BodyWriter(), file); err != nil {
 			return nil
@@ -150,6 +139,46 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 	}
 
 	return nil
+}
+
+// mimeTypeByExt returns the MIME type for known media file extensions.
+func mimeTypeByExt(ext string) string {
+	switch ext {
+	case ".mp4", ".m4v":
+		return "video/mp4"
+	case ".mkv":
+		return "video/x-matroska"
+	case ".avi":
+		return "video/x-msvideo"
+	case ".mov":
+		return "video/quicktime"
+	case ".wmv":
+		return "video/x-ms-wmv"
+	case ".webm":
+		return "video/webm"
+	case ".flv":
+		return "video/x-flv"
+	case ".ts":
+		return "video/mp2t"
+	case ".mp3":
+		return "audio/mpeg"
+	case ".flac":
+		return "audio/flac"
+	case ".ogg", ".oga":
+		return "audio/ogg"
+	case ".m4a":
+		return "audio/mp4"
+	case ".aac":
+		return "audio/aac"
+	case ".wav":
+		return "audio/wav"
+	case ".opus":
+		return "audio/opus"
+	case ".wma":
+		return "audio/x-ms-wma"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 // parseRangeHeader parses a Range header value like "bytes=0-499" and returns
@@ -193,4 +222,3 @@ func parseRangeHeader(rangeHeader string, fileSize int64) (start, end int64, err
 
 	return start, end, nil
 }
-

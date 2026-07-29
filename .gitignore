@@ -8,3 +8,6 @@ backend/data/
 *.db
 .zcode/
 .superpowers/
+
+# Local config (contains secrets)
+backend/configs/config.yaml

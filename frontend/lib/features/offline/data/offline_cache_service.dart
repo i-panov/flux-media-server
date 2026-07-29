@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// Manages offline media downloads.
@@ -42,24 +43,50 @@ class OfflineCacheService {
       request.headers['Authorization'] = 'Bearer $_authToken';
     }
 
-    final response = await http.Client().send(request);
-    if (response.statusCode != 200) {
-      throw Exception('Download failed: ${response.statusCode}');
-    }
-
-    final total = response.contentLength;
+    final client = http.Client();
     final dir = await getApplicationDocumentsDirectory();
     final localFile = File('${dir.path}/flux_media_${media.id}');
-    final sink = localFile.openWrite();
+    // Write to a temporary file first so interrupted downloads
+    // don't leave corrupt files behind.
+    final partFile = File('${localFile.path}.part');
 
-    int received = 0;
-    await response.stream.map((chunk) {
-      received += chunk.length;
-      onProgress?.call(received, total);
-      return chunk;
-    }).pipe(sink);
+    try {
+      final response = await client.send(request);
+      if (response.statusCode != 200) {
+        throw Exception('Download failed: ${response.statusCode}');
+      }
 
-    return localFile.path;
+      final total = response.contentLength;
+      final sink = partFile.openWrite();
+
+      int received = 0;
+      try {
+        await response.stream.map((chunk) {
+          received += chunk.length;
+          onProgress?.call(received, total);
+          return chunk;
+        }).pipe(sink);
+      } finally {
+        await sink.close();
+      }
+
+      if (await localFile.exists()) {
+        await localFile.delete();
+      }
+      await partFile.rename(localFile.path);
+      return localFile.path;
+    } catch (e) {
+      if (await partFile.exists()) {
+        try {
+          await partFile.delete();
+        } on Exception {
+          // Best-effort cleanup of the partial file.
+        }
+      }
+      rethrow;
+    } finally {
+      client.close();
+    }
   }
 
   /// Removes a downloaded media file.
@@ -102,7 +129,10 @@ class OfflineCacheService {
 
 /// Provider for the offline cache service.
 final offlineCacheServiceProvider = Provider<OfflineCacheService>((ref) {
-  return OfflineCacheService(ref.watch(baseUrlProvider), null);
+  return OfflineCacheService(
+    ref.watch(baseUrlProvider),
+    ref.watch(settingsProvider).settings.authToken,
+  );
 });
 
 /// State notifier for managing download state of a specific media item.
@@ -114,6 +144,7 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
   /// Checks if the media item is already downloaded.
   Future<void> checkStatus(int mediaId) async {
     final cached = await _cacheService.isCached(mediaId);
+    if (!mounted) return;
     state = cached ? const DownloadState.downloaded() : const DownloadState.idle();
   }
 
@@ -124,14 +155,17 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
       await _cacheService.download(
         media,
         onProgress: (received, total) {
+          if (!mounted) return;
           if (total != null && total > 0) {
             final progress = received / total;
             state = DownloadState.downloading(progress: progress);
           }
         },
       );
+      if (!mounted) return;
       state = const DownloadState.downloaded();
     } catch (e) {
+      if (!mounted) return;
       state = DownloadState.error(e.toString());
     }
   }
@@ -139,6 +173,7 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
   /// Removes the downloaded file.
   Future<void> remove(int mediaId) async {
     await _cacheService.remove(mediaId);
+    if (!mounted) return;
     state = const DownloadState.idle();
   }
 }
@@ -171,8 +206,9 @@ class DownloadError extends DownloadState {
 }
 
 /// Provider for download state of a specific media item.
+/// Not auto-disposed: downloads must survive widget rebuilds/navigation.
 final downloadNotifierProvider =
-    StateNotifierProvider.autoDispose.family<DownloadNotifier, DownloadState, int>(
+    StateNotifierProvider.family<DownloadNotifier, DownloadState, int>(
   (ref, mediaId) {
     final notifier = DownloadNotifier(ref.watch(offlineCacheServiceProvider));
     notifier.checkStatus(mediaId);

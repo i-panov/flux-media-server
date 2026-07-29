@@ -13,6 +13,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *models.User) error
 	Update(ctx context.Context, user *models.User) error
 	Delete(ctx context.Context, id uint) error
+	Count(ctx context.Context) (int64, error)
 }
 
 // MediaRepository defines data access methods for Media entities.
@@ -68,6 +69,7 @@ type CollectionRepository interface {
 // CollectionItemRepository defines data access methods for CollectionItem entities.
 type CollectionItemRepository interface {
 	FindByCollection(ctx context.Context, collectionID uint) ([]models.CollectionItem, error)
+	FindMediaByCollection(ctx context.Context, collectionID uint) ([]models.Media, error)
 	Add(ctx context.Context, item *models.CollectionItem) error
 	Remove(ctx context.Context, collectionID, mediaID uint) error
 }

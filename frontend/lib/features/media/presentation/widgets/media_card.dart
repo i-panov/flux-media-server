@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 class MediaCard extends ConsumerWidget {
@@ -39,7 +39,7 @@ class MediaCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: CachedNetworkImage(
+                    child: AuthNetworkImage(
                       imageUrl: thumbnailUrl,
                       fit: BoxFit.cover,
                       placeholder: (_, __) => const Center(

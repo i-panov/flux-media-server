@@ -1,6 +1,7 @@
 package services
 
 import (
+	"crypto/subtle"
 	"errors"
 	"sync"
 	"time"
@@ -12,9 +13,14 @@ import (
 
 var ErrOTPStoreFull = errors.New("otp store is full")
 
+// MaxOTPAttempts is the number of failed verification attempts after which
+// the code is invalidated (anti brute-force).
+const MaxOTPAttempts = 5
+
 type OTPEntry struct {
 	Code      string
 	ExpiresAt time.Time
+	Attempts  int
 }
 
 type OTPStore struct {
@@ -68,7 +74,14 @@ func (s *OTPStore) cleanup() {
 }
 
 func (s *OTPStore) Stop() {
-	close(s.stopChan)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	select {
+	case <-s.stopChan:
+		// already closed
+	default:
+		close(s.stopChan)
+	}
 }
 
 func (s *OTPStore) Generate(addr string) (string, error) {
@@ -104,7 +117,13 @@ func (s *OTPStore) Verify(email, code string) bool {
 		return false
 	}
 
-	if entry.Code != code {
+	// Constant-time comparison to avoid timing attacks.
+	if subtle.ConstantTimeCompare([]byte(entry.Code), []byte(code)) != 1 {
+		entry.Attempts++
+		if entry.Attempts >= MaxOTPAttempts {
+			// Invalidate the code after too many failed attempts.
+			delete(s.entries, email)
+		}
 		return false
 	}
 
@@ -118,9 +137,16 @@ type JWTManager struct {
 	refreshExpiry time.Duration
 }
 
+// Token types stored in the "type" claim to distinguish access and refresh tokens.
+const (
+	TokenTypeAccess  = "access"
+	TokenTypeRefresh = "refresh"
+)
+
 type Claims struct {
 	UserID uint   `json:"user_id"`
 	Email  string `json:"email"`
+	Type   string `json:"type"`
 	jwt.RegisteredClaims
 }
 
@@ -138,25 +164,20 @@ func NewJWTService(secret string, expiry time.Duration, refreshExpiry time.Durat
 }
 
 func (s *JWTManager) GenerateToken(userID uint, email string) (string, error) {
-	claims := Claims{
-		UserID: userID,
-		Email:  email,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.expiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(s.secret)
+	return s.generateToken(userID, email, TokenTypeAccess, s.expiry)
 }
 
 func (s *JWTManager) GenerateRefreshToken(userID uint, email string) (string, error) {
+	return s.generateToken(userID, email, TokenTypeRefresh, s.refreshExpiry)
+}
+
+func (s *JWTManager) generateToken(userID uint, email, tokenType string, expiry time.Duration) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
+		Type:   tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.refreshExpiry)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -182,10 +203,23 @@ func (s *JWTManager) GenerateTokenPair(userID uint, email string) (*TokenPair, e
 	}, nil
 }
 
+// ValidateToken validates an access token. Refresh tokens are rejected.
 func (s *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
+	return s.validateToken(tokenString, TokenTypeAccess)
+}
+
+// ValidateRefreshToken validates a refresh token. Access tokens are rejected.
+func (s *JWTManager) ValidateRefreshToken(tokenString string) (*Claims, error) {
+	return s.validateToken(tokenString, TokenTypeRefresh)
+}
+
+func (s *JWTManager) validateToken(tokenString, expectedType string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
 		return s.secret, nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}))
 
 	if err != nil {
 		return nil, err
@@ -196,9 +230,11 @@ func (s *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 		return nil, errors.New("invalid token")
 	}
 
-	return claims, nil
-}
+	// Tokens issued before the "type" claim existed (empty type) are treated
+	// as access tokens for backwards compatibility.
+	if claims.Type != expectedType && !(claims.Type == "" && expectedType == TokenTypeAccess) {
+		return nil, errors.New("invalid token type")
+	}
 
-func (s *JWTManager) ValidateRefreshToken(tokenString string) (*Claims, error) {
-	return s.ValidateToken(tokenString)
+	return claims, nil
 }

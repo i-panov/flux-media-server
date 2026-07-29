@@ -13,8 +13,8 @@ import (
 
 // ThumbHandler serves media thumbnails.
 type ThumbHandler struct {
- mediaRepo  repository.MediaRepository
- thumbSvc   *services.ThumbnailService
+	mediaRepo repository.MediaRepository
+	thumbSvc  *services.ThumbnailService
 }
 
 // NewThumbHandler creates a new ThumbHandler.

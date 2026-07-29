@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/usecases/usecase.dart';
 import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
@@ -74,9 +75,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _getCurrentUser(const NoParams());
     await result.fold<Future<void>>(
       (failure) async {
-        // Token is invalid — clear it to prevent infinite 401 loop
-        await _ref.read(settingsProvider.notifier).logout();
-        state = const AuthState.initial();
+        if (failure is AuthFailure) {
+          // Token is invalid — clear it to prevent infinite 401 loop
+          await _ref.read(settingsProvider.notifier).logout();
+          state = const AuthState.initial();
+        } else {
+          // Network/server error — keep the stored session so the user
+          // isn't logged out just because the server is unreachable.
+          state = AuthState.error(message: failure.message);
+        }
       },
       (user) async => state = AuthState.authenticated(user: user),
     );

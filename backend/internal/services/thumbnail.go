@@ -16,7 +16,7 @@ import (
 
 // ThumbnailService generates and serves thumbnails for media files.
 type ThumbnailService struct {
- thumbnailsDir string
+	thumbnailsDir string
 }
 
 // NewThumbnailService creates a new ThumbnailService.

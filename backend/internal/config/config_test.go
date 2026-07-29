@@ -84,8 +84,8 @@ media:
 	assert.Equal(t, 30, cfg.Scanner.Interval)
 
 	// Media
-		assert.Equal(t, "./thumbnails", cfg.Media.ThumbnailPath)
-	}
+	assert.Equal(t, "./thumbnails", cfg.Media.ThumbnailPath)
+}
 
 func TestLoadConfigDefaults(t *testing.T) {
 	tmpDir := t.TempDir()

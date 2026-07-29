@@ -2,11 +2,18 @@ package email
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"fmt"
-	"log"
 	"math/big"
+	"net"
 	"net/smtp"
+	"strings"
+	"time"
 )
+
+// smtpTimeout bounds all SMTP network operations so a hanging server does
+// not block a request worker indefinitely.
+const smtpTimeout = 15 * time.Second
 
 type SMTPConfig struct {
 	Host     string
@@ -24,23 +31,25 @@ func NewSMTPClient(config SMTPConfig) *SMTPClient {
 	return &SMTPClient{config: config}
 }
 
+// GenerateCode generates a numeric code of the given length using
+// crypto/rand. It panics on entropy failure — falling back to a predictable
+// digit would silently weaken authentication codes.
 func GenerateCode(length int) string {
-	code := ""
+	var sb strings.Builder
+	sb.Grow(length)
 	for i := 0; i < length; i++ {
 		n, err := rand.Int(rand.Reader, big.NewInt(10))
 		if err != nil {
-			log.Printf("Warning: crypto/rand failed, falling back to 0: %v", err)
-			code += "0"
-			continue
+			panic(fmt.Sprintf("crypto/rand unavailable, cannot generate secure code: %v", err))
 		}
-		code += fmt.Sprintf("%d", n.Int64())
+		fmt.Fprintf(&sb, "%d", n.Int64())
 	}
-	return code
+	return sb.String()
 }
 
-func (c *SMTPClient) SendCode(to string, code string) error {
+func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
 	subject := "Flux Media Server - Login Code"
-	body := fmt.Sprintf("Your login code is: %s\n\nThis code will expire in 5 minutes.", code)
+	body := fmt.Sprintf("Your login code is: %s\n\nThis code will expire in %d minutes.", code, expiryMinutes)
 	msg := fmt.Sprintf("From: %s\nTo: %s\nSubject: %s\n\n%s", c.config.From, to, subject, body)
 
 	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
@@ -52,5 +61,70 @@ func (c *SMTPClient) SendCode(to string, code string) error {
 		fromAddr = c.config.Username
 	}
 
-	return smtp.SendMail(addr, auth, fromAddr, []string{to}, []byte(msg))
+	return sendMailWithTimeout(addr, auth, fromAddr, []string{to}, []byte(msg))
+}
+
+// sendMailWithTimeout is smtp.SendMail with a connection-level deadline.
+func sendMailWithTimeout(addr string, auth smtp.Auth, from string, to []string, msg []byte) error {
+	conn, err := net.DialTimeout("tcp", addr, smtpTimeout)
+	if err != nil {
+		return err
+	}
+
+	client, err := smtp.NewClient(conn, hostOf(addr))
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	defer client.Close()
+
+	if err := conn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
+		return err
+	}
+
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		// Always verify the server certificate.
+		tlsConfig := &tls.Config{ServerName: hostOf(addr), MinVersion: tls.VersionTLS12}
+		if err := client.StartTLS(tlsConfig); err != nil {
+			return err
+		}
+	}
+
+	if auth != nil {
+		if ok, _ := client.Extension("AUTH"); ok {
+			if err := client.Auth(auth); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	for _, rcpt := range to {
+		if err := client.Rcpt(rcpt); err != nil {
+			return err
+		}
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(msg); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+
+	return client.Quit()
+}
+
+func hostOf(addr string) string {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	return host
 }

@@ -36,9 +36,9 @@ final getMediaDetailUseCaseProvider = Provider<GetMediaDetail>((ref) {
   return GetMediaDetail(ref.watch(mediaRepositoryProvider));
 });
 
-final mediaDetailProvider =
-    StateNotifierProvider.autoDispose<MediaDetailNotifier, MediaDetailState>(
-  (ref) => MediaDetailNotifier(
+final mediaDetailProvider = StateNotifierProvider.autoDispose
+    .family<MediaDetailNotifier, MediaDetailState, int>(
+  (ref, mediaId) => MediaDetailNotifier(
     getMediaDetail: ref.watch(getMediaDetailUseCaseProvider),
   ),
 );

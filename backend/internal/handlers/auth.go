@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"log"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -64,6 +65,12 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Email is required")
 	}
 
+	// Validate the email format. Besides rejecting garbage input, this
+	// prevents SMTP header injection through control characters.
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid email address")
+	}
+
 	allowed := false
 	for _, e := range h.config.Auth.AllowedEmails {
 		if strings.ToLower(e) == req.Email {
@@ -93,7 +100,11 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 	if h.config.Server.Debug {
 		resp["code"] = code
 	} else {
-		if err := h.smtpClient.SendCode(req.Email, code); err != nil {
+		expiryMinutes := h.config.Auth.CodeExpiry / 60
+		if expiryMinutes < 1 {
+			expiryMinutes = 1
+		}
+		if err := h.smtpClient.SendCode(req.Email, code, expiryMinutes); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "Failed to send code")
 		}
 	}
@@ -123,6 +134,10 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 		user = &models.User{
 			Email: req.Email,
 		}
+		// The very first user becomes the administrator.
+		if count, cntErr := h.userRepo.Count(ctx); cntErr == nil && count == 0 {
+			user.IsAdmin = true
+		}
 		if err := h.userRepo.Create(ctx, user); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "Failed to create user")
 		}
@@ -134,21 +149,18 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 	}
 
 	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
-	refreshRecord := &models.RefreshToken{
-		UserID:    user.ID,
-		Token:     tokens.RefreshToken,
-		ExpiresAt: time.Now().Add(refreshExpiry),
-	}
-	if err := h.refreshTokenDB.Create(ctx, refreshRecord); err != nil {
+	if err := h.refreshTokenDB.Create(ctx, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
 		log.Printf("Failed to store refresh token: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
 	}
 
 	return c.JSON(fiber.Map{
 		"token":         tokens.AccessToken,
 		"refresh_token": tokens.RefreshToken,
 		"user": fiber.Map{
-			"id":    user.ID,
-			"email": user.Email,
+			"id":       user.ID,
+			"email":    user.Email,
+			"is_admin": user.IsAdmin,
 		},
 	})
 }
@@ -166,9 +178,25 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"id":    user.ID,
-		"email": user.Email,
+		"id":       user.ID,
+		"email":    user.Email,
+		"is_admin": user.IsAdmin,
 	})
+}
+
+// Logout revokes all refresh tokens of the current user (invalidates sessions).
+func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(uint)
+	if !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	if err := h.refreshTokenDB.DeleteByUserID(c.UserContext(), userID); err != nil {
+		log.Printf("Logout: delete refresh tokens: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+	}
+
+	return c.JSON(fiber.Map{"message": "Logged out successfully"})
 }
 
 type RefreshRequest struct {
@@ -208,17 +236,18 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate tokens")
 	}
 
-	// Rotate: delete old refresh token, store new one
-	_ = h.refreshTokenDB.DeleteByToken(ctx, req.RefreshToken)
+	// Rotate: delete old refresh token, store new one. If rotation fails we
+	// must not issue the new pair — otherwise multiple valid refresh tokens
+	// accumulate silently.
+	if err := h.refreshTokenDB.DeleteByToken(ctx, req.RefreshToken); err != nil {
+		log.Printf("Failed to rotate refresh token: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to rotate session")
+	}
 
 	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
-	refreshRecord := &models.RefreshToken{
-		UserID:    user.ID,
-		Token:     tokens.RefreshToken,
-		ExpiresAt: time.Now().Add(refreshExpiry),
-	}
-	if err := h.refreshTokenDB.Create(ctx, refreshRecord); err != nil {
+	if err := h.refreshTokenDB.Create(ctx, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
 		log.Printf("Failed to store refresh token: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
 	}
 
 	return c.JSON(fiber.Map{

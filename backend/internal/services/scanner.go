@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"log"
 	"os"
@@ -20,6 +21,9 @@ import (
 	"flux/internal/repository"
 )
 
+// ErrScanInProgress is returned when a scan for the same library is already running.
+var ErrScanInProgress = errors.New("scan already in progress")
+
 const quickHashChunk = 1024 * 1024 // 1MB head/tail for quick hash
 
 var allowedExtensions = map[string]bool{
@@ -34,11 +38,11 @@ func IsAllowedExtension(ext string) bool {
 }
 
 type ScannerService struct {
-	libraryRepo    repository.LibraryRepository
-	mediaRepo      repository.MediaRepository
-	config         *config.Config
-	metaExtractor  *MetadataExtractor
-	thumbService   *ThumbnailService
+	libraryRepo   repository.LibraryRepository
+	mediaRepo     repository.MediaRepository
+	config        *config.Config
+	metaExtractor *MetadataExtractor
+	thumbService  *ThumbnailService
 
 	mu       sync.RWMutex
 	statuses map[uint]*ScanStatus
@@ -87,12 +91,13 @@ func (s *ScannerService) GetScanStatus(libraryID uint) *ScanStatus {
 }
 
 func (s *ScannerService) ScanLibrary(ctx context.Context, libraryID uint) error {
-	library, err := s.libraryRepo.FindByID(ctx, libraryID)
-	if err != nil {
-		return err
-	}
-
+	// Reject concurrent scans of the same library: parallel walks would race
+	// on statuses and on find-then-create against the unique file_path index.
 	s.mu.Lock()
+	if st, ok := s.statuses[libraryID]; ok && st.Running {
+		s.mu.Unlock()
+		return ErrScanInProgress
+	}
 	s.statuses[libraryID] = &ScanStatus{
 		LibraryID: libraryID,
 		Running:   true,
@@ -100,7 +105,21 @@ func (s *ScannerService) ScanLibrary(ctx context.Context, libraryID uint) error 
 	}
 	s.mu.Unlock()
 
-	scanErr := s.scanLibraryWalk(ctx, library)
+	library, err := s.libraryRepo.FindByID(ctx, libraryID)
+
+	var scanErr error
+	if err != nil {
+		scanErr = err
+	} else {
+		var seen map[string]struct{}
+		seen, scanErr = s.scanLibraryWalk(ctx, library)
+		if scanErr == nil {
+			// Remove DB records whose files disappeared from disk.
+			if err := s.sweepDeleted(ctx, library, seen); err != nil {
+				log.Printf("Sweep deleted files for library %s: %v", library.Name, err)
+			}
+		}
+	}
 
 	s.mu.Lock()
 	st := s.statuses[libraryID]
@@ -115,8 +134,33 @@ func (s *ScannerService) ScanLibrary(ctx context.Context, libraryID uint) error 
 	return scanErr
 }
 
-func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.MediaLibrary) error {
-	return filepath.Walk(library.Path, func(path string, info os.FileInfo, err error) error {
+// sweepDeleted removes media records under the library path whose files were
+// not seen during the scan (i.e. deleted from disk).
+func (s *ScannerService) sweepDeleted(ctx context.Context, library *models.MediaLibrary, seen map[string]struct{}) error {
+	all, _, err := s.mediaRepo.FindAll(ctx, map[string]interface{}{}, 0, 0)
+	if err != nil {
+		return err
+	}
+
+	for _, m := range all {
+		if !IsSubPath(library.Path, m.FilePath) {
+			continue
+		}
+		if _, ok := seen[m.FilePath]; !ok {
+			if err := s.mediaRepo.Delete(ctx, m.ID); err != nil {
+				log.Printf("Sweep: delete media %d (%s): %v", m.ID, m.FilePath, err)
+			} else {
+				log.Printf("Sweep: removed missing file from library: %s", m.FilePath)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.MediaLibrary) (map[string]struct{}, error) {
+	seen := make(map[string]struct{})
+
+	err := filepath.Walk(library.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Printf("Walk error for %s: %v", path, err)
 			return nil
@@ -136,6 +180,8 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 		if !IsAllowedExtension(ext) {
 			return nil
 		}
+
+		seen[path] = struct{}{}
 
 		// Check if file already exists in database by path
 		existing, err := s.mediaRepo.FindByPath(ctx, path)
@@ -221,12 +267,12 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 		mediaType := DetermineMediaType(path)
 
 		media := &models.Media{
-			Title:    title,
-			Year:     year,
-			Type:     mediaType,
-			FilePath: path,
-			FileSize: info.Size(),
-			FileHash: hash,
+			Title:     title,
+			Year:      year,
+			Type:      mediaType,
+			FilePath:  path,
+			FileSize:  info.Size(),
+			FileHash:  hash,
 			QuickHash: qh,
 		}
 
@@ -261,17 +307,23 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 				}
 				media.Description = desc
 			}
-			s.mediaRepo.Update(ctx, media)
+			if err := s.mediaRepo.Update(ctx, media); err != nil {
+				log.Printf("Error updating media metadata for %s: %v", path, err)
+			}
 		}
 
 		// Generate thumbnail.
 		if thumbPath := s.thumbService.Generate(media.ID, path); thumbPath != "" {
 			media.ThumbnailURL = thumbPath
-			s.mediaRepo.Update(ctx, media)
+			if err := s.mediaRepo.Update(ctx, media); err != nil {
+				log.Printf("Error updating media thumbnail for %s: %v", path, err)
+			}
 		}
 
 		return nil
 	})
+
+	return seen, err
 }
 
 // HashFile computes full SHA-256 of a file.

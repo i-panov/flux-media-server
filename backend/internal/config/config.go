@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,8 +30,8 @@ type DatabaseConfig struct {
 
 type AuthConfig struct {
 	JWTSecret         string     `yaml:"jwt_secret"`
-	JWTExpiry         int        `yaml:"jwt_expiry"`          // in hours
-	RefreshExpiry     int        `yaml:"refresh_expiry"`      // in hours
+	JWTExpiry         int        `yaml:"jwt_expiry"`     // in hours
+	RefreshExpiry     int        `yaml:"refresh_expiry"` // in hours
 	CodeLength        int        `yaml:"code_length"`
 	CodeExpiry        int        `yaml:"code_expiry"`
 	MaxOTPEntries     int        `yaml:"max_otp_entries"`
@@ -48,8 +49,8 @@ type SMTPConfig struct {
 }
 
 type ScannerConfig struct {
-	Enabled     bool `yaml:"enabled"`
-	Interval    int  `yaml:"interval"`
+	Enabled      bool `yaml:"enabled"`
+	Interval     int  `yaml:"interval"`
 	WatchEnabled bool `yaml:"watch_enabled"`
 }
 
@@ -96,6 +97,11 @@ func Load(path string) (*Config, error) {
 	// Validate JWT secret
 	if len(cfg.Auth.JWTSecret) < 32 {
 		return nil, errors.New("jwt_secret must be at least 32 characters")
+	}
+
+	// Refuse to run in production mode with the well-known default secret.
+	if !cfg.Server.Debug && strings.HasPrefix(cfg.Auth.JWTSecret, "change-me") {
+		return nil, errors.New("jwt_secret must be changed from the default value (generate one with: openssl rand -base64 48)")
 	}
 
 	return cfg, nil

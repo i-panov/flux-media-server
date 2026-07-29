@@ -43,6 +43,10 @@ func main() {
 		log.Fatalf("Failed to load config %s: %v", configPath, err)
 	}
 
+	if cfg.Server.Debug {
+		log.Println("WARNING: debug mode is enabled — OTP codes are returned in API responses and SQL queries are logged. Do NOT use in production.")
+	}
+
 	application, err := app.New(cfg, version)
 	if err != nil {
 		log.Fatalf("Failed to initialize app: %v", err)
@@ -51,14 +55,18 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
+	serverErr := make(chan error, 1)
 	go func() {
-		if err := application.Listen(); err != nil {
-			log.Fatalf("Server error: %v", err)
-		}
+		serverErr <- application.Listen()
 	}()
 
-	<-quit
-	log.Println("Shutting down server...")
+	select {
+	case err := <-serverErr:
+		// log.Fatalf in a goroutine would bypass deferred cleanup; handle here.
+		log.Fatalf("Server error: %v", err)
+	case <-quit:
+		log.Println("Shutting down server...")
+	}
 
 	application.Shutdown()
 

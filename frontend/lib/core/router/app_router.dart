@@ -39,13 +39,13 @@ class AppRouter extends _$AppRouter {
             AutoRoute(page: AudioRoute.page),
           ],
         ),
-        AutoRoute(page: MediaDetailRoute.page),
-        AutoRoute(page: PlayerRoute.page),
-        AutoRoute(page: AudioPlayerRoute.page),
-        AutoRoute(page: UploadRoute.page),
-        AutoRoute(page: SettingsRoute.page),
-        AutoRoute(page: ArtistRoute.page),
-        AutoRoute(page: CollectionDetailRoute.page),
+        AutoRoute(page: MediaDetailRoute.page, guards: [authGuard]),
+        AutoRoute(page: PlayerRoute.page, guards: [authGuard]),
+        AutoRoute(page: AudioPlayerRoute.page, guards: [authGuard]),
+        AutoRoute(page: UploadRoute.page, guards: [authGuard]),
+        AutoRoute(page: SettingsRoute.page, guards: [authGuard]),
+        AutoRoute(page: ArtistRoute.page, guards: [authGuard]),
+        AutoRoute(page: CollectionDetailRoute.page, guards: [authGuard]),
       ];
 }
 
