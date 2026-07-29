@@ -6,6 +6,8 @@ import 'package:flux_media_server/features/auth/presentation/screens/login_scree
 import 'package:flux_media_server/features/audio/presentation/screens/audio_screen.dart';
 import 'package:flux_media_server/features/audio/presentation/screens/artist_page.dart';
 import 'package:flux_media_server/features/video/presentation/screens/video_screen.dart';
+import 'package:flux_media_server/features/library/presentation/screens/library_screen.dart';
+import 'package:flux_media_server/features/library/presentation/screens/library_media_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/media_detail_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/upload_screen.dart';
 import 'package:flux_media_server/features/player/presentation/screens/player_screen.dart';
@@ -18,6 +20,7 @@ import 'package:flux_media_server/features/settings/presentation/screens/setting
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/library.dart';
 
 part 'app_router.gr.dart';
 
@@ -38,9 +41,11 @@ class AppRouter extends _$AppRouter {
           children: [
             AutoRoute(page: VideoRoute.page, initial: true),
             AutoRoute(page: AudioRoute.page),
+            AutoRoute(page: LibraryRoute.page),
             AutoRoute(page: DownloadsRoute.page),
           ],
         ),
+        AutoRoute(page: LibraryMediaRoute.page, guards: [authGuard]),
         AutoRoute(page: MediaDetailRoute.page, guards: [authGuard]),
         AutoRoute(page: PlayerRoute.page, guards: [authGuard]),
         AutoRoute(page: AudioPlayerRoute.page, guards: [authGuard]),
@@ -65,6 +70,7 @@ class MainScreen extends StatelessWidget {
     final destinations = [
       (icon: Icons.movie_outlined, selectedIcon: Icons.movie, label: l.videoTab),
       (icon: Icons.music_note_outlined, selectedIcon: Icons.music_note, label: l.audioTab),
+      (icon: Icons.folder_outlined, selectedIcon: Icons.folder, label: l.libraries),
       (icon: Icons.download_outlined, selectedIcon: Icons.download, label: l.downloads),
     ];
 
@@ -88,6 +94,7 @@ class _WideLayout extends StatelessWidget {
       routes: const [
         VideoRoute(),
         AudioRoute(),
+        LibraryRoute(),
         DownloadsRoute(),
       ],
       builder: (context, child) {
@@ -152,6 +159,7 @@ class _NarrowLayout extends StatelessWidget {
       routes: const [
         VideoRoute(),
         AudioRoute(),
+        LibraryRoute(),
         DownloadsRoute(),
       ],
       bottomNavigationBuilder: (context, tabsRouter) {

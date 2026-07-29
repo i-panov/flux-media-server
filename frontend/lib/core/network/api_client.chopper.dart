@@ -76,6 +76,7 @@ final class _$ApiClient extends ApiClient {
     String? q,
     int? limit,
     int? offset,
+    int? libraryId,
   }) {
     final Uri $url = Uri.parse('/media');
     final Map<String, dynamic> $params = <String, dynamic>{
@@ -84,6 +85,7 @@ final class _$ApiClient extends ApiClient {
       'q': q,
       'limit': limit,
       'offset': offset,
+      'library_id': libraryId,
     };
     final Request $request = Request(
       'GET',

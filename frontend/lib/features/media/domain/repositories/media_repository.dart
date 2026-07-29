@@ -10,6 +10,7 @@ abstract class MediaRepository {
     String? q,
     int? limit,
     int? offset,
+    int? libraryId,
   });
 
   Future<Either<Failure, Media>> getMediaDetail(int id);

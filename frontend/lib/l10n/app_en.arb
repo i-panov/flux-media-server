@@ -74,6 +74,8 @@
   "@newLibrary": {},
   "name": "Name",
   "@name": {},
+  "libraryName": "Library name",
+  "@libraryName": {},
   "type": "Type",
   "@type": {},
   "cancel": "Cancel",

@@ -120,6 +120,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get name => 'Название';
 
   @override
+  String get libraryName => 'Название библиотеки';
+
+  @override
   String get type => 'Тип';
 
   @override

@@ -120,6 +120,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get name => 'Name';
 
   @override
+  String get libraryName => 'Library name';
+
+  @override
   String get type => 'Type';
 
   @override

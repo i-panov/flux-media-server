@@ -21,6 +21,7 @@ class MediaRemoteDataSource {
     String? q,
     int? limit,
     int? offset,
+    int? libraryId,
   }) async {
     final Response<Map<String, dynamic>> response = await apiClient.getMediaList(
       type: type,
@@ -28,6 +29,7 @@ class MediaRemoteDataSource {
       q: q,
       limit: limit,
       offset: offset,
+      libraryId: libraryId,
     );
     checkResponse(response, 'Failed to fetch media');
     final body = response.body!;

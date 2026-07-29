@@ -82,6 +82,7 @@ abstract class ApiClient extends ChopperService {
     @Query('q') String? q,
     @Query('limit') int? limit,
     @Query('offset') int? offset,
+    @Query('library_id') int? libraryId,
   });
 
   @Get(path: '/media/{id}')

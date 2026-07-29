@@ -18,6 +18,7 @@ class MediaRepositoryImpl implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
+    int? libraryId,
   }) =>
       safeRepositoryCall(() async {
         final result = await remoteDataSource.getMediaList(
@@ -26,6 +27,7 @@ class MediaRepositoryImpl implements MediaRepository {
           q: q,
           limit: limit,
           offset: offset,
+          libraryId: libraryId,
         );
         final mediaList =
             result.items.map((json) => Media.fromJson(json)).toList();
