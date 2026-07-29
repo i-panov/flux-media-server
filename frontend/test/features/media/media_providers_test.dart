@@ -135,10 +135,10 @@ void main() {
       final media = _fakeMedia(1, 'The Matrix');
       fakeRepo.onGetMediaDetail = (_) async => Right(media);
 
-      final notifier = container.read(mediaDetailProvider.notifier);
+      final notifier = container.read(mediaDetailProvider(1).notifier);
       await notifier.load(1);
 
-      final state = container.read(mediaDetailProvider);
+      final state = container.read(mediaDetailProvider(1));
       expect(state, isA<MediaDetailLoaded>());
       expect((state as MediaDetailLoaded).media.title, 'The Matrix');
     });
@@ -147,10 +147,10 @@ void main() {
       fakeRepo.onGetMediaDetail =
           (_) async => const Left(ServerFailure(message: 'Not found'));
 
-      final notifier = container.read(mediaDetailProvider.notifier);
+      final notifier = container.read(mediaDetailProvider(999).notifier);
       await notifier.load(999);
 
-      final state = container.read(mediaDetailProvider);
+      final state = container.read(mediaDetailProvider(999));
       expect(state, isA<MediaDetailError>());
       expect((state as MediaDetailError).message, 'Not found');
     });

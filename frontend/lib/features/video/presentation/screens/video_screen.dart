@@ -28,6 +28,28 @@ class VideoScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoScreenState extends ConsumerState<VideoScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(mediaTypeFilterProvider.notifier).state = 'video';
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.8) {
+      ref.read(mediaListProvider.notifier).loadMore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -139,19 +161,18 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         .map((f) => f.mediaId!)
         .toSet();
 
-    // Filter video items from media list for sections
-    final videoItems = mediaList.items.where((m) => m.type == 'video').toList();
-    final recentlyAdded = videoItems.take(10).toList();
+    // Recently Added section
+    final recentlyAdded = mediaList.items.take(10).toList();
 
-    // Filter favorites from video items
-    final favoriteVideos = videoItems
+    // Filter favorites from media items
+    final favoriteVideos = mediaList.items
         .where((m) => favoriteMediaIds.contains(m.id))
         .take(10)
         .toList();
 
     // Build continue watching items with progress
     final continueWatchingItems = incompleteProgress.map((p) {
-      final media = videoItems.firstWhere(
+      final media = mediaList.items.firstWhere(
         (m) => m.id == p.mediaId,
         orElse: () => Media(
           id: p.mediaId,
@@ -173,6 +194,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     }).toList();
 
     return CustomScrollView(
+      controller: _scrollController,
       slivers: [
         // Continue Watching section
         if (continueWatchingItems.isNotEmpty)
@@ -239,7 +261,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           ),
 
         // All Movies section
-        if (videoItems.isEmpty)
+        if (mediaList.items.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
@@ -273,7 +295,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final media = videoItems[index];
+                  final media = mediaList.items[index];
                   return MediaCard(
                     media: media,
                     onTap: () =>
@@ -284,7 +306,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
                     onDownload: () => _toggleDownload(media.id),
                   );
                 },
-                childCount: videoItems.length,
+                childCount: mediaList.items.length,
               ),
             ),
           ),

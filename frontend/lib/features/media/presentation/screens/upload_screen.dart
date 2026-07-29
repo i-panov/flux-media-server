@@ -46,20 +46,20 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     for (final file in result.files) {
       if (file.path == null) continue;
-      if (file.size == 0) continue; // skip empty files
+      if (file.size == 0) continue;
 
       setState(() => _statusText = l.checkingFile(file.name));
 
-      // Compute SHA-256 hash.
       final hash = await _computeHash(File(file.path!));
 
-      // Check if file already exists on server.
+      if (!mounted) return;
+
       final checkResult = await checkMediaHash(hash);
+
+      if (!mounted) return;
 
       final exists = checkResult.fold(
         (failure) {
-          // On hash-check error, treat as non-existent so the server
-          // will reject duplicates during upload.
           return false;
         },
         (data) => data.exists,
@@ -78,6 +78,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       }
     }
 
+    if (!mounted) return;
     setState(() => _statusText = null);
   }
 
@@ -111,6 +112,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           fileName: fileInfo.name,
         ),
       );
+
+      if (!mounted) return;
 
       result.fold(
         (failure) => firstError ??= failure.message,

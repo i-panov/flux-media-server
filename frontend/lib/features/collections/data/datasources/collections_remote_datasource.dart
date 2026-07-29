@@ -1,6 +1,7 @@
 import 'package:flux_media_server/core/network/api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 class CollectionsRemoteDataSource {
   CollectionsRemoteDataSource(this.apiClient);
@@ -60,6 +61,15 @@ class CollectionsRemoteDataSource {
     final body = response.body!;
     return body
         .map((json) => CollectionItem.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Media>> getCollectionItemsFull(int collectionId) async {
+    final response = await apiClient.getCollectionItems(collectionId);
+    checkResponse(response, 'Failed to fetch collection items');
+    final body = response.body!;
+    return body
+        .map((json) => Media.fromJson(json as Map<String, dynamic>))
         .toList();
   }
 }

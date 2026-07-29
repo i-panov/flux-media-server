@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -285,14 +287,21 @@ class _PlayerControls extends ConsumerStatefulWidget {
 
 class _PlayerControlsState extends ConsumerState<_PlayerControls> {
   double _volume = 100.0;
+  StreamSubscription<double>? _volumeSub;
 
   @override
   void initState() {
     super.initState();
     final audioDs = ref.read(audioPlayerDatasourceProvider);
-    audioDs.volumeStream.listen((v) {
+    _volumeSub = audioDs.volumeStream.listen((v) {
       if (mounted) setState(() => _volume = v);
     });
+  }
+
+  @override
+  void dispose() {
+    _volumeSub?.cancel();
+    super.dispose();
   }
 
   @override

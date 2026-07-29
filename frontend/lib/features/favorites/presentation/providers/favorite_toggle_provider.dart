@@ -55,6 +55,6 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
 
 /// Provider for toggling favorite status of a specific media item.
 final favoriteToggleProvider =
-    StateNotifierProvider.autoDispose.family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
+    StateNotifierProvider.family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
   (ref, mediaId) => FavoriteToggleNotifier(ref),
 );

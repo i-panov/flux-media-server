@@ -24,6 +24,28 @@ class AudioScreen extends ConsumerStatefulWidget {
 }
 
 class _AudioScreenState extends ConsumerState<AudioScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(mediaTypeFilterProvider.notifier).state = 'audio';
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.8) {
+      ref.read(mediaListProvider.notifier).loadMore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -101,9 +123,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     final mediaList = mediaListState.valueOrNull ?? MediaListResult(items: <Media>[].toIList(), total: 0);
     final favorites = favoritesState.valueOrNull ?? [];
 
-    final audioItems = mediaList.items.where((Media m) => m.type == 'audio').toList();
-
-    if (audioItems.isEmpty) {
+    if (mediaList.items.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -124,20 +144,21 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
         .map((Favorite f) => f.mediaId!)
         .toSet();
 
-    final likedTracks = audioItems
+    final likedTracks = mediaList.items
         .where((Media m) => favoriteMediaIds.contains(m.id))
         .toList();
 
-    final artists = audioItems
+    final artists = mediaList.items
         .where((Media m) => m.artist != null && m.artist!.isNotEmpty)
         .map((Media m) => m.artist!)
         .toSet()
         .toList()
           ..sort();
 
-    final recentlyAdded = audioItems.take(10).toList();
+    final recentlyAdded = mediaList.items.take(10).toList();
 
     return CustomScrollView(
+      controller: _scrollController,
       slivers: [
         if (likedTracks.isNotEmpty)
           SliverToBoxAdapter(

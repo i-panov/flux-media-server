@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
-import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
@@ -24,7 +23,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final itemsState = ref.watch(collectionItemsProvider(widget.collection.id));
+    final itemsState = ref.watch(collectionItemsFullProvider(widget.collection.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -48,7 +47,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => ref.invalidate(
-                    collectionItemsProvider(widget.collection.id)),
+                    collectionItemsFullProvider(widget.collection.id)),
                 child: Text(l.retry),
               ),
             ],
@@ -79,34 +78,15 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
             ),
             itemCount: items.length,
             itemBuilder: (context, index) {
-              final item = items[index];
-              return FutureBuilder<Media?>(
-                future: _fetchMedia(item.mediaId),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Card(child: Center(child: CircularProgressIndicator()));
-                  }
-                  final media = snapshot.data!;
-                  return MediaCard(
-                    media: media,
-                    onTap: () => context.router.push(MediaDetailRoute(mediaId: media.id)),
-                  );
-                },
+              final media = items[index];
+              return MediaCard(
+                media: media,
+                onTap: () => context.router.push(MediaDetailRoute(mediaId: media.id)),
               );
             },
           );
         },
       ),
-    );
-  }
-
-  Future<Media?> _fetchMedia(int mediaId) async {
-    final mediaDetail = ref.read(mediaDetailProvider.notifier);
-    await mediaDetail.load(mediaId);
-    final state = ref.read(mediaDetailProvider);
-    return state.maybeWhen(
-      loaded: (media) => media,
-      orElse: () => null,
     );
   }
 

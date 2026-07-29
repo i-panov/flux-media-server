@@ -39,6 +39,9 @@ final uploadMediaProvider = Provider<UploadMedia>((ref) {
 /// Current search query. Empty string means no search.
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
+/// Current media type filter. null = all, 'video' or 'audio'.
+final mediaTypeFilterProvider = StateProvider<String?>((ref) => null);
+
 final mediaListProvider = AsyncNotifierProvider<MediaListNotifier, MediaListResult>(MediaListNotifier.new);
 
 class MediaListNotifier extends AsyncNotifier<MediaListResult> {
@@ -48,11 +51,13 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
   Future<MediaListResult> build() async {
     final getMediaList = ref.watch(getMediaListProvider);
     final q = ref.watch(searchQueryProvider);
+    final type = ref.watch(mediaTypeFilterProvider);
     final result = await getMediaList(
       GetMediaListParams(
         limit: _pageSize,
         offset: 0,
         q: q.isEmpty ? null : q,
+        type: type,
       ),
     );
     return result.fold(
@@ -69,11 +74,13 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
     if (current == null || current.items.length >= current.total) return;
     final getMediaList = ref.read(getMediaListProvider);
     final q = ref.read(searchQueryProvider);
+    final type = ref.read(mediaTypeFilterProvider);
     final result = await getMediaList(
       GetMediaListParams(
         limit: _pageSize,
         offset: current.items.length,
         q: q.isEmpty ? null : q,
+        type: type,
       ),
     );
     result.fold(

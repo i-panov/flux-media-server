@@ -11,6 +11,7 @@ import 'package:flux_media_server/features/collections/domain/usecases/get_colle
 import 'package:flux_media_server/features/collections/domain/usecases/get_collections.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/remove_collection_item.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 final collectionsRemoteDataSourceProvider =
     Provider<CollectionsRemoteDataSource>((ref) {
@@ -68,5 +69,14 @@ final collectionItemsProvider =
       (failure) => throw Exception(failure.message),
       (items) => items,
     );
+  },
+);
+
+/// Fetches full media items for a specific collection (new API).
+final collectionItemsFullProvider =
+    FutureProvider.autoDispose.family<List<Media>, int>(
+  (ref, collectionId) async {
+    final ds = ref.watch(collectionsRemoteDataSourceProvider);
+    return ds.getCollectionItemsFull(collectionId);
   },
 );
