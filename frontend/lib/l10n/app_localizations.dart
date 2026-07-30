@@ -715,6 +715,31 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error'**
   String get errorLabel;
+
+  /// No description provided for @addToQueue.
+  String get addToQueue;
+
+  /// No description provided for @continueFrom.
+  String continueFrom(String formatted);
+
+  /// No description provided for @startFromBeginning.
+  String get startFromBeginning;
+
+  /// No description provided for @editMetadata.
+  String get editMetadata;
+
+  /// No description provided for @artist.
+  String get artist;
+
+  /// No description provided for @album.
+  String get album;
+
+  /// No description provided for @genre.
+  String get genre;
+
+  /// No description provided for @year.
+  String get year;
+
 }
 
 class _AppLocalizationsDelegate
