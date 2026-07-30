@@ -75,11 +75,29 @@ class FluxApp extends ConsumerStatefulWidget {
 
 class _FluxAppState extends ConsumerState<FluxApp> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = ref.read(authProvider);
+      if (authState is AuthAuthenticated) {
+        widget.router.replaceAll([const MainRoute()]);
+      } else if (authState is! AuthLoading && widget.hasServerUrl) {
+        widget.router.replace(const LoginRoute());
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final locale = ref.watch(settingsProvider.select((s) => s.settings.locale));
     final authState = ref.watch(authProvider);
 
     ref.listen(authProvider, (previous, next) {
+      if (next is AuthAuthenticated) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          widget.router.replaceAll([const MainRoute()]);
+        });
+      }
       if (previous is AuthAuthenticated && next is AuthInitial) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           widget.router.replace(const LoginRoute());
