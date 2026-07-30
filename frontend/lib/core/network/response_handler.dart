@@ -54,6 +54,8 @@ Future<T> safeApiCall<T>(Future<T> Function() call) async {
     throw const NetworkException(message: 'Network error');
   } on Exception catch (e) {
     throw ServerException(message: e.toString());
+  } catch (e) {
+    throw ServerException(message: e.toString());
   }
 }
 
@@ -73,5 +75,7 @@ Future<Either<Failure, T>> safeRepositoryCall<T>(
     return Left(ServerFailure(message: e.message));
   } on NetworkException catch (e) {
     return Left(NetworkFailure(message: e.message));
+  } catch (e) {
+    return Left(ServerFailure(message: e.toString()));
   }
 }

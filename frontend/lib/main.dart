@@ -95,11 +95,19 @@ class _FluxAppState extends ConsumerState<FluxApp> {
     ref.listen(authProvider, (previous, next) {
       if (next is AuthAuthenticated) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
           widget.router.replaceAll([const MainRoute()]);
         });
-      }
-      if (previous is AuthAuthenticated && next is AuthInitial) {
+      } else if (next is AuthInitial && widget.hasServerUrl) {
+        if (previous is AuthAuthenticated || previous is AuthLoading) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            widget.router.replace(const LoginRoute());
+          });
+        }
+      } else if (next is AuthError && widget.hasServerUrl && previous is AuthLoading) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
           widget.router.replace(const LoginRoute());
         });
       }

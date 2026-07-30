@@ -56,7 +56,10 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
     ref.listen(authProvider, (previous, next) {
       if (next is AuthAuthenticated) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          context.router.replaceAll([MainRoute()]);
+          if (!mounted) return;
+          try {
+            context.router.replaceAll([MainRoute()]);
+          } catch (_) {}
         });
       }
     });

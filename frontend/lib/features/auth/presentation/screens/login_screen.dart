@@ -37,12 +37,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen(authProvider, (previous, next) {
       if (next is AuthCodeSent && previous is! AuthCodeSent) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          // Replace (not push) so a resend triggered from CodeScreen
-          // doesn't stack a second CodeScreen on top.
-          context.router.replace(CodeRoute(
-            email: next.email,
-            debugCode: next.debugCode,
-          ));
+          if (!mounted) return;
+          try {
+            // Replace (not push) so a resend triggered from CodeScreen
+            // doesn't stack a second CodeScreen on top.
+            context.router.replace(CodeRoute(
+              email: next.email,
+              debugCode: next.debugCode,
+            ));
+          } catch (_) {}
         });
       }
     });
