@@ -23,12 +23,13 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_formKey.currentState!.validate()) {
       final url = _controller.text.trim();
-      ref.read(settingsProvider.notifier).setServerUrl(
+      await ref.read(settingsProvider.notifier).setServerUrl(
             url.endsWith('/') ? url.substring(0, url.length - 1) : url,
           );
+      if (!mounted) return;
       context.router.replace(const LoginRoute());
     }
   }
