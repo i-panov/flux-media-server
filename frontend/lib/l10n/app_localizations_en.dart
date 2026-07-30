@@ -347,7 +347,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToQueue => 'Add to Queue';
 
   @override
-  String continueFrom(String formatted) => 'Continue from $formatted';
+  String continueFrom(Object formatted) {
+    return 'Continue from $formatted';
+  }
 
   @override
   String get startFromBeginning => 'Start over';
@@ -366,5 +368,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get year => 'Year';
-
 }

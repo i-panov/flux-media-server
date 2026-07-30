@@ -348,7 +348,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addToQueue => 'В очередь';
 
   @override
-  String continueFrom(String formatted) => 'Продолжить с $formatted';
+  String continueFrom(Object formatted) {
+    return 'Продолжить с $formatted';
+  }
 
   @override
   String get startFromBeginning => 'Начать сначала';
@@ -367,5 +369,4 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get year => 'Год';
-
 }
