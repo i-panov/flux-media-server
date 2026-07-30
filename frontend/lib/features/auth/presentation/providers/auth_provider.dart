@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/error/failures.dart';
@@ -50,13 +51,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> requestCode(String email) async {
     state = const AuthState.loading();
+    debugPrint('[Auth] requestCode: calling API for $email');
     final result = await _requestCode(email);
+    debugPrint('[Auth] requestCode: result=$result');
     result.fold(
-      (failure) => state = AuthState.error(message: failure.message),
-      (debugCode) => state = AuthState.codeSent(
-        email: email,
-        debugCode: debugCode,
-      ),
+      (failure) {
+        debugPrint('[Auth] requestCode: failure=${failure.message}');
+        state = AuthState.error(message: failure.message);
+      },
+      (debugCode) {
+        debugPrint('[Auth] requestCode: success, debugCode=$debugCode');
+        state = AuthState.codeSent(
+          email: email,
+          debugCode: debugCode,
+        );
+      },
     );
   }
 
