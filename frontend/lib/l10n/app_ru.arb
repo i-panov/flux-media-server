@@ -212,5 +212,25 @@
   "downloaded": "Загружено",
   "@downloaded": {},
   "errorLabel": "Ошибка",
-  "@errorLabel": {}
+  "@errorLabel": {},
+"addToQueue": "В очередь",
+  "@addToQueue": {},
+  "continueFrom": "Продолжить с {formatted}",
+  "@continueFrom": {
+    "placeholders": {
+      "formatted": {}
+    }
+  },
+  "startFromBeginning": "Начать сначала",
+  "@startFromBeginning": {},
+  "editMetadata": "Редактировать метаданные",
+  "@editMetadata": {},
+  "artist": "Исполнитель",
+  "@artist": {},
+  "album": "Альбом",
+  "@album": {},
+  "genre": "Жанр",
+  "@genre": {},
+  "year": "Год",
+  "@year": {}
 }

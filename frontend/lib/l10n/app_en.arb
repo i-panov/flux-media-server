@@ -262,5 +262,25 @@
   "downloaded": "Downloaded",
   "@downloaded": {},
   "errorLabel": "Error",
-  "@errorLabel": {}
+  "@errorLabel": {},
+"addToQueue": "Add to Queue",
+  "@addToQueue": {},
+  "continueFrom": "Continue from {formatted}",
+  "@continueFrom": {
+    "placeholders": {
+      "formatted": {}
+    }
+  },
+  "startFromBeginning": "Start over",
+  "@startFromBeginning": {},
+  "editMetadata": "Edit Metadata",
+  "@editMetadata": {},
+  "artist": "Artist",
+  "@artist": {},
+  "album": "Album",
+  "@album": {},
+  "genre": "Genre",
+  "@genre": {},
+  "year": "Year",
+  "@year": {}
 }
