@@ -48,7 +48,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _showResumeDialog(Duration savedPosition) {
     final l = AppLocalizations.of(context)!;
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(

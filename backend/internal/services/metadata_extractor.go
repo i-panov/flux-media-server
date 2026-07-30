@@ -36,13 +36,18 @@ func NewMetadataExtractor() *MetadataExtractor {
 }
 
 // ExtractFromFile reads metadata from a media file based on its extension.
-func (e *MetadataExtractor) ExtractFromFile(path string) *FileMetadata {
+// If probeData is provided and non-nil, it is used for video files instead of
+// calling ffprobe again.
+func (e *MetadataExtractor) ExtractFromFile(path string, probeData ...*ffprobe.ProbeData) *FileMetadata {
 	ext := strings.ToLower(filepath.Ext(path))
 
 	switch ext {
 	case ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".wav":
 		return e.extractAudio(path)
 	case ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".flv", ".ts":
+		if len(probeData) > 0 && probeData[0] != nil {
+			return extractVideoFromData(probeData[0])
+		}
 		return e.extractVideo(path)
 	default:
 		return nil
@@ -61,6 +66,11 @@ func (e *MetadataExtractor) extractAudio(path string) *FileMetadata {
 	m, err := tag.ReadFrom(f)
 	if err != nil {
 		log.Printf("metadata: read tags from %s: %v", path, err)
+		return nil
+	}
+
+	if m == nil {
+		log.Printf("metadata: tag reader returned nil metadata for %s", path)
 		return nil
 	}
 
@@ -92,6 +102,18 @@ func (e *MetadataExtractor) extractVideo(path string) *FileMetadata {
 		return nil
 	}
 
+	return extractVideoFromData(data)
+}
+
+// extractVideoFromData builds FileMetadata from existing ffprobe data.
+func extractVideoFromData(data *ffprobe.ProbeData) *FileMetadata {
+	if data == nil {
+		return nil
+	}
+	if data.Format == nil {
+		return nil
+	}
+
 	meta := &FileMetadata{}
 
 	if dur := data.Format.Duration(); dur > 0 {
@@ -113,4 +135,22 @@ func (e *MetadataExtractor) extractVideo(path string) *FileMetadata {
 	}
 
 	return meta
+}
+
+// DetermineMediaTypeFromProbe returns the media type from probe stream data.
+func DetermineMediaTypeFromProbe(data *ffprobe.ProbeData) string {
+	hasVideo := false
+	hasAudio := false
+	for _, s := range data.Streams {
+		switch s.CodecType {
+		case "video":
+			hasVideo = true
+		case "audio":
+			hasAudio = true
+		}
+	}
+	if hasAudio && !hasVideo {
+		return "audio"
+	}
+	return "video"
 }

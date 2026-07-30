@@ -343,28 +343,4 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get errorLabel => 'Ошибка';
-
-  @override
-  String continueFrom(String time) => 'Продолжить с $time?';
-
-  @override
-  String get startFromBeginning => 'С начала';
-
-  @override
-  String get addToQueue => 'В очередь';
-
-  @override
-  String get editMetadata => 'Редактировать метаданные';
-
-  @override
-  String get artist => 'Исполнитель';
-
-  @override
-  String get album => 'Альбом';
-
-  @override
-  String get genre => 'Жанр';
-
-  @override
-  String get year => 'Год';
 }

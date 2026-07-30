@@ -13,18 +13,22 @@ class TokenRefreshedException implements Exception {
 }
 
 /// Intercepts 401 responses, attempts token refresh, and signals retry.
+// ignore: must_be_immutable
 class TokenRefreshInterceptor implements ResponseInterceptor {
   TokenRefreshInterceptor(this._ref);
 
   final Ref _ref;
+  bool _isRefreshing = false;
 
   @override
   FutureOr<Response<dynamic>> onResponse(Response<dynamic> response) async {
     if (response.statusCode != 401) return response;
+    if (_isRefreshing) return response;
 
     final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
     if (refreshToken == null) return response;
 
+    _isRefreshing = true;
     try {
       final baseUrl = _ref.read(baseUrlProvider);
       final uri = Uri.parse('$baseUrl/auth/refresh');
@@ -45,7 +49,8 @@ class TokenRefreshInterceptor implements ResponseInterceptor {
       }
     } catch (e) {
       if (e is TokenRefreshedException) rethrow;
-      // Refresh failed — fall through to normal 401 handling
+    } finally {
+      _isRefreshing = false;
     }
 
     return response;

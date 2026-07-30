@@ -41,11 +41,12 @@ type AuthConfig struct {
 }
 
 type SMTPConfig struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	From     string `yaml:"from"`
+	Host       string `yaml:"host"`
+	Port       int    `yaml:"port"`
+	Username   string `yaml:"username"`
+	Password   string `yaml:"password"`
+	From       string `yaml:"from"`
+	RequireTLS bool   `yaml:"require_tls"`
 }
 
 type ScannerConfig struct {
@@ -76,7 +77,7 @@ func Load(path string) (*Config, error) {
 		cfg.Server.Port = 8080
 	}
 	if cfg.Server.MaxUploadSize == 0 {
-		cfg.Server.MaxUploadSize = 2 << 30 // 2GB
+		cfg.Server.MaxUploadSize = 100 * 1024 * 1024 // 100MB
 	}
 	if cfg.Auth.CodeLength == 0 {
 		cfg.Auth.CodeLength = 6
@@ -92,6 +93,11 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Auth.MaxOTPEntries == 0 {
 		cfg.Auth.MaxOTPEntries = 10000
+	}
+
+	// Validate code length
+	if cfg.Auth.CodeLength < 6 {
+		return nil, errors.New("auth.code_length must be >= 6")
 	}
 
 	// Validate JWT secret

@@ -139,3 +139,11 @@ final scanStatusProvider = FutureProvider.family<ScanStatus?, int>((ref, library
     (status) => status,
   );
 });
+
+/// Triggers a library scan and invalidates related providers on completion.
+final libraryScanProvider = FutureProvider.family<void, int>((ref, libraryId) async {
+  final repo = ref.watch(libraryRepositoryProvider);
+  await repo.scanLibrary(libraryId);
+  ref.invalidate(libraryProvider);
+  ref.invalidate(scanStatusProvider(libraryId));
+});

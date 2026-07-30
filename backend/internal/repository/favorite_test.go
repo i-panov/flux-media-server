@@ -26,9 +26,10 @@ func TestFavoriteStore_CreateAndFindByUser(t *testing.T) {
 	}
 	require.NoError(t, store.Create(ctx, fav))
 
-	favs, err := store.FindByUser(ctx, 1, "video")
+	favs, total, err := store.FindByUser(ctx, 1, "video", 50, 0)
 	assert.NoError(t, err)
 	assert.Len(t, favs, 1)
+	assert.Equal(t, int64(1), total)
 	assert.Equal(t, "video", favs[0].Type)
 }
 

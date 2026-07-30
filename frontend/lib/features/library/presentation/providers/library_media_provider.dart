@@ -6,6 +6,9 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 final libraryMediaTypeFilterProvider = StateProvider<String?>((ref) => null);
 
+/// Search query for the library media screen. Empty string means no search.
+final libraryMediaSearchQueryProvider = StateProvider<String>((ref) => '');
+
 final libraryMediaProvider = AsyncNotifierProvider.family<LibraryMediaNotifier, IList<Media>, MediaLibrary>(
   LibraryMediaNotifier.new,
 );
@@ -17,7 +20,14 @@ class LibraryMediaNotifier extends FamilyAsyncNotifier<IList<Media>, MediaLibrar
   Future<IList<Media>> build(MediaLibrary arg) async {
     final repo = ref.watch(mediaRepositoryProvider);
     final type = ref.watch(libraryMediaTypeFilterProvider);
-    final result = await repo.getMediaList(libraryId: arg.id, type: type, limit: _pageSize, offset: 0);
+    final q = ref.watch(libraryMediaSearchQueryProvider);
+    final result = await repo.getMediaList(
+      libraryId: arg.id,
+      type: type,
+      q: q.isEmpty ? null : q,
+      limit: _pageSize,
+      offset: 0,
+    );
     return result.fold(
       (failure) => throw Exception(failure.message),
       (data) => data.items.toIList(),
@@ -28,7 +38,14 @@ class LibraryMediaNotifier extends FamilyAsyncNotifier<IList<Media>, MediaLibrar
     final current = state.valueOrNull ?? IList();
     final repo = ref.read(mediaRepositoryProvider);
     final type = ref.read(libraryMediaTypeFilterProvider);
-    final result = await repo.getMediaList(libraryId: arg.id, type: type, limit: _pageSize, offset: current.length);
+    final q = ref.read(libraryMediaSearchQueryProvider);
+    final result = await repo.getMediaList(
+      libraryId: arg.id,
+      type: type,
+      q: q.isEmpty ? null : q,
+      limit: _pageSize,
+      offset: current.length,
+    );
     result.fold(
       (failure) => state = AsyncError(Exception(failure.message), StackTrace.current),
       (data) => state = AsyncValue.data(current.addAll(data.items)),

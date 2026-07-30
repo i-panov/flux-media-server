@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -26,7 +28,8 @@ void main() async {
     await container.read(settingsProvider.notifier).init();
     final settings = container.read(settingsProvider).settings;
     if (settings.authToken != null) {
-      await container.read(authProvider.notifier).checkAuthStatus();
+      // Non-blocking: splash screen handles loading state
+      unawaited(container.read(authProvider.notifier).checkAuthStatus());
     }
   }
 
@@ -38,6 +41,26 @@ void main() async {
       child: FluxApp(router: router, hasServerUrl: serverUrl != null),
     ),
   );
+}
+
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Checking authentication...'),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class FluxApp extends ConsumerStatefulWidget {
@@ -52,22 +75,9 @@ class FluxApp extends ConsumerStatefulWidget {
 
 class _FluxAppState extends ConsumerState<FluxApp> {
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authState = ref.read(authProvider);
-      if (authState is AuthAuthenticated) {
-        widget.router.replace(const MainRoute());
-      } else if (widget.hasServerUrl) {
-        widget.router.replace(const LoginRoute());
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Watch only the locale so token refreshes don't rebuild MaterialApp.
     final locale = ref.watch(settingsProvider.select((s) => s.settings.locale));
+    final authState = ref.watch(authProvider);
 
     ref.listen(authProvider, (previous, next) {
       if (previous is AuthAuthenticated && next is AuthInitial) {
@@ -76,6 +86,11 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         });
       }
     });
+
+    final showSplash = authState is AuthLoading ||
+        (authState is AuthInitial &&
+            widget.hasServerUrl &&
+            ref.read(settingsProvider).settings.authToken != null);
 
     return MaterialApp.router(
       title: 'Flux Media Server',
@@ -99,6 +114,9 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: widget.router.config(),
+      builder: showSplash
+          ? (context, child) => const SplashScreen()
+          : null,
     );
   }
 }

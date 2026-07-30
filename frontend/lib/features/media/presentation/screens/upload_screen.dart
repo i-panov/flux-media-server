@@ -30,6 +30,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   int _totalCount = 0;
   int _skippedCount = 0;
   String? _statusText;
+  int? _currentUploadingIndex;
 
   Future<void> _pickFiles() async {
     final result = await FilePicker.platform.pickFiles(
@@ -105,7 +106,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     var successCount = 0;
     String? firstError;
 
-    for (final fileInfo in _selectedFiles) {
+    for (var i = 0; i < _selectedFiles.length; i++) {
+      final fileInfo = _selectedFiles[i];
+      setState(() => _currentUploadingIndex = i);
       try {
         final result = await uploadMedia(
           UploadMediaParams(
@@ -133,6 +136,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     setState(() {
       _isUploading = false;
       _statusText = null;
+      _currentUploadingIndex = null;
     });
 
     if (mounted) {
@@ -154,7 +158,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       );
 
       if (successCount > 0) {
-        ref.invalidate(mediaListProvider);
+        ref.invalidate(mediaListProvider('video'));
+        ref.invalidate(mediaListProvider('audio'));
         context.router.maybePop();
       }
     }
@@ -290,6 +295,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                       ? '${(size / (1024 * 1024)).toStringAsFixed(1)} MB'
                       : '${(size / 1024).toStringAsFixed(1)} KB';
 
+                  final isCurrentlyUploading = _isUploading && index == _currentUploadingIndex;
+
                   return Card(
                     child: ListTile(
                       leading: Icon(
@@ -298,13 +305,22 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                       ),
                       title: Text(file.name, maxLines: 2, overflow: TextOverflow.ellipsis),
                       subtitle: Text(sizeStr),
-                      trailing: _isUploading
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.remove_circle_outline),
-                              tooltip: l.delete,
-                              onPressed: () => setState(() => _selectedFiles.removeAt(index)),
-                            ),
+                      trailing: isCurrentlyUploading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : _isUploading
+                              ? (index < _uploadedCount
+                                  ? Icon(Icons.check_circle,
+                                      color: Theme.of(context).colorScheme.primary)
+                                  : null)
+                              : IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  tooltip: l.delete,
+                                  onPressed: () => setState(() => _selectedFiles.removeAt(index)),
+                                ),
                     ),
                   );
                 },

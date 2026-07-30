@@ -4,12 +4,20 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateCode(t *testing.T) {
-	code := GenerateCode(6)
+	code, err := GenerateCode(6)
+	require.NoError(t, err)
 	assert.Len(t, code, 6)
 	assert.Regexp(t, `^\d{6}$`, code)
+
+	_, err = GenerateCode(0)
+	assert.Error(t, err)
+
+	_, err = GenerateCode(-1)
+	assert.Error(t, err)
 }
 
 func TestNewSMTPClient(t *testing.T) {

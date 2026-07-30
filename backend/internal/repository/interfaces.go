@@ -39,7 +39,7 @@ type LibraryRepository interface {
 
 // ProgressRepository defines data access methods for WatchProgress entities.
 type ProgressRepository interface {
-	FindByUser(ctx context.Context, userID uint) ([]models.WatchProgress, error)
+	FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.WatchProgress, int64, error)
 	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.WatchProgress, error)
 	Upsert(ctx context.Context, progress *models.WatchProgress) error
 	Delete(ctx context.Context, userID, mediaID uint) error
@@ -47,7 +47,7 @@ type ProgressRepository interface {
 
 // FavoriteRepository defines data access methods for Favorite entities.
 type FavoriteRepository interface {
-	FindByUser(ctx context.Context, userID uint, favType string) ([]models.Favorite, error)
+	FindByUser(ctx context.Context, userID uint, favType string, limit, offset int) ([]models.Favorite, int64, error)
 	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error)
 	FindByUserAndArtist(ctx context.Context, userID uint, artistName string) (*models.Favorite, error)
 	IsFavorited(ctx context.Context, userID, mediaID uint) (bool, error)

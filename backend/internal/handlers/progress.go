@@ -34,14 +34,31 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
+	limit := c.QueryInt("limit", 50)
+	offset := c.QueryInt("offset", 0)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
 	ctx := c.UserContext()
-	progress, err := h.progressRepo.FindByUser(ctx, userID)
+	progress, total, err := h.progressRepo.FindByUser(ctx, userID, limit, offset)
 	if err != nil {
 		log.Printf("FindByUser: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch progress")
 	}
 
-	return c.JSON(progress)
+	return c.JSON(fiber.Map{
+		"items":  progress,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *ProgressHandler) Update(c *fiber.Ctx) error {

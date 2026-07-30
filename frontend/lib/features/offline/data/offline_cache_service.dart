@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,8 +12,9 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// Manages offline media downloads.
 /// Files are stored in the app's documents directory.
 class OfflineCacheService {
-  OfflineCacheService(this._baseUrl, this._authToken);
+  OfflineCacheService(this._ref, this._baseUrl, this._authToken);
 
+  final Ref _ref;
   final String _baseUrl;
   final String? _authToken;
 
@@ -38,55 +40,91 @@ class OfflineCacheService {
     void Function(int received, int? total)? onProgress,
   }) async {
     final url = '$_baseUrl/media/${media.id}/stream';
-    final request = http.Request('GET', Uri.parse(url));
-    if (_authToken != null) {
-      request.headers['Authorization'] = 'Bearer $_authToken';
-    }
+    var token = _authToken;
 
-    final client = http.Client();
-    final dir = await getApplicationDocumentsDirectory();
-    final localFile = File('${dir.path}/flux_media_${media.id}');
-    // Write to a temporary file first so interrupted downloads
-    // don't leave corrupt files behind.
-    final partFile = File('${localFile.path}.part');
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final request = http.Request('GET', Uri.parse(url));
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      final client = http.Client();
+      final dir = await getApplicationDocumentsDirectory();
+      final localFile = File('${dir.path}/flux_media_${media.id}');
+      final partFile = File('${localFile.path}.part');
+
+      try {
+        final response = await client.send(request);
+
+        if (response.statusCode == 401 && attempt == 0) {
+          token = await _refreshToken();
+          if (token != null) continue;
+          throw Exception('Download failed: 401');
+        }
+
+        if (response.statusCode != 200) {
+          throw Exception('Download failed: ${response.statusCode}');
+        }
+
+        final total = response.contentLength;
+        final sink = partFile.openWrite();
+
+        int received = 0;
+        try {
+          await response.stream.map((chunk) {
+            received += chunk.length;
+            onProgress?.call(received, total);
+            return chunk;
+          }).pipe(sink);
+        } finally {
+          await sink.close();
+        }
+
+        if (await localFile.exists()) {
+          await localFile.delete();
+        }
+        await partFile.rename(localFile.path);
+        return localFile.path;
+      } catch (e) {
+        if (await partFile.exists()) {
+          try {
+            await partFile.delete();
+          } on Exception {
+            // Best-effort cleanup of the partial file.
+          }
+        }
+        rethrow;
+      } finally {
+        client.close();
+      }
+    }
+    throw Exception('Download failed');
+  }
+
+  Future<String?> _refreshToken() async {
+    final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
+    if (refreshToken == null) return null;
 
     try {
-      final response = await client.send(request);
-      if (response.statusCode != 200) {
-        throw Exception('Download failed: ${response.statusCode}');
-      }
+      final baseUrl = _ref.read(baseUrlProvider);
+      final uri = Uri.parse('$baseUrl/auth/refresh');
+      final httpResponse = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': refreshToken}),
+      );
 
-      final total = response.contentLength;
-      final sink = partFile.openWrite();
-
-      int received = 0;
-      try {
-        await response.stream.map((chunk) {
-          received += chunk.length;
-          onProgress?.call(received, total);
-          return chunk;
-        }).pipe(sink);
-      } finally {
-        await sink.close();
+      if (httpResponse.statusCode == 200) {
+        final data = jsonDecode(httpResponse.body) as Map<String, dynamic>;
+        final newAccessToken = data['token'] as String;
+        final newRefreshToken = data['refresh_token'] as String;
+        await _ref
+            .read(settingsProvider.notifier)
+            .setTokens(newAccessToken, newRefreshToken);
+        return newAccessToken;
       }
-
-      if (await localFile.exists()) {
-        await localFile.delete();
-      }
-      await partFile.rename(localFile.path);
-      return localFile.path;
-    } catch (e) {
-      if (await partFile.exists()) {
-        try {
-          await partFile.delete();
-        } on Exception {
-          // Best-effort cleanup of the partial file.
-        }
-      }
-      rethrow;
-    } finally {
-      client.close();
-    }
+    } catch (_) {}
+    return null;
   }
 
   /// Removes a downloaded media file.
@@ -130,21 +168,27 @@ class OfflineCacheService {
 /// Provider for the offline cache service.
 final offlineCacheServiceProvider = Provider<OfflineCacheService>((ref) {
   return OfflineCacheService(
+    ref,
     ref.watch(baseUrlProvider),
     ref.watch(settingsProvider).settings.authToken,
   );
 });
 
 /// State notifier for managing download state of a specific media item.
-class DownloadNotifier extends StateNotifier<DownloadState> {
-  DownloadNotifier(this._cacheService) : super(const DownloadState.idle());
+class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
+  late final OfflineCacheService _cacheService;
 
-  final OfflineCacheService _cacheService;
+  @override
+  DownloadState build(int arg) {
+    _cacheService = ref.watch(offlineCacheServiceProvider);
+    checkStatus(arg);
+    ref.onDispose(() {});
+    return const DownloadState.idle();
+  }
 
   /// Checks if the media item is already downloaded.
   Future<void> checkStatus(int mediaId) async {
     final cached = await _cacheService.isCached(mediaId);
-    if (!mounted) return;
     state = cached ? const DownloadState.downloaded() : const DownloadState.idle();
   }
 
@@ -155,17 +199,14 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
       await _cacheService.download(
         media,
         onProgress: (received, total) {
-          if (!mounted) return;
           if (total != null && total > 0) {
             final progress = received / total;
             state = DownloadState.downloading(progress: progress);
           }
         },
       );
-      if (!mounted) return;
       state = const DownloadState.downloaded();
     } catch (e) {
-      if (!mounted) return;
       state = DownloadState.error(e.toString());
     }
   }
@@ -173,7 +214,6 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
   /// Removes the downloaded file.
   Future<void> remove(int mediaId) async {
     await _cacheService.remove(mediaId);
-    if (!mounted) return;
     state = const DownloadState.idle();
   }
 }
@@ -208,10 +248,6 @@ class DownloadError extends DownloadState {
 /// Provider for download state of a specific media item.
 /// Not auto-disposed: downloads must survive widget rebuilds/navigation.
 final downloadNotifierProvider =
-    StateNotifierProvider.family<DownloadNotifier, DownloadState, int>(
-  (ref, mediaId) {
-    final notifier = DownloadNotifier(ref.watch(offlineCacheServiceProvider));
-    notifier.checkStatus(mediaId);
-    return notifier;
-  },
+    NotifierProvider.family<DownloadNotifier, DownloadState, int>(
+  DownloadNotifier.new,
 );

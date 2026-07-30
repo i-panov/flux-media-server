@@ -58,6 +58,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   void dispose() {
     _cancelSubscriptions();
     _cancelProgressTimer();
+    _datasource.dispose();
     super.dispose();
   }
 

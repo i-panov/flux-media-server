@@ -31,10 +31,17 @@ type CreateMediaRequest struct {
 	FilePath    string `json:"file_path"`
 }
 
+func isValidMediaType(t string) bool {
+	return t == "" || t == "video" || t == "audio"
+}
+
 func (h *MediaHandler) List(c *fiber.Ctx) error {
 	filters := make(map[string]interface{})
 
 	if mediaType := c.Query("type"); mediaType != "" {
+		if !isValidMediaType(mediaType) {
+			return response.Error(c, fiber.StatusBadRequest, "invalid type")
+		}
 		filters["type"] = mediaType
 	}
 	if year := c.Query("year"); year != "" {

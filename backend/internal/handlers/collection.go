@@ -173,9 +173,18 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Media not found")
 	}
 
+	// Determine the next position in the collection.
+	items, err := h.itemRepo.FindByCollection(ctx, uint(collectionID))
+	if err != nil {
+		log.Printf("FindByCollection: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to add item")
+	}
+	nextPos := len(items)
+
 	item := &models.CollectionItem{
 		CollectionID: uint(collectionID),
 		MediaID:      req.MediaID,
+		Position:     nextPos,
 	}
 
 	if err := h.itemRepo.Add(ctx, item); err != nil {

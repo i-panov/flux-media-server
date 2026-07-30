@@ -89,15 +89,31 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 	}
 
 	favType := c.Query("type")
+	limit := c.QueryInt("limit", 50)
+	offset := c.QueryInt("offset", 0)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
 
 	ctx := c.UserContext()
-	favs, err := h.favRepo.FindByUser(ctx, userID, favType)
+	favs, total, err := h.favRepo.FindByUser(ctx, userID, favType, limit, offset)
 	if err != nil {
 		log.Printf("FindByUser favorites: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch favorites")
 	}
 
-	return c.JSON(favs)
+	return c.JSON(fiber.Map{
+		"items":  favs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 // AddArtistFavorite adds an artist to the user's favorites.

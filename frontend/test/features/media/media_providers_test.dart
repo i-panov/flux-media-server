@@ -106,7 +106,7 @@ void main() {
       fakeRepo.onGetMediaList =
           ({type, year, q, limit, offset, libraryId}) async => Right((items: items, total: 2));
 
-      final result = await container.read(mediaListProvider.future);
+      final result = await container.read(mediaListProvider('video').future);
       expect(result.items, hasLength(2));
       expect(result.total, 2);
     });
@@ -116,15 +116,15 @@ void main() {
       fakeRepo.onGetMediaList =
           ({type, year, q, limit, offset, libraryId}) async => Right((items: first, total: 4));
 
-      await container.read(mediaListProvider.future);
+      await container.read(mediaListProvider('video').future);
 
       final second = [_fakeMedia(3), _fakeMedia(4)];
       fakeRepo.onGetMediaList =
           ({type, year, q, limit, offset, libraryId}) async => Right((items: second, total: 4));
 
-      await container.read(mediaListProvider.notifier).loadMore();
+      await container.read(mediaListProvider('video').notifier).loadMore();
 
-      final state = container.read(mediaListProvider).value;
+      final state = container.read(mediaListProvider('video')).value;
       expect(state?.items, hasLength(4));
     });
   });

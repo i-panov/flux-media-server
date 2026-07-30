@@ -130,7 +130,10 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	// Fiber app
 	fiberApp := fiber.New(fiber.Config{
-		BodyLimit: int(cfg.Server.MaxUploadSize),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		BodyLimit:    int(cfg.Server.MaxUploadSize),
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
@@ -183,6 +186,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	}))
 
 	// Health check
+	fiberApp.Get("/api/health", handlers.HealthCheck)
 	fiberApp.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "version": version})
 	})
@@ -192,7 +196,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 		Max:        10,
 		Expiration: time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
+			return getClientIP(c)
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
@@ -320,6 +324,18 @@ func (a *App) Listen() error {
 	}
 	log.Printf("Flux Media Server %s starting on port %d", a.Version, port)
 	return a.Fiber.Listen(fmt.Sprintf(":%d", port))
+}
+
+// getClientIP extracts the real client IP from proxy headers, falling back
+// to the direct connection address.
+func getClientIP(c *fiber.Ctx) string {
+	if ip := c.Get("X-Forwarded-For"); ip != "" {
+		return ip
+	}
+	if ip := c.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	return c.IP()
 }
 
 // Shutdown gracefully stops the application.

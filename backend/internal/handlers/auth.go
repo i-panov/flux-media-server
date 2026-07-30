@@ -134,10 +134,7 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 		user = &models.User{
 			Email: req.Email,
 		}
-		// The very first user becomes the administrator.
-		if count, cntErr := h.userRepo.Count(ctx); cntErr == nil && count == 0 {
-			user.IsAdmin = true
-		}
+		// Create handles the TOCTOU-safe first-user-admin promotion internally.
 		if err := h.userRepo.Create(ctx, user); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "Failed to create user")
 		}
@@ -184,16 +181,31 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	})
 }
 
-// Logout revokes all refresh tokens of the current user (invalidates sessions).
+// Logout revokes refresh tokens. If refresh_token_id is provided only that
+// specific token is revoked; otherwise all tokens of the current user are
+// deleted (full logout).
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	userID, ok := c.Locals("user_id").(uint)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	if err := h.refreshTokenDB.DeleteByUserID(c.UserContext(), userID); err != nil {
-		log.Printf("Logout: delete refresh tokens: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+	var req struct {
+		RefreshTokenID *uint `json:"refresh_token_id"`
+	}
+	c.BodyParser(&req)
+
+	ctx := c.UserContext()
+	if req.RefreshTokenID != nil {
+		if err := h.refreshTokenDB.DeleteByID(ctx, *req.RefreshTokenID); err != nil {
+			log.Printf("Logout: delete refresh token %d: %v", *req.RefreshTokenID, err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+		}
+	} else {
+		if err := h.refreshTokenDB.DeleteByUserID(ctx, userID); err != nil {
+			log.Printf("Logout: delete refresh tokens: %v", err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+		}
 	}
 
 	return c.JSON(fiber.Map{"message": "Logged out successfully"})
@@ -220,12 +232,6 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 
 	ctx := c.UserContext()
 
-	// Verify the refresh token exists in the database
-	_, err = h.refreshTokenDB.FindByToken(ctx, req.RefreshToken)
-	if err != nil {
-		return response.Error(c, fiber.StatusUnauthorized, "Invalid refresh token")
-	}
-
 	user, err := h.userRepo.FindByID(ctx, claims.UserID)
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
@@ -236,18 +242,13 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate tokens")
 	}
 
-	// Rotate: delete old refresh token, store new one. If rotation fails we
-	// must not issue the new pair — otherwise multiple valid refresh tokens
-	// accumulate silently.
-	if err := h.refreshTokenDB.DeleteByToken(ctx, req.RefreshToken); err != nil {
+	// Rotate atomically: delete old refresh token, store new one in a single
+	// transaction. If rotation fails we must not issue the new pair —
+	// otherwise multiple valid refresh tokens accumulate silently.
+	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
+	if _, err := h.refreshTokenDB.RotateToken(ctx, req.RefreshToken, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
 		log.Printf("Failed to rotate refresh token: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to rotate session")
-	}
-
-	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
-	if err := h.refreshTokenDB.Create(ctx, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
-		log.Printf("Failed to store refresh token: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
 	}
 
 	return c.JSON(fiber.Map{

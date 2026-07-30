@@ -25,12 +25,12 @@ class AudioScreen extends ConsumerStatefulWidget {
 }
 
 class _AudioScreenState extends ConsumerState<AudioScreen> {
+  static const _mediaType = 'audio';
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    ref.read(mediaTypeFilterProvider.notifier).state = 'audio';
     _scrollController.addListener(_onScroll);
   }
 
@@ -43,7 +43,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.8) {
-      ref.read(mediaListProvider.notifier).loadMore();
+      ref.read(mediaListProvider(_mediaType).notifier).loadMore();
     }
   }
 
@@ -53,7 +53,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     final baseUrl = ref.watch(baseUrlProvider);
     final isNarrow = MediaQuery.of(context).size.width < 900;
 
-    final mediaListState = ref.watch(mediaListProvider);
+    final mediaListState = ref.watch(mediaListProvider(_mediaType));
     final favoritesState = ref.watch(favoritesProvider('audio'));
 
     return Scaffold(
@@ -114,7 +114,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.invalidate(mediaListProvider);
+                ref.invalidate(mediaListProvider(_mediaType));
                 ref.invalidate(favoritesProvider);
               },
               child: Text(l.retry),
@@ -163,9 +163,9 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(mediaListProvider);
+        ref.invalidate(mediaListProvider(_mediaType));
         ref.invalidate(favoritesProvider);
-        await ref.watch(mediaListProvider.future);
+        await ref.watch(mediaListProvider(_mediaType).future);
       },
       child: CustomScrollView(
       controller: _scrollController,
@@ -333,7 +333,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     if (downloadState is DownloadDownloaded) {
       ref.read(downloadNotifierProvider(mediaId).notifier).remove(mediaId);
     } else if (downloadState is! DownloadDownloading) {
-      final mediaList = ref.read(mediaListProvider).valueOrNull;
+      final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
       if (mediaList != null) {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,

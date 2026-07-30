@@ -86,11 +86,15 @@ func TestFavoriteHandler_ListFavorites(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 
-	var favs []models.Favorite
+	var result struct {
+		Items []models.Favorite `json:"items"`
+		Total int64             `json:"total"`
+	}
 	body := bytes.Buffer{}
 	body.ReadFrom(resp.Body)
-	json.Unmarshal(body.Bytes(), &favs)
-	assert.Len(t, favs, 1)
+	json.Unmarshal(body.Bytes(), &result)
+	assert.Len(t, result.Items, 1)
+	assert.Equal(t, int64(1), result.Total)
 }
 
 func TestFavoriteHandler_AddArtistFavorite(t *testing.T) {

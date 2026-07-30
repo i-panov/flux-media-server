@@ -39,19 +39,21 @@ final uploadMediaProvider = Provider<UploadMedia>((ref) {
 /// Current search query. Empty string means no search.
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
-/// Current media type filter. null = all, 'video' or 'audio'.
-final mediaTypeFilterProvider = StateProvider<String?>((ref) => null);
+/// Media list scoped to a media type ('video' or 'audio').
+/// Using a family avoids state leakage between audio/video tabs that
+/// previously shared a single global [mediaListProvider].
+final mediaListProvider =
+    AsyncNotifierProvider.family<MediaListNotifier, MediaListResult, String>(
+  MediaListNotifier.new,
+);
 
-final mediaListProvider = AsyncNotifierProvider<MediaListNotifier, MediaListResult>(MediaListNotifier.new);
-
-class MediaListNotifier extends AsyncNotifier<MediaListResult> {
+class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
   static const _pageSize = 20;
 
   @override
-  Future<MediaListResult> build() async {
+  Future<MediaListResult> build(String type) async {
     final getMediaList = ref.watch(getMediaListProvider);
     final q = ref.watch(searchQueryProvider);
-    final type = ref.watch(mediaTypeFilterProvider);
     final result = await getMediaList(
       GetMediaListParams(
         limit: _pageSize,
@@ -74,13 +76,12 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
     if (current == null || current.items.length >= current.total) return;
     final getMediaList = ref.read(getMediaListProvider);
     final q = ref.read(searchQueryProvider);
-    final type = ref.read(mediaTypeFilterProvider);
     final result = await getMediaList(
       GetMediaListParams(
         limit: _pageSize,
         offset: current.items.length,
         q: q.isEmpty ? null : q,
-        type: type,
+        type: arg,
       ),
     );
     result.fold(

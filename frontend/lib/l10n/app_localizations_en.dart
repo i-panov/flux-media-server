@@ -342,28 +342,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorLabel => 'Error';
-
-  @override
-  String continueFrom(String time) => 'Continue from $time?';
-
-  @override
-  String get startFromBeginning => 'Start from beginning';
-
-  @override
-  String get addToQueue => 'Add to queue';
-
-  @override
-  String get editMetadata => 'Edit Metadata';
-
-  @override
-  String get artist => 'Artist';
-
-  @override
-  String get album => 'Album';
-
-  @override
-  String get genre => 'Genre';
-
-  @override
-  String get year => 'Year';
 }

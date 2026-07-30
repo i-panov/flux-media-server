@@ -23,6 +23,7 @@ class ArtistPage extends ConsumerStatefulWidget {
 }
 
 class _ArtistPageState extends ConsumerState<ArtistPage> {
+  static const _mediaType = 'audio';
   bool _downloadingAll = false;
   int _downloadedCount = 0;
   int _downloadTotal = 0;
@@ -32,7 +33,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
   }
 
   Future<void> _downloadAll() async {
-    final mediaList = ref.read(mediaListProvider).valueOrNull;
+    final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
     if (mediaList == null) return;
 
     final tracks = mediaList.items
@@ -69,7 +70,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     if (downloadState is DownloadDownloaded) {
       ref.read(downloadNotifierProvider(mediaId).notifier).remove(mediaId);
     } else if (downloadState is! DownloadDownloading) {
-      final mediaList = ref.read(mediaListProvider).valueOrNull;
+      final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
       if (mediaList != null) {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,
@@ -88,7 +89,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
 
-    final mediaListState = ref.watch(mediaListProvider);
+    final mediaListState = ref.watch(mediaListProvider(_mediaType));
     final favoritesState = ref.watch(favoritesProvider('audio'));
 
     return Scaffold(
@@ -146,7 +147,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.invalidate(mediaListProvider);
+                ref.invalidate(mediaListProvider(_mediaType));
                 ref.invalidate(favoritesProvider);
               },
               child: Text(l.retry),

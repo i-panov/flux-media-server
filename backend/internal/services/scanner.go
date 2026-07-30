@@ -161,6 +161,13 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 	seen := make(map[string]struct{})
 
 	err := filepath.Walk(library.Path, func(path string, info os.FileInfo, err error) error {
+		// Honour context cancellation so a shutdown/abort does not block.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if err != nil {
 			log.Printf("Walk error for %s: %v", path, err)
 			return nil
@@ -263,8 +270,18 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 		// Parse filename for metadata
 		title, year := metadata.ParseFilename(filepath.Base(path))
 
-		// Determine media type based on file extension.
-		mediaType := DetermineMediaType(path)
+		// Probe once for both media type and video metadata
+		probeCtx, probeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		probeData, probeErr := ffprobe.ProbeURL(probeCtx, path)
+		probeCancel()
+
+		mediaType := "video"
+		if probeErr == nil {
+			mediaType = DetermineMediaTypeFromProbe(probeData)
+		} else {
+			log.Printf("Probe failed for %s: %v, using extension fallback", path, probeErr)
+			mediaType = determineMediaTypeByExt(path)
+		}
 
 		media := &models.Media{
 			Title:     title,
@@ -282,7 +299,8 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 		}
 
 		// Extract metadata from file (duration, tags, etc.)
-		if fileMeta := s.metaExtractor.ExtractFromFile(path); fileMeta != nil {
+		// Reuse probe data when available to avoid a second ffprobe call.
+		if fileMeta := s.metaExtractor.ExtractFromFile(path, probeData); fileMeta != nil {
 			if media.Duration == 0 && fileMeta.Duration > 0 {
 				media.Duration = fileMeta.Duration
 			}

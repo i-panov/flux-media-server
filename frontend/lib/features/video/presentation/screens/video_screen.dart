@@ -29,12 +29,12 @@ class VideoScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoScreenState extends ConsumerState<VideoScreen> {
+  static const _mediaType = 'video';
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    ref.read(mediaTypeFilterProvider.notifier).state = 'video';
     _scrollController.addListener(_onScroll);
   }
 
@@ -47,7 +47,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.8) {
-      ref.read(mediaListProvider.notifier).loadMore();
+      ref.read(mediaListProvider(_mediaType).notifier).loadMore();
     }
   }
 
@@ -58,7 +58,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     final isNarrow = MediaQuery.of(context).size.width < 900;
 
     // Fetch all data in parallel
-    final mediaListState = ref.watch(mediaListProvider);
+    final mediaListState = ref.watch(mediaListProvider(_mediaType));
     final watchProgressState = ref.watch(watchProgressProvider);
     final favoritesState = ref.watch(favoritesProvider('video'));
     final collectionsState = ref.watch(collectionsProvider);
@@ -134,7 +134,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.invalidate(mediaListProvider);
+                ref.invalidate(mediaListProvider(_mediaType));
                 ref.invalidate(watchProgressProvider);
                 ref.invalidate(favoritesProvider);
                 ref.invalidate(collectionsProvider);
@@ -198,12 +198,12 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(mediaListProvider);
+        ref.invalidate(mediaListProvider(_mediaType));
         ref.invalidate(watchProgressProvider);
         ref.invalidate(favoritesProvider);
         ref.invalidate(collectionsProvider);
         // Wait for the next stable state
-        await ref.watch(mediaListProvider.future);
+        await ref.watch(mediaListProvider(_mediaType).future);
       },
       child: CustomScrollView(
       controller: _scrollController,
@@ -389,7 +389,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
       ref.read(downloadNotifierProvider(mediaId).notifier).remove(mediaId);
     } else if (downloadState is! DownloadDownloading) {
       // Need media object — find from list
-      final mediaList = ref.read(mediaListProvider).valueOrNull;
+      final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
       if (mediaList != null) {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,

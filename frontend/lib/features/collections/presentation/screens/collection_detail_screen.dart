@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -35,7 +36,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
         ],
       ),
       body: itemsState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => _buildSkeletonGrid(context),
         error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -85,6 +86,43 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSkeletonGrid(BuildContext context) {
+    final crossAxisCount =
+        (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6);
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: 0.7,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: crossAxisCount * 2,
+      itemBuilder: (context, index) => Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SkeletonWidget(width: double.infinity, height: double.infinity),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SkeletonWidget(height: 14, width: double.infinity),
+                  const SizedBox(height: 6),
+                  const SkeletonWidget(height: 10, width: 60),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,27 +2,31 @@ package models
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Media struct {
-	ID           uint      `gorm:"primaryKey" json:"id"`
-	Title        string    `gorm:"index" json:"title"`
-	Year         int       `json:"year"`
-	Description  string    `json:"description"`
-	Type         string    `gorm:"index" json:"type"` // movie, episode, audio
-	Artist       string    `gorm:"index" json:"artist"`
-	Album        string    `json:"album"`
-	Genre        string    `json:"genre"`
-	Duration     int       `json:"duration"` // seconds
-	FilePath     string    `gorm:"uniqueIndex" json:"-"`
-	FileSize     int64     `json:"file_size"`
-	FileHash     string    `gorm:"index" json:"file_hash"`
-	QuickHash    string    `gorm:"index" json:"quick_hash"`
-	ThumbnailURL string    `json:"thumbnail_url"`
-	MetadataID   *uint     `json:"metadata_id,omitempty"`
-	Metadata     *Metadata `json:"metadata,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           uint           `gorm:"primaryKey" json:"id"`
+	LibraryID    uint           `gorm:"not null;index;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"library_id"`
+	Title        string         `gorm:"index" json:"title"`
+	Year         int            `json:"year"`
+	Description  string         `gorm:"index" json:"description"`
+	Type         string         `gorm:"index" json:"type"` // movie, episode, audio
+	Artist       string         `gorm:"index" json:"artist"`
+	Album        string         `gorm:"index" json:"album"`
+	Genre        string         `json:"genre"`
+	Duration     int            `json:"duration"` // seconds
+	FilePath     string         `gorm:"uniqueIndex" json:"-"`
+	FileSize     int64          `json:"file_size"`
+	FileHash     string         `gorm:"index" json:"file_hash"`
+	QuickHash    string         `gorm:"index" json:"quick_hash"`
+	ThumbnailURL string         `json:"thumbnail_url"`
+	MetadataID   *uint          `json:"metadata_id,omitempty"`
+	Metadata     *Metadata      `json:"metadata,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 type Metadata struct {

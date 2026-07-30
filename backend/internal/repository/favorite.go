@@ -17,14 +17,24 @@ func NewFavoriteRepository(db *gorm.DB) *FavoriteStore {
 	return &FavoriteStore{db: db}
 }
 
-func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, favType string) ([]models.Favorite, error) {
+func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, favType string, limit, offset int) ([]models.Favorite, int64, error) {
 	var favs []models.Favorite
-	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+	var total int64
+	query := r.db.WithContext(ctx).Model(&models.Favorite{}).Where("user_id = ?", userID)
 	if favType != "" {
 		query = query.Where("type = ?", favType)
 	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
 	err := query.Find(&favs).Error
-	return favs, err
+	return favs, total, err
 }
 
 func (r *FavoriteStore) FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error) {

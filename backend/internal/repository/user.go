@@ -29,7 +29,14 @@ func (r *UserStore) FindByID(ctx context.Context, id uint) (*models.User, error)
 }
 
 func (r *UserStore) Create(ctx context.Context, user *models.User) error {
-	return r.db.WithContext(ctx).Create(user).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		tx.Model(&models.User{}).Count(&count)
+		if count == 0 {
+			user.IsAdmin = true
+		}
+		return tx.Create(user).Error
+	})
 }
 
 // Count returns the total number of users.

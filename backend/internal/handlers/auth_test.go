@@ -66,7 +66,7 @@ func TestAuthLoginSuccess(t *testing.T) {
 	// Parse response to get token
 	var body map[string]interface{}
 	parseJSONResponse(t, resp, &body)
-	
+
 	assert.NotEmpty(t, body["token"])
 
 	user, ok := body["user"].(map[string]interface{})
@@ -121,7 +121,7 @@ func TestAuthRegisterFirstUser(t *testing.T) {
 	// Verify first user is admin by checking the response
 	var body map[string]interface{}
 	parseJSONResponse(t, resp, &body)
-	
+
 	user, ok := body["user"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, emailAddr, user["email"])
@@ -159,7 +159,7 @@ func TestAuthRegisterSecondUser(t *testing.T) {
 	// Verify second user is not admin by checking the response
 	var body map[string]interface{}
 	parseJSONResponse(t, resp2, &body)
-	
+
 	user, ok := body["user"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "user@example.com", user["email"])

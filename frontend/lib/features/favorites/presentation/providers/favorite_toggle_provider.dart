@@ -28,9 +28,10 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
         result.fold(
           (failure) => state = AsyncValue.error(failure.message, StackTrace.current),
           (_) {
-            // Refresh favorites list
             _ref.invalidate(favoritesProvider(null));
             _ref.invalidate(favoritesProvider(type));
+            _ref.invalidate(favoritesProvider('video'));
+            _ref.invalidate(favoritesProvider('audio'));
           },
         );
       } else {
@@ -42,6 +43,8 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
           (_) {
             _ref.invalidate(favoritesProvider(null));
             _ref.invalidate(favoritesProvider(type));
+            _ref.invalidate(favoritesProvider('video'));
+            _ref.invalidate(favoritesProvider('audio'));
           },
         );
       }

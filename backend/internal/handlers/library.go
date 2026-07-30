@@ -178,7 +178,14 @@ func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Library not found")
 	}
 
-	// Start the scan synchronously in a goroutine, but report conflicts.
+	// Check scan status before launching the goroutine.
+	status := h.scanner.GetScanStatus(uint(id))
+	if status.Running {
+		return response.Error(c, fiber.StatusConflict, "Scan already in progress")
+	}
+
+	// Start the scan asynchronously — ErrScanInProgress is still guarded by
+	// the mutex inside ScanLibrary so a concurrent request is still safe.
 	go func() {
 		scanCtx := context.Background()
 		if err := h.scanner.ScanLibrary(scanCtx, library.ID); err != nil {

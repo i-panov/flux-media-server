@@ -1,13 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
-Media _fakeMedia() => const Media(
-      id: 1,
-      title: 'Test Media',
+Media _fakeMedia([int id = 1, String type = 'movie']) => Media(
+      id: id,
+      title: 'Test Media $id',
       year: 2024,
-      type: 'movie',
-      filePath: '/test.mp4',
+      type: type,
+      filePath: '/test$id.mp4',
       fileSize: 1024,
     );
 

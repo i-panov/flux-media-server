@@ -75,7 +75,7 @@ func (r *MediaStore) Create(ctx context.Context, media *models.Media) error {
 }
 
 func (r *MediaStore) Update(ctx context.Context, media *models.Media) error {
-	return r.db.WithContext(ctx).Save(media).Error
+	return r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Save(media).Error
 }
 
 func (r *MediaStore) Delete(ctx context.Context, id uint) error {

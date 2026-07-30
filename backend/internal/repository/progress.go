@@ -16,10 +16,21 @@ func NewProgressRepository(db *gorm.DB) *ProgressStore {
 	return &ProgressStore{db: db}
 }
 
-func (r *ProgressStore) FindByUser(ctx context.Context, userID uint) ([]models.WatchProgress, error) {
+func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.WatchProgress, int64, error) {
 	var progress []models.WatchProgress
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).Find(&progress).Error
-	return progress, err
+	var total int64
+	query := r.db.WithContext(ctx).Model(&models.WatchProgress{}).Where("user_id = ?", userID)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	err := query.Find(&progress).Error
+	return progress, total, err
 }
 
 func (r *ProgressStore) FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.WatchProgress, error) {

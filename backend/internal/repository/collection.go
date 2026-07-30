@@ -69,7 +69,7 @@ func (r *CollectionItemStore) FindMediaByCollection(ctx context.Context, collect
 		Select("media.*").
 		Joins("JOIN collection_items ON collection_items.media_id = media.id").
 		Where("collection_items.collection_id = ?", collectionID).
-		Order("collection_items.added_at ASC").
+		Order("collection_items.position ASC, collection_items.id ASC").
 		Scan(&media).Error
 	return media, err
 }

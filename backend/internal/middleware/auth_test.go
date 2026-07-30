@@ -75,7 +75,7 @@ func TestAdminMiddlewareUserTokenOnAdminRoute(t *testing.T) {
 
 	// Create an admin user first (so the next user won't be admin)
 	_ = createTestUser(t, userRepo, "admin@example.com", true)
-	
+
 	// Create a regular user (second user won't be auto-admin)
 	regUser := createTestUser(t, userRepo, "user@example.com", false)
 

@@ -25,7 +25,7 @@ func setupUploadTest(t *testing.T) (*fiber.App, repository.LibraryRepository, re
 	// Create test database
 	db, err := repository.InitDB(":memory:")
 	require.NoError(t, err)
-	
+
 	// Run migrations
 	err = repository.AutoMigrate(db)
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func setupUploadTest(t *testing.T) (*fiber.App, repository.LibraryRepository, re
 		MaxFileSize: 10 * 1024 * 1024, // 10MB - larger than Fiber's limit
 	}
 	handler := handlers.NewUploadHandler(libraryRepo, mediaRepo, nil, thumbSvc, cfg)
-	
+
 	// Register route
 	app.Post("/api/media/upload", handler.Upload)
 

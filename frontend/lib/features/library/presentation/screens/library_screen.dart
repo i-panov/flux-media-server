@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
-import 'package:flux_media_server/shared/models/library.dart';
 
 @RoutePage()
 class LibraryScreen extends ConsumerStatefulWidget {
@@ -162,7 +161,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final nameController = TextEditingController();
     String selectedType = 'video';
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(

@@ -2,10 +2,13 @@ package services
 
 import (
 	"context"
+	"io"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -124,4 +127,52 @@ func TestMimeTypeByExt(t *testing.T) {
 	assert.Equal(t, "audio/ogg", mimeTypeByExt(".ogg"))
 	assert.Equal(t, "audio/wav", mimeTypeByExt(".wav"))
 	assert.Equal(t, "application/octet-stream", mimeTypeByExt(".xyz"))
+}
+
+func TestStream(t *testing.T) {
+	dir := t.TempDir()
+	libDir := filepath.Join(dir, "library")
+	require.NoError(t, os.MkdirAll(libDir, 0755))
+
+	filePath := filepath.Join(libDir, "test.mp4")
+	content := []byte("fake mp4 content")
+	require.NoError(t, os.WriteFile(filePath, content, 0644))
+
+	app := fiber.New()
+	s := setupStreamer(t, []models.MediaLibrary{
+		{Name: "Video", Path: libDir, Type: "video", Enabled: true},
+	})
+
+	app.Get("/stream", func(c *fiber.Ctx) error {
+		return s.Stream(c, filePath)
+	})
+
+	req := httptest.NewRequest("GET", "/stream", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, content, body)
+}
+
+func TestStreamNotFound(t *testing.T) {
+	dir := t.TempDir()
+	libDir := filepath.Join(dir, "library")
+	require.NoError(t, os.MkdirAll(libDir, 0755))
+
+	app := fiber.New()
+	s := setupStreamer(t, []models.MediaLibrary{
+		{Name: "Video", Path: libDir, Type: "video", Enabled: true},
+	})
+
+	app.Get("/stream", func(c *fiber.Ctx) error {
+		return s.Stream(c, filepath.Join(libDir, "nonexistent.mp4"))
+	})
+
+	req := httptest.NewRequest("GET", "/stream", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 }

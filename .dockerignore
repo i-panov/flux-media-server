@@ -1,0 +1,8 @@
+.git/
+.gitignore
+README.md
+AGENTS.md
+frontend/
+backend/tmp/
+backend/configs/config.yaml
+*.md

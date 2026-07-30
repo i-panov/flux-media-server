@@ -16,11 +16,12 @@ import (
 const smtpTimeout = 15 * time.Second
 
 type SMTPConfig struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	From     string
+	Host       string
+	Port       int
+	Username   string
+	Password   string
+	From       string
+	RequireTLS bool
 }
 
 type SMTPClient struct {
@@ -34,7 +35,10 @@ func NewSMTPClient(config SMTPConfig) *SMTPClient {
 // GenerateCode generates a numeric code of the given length using
 // crypto/rand. It panics on entropy failure — falling back to a predictable
 // digit would silently weaken authentication codes.
-func GenerateCode(length int) string {
+func GenerateCode(length int) (string, error) {
+	if length < 1 {
+		return "", fmt.Errorf("code length must be positive, got %d", length)
+	}
 	var sb strings.Builder
 	sb.Grow(length)
 	for i := 0; i < length; i++ {
@@ -44,7 +48,7 @@ func GenerateCode(length int) string {
 		}
 		fmt.Fprintf(&sb, "%d", n.Int64())
 	}
-	return sb.String()
+	return sb.String(), nil
 }
 
 func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
@@ -61,11 +65,11 @@ func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
 		fromAddr = c.config.Username
 	}
 
-	return sendMailWithTimeout(addr, auth, fromAddr, []string{to}, []byte(msg))
+	return sendMailWithTimeout(addr, auth, fromAddr, []string{to}, []byte(msg), c.config.RequireTLS)
 }
 
 // sendMailWithTimeout is smtp.SendMail with a connection-level deadline.
-func sendMailWithTimeout(addr string, auth smtp.Auth, from string, to []string, msg []byte) error {
+func sendMailWithTimeout(addr string, auth smtp.Auth, from string, to []string, msg []byte, requireTLS bool) error {
 	conn, err := net.DialTimeout("tcp", addr, smtpTimeout)
 	if err != nil {
 		return err
@@ -83,11 +87,12 @@ func sendMailWithTimeout(addr string, auth smtp.Auth, from string, to []string, 
 	}
 
 	if ok, _ := client.Extension("STARTTLS"); ok {
-		// Always verify the server certificate.
 		tlsConfig := &tls.Config{ServerName: hostOf(addr), MinVersion: tls.VersionTLS12}
 		if err := client.StartTLS(tlsConfig); err != nil {
 			return err
 		}
+	} else if requireTLS {
+		return fmt.Errorf("smtp: server %s does not support STARTTLS", hostOf(addr))
 	}
 
 	if auth != nil {

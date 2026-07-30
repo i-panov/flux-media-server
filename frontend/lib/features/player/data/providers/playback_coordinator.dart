@@ -86,6 +86,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     if (media.type == 'audio') {
       // Mutual exclusion: stop video playback before starting audio.
       await _ref.read(playerProvider.notifier).stop();
+      await _videoPlayer.stop();
 
       // Start audio playback
       await _audioPlayer.open(url, httpHeaders: headers);

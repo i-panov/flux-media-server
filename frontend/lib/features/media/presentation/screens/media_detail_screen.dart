@@ -201,6 +201,8 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                           const SizedBox(height: 16),
                           Text(
                             media.description!,
+                            softWrap: true,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(color: Colors.white70),
                           ),
                         ],

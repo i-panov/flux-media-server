@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 	"log"
+	"runtime"
 
 	"flux/internal/models"
 
@@ -32,18 +33,33 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqlDB.SetMaxOpenConns(1)
+	maxConns := runtime.NumCPU()
+	if maxConns < 4 {
+		maxConns = 4
+	}
+	sqlDB.SetMaxOpenConns(maxConns)
+
+	// Enable foreign keys — required for SQLite FK constraints.
+	db.Exec("PRAGMA foreign_keys = ON")
+
+	// Performance tuning for SQLite in server mode.
+	db.Exec("PRAGMA journal_mode = WAL")
+	db.Exec("PRAGMA synchronous = NORMAL")
+	db.Exec("PRAGMA cache_size = -8000")
+	db.Exec("PRAGMA busy_timeout = 5000")
+	db.Exec("PRAGMA temp_store = MEMORY")
+	db.Exec("PRAGMA mmap_size = 268435456")
 
 	return db, nil
 }
 
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
+		&models.MediaLibrary{}, // must be before Media (FK constraint)
 		&models.Media{},
 		&models.Metadata{},
 		&models.User{},
 		&models.WatchProgress{},
-		&models.MediaLibrary{},
 		&models.Favorite{},
 		&models.Collection{},
 		&models.CollectionItem{},

@@ -85,7 +85,10 @@ func (s *OTPStore) Stop() {
 }
 
 func (s *OTPStore) Generate(addr string) (string, error) {
-	code := email.GenerateCode(s.codeLength)
+	code, err := email.GenerateCode(s.codeLength)
+	if err != nil {
+		return "", err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -109,6 +112,12 @@ func (s *OTPStore) Verify(email, code string) bool {
 
 	entry, exists := s.entries[email]
 	if !exists {
+		return false
+	}
+
+	// Double protection: empty codes bypass ConstantTimeCompare
+	if entry.Code == "" || code == "" {
+		delete(s.entries, email)
 		return false
 	}
 

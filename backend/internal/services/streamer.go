@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"flux/internal/repository"
+	"flux/internal/response"
 )
 
 type StreamerService struct {
@@ -67,78 +67,20 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 
 	allowed, err := s.IsPathAllowed(ctx, filePath)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to validate file path",
-		})
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to validate file path")
 	}
 	if !allowed {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Access denied",
-		})
+		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "File not found",
-			})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to open file",
-		})
-	}
-	defer file.Close()
-
-	stat, err := file.Stat()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get file info",
-		})
-	}
-
-	fileSize := stat.Size()
-
-	// Set content type based on extension
 	ext := strings.ToLower(filepath.Ext(filePath))
-	contentType := mimeTypeByExt(ext)
+	c.Set("Content-Type", mimeTypeByExt(ext))
 
-	c.Set("Accept-Ranges", "bytes")
-
-	// Handle Range request
-	rangeHeader := c.Get("Range")
-	if rangeHeader != "" {
-		start, end, err := parseRangeHeader(rangeHeader, fileSize)
-		if err != nil {
-			// Note: Content-Type is set only after the range is validated,
-			// so the 416 error carries a JSON content type.
-			return c.Status(fiber.StatusRequestedRangeNotSatisfiable).JSON(fiber.Map{
-				"error": "Range not satisfiable",
-			})
-		}
-
-		c.Set("Content-Type", contentType)
-
-		contentLength := end - start + 1
-
-		c.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileSize))
-		c.Set("Content-Length", strconv.FormatInt(contentLength, 10))
-		c.Status(fiber.StatusPartialContent)
-
-		file.Seek(start, io.SeekStart)
-		if _, err := io.CopyN(c.Response().BodyWriter(), file, contentLength); err != nil {
-			// Client disconnected or write error — not a server error
-			return nil
-		}
-	} else {
-		c.Set("Content-Type", contentType)
-		c.Set("Content-Length", strconv.FormatInt(fileSize, 10))
-		if _, err := io.Copy(c.Response().BodyWriter(), file); err != nil {
-			return nil
-		}
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return response.Error(c, fiber.StatusNotFound, err.Error())
 	}
 
-	return nil
+	return c.SendFile(filePath)
 }
 
 // mimeTypeByExt returns the MIME type for known media file extensions.
