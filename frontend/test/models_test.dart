@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_media_server/shared/models/media.dart';
-import 'package:flux_media_server/shared/models/user.dart';
 import 'package:flux_media_server/shared/models/library.dart';
-import 'package:flux_media_server/shared/models/progress.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/metadata.dart';
+import 'package:flux_media_server/shared/models/progress.dart';
+import 'package:flux_media_server/shared/models/user.dart';
 
 void main() {
   group('Media', () {
@@ -54,7 +54,7 @@ void main() {
     });
 
     test('equality works', () {
-      final a = Media(
+      const a = Media(
         id: 1,
         title: 'Test',
         year: 2024,
@@ -62,7 +62,7 @@ void main() {
         filePath: '/test.mp4',
         fileSize: 100,
       );
-      final b = Media(
+      const b = Media(
         id: 1,
         title: 'Test',
         year: 2024,

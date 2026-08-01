@@ -50,7 +50,7 @@ void main() {
 
   group('PlayQueueState methods', () {
     test('add to queue', () {
-      final state = const PlayQueueState();
+      const state = PlayQueueState();
       final newState = state.copyWith(items: [...state.items, _fakeMedia(1)]);
       
       expect(newState.items, hasLength(1));
@@ -58,7 +58,7 @@ void main() {
     });
 
     test('remove from queue', () {
-      final state = PlayQueueState(items: [_fakeMedia(1), _fakeMedia(2), _fakeMedia(3)], currentIndex: 0);
+      final state = PlayQueueState(items: [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)], currentIndex: 0);
       final items = List<Media>.from(state.items)..removeAt(1); // Remove media2
       final newState = state.copyWith(items: items, currentIndex: 0);
       
@@ -68,15 +68,14 @@ void main() {
     });
 
     test('clear queue', () {
-      final state = PlayQueueState(items: [_fakeMedia(1), _fakeMedia(2)], currentIndex: 0);
-      final newState = const PlayQueueState();
+      const newState = PlayQueueState();
       
       expect(newState.items, isEmpty);
       expect(newState.currentIndex, -1);
     });
 
     test('play next from queue', () {
-      final state = PlayQueueState(items: [_fakeMedia(1), _fakeMedia(2)], currentIndex: 0);
+      final state = PlayQueueState(items: [_fakeMedia(), _fakeMedia(2)], currentIndex: 0);
       final newState = state.copyWith(currentIndex: 1);
       
       expect(newState.currentIndex, 1);

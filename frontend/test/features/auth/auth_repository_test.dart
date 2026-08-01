@@ -73,9 +73,9 @@ void main() {
 
   group('verifyCode', () {
     test('returns Right(token, refreshToken, user) on success', () async {
-      final user = User(id: 1, email: 'test@example.com');
+      const user = User(id: 1, email: 'test@example.com');
       (repository as FakeAuthRepository).onVerifyCode = (_, __) async =>
-          Right<Failure, ({String token, String refreshToken, User user})>(
+          const Right<Failure, ({String token, String refreshToken, User user})>(
             (token: 'jwt-123', refreshToken: 'refresh-456', user: user),
           );
 
@@ -116,9 +116,9 @@ void main() {
 
   group('getCurrentUser', () {
     test('returns Right(user) on success', () async {
-      final user = User(id: 1, email: 'test@example.com');
+      const user = User(id: 1, email: 'test@example.com');
       (repository as FakeAuthRepository).onGetCurrentUser = () async =>
-          Right<Failure, User>(user);
+          const Right<Failure, User>(user);
 
       final result = await repository.getCurrentUser();
 

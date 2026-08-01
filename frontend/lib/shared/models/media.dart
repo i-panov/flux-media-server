@@ -1,6 +1,5 @@
+import 'package:flux_media_server/shared/models/metadata.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-
-import 'metadata.dart';
 
 // ignore_for_file: invalid_annotation_target
 

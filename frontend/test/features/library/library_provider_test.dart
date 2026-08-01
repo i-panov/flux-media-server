@@ -73,7 +73,7 @@ void main() {
     final libs = [_fakeLibrary(1)];
     fakeRepo.onGetLibraries = () async => Right(libs);
     fakeRepo.onScanLibrary = (_) async => const Right('Scan started');
-    fakeRepo.onGetScanStatus = (_) async => Right(
+    fakeRepo.onGetScanStatus = (_) async => const Right(
       ScanStatus(libraryId: 1, running: false),
     );
 

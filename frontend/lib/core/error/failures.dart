@@ -14,21 +14,21 @@ abstract class Failure {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure({String message = "Server error occurred"})
+  const ServerFailure({String message = 'Server error occurred'})
       : super(message: message);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure({String message = "Network error occurred"})
+  const NetworkFailure({String message = 'Network error occurred'})
       : super(message: message);
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure({String message = "Cache error occurred"})
+  const CacheFailure({String message = 'Cache error occurred'})
       : super(message: message);
 }
 
 class AuthFailure extends Failure {
-  const AuthFailure({String message = "Authentication error occurred"})
+  const AuthFailure({String message = 'Authentication error occurred'})
       : super(message: message);
 }

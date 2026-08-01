@@ -32,14 +32,14 @@ void main() {
 
       test('should convert SocketException to NetworkException', () async {
         expect(
-          () => safeApiCall(() async => throw SocketException('Connection failed')),
+          () => safeApiCall(() async => throw const SocketException('Connection failed')),
           throwsA(const TypeMatcher<NetworkException>()),
         );
       });
 
       test('should convert HttpException to NetworkException', () async {
         expect(
-          () => safeApiCall(() async => throw HttpException('HTTP error')),
+          () => safeApiCall(() async => throw const HttpException('HTTP error')),
           throwsA(const TypeMatcher<NetworkException>()),
         );
       });
@@ -53,7 +53,7 @@ void main() {
 
       test('should convert IOException to NetworkException', () async {
         expect(
-          () => safeApiCall(() async => throw FileSystemException('IO error')),
+          () => safeApiCall(() async => throw const FileSystemException('IO error')),
           throwsA(const TypeMatcher<NetworkException>()),
         );
       });

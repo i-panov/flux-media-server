@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_media_server/core/network/interceptors/token_refresh_interceptor.dart';
 
 void main() {
   group('TokenRefreshInterceptor', () {

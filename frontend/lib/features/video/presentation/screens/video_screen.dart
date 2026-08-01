@@ -272,7 +272,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
               onItemTapped: (id) =>
                   context.router.push(MediaDetailRoute(mediaId: id)),
               isFavoriteMap: {
-                for (var id in favoriteMediaIds) id: true
+                for (final id in favoriteMediaIds) id: true
               },
               onFavoriteToggled: (id) => _toggleFavorite(id),
               isDownloadedMap: const {},
@@ -376,7 +376,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         mainAxisSpacing: 8,
       ),
       itemCount: crossAxisCount * 2,
-      itemBuilder: (context, index) => Card(
+      itemBuilder: (context, index) => const Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -385,13 +385,13 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
               child: SkeletonWidget(width: double.infinity, height: double.infinity),
             ),
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SkeletonWidget(height: 14, width: double.infinity),
-                  const SizedBox(height: 6),
-                  const SkeletonWidget(height: 10, width: 60),
+                  SkeletonWidget(height: 14, width: double.infinity),
+                  SizedBox(height: 6),
+                  SkeletonWidget(height: 10, width: 60),
                 ],
               ),
             ),

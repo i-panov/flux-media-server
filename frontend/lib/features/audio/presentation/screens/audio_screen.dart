@@ -1,22 +1,21 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
-import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
-import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
-import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
-import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/artist_card.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
+import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
-import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
-import 'package:fast_immutable_collections/fast_immutable_collections.dart';
-import 'package:flux_media_server/shared/models/media.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class AudioScreen extends ConsumerStatefulWidget {
