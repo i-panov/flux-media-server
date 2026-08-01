@@ -7,6 +7,7 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -31,13 +32,11 @@ class PlaybackState with _$PlaybackState {
 class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   PlaybackCoordinator(
     this._audioPlayer,
-    this._videoPlayer,
     this._baseUrl,
     this._ref,
   ) : super(const PlaybackState.initial());
 
   final AudioPlayerDatasource _audioPlayer;
-  final VideoPlayerDatasource _videoPlayer;
   final String _baseUrl;
 
   /// Used to lazily read the current auth token (so token refreshes don't
@@ -45,6 +44,12 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   final Ref _ref;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _progressTimer;
+
+  /// Lazily reads the video player datasource. Using ref.read instead of
+  /// ref.watch prevents this long-lived provider from keeping the
+  /// autoDispose videoPlayerDatasourceProvider alive.
+  VideoPlayerDatasource get _videoPlayer =>
+      _ref.read(videoPlayerDatasourceProvider);
 
   void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
@@ -161,7 +166,14 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       ));
     }
     _cancelProgressTimer();
-    state = const PlaybackState.completed();
+
+    // Auto-advance to next track in queue if available.
+    final queue = _ref.read(playQueueProvider);
+    if (queue.hasNext) {
+      unawaited(_ref.read(playQueueProvider.notifier).next());
+    } else {
+      state = const PlaybackState.completed();
+    }
   }
 
   void _subscribeToStream<T>(Stream<T> stream, void Function(T) onNext) {
@@ -216,7 +228,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       } else {
         await _videoPlayer.pause();
       }
-      if (!mounted) return;
       state = current.copyWith(isPaused: true);
       await _saveProgress(
         current.media.id,
@@ -234,7 +245,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       } else {
         await _videoPlayer.play();
       }
-      if (!mounted) return;
       state = current.copyWith(isPaused: false);
     }
   }
@@ -270,7 +280,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
         await _videoPlayer.stop();
       }
     }
-    if (!mounted) return;
     state = const PlaybackState.initial();
   }
 
@@ -291,7 +300,6 @@ final playbackCoordinatorProvider =
     StateNotifierProvider<PlaybackCoordinator, PlaybackState>((ref) {
   return PlaybackCoordinator(
     ref.watch(audioPlayerDatasourceProvider),
-    ref.watch(videoPlayerDatasourceProvider),
     ref.watch(baseUrlProvider),
     ref,
   );

@@ -76,6 +76,15 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
       await ref.read(downloadNotifierProvider(widget.mediaId).notifier).remove(widget.mediaId);
     } else if (downloadState is! DownloadDownloading) {
       await ref.read(downloadNotifierProvider(widget.mediaId).notifier).download(media);
+
+      if (!mounted) return;
+      final newState = ref.read(downloadNotifierProvider(widget.mediaId));
+      if (newState is DownloadError && mounted) {
+        final l = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l.errorLabel}: ${newState.message}')),
+        );
+      }
     }
   }
 

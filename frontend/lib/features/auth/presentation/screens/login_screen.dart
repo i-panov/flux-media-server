@@ -16,6 +16,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -23,33 +24,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _requestCode() {
+  Future<void> _requestCode() async {
     if (_formKey.currentState!.validate()) {
-      ref
-          .read(authProvider.notifier)
-          .requestCode(_emailController.text.trim());
+      setState(() => _isLoading = true);
+      final email = _emailController.text.trim();
+      await ref.read(authProvider.notifier).requestCode(email);
+      if (mounted) {
+        final state = ref.read(authProvider);
+        if (state is AuthCodeSent) {
+          context.router.replace(CodeRoute(
+            email: state.email,
+            debugCode: state.debugCode,
+          ));
+        }
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    ref.listen(authProvider, (previous, next) {
-      if (next is AuthCodeSent && previous is! AuthCodeSent) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          try {
-            // Replace (not push) so a resend triggered from CodeScreen
-            // doesn't stack a second CodeScreen on top.
-            context.router.replace(CodeRoute(
-              email: next.email,
-              debugCode: next.debugCode,
-            ));
-          } catch (_) {}
-        });
-      }
-    });
-
     final authState = ref.watch(authProvider);
 
     return Scaffold(
@@ -101,8 +96,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: authState is AuthLoading ? null : _requestCode,
-                    child: authState is AuthLoading
+                    onPressed: _isLoading ? null : _requestCode,
+                    child: _isLoading
                         ? const CircularProgressIndicator()
                         : Text(l.getCode),
                   ),

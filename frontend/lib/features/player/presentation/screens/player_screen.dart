@@ -10,7 +10,7 @@ import 'package:flux_media_server/core/utils/platform_detection.dart';
 import 'package:flux_media_server/features/player/presentation/widgets/pip_manager.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
-final videoControllerProvider = Provider<VideoController>((ref) {
+final videoControllerProvider = Provider.autoDispose<VideoController>((ref) {
   final datasource = ref.watch(videoPlayerDatasourceProvider);
   return VideoController(
     datasource.player,
@@ -32,17 +32,19 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _resumeDialogShown = false;
+  late final PlayerNotifier _playerNotifier;
 
   @override
   void initState() {
     super.initState();
+    _playerNotifier = ref.read(playerProvider.notifier);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(playerProvider.notifier).play(widget.media);
+      _playerNotifier.play(widget.media);
     });
   }
 
@@ -81,7 +83,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     // Stop playback (also persists watch progress) when leaving the screen,
     // e.g. via system back button which bypasses the in-app back button.
-    ref.read(playerProvider.notifier).stop();
+    _playerNotifier.stop();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -177,48 +179,74 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             ],
           );
         },
-        completed: () => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.replay, size: 64, color: Colors.white),
-              const SizedBox(height: 16),
-              Text(
-                l.playbackCompleted,
-                style: const TextStyle(color: Colors.white, fontSize: 18),
+        completed: () => Stack(
+          children: [
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.replay, size: 64, color: Colors.white),
+                  const SizedBox(height: 16),
+                  Text(
+                    l.playbackCompleted,
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () {
+                      ref.read(playerProvider.notifier).reset();
+                      ref.read(playerProvider.notifier).play(widget.media);
+                    },
+                    child: Text(l.replay),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  ref.read(playerProvider.notifier).reset();
-                  ref.read(playerProvider.notifier).play(widget.media);
-                },
-                child: Text(l.replay),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                color: Colors.white,
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.maybePop(),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        error: (message) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                style: const TextStyle(color: Colors.white),
-                textAlign: TextAlign.center,
+        error: (message) => Stack(
+          children: [
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    style: const TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () {
+                      ref.read(playerProvider.notifier).reset();
+                      ref.read(playerProvider.notifier).play(widget.media);
+                    },
+                    child: Text(l.retry),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  ref.read(playerProvider.notifier).reset();
-                  ref.read(playerProvider.notifier).play(widget.media);
-                },
-                child: Text(l.retry),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                color: Colors.white,
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.maybePop(),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

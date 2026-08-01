@@ -21,7 +21,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final notifier = ref.read(libraryProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l.libraries)),
+      appBar: AppBar(
+        leading: const SizedBox.shrink(),
+        title: Text(l.libraries),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(libraryProvider);

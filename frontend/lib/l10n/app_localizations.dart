@@ -763,6 +763,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Year'**
   String get year;
+
+  /// No description provided for @details.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get details;
+
+  /// No description provided for @addedToQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to queue'**
+  String get addedToQueue;
 }
 
 class _AppLocalizationsDelegate

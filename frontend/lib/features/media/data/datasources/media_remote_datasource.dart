@@ -86,9 +86,11 @@ class MediaRemoteDataSource {
 
   /// Fetches watch progress for all media.
   Future<List<WatchProgress>> getProgress() async {
-    final Response<List<dynamic>> response = await apiClient.getProgress();
+    final Response<Map<String, dynamic>> response = await apiClient.getProgress();
     checkResponse(response, 'Failed to fetch progress');
-    return response.body!
+    final body = response.body!;
+    final items = body['items'] as List<dynamic>;
+    return items
         .map((e) => WatchProgress.fromJson(e as Map<String, dynamic>))
         .toList();
   }

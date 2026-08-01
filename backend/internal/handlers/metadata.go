@@ -84,6 +84,10 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 	var req struct {
 		Title       *string  `json:"title"`
 		Description *string  `json:"description"`
+		Artist      *string  `json:"artist"`
+		Album       *string  `json:"album"`
+		Genre       *string  `json:"genre"`
+		Year        *int     `json:"year"`
 		PosterURL   *string  `json:"poster_url"`
 		Rating      *float64 `json:"rating"`
 		Genres      *string  `json:"genres"`
@@ -92,15 +96,27 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	if media.Metadata == nil {
-		media.Metadata = &models.Metadata{}
-	}
-
 	if req.Title != nil {
-		media.Metadata.Title = *req.Title
+		media.Title = *req.Title
 	}
 	if req.Description != nil {
-		media.Metadata.Description = *req.Description
+		media.Description = *req.Description
+	}
+	if req.Artist != nil {
+		media.Artist = *req.Artist
+	}
+	if req.Album != nil {
+		media.Album = *req.Album
+	}
+	if req.Genre != nil {
+		media.Genre = *req.Genre
+	}
+	if req.Year != nil {
+		media.Year = *req.Year
+	}
+
+	if media.Metadata == nil {
+		media.Metadata = &models.Metadata{}
 	}
 	if req.PosterURL != nil {
 		media.Metadata.PosterURL = *req.PosterURL
@@ -117,5 +133,5 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to update metadata")
 	}
 
-	return c.JSON(media.Metadata)
+	return c.JSON(media)
 }

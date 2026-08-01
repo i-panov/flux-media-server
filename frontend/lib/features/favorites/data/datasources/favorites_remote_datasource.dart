@@ -11,7 +11,8 @@ class FavoritesRemoteDataSource {
     final response = await apiClient.getFavorites(type: type);
     checkResponse(response, 'Failed to fetch favorites');
     final body = response.body!;
-    return body
+    final items = body['items'] as List<dynamic>;
+    return items
         .map((json) => Favorite.fromJson(json as Map<String, dynamic>))
         .toList();
   }

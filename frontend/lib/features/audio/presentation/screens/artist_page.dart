@@ -4,10 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
@@ -30,6 +34,18 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
 
   void _toggleFavorite(int mediaId) {
     ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId, 'audio');
+  }
+
+  void _playTrack(List<Media> queue, int index) {
+    ref.read(playQueueProvider.notifier).setQueue(queue, startIndex: index);
+  }
+
+  void _addToQueue(Media media) {
+    ref.read(playQueueProvider.notifier).enqueue(media);
+    final l = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l.addedToQueue)),
+    );
   }
 
   Future<void> _downloadAll() async {
@@ -194,55 +210,78 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         .where((Media t) => !favoriteMediaIds.contains(t.id))
         .toList();
 
+    final currentlyPlayingId = ref.watch(
+      playbackCoordinatorProvider.select((state) {
+        return state is PlaybackPlaying ? state.media.id : null;
+      }),
+    );
+
     return ListView(
       children: [
         if (likedTracks.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.favorite, size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l.likedTracks, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-          ),
-          ...likedTracks.map((track) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: AudioTrackRow(
-                  media: track,
-                  onTap: () => context.router.push(MediaDetailRoute(mediaId: track.id)),
-                  isFavorite: true,
-                  onFavorite: () => _toggleFavorite(track.id),
-                  isDownloaded: false,
-                  onDownload: () => _toggleDownload(track.id),
-                ),
-              )),
+          _SectionHeader(icon: Icons.favorite, title: l.likedTracks),
+          ...likedTracks.asMap().entries.map((entry) {
+            final track = entry.value;
+            final index = entry.key;
+            return AudioTrackRow(
+              media: track,
+              isPlaying: currentlyPlayingId == track.id,
+              isFavorite: true,
+              onPlay: () => _playTrack(likedTracks, index),
+              onFavorite: () => _toggleFavorite(track.id),
+              onDownload: () => _toggleDownload(track.id),
+              onAddToQueue: () => _addToQueue(track),
+              onAddToCollection: () =>
+                  showAddToCollectionDialog(context, ref, track.id),
+              onEditMetadata: () => showEditMetadataDialog(context, ref, track),
+              onDetails: () =>
+                  context.router.push(MediaDetailRoute(mediaId: track.id)),
+            );
+          }),
         ],
         if (otherTracks.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.music_note, size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l.allTracks, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-          ),
-          ...otherTracks.map((track) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: AudioTrackRow(
-                  media: track,
-                  onTap: () => context.router.push(MediaDetailRoute(mediaId: track.id)),
-                  isFavorite: false,
-                  onFavorite: () => _toggleFavorite(track.id),
-                  isDownloaded: false,
-                  onDownload: () => _toggleDownload(track.id),
-                ),
-              )),
+          _SectionHeader(icon: Icons.music_note, title: l.allTracks),
+          ...otherTracks.asMap().entries.map((entry) {
+            final track = entry.value;
+            final index = entry.key;
+            return AudioTrackRow(
+              media: track,
+              isPlaying: currentlyPlayingId == track.id,
+              isFavorite: false,
+              onPlay: () => _playTrack(otherTracks, index),
+              onFavorite: () => _toggleFavorite(track.id),
+              onDownload: () => _toggleDownload(track.id),
+              onAddToQueue: () => _addToQueue(track),
+              onAddToCollection: () =>
+                  showAddToCollectionDialog(context, ref, track.id),
+              onEditMetadata: () => showEditMetadataDialog(context, ref, track),
+              onDetails: () =>
+                  context.router.push(MediaDetailRoute(mediaId: track.id)),
+            );
+          }),
         ],
       ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+        ],
+      ),
     );
   }
 }

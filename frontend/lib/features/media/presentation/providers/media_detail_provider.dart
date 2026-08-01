@@ -30,6 +30,10 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
       (media) => state = MediaDetailState.loaded(media: media),
     );
   }
+
+  void updateMedia(Media media) {
+    state = MediaDetailState.loaded(media: media);
+  }
 }
 
 final getMediaDetailUseCaseProvider = Provider<GetMediaDetail>((ref) {

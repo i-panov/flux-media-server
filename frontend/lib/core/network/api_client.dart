@@ -135,7 +135,7 @@ abstract class ApiClient extends ChopperService {
   Future<Response<Map<String, dynamic>>> removeFavorite(@Path('id') int id);
 
   @Get(path: '/favorites')
-  Future<Response<List<dynamic>>> getFavorites({
+  Future<Response<Map<String, dynamic>>> getFavorites({
     @Query('type') String? type,
   });
 
@@ -184,7 +184,7 @@ abstract class ApiClient extends ChopperService {
 
   // Progress
   @Get(path: '/progress')
-  Future<Response<List<dynamic>>> getProgress();
+  Future<Response<Map<String, dynamic>>> getProgress();
 
   @Put(path: '/progress/{mediaId}')
   Future<Response<Map<String, dynamic>>> updateProgress(

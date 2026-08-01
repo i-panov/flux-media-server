@@ -12,11 +12,12 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// Manages offline media downloads.
 /// Files are stored in the app's documents directory.
 class OfflineCacheService {
-  OfflineCacheService(this._ref, this._baseUrl, this._authToken);
+  OfflineCacheService(this._ref, this._baseUrl);
 
   final Ref _ref;
   final String _baseUrl;
-  final String? _authToken;
+
+  String? get _authToken => _ref.read(settingsProvider).settings.authToken;
 
   /// Returns the local file path for a cached media item, or null if not cached.
   Future<String?> getLocalPath(int mediaId) async {
@@ -41,6 +42,7 @@ class OfflineCacheService {
   }) async {
     final url = '$_baseUrl/media/${media.id}/stream';
     var token = _authToken;
+    AppLogger.info('Download started: $url, token=${token != null}');
 
     for (var attempt = 0; attempt < 2; attempt++) {
       final request = http.Request('GET', Uri.parse(url));
@@ -55,6 +57,7 @@ class OfflineCacheService {
 
       try {
         final response = await client.send(request);
+        AppLogger.info('Download response: ${response.statusCode}');
 
         if (response.statusCode == 401 && attempt == 0) {
           token = await _refreshToken();
@@ -170,26 +173,26 @@ final offlineCacheServiceProvider = Provider<OfflineCacheService>((ref) {
   return OfflineCacheService(
     ref,
     ref.watch(baseUrlProvider),
-    ref.watch(settingsProvider).settings.authToken,
   );
 });
 
 /// State notifier for managing download state of a specific media item.
 class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
-  late final OfflineCacheService _cacheService;
-
   @override
   DownloadState build(int arg) {
-    _cacheService = ref.watch(offlineCacheServiceProvider);
     checkStatus(arg);
-    ref.onDispose(() {});
     return const DownloadState.idle();
   }
+
+  OfflineCacheService get _cacheService =>
+      ref.read(offlineCacheServiceProvider);
 
   /// Checks if the media item is already downloaded.
   Future<void> checkStatus(int mediaId) async {
     final cached = await _cacheService.isCached(mediaId);
-    state = cached ? const DownloadState.downloaded() : const DownloadState.idle();
+    if (state is! DownloadDownloading) {
+      state = cached ? const DownloadState.downloaded() : const DownloadState.idle();
+    }
   }
 
   /// Starts downloading the media item with progress tracking.
@@ -206,7 +209,8 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
         },
       );
       state = const DownloadState.downloaded();
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger.error('Download failed', e, st);
       state = DownloadState.error(e.toString());
     }
   }

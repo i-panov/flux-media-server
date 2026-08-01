@@ -254,7 +254,7 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
-  Future<Response<List<dynamic>>> getFavorites({String? type}) {
+  Future<Response<Map<String, dynamic>>> getFavorites({String? type}) {
     final Uri $url = Uri.parse('/favorites');
     final Map<String, dynamic> $params = <String, dynamic>{'type': type};
     final Request $request = Request(
@@ -263,7 +263,7 @@ final class _$ApiClient extends ApiClient {
       client.baseUrl,
       parameters: $params,
     );
-    return client.send<List<dynamic>, List<dynamic>>($request);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
@@ -387,14 +387,14 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
-  Future<Response<List<dynamic>>> getProgress() {
+  Future<Response<Map<String, dynamic>>> getProgress() {
     final Uri $url = Uri.parse('/progress');
     final Request $request = Request(
       'GET',
       $url,
       client.baseUrl,
     );
-    return client.send<List<dynamic>, List<dynamic>>($request);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override

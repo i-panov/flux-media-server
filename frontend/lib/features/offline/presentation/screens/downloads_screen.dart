@@ -23,6 +23,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const SizedBox.shrink(),
         title: Text(l.downloads),
       ),
       body: downloadsState.when(

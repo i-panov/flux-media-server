@@ -39,8 +39,8 @@ class AppRouter extends _$AppRouter {
           page: MainRoute.page,
           guards: [authGuard],
           children: [
-            AutoRoute(page: VideoRoute.page, initial: true),
-            AutoRoute(page: AudioRoute.page),
+            AutoRoute(page: VideoRoute.page, initial: true, keepHistory: false),
+            AutoRoute(page: AudioRoute.page, keepHistory: false),
             AutoRoute(page: LibraryRoute.page),
             AutoRoute(page: DownloadsRoute.page),
           ],

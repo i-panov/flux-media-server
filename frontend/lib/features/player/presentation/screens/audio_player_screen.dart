@@ -46,6 +46,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final playbackState = ref.watch(playbackCoordinatorProvider);
+    final currentMedia = switch (playbackState) {
+      PlaybackPlaying(:final media) => media,
+      _ => widget.media,
+    };
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -67,12 +73,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _LyricsTab(media: widget.media),
-          _TranslationTab(media: widget.media),
+          _LyricsTab(media: currentMedia),
+          _TranslationTab(media: currentMedia),
           const _QueueTab(),
         ],
       ),
-      bottomNavigationBar: _PlayerControls(media: widget.media),
+      bottomNavigationBar: _PlayerControls(media: currentMedia),
     );
   }
 }

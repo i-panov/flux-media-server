@@ -50,17 +50,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final GetCurrentUser _getCurrentUser;
 
   Future<void> requestCode(String email) async {
-    state = const AuthState.loading();
-    debugPrint('[Auth] requestCode: calling API for $email');
+    // Don't set AuthLoading here — FluxApp's showSplash catches it
+    // and removes LoginScreen from the widget tree, breaking navigation.
     final result = await _requestCode(email);
-    debugPrint('[Auth] requestCode: result=$result');
     result.fold(
       (failure) {
-        debugPrint('[Auth] requestCode: failure=${failure.message}');
         state = AuthState.error(message: failure.message);
       },
       (debugCode) {
-        debugPrint('[Auth] requestCode: success, debugCode=$debugCode');
         state = AuthState.codeSent(
           email: email,
           debugCode: debugCode,
@@ -79,6 +76,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _ref
             .read(settingsProvider.notifier)
             .setTokens(data.token, data.refreshToken);
+        // Invalidate all cached data providers so they refetch with the new token.
+        // Without this, stale providers from a previous session may still hold
+        // invalid tokens and fail with "session expired".
+        _ref.invalidate(mediaListProvider('video'));
+        _ref.invalidate(mediaListProvider('audio'));
+        _ref.invalidate(favoritesProvider);
+        _ref.invalidate(collectionsProvider);
+        _ref.invalidate(libraryProvider);
+        _ref.invalidate(watchProgressProvider);
         state = AuthState.authenticated(user: data.user);
       },
     );

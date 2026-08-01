@@ -65,6 +65,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const SizedBox.shrink(),
         title: Text(l.videoTab),
         actions: [
           IconButton(
@@ -152,29 +153,24 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     final favorites = favoritesState.valueOrNull ?? [];
     final collections = collectionsState.valueOrNull ?? [];
 
-    // Filter incomplete watch progress
-    final incompleteProgress = watchProgress
-        .where((p) => !p.completed)
-        .take(10)
-        .toList();
-
     // Get favorite media IDs
     final favoriteMediaIds = favorites
         .where((f) => f.mediaId != null)
         .map((f) => f.mediaId!)
         .toSet();
 
-    // Recently Added section
-    final recentlyAdded = mediaList.items.take(10).toList();
-
-    // Filter favorites from media items
-    final favoriteVideos = mediaList.items
-        .where((m) => favoriteMediaIds.contains(m.id))
+    // Continue Watching: incomplete progress for items in the current list.
+    final mediaIds = mediaList.items.map((m) => m.id).toSet();
+    final continueWatchingProgress = watchProgress
+        .where((p) => !p.completed && mediaIds.contains(p.mediaId))
         .take(10)
         .toList();
+    final continueWatchingIds = continueWatchingProgress
+        .map((p) => p.mediaId)
+        .toSet();
 
     // Build continue watching items with progress
-    final continueWatchingItems = incompleteProgress.map((p) {
+    final continueWatchingItems = continueWatchingProgress.map((p) {
       final media = mediaList.items.firstWhere(
         (m) => m.id == p.mediaId,
         orElse: () => Media(
@@ -195,6 +191,32 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
       );
       return (media, p);
     }).toList();
+
+    // Recently Added: first 10 items NOT already in Continue Watching.
+    final recentlyAdded = mediaList.items
+        .where((m) => !continueWatchingIds.contains(m.id))
+        .take(10)
+        .toList();
+    final recentlyAddedIds = recentlyAdded.map((m) => m.id).toSet();
+
+    // Favorites: favorited items NOT already in Continue Watching or Recently Added.
+    final favoriteVideos = mediaList.items
+        .where((m) =>
+            favoriteMediaIds.contains(m.id) &&
+            !continueWatchingIds.contains(m.id) &&
+            !recentlyAddedIds.contains(m.id))
+        .take(10)
+        .toList();
+
+    // Main grid: everything not shown in the highlight rows above.
+    final highlightIds = {
+      ...continueWatchingIds,
+      ...recentlyAddedIds,
+      ...favoriteVideos.map((m) => m.id),
+    };
+    final gridItems = mediaList.items
+        .where((m) => !highlightIds.contains(m.id))
+        .toList();
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -289,7 +311,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           ),
 
         // All Movies section
-        if (mediaList.items.isEmpty)
+        if (gridItems.isEmpty && continueWatchingItems.isEmpty && recentlyAdded.isEmpty && favoriteVideos.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
@@ -323,7 +345,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final media = mediaList.items[index];
+                  final media = gridItems[index];
                   return MediaCard(
                     media: media,
                     onTap: () =>
@@ -334,7 +356,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
                     onDownload: () => _toggleDownload(media.id),
                   );
                 },
-                childCount: mediaList.items.length,
+                childCount: gridItems.length,
               ),
             ),
           ),

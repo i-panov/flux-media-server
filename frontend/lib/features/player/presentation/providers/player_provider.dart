@@ -36,11 +36,12 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   PlayerNotifier(this._datasource, this._baseUrl, this._ref)
       : super(const PlayerNotifierState.initial());
 
-  final VideoPlayerDatasource _datasource;
+  VideoPlayerDatasource _datasource;
   final String _baseUrl;
   final Ref _ref;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _progressTimer;
+  bool _disposed = false;
 
   void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
@@ -54,11 +55,21 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
     _progressTimer = null;
   }
 
+  /// Safe state setter: ignores updates after dispose to prevent
+  /// "defunct element" assertions from stream callbacks.
+  set _state(PlayerNotifierState value) {
+    if (!_disposed) state = value;
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _cancelSubscriptions();
     _cancelProgressTimer();
-    _datasource.dispose();
+    // Don't dispose the datasource here — it's owned by
+    // videoPlayerDatasourceProvider (also autoDispose), which
+    // handles disposal. Disposing here would kill the Player
+    // while the Video widget controls are still interactive.
     super.dispose();
   }
 
@@ -69,7 +80,12 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
     // Mutual exclusion: stop audio playback (mini player / queue) first.
     await _ref.read(playbackCoordinatorProvider.notifier).stop();
     await _ref.read(audioPlayerDatasourceProvider).stop();
-    state = PlayerNotifierState.playing(media: media, isPaused: true);
+
+    // Reuse the datasource from the provider — the VideoController
+    // is bound to the same player, so they stay in sync.
+    await _datasource.stop();
+
+    _state = PlayerNotifierState.playing(media: media, isPaused: true);
     try {
       final streamUrl = '$_baseUrl/media/${media.id}/stream';
       final token = _ref.read(settingsProvider).settings.authToken;
@@ -83,30 +99,30 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
       if (resumePosition != null && resumePosition > Duration.zero) {
         if (resumePosition > const Duration(seconds: 5)) {
           // Show resume dialog instead of auto-seeking.
-          state = (state as PlayerNotifierPlaying).copyWith(
+          _state = (state as PlayerNotifierPlaying).copyWith(
             savedPosition: resumePosition,
             isPaused: false,
           );
         } else {
           await _datasource.seek(resumePosition);
-          state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+          _state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
         }
       } else {
         if (state is PlayerNotifierPlaying) {
-          state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+          _state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
         }
       }
       _startProgressTimer();
 
       _subscriptions.add(_datasource.positionStream.listen((position) {
         if (state is PlayerNotifierPlaying) {
-          state = (state as PlayerNotifierPlaying).copyWith(position: position);
+          _state = (state as PlayerNotifierPlaying).copyWith(position: position);
         }
       }));
 
       _subscriptions.add(_datasource.durationStream.listen((duration) {
         if (state is PlayerNotifierPlaying) {
-          state = (state as PlayerNotifierPlaying).copyWith(duration: duration);
+          _state = (state as PlayerNotifierPlaying).copyWith(duration: duration);
         }
       }));
 
@@ -116,7 +132,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
         }
       }));
     } on Exception catch (e) {
-      state = PlayerNotifierState.error(message: e.toString());
+      _state = PlayerNotifierState.error(message: e.toString());
     }
   }
 
@@ -184,8 +200,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
     final current = state;
     if (current is PlayerNotifierPlaying) {
       await _datasource.pause();
-      if (!mounted) return;
-      state = current.copyWith(isPaused: true);
+      _state = current.copyWith(isPaused: true);
       await _saveProgress(
         current.media.id,
         current.position,
@@ -198,8 +213,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   Future<void> resume() async {
     if (state is PlayerNotifierPlaying) {
       await _datasource.play();
-      if (!mounted) return;
-      state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
+      _state = (state as PlayerNotifierPlaying).copyWith(isPaused: false);
     }
   }
 
@@ -207,8 +221,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   Future<void> setSpeed(double speed) async {
     if (state is PlayerNotifierPlaying) {
       await _datasource.player.setRate(speed);
-      if (!mounted) return;
-      state = (state as PlayerNotifierPlaying).copyWith(speed: speed);
+      _state = (state as PlayerNotifierPlaying).copyWith(speed: speed);
     }
   }
 
@@ -221,7 +234,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
       final saved = (state as PlayerNotifierPlaying).savedPosition;
       if (saved != null) {
         await _datasource.seek(saved);
-        state = (state as PlayerNotifierPlaying).copyWith(savedPosition: null);
+        _state = (state as PlayerNotifierPlaying).copyWith(savedPosition: null);
       }
     }
   }
@@ -230,14 +243,14 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   Future<void> startFromBeginning() async {
     if (state is PlayerNotifierPlaying) {
       await _datasource.seek(Duration.zero);
-      state = (state as PlayerNotifierPlaying).copyWith(savedPosition: null);
+      _state = (state as PlayerNotifierPlaying).copyWith(savedPosition: null);
     }
   }
 
   /// Updates the duration of the current media.
   void updateDuration(Duration duration) {
     if (state is PlayerNotifierPlaying) {
-      state = (state as PlayerNotifierPlaying).copyWith(duration: duration);
+      _state = (state as PlayerNotifierPlaying).copyWith(duration: duration);
     }
   }
 
@@ -252,7 +265,7 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
         completed: true,
       ));
     }
-    state = const PlayerNotifierState.completed();
+    _state = const PlayerNotifierState.completed();
   }
 
   /// Stops playback and resets to initial state.
@@ -267,9 +280,14 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
         current.duration ?? Duration.zero,
       );
     }
-    await _datasource.stop();
-    if (!mounted) return;
-    state = const PlayerNotifierState.initial();
+    // Guard against disposed player — autoDispose may have already
+    // disposed the datasource by the time this async method runs.
+    try {
+      await _datasource.stop();
+    } on Exception {
+      // Player already disposed — nothing to stop.
+    }
+    _state = const PlayerNotifierState.initial();
   }
 
   /// Resets the player to initial state.
@@ -278,17 +296,20 @@ class PlayerNotifier extends StateNotifier<PlayerNotifierState> {
   }
 }
 
-final videoPlayerDatasourceProvider = Provider<VideoPlayerDatasource>((ref) {
+final videoPlayerDatasourceProvider =
+    Provider.autoDispose<VideoPlayerDatasource>((ref) {
   final ds = VideoPlayerDatasource();
   ref.onDispose(ds.dispose);
   return ds;
 });
 
 final playerProvider =
-    StateNotifierProvider<PlayerNotifier, PlayerNotifierState>((ref) {
-  return PlayerNotifier(
-    ref.watch(videoPlayerDatasourceProvider),
-    ref.watch(baseUrlProvider),
-    ref,
-  );
-});
+    StateNotifierProvider.autoDispose<PlayerNotifier, PlayerNotifierState>(
+  (ref) {
+    return PlayerNotifier(
+      ref.watch(videoPlayerDatasourceProvider),
+      ref.watch(baseUrlProvider),
+      ref,
+    );
+  },
+);

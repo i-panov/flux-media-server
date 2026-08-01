@@ -232,5 +232,9 @@
   "genre": "Жанр",
   "@genre": {},
   "year": "Год",
-  "@year": {}
+  "@year": {},
+  "details": "Подробнее",
+  "@details": {},
+  "addedToQueue": "Добавлено в очередь",
+  "@addedToQueue": {}
 }

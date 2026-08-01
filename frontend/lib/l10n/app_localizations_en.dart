@@ -368,4 +368,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get year => 'Year';
+
+  @override
+  String get details => 'Details';
+
+  @override
+  String get addedToQueue => 'Added to queue';
 }

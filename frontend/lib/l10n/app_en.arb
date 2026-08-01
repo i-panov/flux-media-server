@@ -282,5 +282,9 @@
   "genre": "Genre",
   "@genre": {},
   "year": "Year",
-  "@year": {}
+  "@year": {},
+  "details": "Details",
+  "@details": {},
+  "addedToQueue": "Added to queue",
+  "@addedToQueue": {}
 }

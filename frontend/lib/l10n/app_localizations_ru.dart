@@ -369,4 +369,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get year => 'Год';
+
+  @override
+  String get details => 'Подробнее';
+
+  @override
+  String get addedToQueue => 'Добавлено в очередь';
 }
