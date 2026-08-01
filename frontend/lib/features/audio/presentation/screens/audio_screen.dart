@@ -198,12 +198,6 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
 
     final allTracks = mediaList.items.toList();
 
-    final currentlyPlayingId = ref.watch(
-      playbackCoordinatorProvider.select((state) {
-        return state is PlaybackPlaying ? state.media.id : null;
-      }),
-    );
-
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(mediaListProvider(_mediaType));
@@ -240,7 +234,6 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => AudioTrackRow(
                   media: likedTracks[index],
-                  isPlaying: currentlyPlayingId == likedTracks[index].id,
                   isFavorite: true,
                   onPlay: () => _playTrack(likedTracks, index),
                   onFavorite: () => _toggleFavorite(likedTracks[index].id),
@@ -294,7 +287,6 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) => AudioTrackRow(
                 media: allTracks[index],
-                isPlaying: currentlyPlayingId == allTracks[index].id,
                 isFavorite: favoriteMediaIds.contains(allTracks[index].id),
                 onPlay: () => _playTrack(allTracks, index),
                 onFavorite: () => _toggleFavorite(allTracks[index].id),

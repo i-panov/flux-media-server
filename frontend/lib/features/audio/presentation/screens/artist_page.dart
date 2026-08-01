@@ -210,12 +210,6 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         .where((Media t) => !favoriteMediaIds.contains(t.id))
         .toList();
 
-    final currentlyPlayingId = ref.watch(
-      playbackCoordinatorProvider.select((state) {
-        return state is PlaybackPlaying ? state.media.id : null;
-      }),
-    );
-
     return ListView(
       children: [
         if (likedTracks.isNotEmpty) ...[
@@ -225,7 +219,6 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
             final index = entry.key;
             return AudioTrackRow(
               media: track,
-              isPlaying: currentlyPlayingId == track.id,
               isFavorite: true,
               onPlay: () => _playTrack(likedTracks, index),
               onFavorite: () => _toggleFavorite(track.id),
@@ -246,7 +239,6 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
             final index = entry.key;
             return AudioTrackRow(
               media: track,
-              isPlaying: currentlyPlayingId == track.id,
               isFavorite: false,
               onPlay: () => _playTrack(otherTracks, index),
               onFavorite: () => _toggleFavorite(track.id),

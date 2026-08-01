@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// Flat track row for audio listings with cover, title, artist, and actions.
-/// Tap starts playback; long-press opens the detail page.
+/// Tap on cover starts/pauses playback; long-press opens the detail page.
 class AudioTrackRow extends ConsumerWidget {
   const AudioTrackRow({
     super.key,
@@ -49,77 +51,101 @@ class AudioTrackRow extends ConsumerWidget {
       _ => 0.0,
     };
 
+    final playbackState = ref.watch(playbackCoordinatorProvider);
+    final isCurrentlyPlaying = playbackState is PlaybackPlaying &&
+        playbackState.media.id == media.id;
+
     return InkWell(
       onTap: onPlay,
       onLongPress: onDetails,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        color: isPlaying
+        color: isCurrentlyPlaying
             ? colorScheme.primaryContainer.withOpacity(0.3)
             : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Row(
           children: [
-            // Cover / equalizer
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 48,
-                height: 48,
-                child: isPlaying
-                    ? Container(
-                        color: colorScheme.primaryContainer,
-                        child: Icon(
-                          Icons.equalizer,
-                          color: colorScheme.primary,
-                          size: 24,
-                        ),
-                      )
-                    : AuthNetworkImage(
-                        imageUrl: thumbUrl,
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
+            // Cover — tap toggles play/pause
+            GestureDetector(
+              onTap: () {
+                final current = ref.read(playbackCoordinatorProvider);
+                if (current is PlaybackPlaying && current.media.id == media.id) {
+                  if (current.isPaused) {
+                    ref.read(playbackCoordinatorProvider.notifier).resume();
+                  } else {
+                    ref.read(playbackCoordinatorProvider.notifier).pause();
+                  }
+                } else {
+                  onPlay?.call();
+                }
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: isCurrentlyPlaying
+                      ? Container(
                           color: colorScheme.primaryContainer,
-                          child: Icon(Icons.music_note,
-                              color: colorScheme.primary, size: 24),
+                          child: Icon(
+                            Icons.equalizer,
+                            color: colorScheme.primary,
+                            size: 24,
+                          ),
+                        )
+                      : AuthNetworkImage(
+                          imageUrl: thumbUrl,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: colorScheme.primaryContainer,
+                            child: Icon(Icons.music_note,
+                                color: colorScheme.primary, size: 24),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            color: colorScheme.primaryContainer,
+                            child: Icon(Icons.music_note,
+                                color: colorScheme.primary, size: 24),
+                          ),
                         ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: colorScheme.primaryContainer,
-                          child: Icon(Icons.music_note,
-                              color: colorScheme.primary, size: 24),
-                        ),
-                      ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
-            // Title + artist
+            // Title + artist — tap navigates to detail
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    media.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: isPlaying ? colorScheme.primary : null,
-                          fontWeight:
-                              isPlaying ? FontWeight.bold : null,
-                        ),
-                  ),
-                  if (media.artist != null && media.artist!.isNotEmpty)
+              child: GestureDetector(
+                onTap: onDetails,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      media.artist!,
+                      media.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isCurrentlyPlaying
+                                ? colorScheme.primary
+                                : null,
+                            fontWeight: isCurrentlyPlaying
+                                ? FontWeight.bold
+                                : null,
                           ),
                     ),
-                ],
+                    if (media.artist != null && media.artist!.isNotEmpty)
+                      Text(
+                        media.artist!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                  ],
+                ),
               ),
             ),
             // Actions
