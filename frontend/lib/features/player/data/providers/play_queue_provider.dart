@@ -102,5 +102,5 @@ class PlayQueueState {
 /// Provider for the play queue.
 final playQueueProvider =
     StateNotifierProvider<PlayQueueNotifier, PlayQueueState>((ref) {
-  return PlayQueueNotifier(ref.watch(playbackCoordinatorProvider.notifier));
+  return PlayQueueNotifier(ref.read(playbackCoordinatorProvider.notifier));
 });
