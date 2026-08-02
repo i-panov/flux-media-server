@@ -414,4 +414,25 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get changeCover => 'Заменить обложку';
+
+  @override
+  String get editLyrics => 'Редактировать текст';
+
+  @override
+  String get editTranslation => 'Редактировать перевод';
+
+  @override
+  String get lyricsSaved => 'Текст сохранён';
+
+  @override
+  String get translationSaved => 'Перевод сохранён';
+
+  @override
+  String get saving => 'Сохранение...';
+
+  @override
+  String get addLyricsHere => 'Введите текст песни...';
+
+  @override
+  String get addTranslationHere => 'Введите перевод...';
 }

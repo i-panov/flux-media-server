@@ -413,4 +413,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get changeCover => 'Change cover';
+
+  @override
+  String get editLyrics => 'Edit lyrics';
+
+  @override
+  String get editTranslation => 'Edit translation';
+
+  @override
+  String get lyricsSaved => 'Lyrics saved';
+
+  @override
+  String get translationSaved => 'Translation saved';
+
+  @override
+  String get saving => 'Saving...';
+
+  @override
+  String get addLyricsHere => 'Enter lyrics here...';
+
+  @override
+  String get addTranslationHere => 'Enter translation here...';
 }

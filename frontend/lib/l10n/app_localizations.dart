@@ -853,6 +853,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change cover'**
   String get changeCover;
+
+  /// No description provided for @editLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit lyrics'**
+  String get editLyrics;
+
+  /// No description provided for @editTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit translation'**
+  String get editTranslation;
+
+  /// No description provided for @lyricsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics saved'**
+  String get lyricsSaved;
+
+  /// No description provided for @translationSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation saved'**
+  String get translationSaved;
+
+  /// No description provided for @saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving...'**
+  String get saving;
+
+  /// No description provided for @addLyricsHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter lyrics here...'**
+  String get addLyricsHere;
+
+  /// No description provided for @addTranslationHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter translation here...'**
+  String get addTranslationHere;
 }
 
 class _AppLocalizationsDelegate

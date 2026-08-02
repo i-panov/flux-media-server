@@ -312,5 +312,19 @@
   "uploadSuccess": "Upload successful",
   "@uploadSuccess": {},
   "changeCover": "Change cover",
-  "@changeCover": {}
+  "@changeCover": {},
+  "editLyrics": "Edit lyrics",
+  "@editLyrics": {},
+  "editTranslation": "Edit translation",
+  "@editTranslation": {},
+  "lyricsSaved": "Lyrics saved",
+  "@lyricsSaved": {},
+  "translationSaved": "Translation saved",
+  "@translationSaved": {},
+  "saving": "Saving...",
+  "@saving": {},
+  "addLyricsHere": "Enter lyrics here...",
+  "@addLyricsHere": {},
+  "addTranslationHere": "Enter translation here...",
+  "@addTranslationHere": {}
 }

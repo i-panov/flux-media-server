@@ -262,5 +262,19 @@
   "uploadSuccess": "Загрузка завершена",
   "@uploadSuccess": {},
   "changeCover": "Заменить обложку",
-  "@changeCover": {}
+  "@changeCover": {},
+  "editLyrics": "Редактировать текст",
+  "@editLyrics": {},
+  "editTranslation": "Редактировать перевод",
+  "@editTranslation": {},
+  "lyricsSaved": "Текст сохранён",
+  "@lyricsSaved": {},
+  "translationSaved": "Перевод сохранён",
+  "@translationSaved": {},
+  "saving": "Сохранение...",
+  "@saving": {},
+  "addLyricsHere": "Введите текст песни...",
+  "@addLyricsHere": {},
+  "addTranslationHere": "Введите перевод...",
+  "@addTranslationHere": {}
 }
