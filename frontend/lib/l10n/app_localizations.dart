@@ -835,6 +835,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'From filename'**
   String get useFilename;
+
+  /// No description provided for @fileAlreadyExists.
+  ///
+  /// In en, this message translates to:
+  /// **'File already exists on server'**
+  String get fileAlreadyExists;
+
+  /// No description provided for @uploadSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload successful'**
+  String get uploadSuccess;
+
+  /// No description provided for @changeCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Change cover'**
+  String get changeCover;
 }
 
 class _AppLocalizationsDelegate

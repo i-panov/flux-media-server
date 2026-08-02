@@ -82,4 +82,8 @@ class MediaRepositoryImpl implements MediaRepository {
             duration: duration,
             completed: completed,
           ));
+
+  @override
+  Future<Either<Failure, void>> uploadCover(int mediaId, String filePath) =>
+      safeRepositoryCall(() => remoteDataSource.uploadCover(mediaId, filePath));
 }

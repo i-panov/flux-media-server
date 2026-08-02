@@ -25,6 +25,7 @@ class Media with _$Media {
     String? genre,
     Metadata? metadata,
     @JsonKey(name: 'file_hash') @Default('') String fileHash,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   }) = _Media;
 
   factory Media.fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);

@@ -256,5 +256,11 @@
   "checkingAuthentication": "Проверка авторизации...",
   "@checkingAuthentication": {},
   "useFilename": "Из имени файла",
-  "@useFilename": {}
+  "@useFilename": {},
+  "fileAlreadyExists": "Файл уже есть на сервере",
+  "@fileAlreadyExists": {},
+  "uploadSuccess": "Загрузка завершена",
+  "@uploadSuccess": {},
+  "changeCover": "Заменить обложку",
+  "@changeCover": {}
 }

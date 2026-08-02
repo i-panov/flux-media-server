@@ -42,6 +42,8 @@ mixin _$Media {
   Metadata? get metadata => throw _privateConstructorUsedError;
   @JsonKey(name: 'file_hash')
   String get fileHash => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -69,7 +71,8 @@ abstract class $MediaCopyWith<$Res> {
       String? album,
       String? genre,
       Metadata? metadata,
-      @JsonKey(name: 'file_hash') String fileHash});
+      @JsonKey(name: 'file_hash') String fileHash,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 
   $MetadataCopyWith<$Res>? get metadata;
 }
@@ -103,6 +106,7 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
     Object? genre = freezed,
     Object? metadata = freezed,
     Object? fileHash = null,
+    Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -169,6 +173,10 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
           ? _value.fileHash
           : fileHash // ignore: cast_nullable_to_non_nullable
               as String,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 
@@ -208,7 +216,8 @@ abstract class _$$MediaImplCopyWith<$Res> implements $MediaCopyWith<$Res> {
       String? album,
       String? genre,
       Metadata? metadata,
-      @JsonKey(name: 'file_hash') String fileHash});
+      @JsonKey(name: 'file_hash') String fileHash,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 
   @override
   $MetadataCopyWith<$Res>? get metadata;
@@ -241,6 +250,7 @@ class __$$MediaImplCopyWithImpl<$Res>
     Object? genre = freezed,
     Object? metadata = freezed,
     Object? fileHash = null,
+    Object? updatedAt = freezed,
   }) {
     return _then(_$MediaImpl(
       id: null == id
@@ -307,6 +317,10 @@ class __$$MediaImplCopyWithImpl<$Res>
           ? _value.fileHash
           : fileHash // ignore: cast_nullable_to_non_nullable
               as String,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ));
   }
 }
@@ -330,7 +344,8 @@ class _$MediaImpl implements _Media {
       this.album,
       this.genre,
       this.metadata,
-      @JsonKey(name: 'file_hash') this.fileHash = ''});
+      @JsonKey(name: 'file_hash') this.fileHash = '',
+      @JsonKey(name: 'updated_at') this.updatedAt});
 
   factory _$MediaImpl.fromJson(Map<String, dynamic> json) =>
       _$$MediaImplFromJson(json);
@@ -373,10 +388,13 @@ class _$MediaImpl implements _Media {
   @override
   @JsonKey(name: 'file_hash')
   final String fileHash;
+  @override
+  @JsonKey(name: 'updated_at')
+  final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'Media(id: $id, title: $title, filename: $filename, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artist: $artist, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash)';
+    return 'Media(id: $id, title: $title, filename: $filename, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artist: $artist, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash, updatedAt: $updatedAt)';
   }
 
   @override
@@ -408,7 +426,9 @@ class _$MediaImpl implements _Media {
             (identical(other.metadata, metadata) ||
                 other.metadata == metadata) &&
             (identical(other.fileHash, fileHash) ||
-                other.fileHash == fileHash));
+                other.fileHash == fileHash) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt));
   }
 
   @JsonKey(ignore: true)
@@ -430,7 +450,8 @@ class _$MediaImpl implements _Media {
       album,
       genre,
       metadata,
-      fileHash);
+      fileHash,
+      updatedAt);
 
   @JsonKey(ignore: true)
   @override
@@ -463,7 +484,8 @@ abstract class _Media implements Media {
       final String? album,
       final String? genre,
       final Metadata? metadata,
-      @JsonKey(name: 'file_hash') final String fileHash}) = _$MediaImpl;
+      @JsonKey(name: 'file_hash') final String fileHash,
+      @JsonKey(name: 'updated_at') final DateTime? updatedAt}) = _$MediaImpl;
 
   factory _Media.fromJson(Map<String, dynamic> json) = _$MediaImpl.fromJson;
 
@@ -505,6 +527,9 @@ abstract class _Media implements Media {
   @override
   @JsonKey(name: 'file_hash')
   String get fileHash;
+  @override
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt;
   @override
   @JsonKey(ignore: true)
   _$$MediaImplCopyWith<_$MediaImpl> get copyWith =>

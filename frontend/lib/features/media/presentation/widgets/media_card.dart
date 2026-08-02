@@ -29,9 +29,12 @@ class MediaCard extends ConsumerWidget {
     final baseUrl = ref.watch(baseUrlProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
+    // Cache-buster: CachedNetworkImage caches by URL, so append updatedAt
+    // to force a reload when the cover changes on the server.
+    final cacheBuster = media.updatedAt?.millisecondsSinceEpoch;
     final imageUrl = hasCover
-        ? '$baseUrl/media/${media.id}/cover'
-        : '$baseUrl/media/${media.id}/thumb';
+        ? '$baseUrl/media/${media.id}/cover${cacheBuster != null ? '?v=$cacheBuster' : ''}'
+        : '$baseUrl/media/${media.id}/thumb${cacheBuster != null ? '?v=$cacheBuster' : ''}';
 
     Widget imageWidget = AuthNetworkImage(
       imageUrl: imageUrl,

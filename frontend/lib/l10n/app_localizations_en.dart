@@ -404,4 +404,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get useFilename => 'From filename';
+
+  @override
+  String get fileAlreadyExists => 'File already exists on server';
+
+  @override
+  String get uploadSuccess => 'Upload successful';
+
+  @override
+  String get changeCover => 'Change cover';
 }

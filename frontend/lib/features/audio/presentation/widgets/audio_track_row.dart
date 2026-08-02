@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
@@ -38,7 +39,12 @@ class AudioTrackRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final baseUrl = ref.watch(baseUrlProvider);
-    final thumbUrl = '$baseUrl/media/${media.id}/thumb';
+    final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
+    final cacheBuster = media.updatedAt?.millisecondsSinceEpoch;
+    final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
+    final imageUrl = hasCover
+        ? '$baseUrl/media/${media.id}/cover$buster'
+        : '$baseUrl/media/${media.id}/thumb$buster';
     final colorScheme = Theme.of(context).colorScheme;
     final l = AppLocalizations.of(context)!;
 
@@ -93,22 +99,26 @@ class AudioTrackRow extends ConsumerWidget {
                             size: 24,
                           ),
                         )
-                      : AuthNetworkImage(
-                          imageUrl: thumbUrl,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(
-                            color: colorScheme.primaryContainer,
-                            child: Icon(Icons.music_note,
-                                color: colorScheme.primary, size: 24),
-                          ),
-                          errorWidget: (_, __, ___) => Container(
-                            color: colorScheme.primaryContainer,
-                            child: Icon(Icons.music_note,
-                                color: colorScheme.primary, size: 24),
-                          ),
-                        ),
+                      : hasCover
+                          ? AuthNetworkImage(
+                              imageUrl: imageUrl,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(
+                                color: colorScheme.primaryContainer,
+                                child: Icon(Icons.music_note,
+                                    color: colorScheme.primary, size: 24),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                color: colorScheme.primaryContainer,
+                                child: Icon(Icons.music_note,
+                                    color: colorScheme.primary, size: 24),
+                              ),
+                            )
+                          : const Center(
+                              child: AudioPlaceholder(size: 36),
+                            ),
                 ),
               ),
             ),

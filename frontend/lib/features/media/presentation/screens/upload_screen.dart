@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
@@ -23,18 +22,16 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
-  final List<_FileInfo> _selectedFiles = [];
   MediaLibrary? _selectedLibrary;
   bool _isUploading = false;
-  int _uploadedCount = 0;
-  int _totalCount = 0;
-  int _skippedCount = 0;
-  String? _statusText;
-  int? _currentUploadingIndex;
+  File? _selectedFile;
+  String? _selectedFileName;
+  int? _selectedFileSize;
+  String? _selectedFileExt;
 
-  Future<void> _pickFiles() async {
+  Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
+      allowMultiple: false,
       type: FileType.custom,
       allowedExtensions: widget.mediaType == 'audio'
           ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
@@ -42,127 +39,80 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     );
 
     if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.path == null) return;
 
-    final l = AppLocalizations.of(context)!;
-    final checkMediaHash = ref.read(checkMediaHashProvider);
-
-    for (final file in result.files) {
-      if (file.path == null) continue;
-      if (file.size == 0) continue;
-
-      setState(() => _statusText = l.checkingFile(file.name));
-
-      final hash = await _computeHash(File(file.path!));
-
-      if (!mounted) return;
-
-      final checkResult = await checkMediaHash(hash);
-
-      if (!mounted) return;
-
-      final exists = checkResult.fold(
-        (failure) {
-          return false;
-        },
-        (data) => data.exists,
-      );
-
-      if (exists) {
-        setState(() => _skippedCount++);
-      } else {
-        _selectedFiles.add(_FileInfo(
-          path: file.path!,
-          name: file.name,
-          size: file.size,
-          hash: hash,
-          extension: file.extension,
-        ));
-      }
-    }
-
-    if (!mounted) return;
-    setState(() => _statusText = null);
-  }
-
-  Future<String> _computeHash(File file) async {
-    final stream = file.openRead();
-    final hash = await sha256.bind(stream).first;
-    return hash.toString();
+    setState(() {
+      _selectedFile = File(file.path!);
+      _selectedFileName = file.name;
+      _selectedFileSize = file.size;
+      _selectedFileExt = file.extension;
+    });
   }
 
   Future<void> _startUpload() async {
-    if (_selectedFiles.isEmpty || _selectedLibrary == null) return;
+    if (_selectedFile == null || _selectedLibrary == null) return;
 
     final l = AppLocalizations.of(context)!;
 
-    setState(() {
-      _isUploading = true;
-      _uploadedCount = 0;
-      _totalCount = _selectedFiles.length;
-      _statusText = l.uploading;
-    });
+    setState(() => _isUploading = true);
 
-    final uploadMedia = ref.read(uploadMediaProvider);
-    var successCount = 0;
-    String? firstError;
+    // Compute hash for duplicate check.
+    final stream = _selectedFile!.openRead();
+    final hash = await sha256.bind(stream).first;
 
-    for (var i = 0; i < _selectedFiles.length; i++) {
-      final fileInfo = _selectedFiles[i];
-      setState(() => _currentUploadingIndex = i);
-      try {
-        final result = await uploadMedia(
-          UploadMediaParams(
-            filePath: fileInfo.path,
-            libraryId: _selectedLibrary!.id,
-            fileName: fileInfo.name,
+    // Check duplicate.
+    final checkMediaHash = ref.read(checkMediaHashProvider);
+    final checkResult = await checkMediaHash(hash.toString());
+    final exists = checkResult.fold((_) => false, (data) => data.exists);
+
+    if (exists) {
+      setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.fileAlreadyExists),
+            backgroundColor: Colors.orange,
           ),
         );
-
-        if (!mounted) return;
-
-        result.fold(
-          (failure) => firstError ??= failure.message,
-          (_) => successCount++,
-        );
-      } on TimeoutException {
-        firstError ??= 'Upload timed out. The file may be too large or the connection is too slow.';
-      } on Exception catch (e) {
-        firstError ??= e.toString();
       }
-
-      setState(() => _uploadedCount++);
+      return;
     }
 
-    setState(() {
-      _isUploading = false;
-      _statusText = null;
-      _currentUploadingIndex = null;
-    });
+    final uploadMedia = ref.read(uploadMediaProvider);
+    final result = await uploadMedia(
+      UploadMediaParams(
+        filePath: _selectedFile!.path,
+        libraryId: _selectedLibrary!.id,
+        fileName: _selectedFileName!,
+      ),
+    );
 
-    if (mounted) {
-      final buffer = StringBuffer(l.uploadedOfTotal(successCount, _totalCount));
-      if (_skippedCount > 0) {
-        buffer.write(' (${l.skippedAlreadyExists(_skippedCount)})');
-      }
-      if (firstError != null) {
-        buffer.write('\n${l.failedToAdd(firstError!)}');
-      }
+    setState(() => _isUploading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(buffer.toString()),
-          backgroundColor: firstError == null && successCount == _totalCount
-              ? Colors.green
-              : Colors.orange,
-        ),
-      );
+    if (!mounted) return;
 
-      if (successCount > 0) {
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l.failedToAdd(failure.message)}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.uploadSuccess),
+            backgroundColor: Colors.green,
+          ),
+        );
         ref.invalidate(mediaListProvider('video'));
         ref.invalidate(mediaListProvider('audio'));
         context.router.maybePop();
-      }
-    }
+      },
+    );
   }
 
   @override
@@ -174,20 +124,16 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       appBar: AppBar(
         title: Text(l.uploadMedia),
         actions: [
-          if (_selectedFiles.isNotEmpty && !_isUploading)
-            Tooltip(
-              message: l.upload,
-              child: TextButton.icon(
-                onPressed: _startUpload,
-                icon: const Icon(Icons.cloud_upload),
-                label: Text(l.upload),
-              ),
+          if (_selectedFile != null && !_isUploading)
+            TextButton.icon(
+              onPressed: _startUpload,
+              icon: const Icon(Icons.cloud_upload),
+              label: Text(l.upload),
             ),
         ],
       ),
       body: Column(
         children: [
-          // Auto-select library based on mediaType.
           librariesAsync.when(
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Padding(
@@ -195,7 +141,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               child: Text('${l.errorLoadingLibraries}: $e'),
             ),
             data: (libraries) {
-              // Filter libraries by media type and auto-select first.
               final filtered = libraries
                   .where((lib) => lib.type == widget.mediaType)
                   .toList();
@@ -211,7 +156,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 );
               }
 
-              // If only one library, no need to show selector.
               if (filtered.length == 1) {
                 return const SizedBox.shrink();
               }
@@ -230,103 +174,48 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                             child: Text(lib.name),
                           ))
                       .toList(),
-                  onChanged: _isUploading
-                      ? null
-                      : (lib) => setState(() => _selectedLibrary = lib),
+                  onChanged: (lib) => setState(() => _selectedLibrary = lib),
                 ),
               );
             },
           ),
 
+          const SizedBox(height: 24),
+
+          // File picker button.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
               width: double.infinity,
-              child: Tooltip(
-                message: l.selectFiles,
-                child: OutlinedButton.icon(
-                  onPressed: _isUploading ? null : _pickFiles,
-                  icon: const Icon(Icons.attach_file),
-                  label: Text(l.selectFiles),
+              child: OutlinedButton.icon(
+                onPressed: _isUploading ? null : _pickFile,
+                icon: Icon(_selectedFile != null ? Icons.check_circle : Icons.attach_file),
+                label: Text(
+                  _selectedFileName ?? l.selectFiles,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           ),
 
-          if (_statusText != null) ...[
+          if (_selectedFileSize != null) ...[
             const SizedBox(height: 8),
-            Text(_statusText!),
+            Text(
+              _selectedFileSize! > 1024 * 1024
+                  ? '${(_selectedFileSize! / (1024 * 1024)).toStringAsFixed(1)} MB'
+                  : '${(_selectedFileSize! / 1024).toStringAsFixed(1)} KB',
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
           ],
 
           if (_isUploading) ...[
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
             const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  LinearProgressIndicator(
-                    value: _totalCount > 0 ? _uploadedCount / _totalCount : 0,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(l.ofTotal(_uploadedCount, _totalCount)),
-                ],
-              ),
-            ),
+            Text(l.uploading),
           ],
 
-          if (_skippedCount > 0 && !_isUploading)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                l.filesSkippedOnServer(_skippedCount),
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-              ),
-            ),
-
-          if (_selectedFiles.isNotEmpty)
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _selectedFiles.length,
-                itemBuilder: (context, index) {
-                  final file = _selectedFiles[index];
-                  final size = file.size;
-                  final sizeStr = size > 1024 * 1024
-                      ? '${(size / (1024 * 1024)).toStringAsFixed(1)} MB'
-                      : '${(size / 1024).toStringAsFixed(1)} KB';
-
-                  final isCurrentlyUploading = _isUploading && index == _currentUploadingIndex;
-
-                  return Card(
-                    child: ListTile(
-                      leading: Icon(
-                        _iconForExtension(file.extension),
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      title: Text(file.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(sizeStr),
-                      trailing: isCurrentlyUploading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : _isUploading
-                              ? (index < _uploadedCount
-                                  ? Icon(Icons.check_circle,
-                                      color: Theme.of(context).colorScheme.primary)
-                                  : null)
-                              : IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline),
-                                  tooltip: l.delete,
-                                  onPressed: () => setState(() => _selectedFiles.removeAt(index)),
-                                ),
-                    ),
-                  );
-                },
-              ),
-            )
-          else
+          if (_selectedFile == null)
             Expanded(
               child: Center(
                 child: Column(
@@ -343,40 +232,4 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       ),
     );
   }
-
-  IconData _iconForExtension(String? ext) {
-    switch (ext?.toLowerCase()) {
-      case 'mp4':
-      case 'mkv':
-      case 'avi':
-      case 'mov':
-      case 'webm':
-        return Icons.movie;
-      case 'mp3':
-      case 'flac':
-      case 'ogg':
-      case 'm4a':
-      case 'aac':
-      case 'wav':
-        return Icons.music_note;
-      default:
-        return Icons.insert_drive_file;
-    }
-  }
-}
-
-class _FileInfo {
-  const _FileInfo({
-    required this.path,
-    required this.name,
-    required this.size,
-    required this.hash,
-    required this.extension,
-  });
-
-  final String path;
-  final String name;
-  final int size;
-  final String hash;
-  final String? extension;
 }

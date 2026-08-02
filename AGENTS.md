@@ -1,5 +1,7 @@
 # AGENTS.md — Flux Media Server
 
+**ОБЯЗАТЕЛЬНОЕ ПРАВИЛО: ВСЕГДА ПИСАТЬ ТОЛЬКО ПО-РУССКИ. НИКОГДА НЕ ИСПОЛЬЗОВАТЬ КИТАЙСКИЙ ЯЗЫК. ЭТО ПРАВИЛО КАСАЕТСЯ ВСЕХ ОТВЕТОВ ПОЛЬЗОВАТЕЛЮ, КОММЕНТАРИЕВ И ЛЮБОГО ТЕКСТА.**
+
 Self-hosted media streaming server: Go backend (Fiber + GORM + SQLite) + Flutter frontend (Riverpod + Chopper + media_kit).
 
 ## Commands

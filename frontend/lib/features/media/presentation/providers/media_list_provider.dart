@@ -7,6 +7,7 @@ import 'package:flux_media_server/features/media/domain/repositories/media_repos
 import 'package:flux_media_server/features/media/domain/usecases/check_media_hash.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
+import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 class MediaListResult {
@@ -34,6 +35,10 @@ final checkMediaHashProvider = Provider<CheckMediaHash>((ref) {
 
 final uploadMediaProvider = Provider<UploadMedia>((ref) {
   return UploadMedia(ref.watch(mediaRepositoryProvider));
+});
+
+final uploadCoverProvider = Provider<UploadCover>((ref) {
+  return UploadCover(ref.watch(mediaRepositoryProvider));
 });
 
 /// Current search query. Empty string means no search.

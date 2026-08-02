@@ -158,6 +158,28 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> uploadCover(
+    int id,
+    MultipartFile cover,
+  ) {
+    final Uri $url = Uri.parse('/media/${id}/cover');
+    final List<PartValue> $parts = <PartValue>[
+      PartValueFile<MultipartFile>(
+        'cover',
+        cover,
+      )
+    ];
+    final Request $request = Request(
+      'PUT',
+      $url,
+      client.baseUrl,
+      parts: $parts,
+      multipart: true,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<List<dynamic>>> getLibraries() {
     final Uri $url = Uri.parse('/libraries');
     final Request $request = Request(

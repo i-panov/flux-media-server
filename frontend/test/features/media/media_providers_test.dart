@@ -83,6 +83,10 @@ class FakeMediaRepository implements MediaRepository {
         duration: 0,
         completed: false,
       ));
+
+  @override
+  Future<Either<Failure, void>> uploadCover(int mediaId, String filePath) async =>
+      const Right(null);
 }
 
 void main() {

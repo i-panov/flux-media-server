@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -163,7 +164,9 @@ func New(cfg *config.Config, version string) (*App, error) {
 	// equals the max upload size (potentially gigabytes), so cap the body size
 	// for all non-upload routes to prevent memory exhaustion.
 	fiberApp.Use(func(c *fiber.Ctx) error {
-		if c.Path() == "/api/media/upload" {
+		p := c.Path()
+		// Allow multipart uploads for media upload and cover upload.
+		if p == "/api/media/upload" || (c.Method() == "PUT" && strings.HasSuffix(p, "/cover")) {
 			return c.Next()
 		}
 		if int64(c.Request().Header.ContentLength()) > maxAPIBodySize {
@@ -232,6 +235,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Get("/:id/stream", mediaHandler.Stream)
 	media.Get("/:id/thumb", thumbHandler.Get)
 	media.Get("/:id/cover", thumbHandler.GetCover)
+	media.Put("/:id/cover", requireAdmin, thumbHandler.UploadCover)
 
 	library := api.Group("/libraries")
 	library.Get("", libraryHandler.List)

@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
@@ -7,10 +8,12 @@ import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
+import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -47,12 +50,15 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
       loaded: (m) => m,
       orElse: () => null,
     );
-    if (media == null) return '$baseUrl/media/${widget.mediaId}/thumb';
+    // Cache-buster: force reload when the cover changes on the server.
+    final cacheBuster = media?.updatedAt?.millisecondsSinceEpoch;
+    final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
+    if (media == null) return '$baseUrl/media/${widget.mediaId}/thumb$buster';
     // Use embedded cover if available, thumbnail otherwise
     if (media.coverUrl != null && media.coverUrl!.isNotEmpty) {
-      return '$baseUrl/media/${media.id}/cover';
+      return '$baseUrl/media/${media.id}/cover$buster';
     }
-    return '$baseUrl/media/${media.id}/thumb';
+    return '$baseUrl/media/${media.id}/thumb$buster';
   }
 
   bool _hasCover() {
@@ -79,6 +85,50 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
 
   Future<void> _addToCollection() async {
     await showAddToCollectionDialog(context, ref, widget.mediaId);
+  }
+
+  Future<void> _changeCover() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.path == null) return;
+
+    final l = AppLocalizations.of(context)!;
+    final uploadCover = ref.read(uploadCoverProvider);
+
+    final r = await uploadCover(
+      UploadCoverParams(mediaId: widget.mediaId, filePath: file.path!),
+    );
+
+    if (!mounted) return;
+
+    r.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l.failedToAdd(failure.message)}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.uploadSuccess),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Reload the media detail to refresh the cover.
+        ref.read(mediaDetailProvider(widget.mediaId).notifier).load(widget.mediaId);
+        // Refresh media lists so cards show the new cover.
+        ref.invalidate(mediaListProvider('video'));
+        ref.invalidate(mediaListProvider('audio'));
+      },
+    );
   }
 
   Future<void> _download() async {
@@ -372,15 +422,29 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
             Positioned(
               top: 8,
               right: 8,
-              child: CircleAvatar(
-                backgroundColor: Colors.black54,
-                child: IconButton(
-                  color: Colors.white,
-                  icon: const Icon(Icons.edit),
-                  onPressed: () =>
-                      showEditMetadataDialog(context, ref, media),
-                  tooltip: l.edit,
-                ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    child: IconButton(
+                      color: Colors.white,
+                      icon: const Icon(Icons.image),
+                      onPressed: _changeCover,
+                      tooltip: l.changeCover,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    child: IconButton(
+                      color: Colors.white,
+                      icon: const Icon(Icons.edit),
+                      onPressed: () =>
+                          showEditMetadataDialog(context, ref, media),
+                      tooltip: l.edit,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

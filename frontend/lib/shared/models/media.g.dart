@@ -25,6 +25,9 @@ _$MediaImpl _$$MediaImplFromJson(Map<String, dynamic> json) => _$MediaImpl(
           ? null
           : Metadata.fromJson(json['metadata'] as Map<String, dynamic>),
       fileHash: json['file_hash'] as String? ?? '',
+      updatedAt: json['updated_at'] == null
+          ? null
+          : DateTime.parse(json['updated_at'] as String),
     );
 
 Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
@@ -45,4 +48,5 @@ Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
       'genre': instance.genre,
       'metadata': instance.metadata,
       'file_hash': instance.fileHash,
+      'updated_at': instance.updatedAt?.toIso8601String(),
     };

@@ -306,5 +306,11 @@
   "checkingAuthentication": "Checking authentication...",
   "@checkingAuthentication": {},
   "useFilename": "From filename",
-  "@useFilename": {}
+  "@useFilename": {},
+  "fileAlreadyExists": "File already exists on server",
+  "@fileAlreadyExists": {},
+  "uploadSuccess": "Upload successful",
+  "@uploadSuccess": {},
+  "changeCover": "Change cover",
+  "@changeCover": {}
 }

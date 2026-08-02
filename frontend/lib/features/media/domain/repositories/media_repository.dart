@@ -38,4 +38,6 @@ abstract class MediaRepository {
     int? duration,
     bool? completed,
   });
+
+  Future<Either<Failure, void>> uploadCover(int mediaId, String filePath);
 }

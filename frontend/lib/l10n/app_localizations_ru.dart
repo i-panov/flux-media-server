@@ -405,4 +405,13 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get useFilename => 'Из имени файла';
+
+  @override
+  String get fileAlreadyExists => 'Файл уже есть на сервере';
+
+  @override
+  String get uploadSuccess => 'Загрузка завершена';
+
+  @override
+  String get changeCover => 'Заменить обложку';
 }

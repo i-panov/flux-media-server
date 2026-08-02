@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -12,7 +13,11 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 /// Mini-player bar shown above the bottom navigation bar during audio playback.
 class AudioMiniPlayer extends ConsumerStatefulWidget {
-  const AudioMiniPlayer({super.key});
+  const AudioMiniPlayer({super.key, this.disableTap = false});
+
+  /// When true, tapping the mini-player does not navigate to the full
+  /// player screen (used when already displayed inside the player screen).
+  final bool disableTap;
 
   @override
   ConsumerState<AudioMiniPlayer> createState() => _AudioMiniPlayerState();
@@ -83,7 +88,9 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: InkWell(
-            onTap: () => context.router.push(AudioPlayerRoute(media: media)),
+            onTap: widget.disableTap
+                ? null
+                : () => context.router.push(AudioPlayerRoute(media: media)),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -100,22 +107,34 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     },
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(6),
-                      child: AuthNetworkImage(
-                        imageUrl: '$baseUrl/media/${media.id}/thumb',
+                      child: SizedBox(
                         width: 36,
                         height: 36,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Icon(Icons.music_note,
-                              color: Theme.of(context).colorScheme.primary,
-                              size: 20),
-                        ),
+                        child: () {
+                          final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
+                          if (!hasCover) {
+                            return const Center(child: AudioPlaceholder(size: 28));
+                          }
+                          final cacheBuster = media.updatedAt?.millisecondsSinceEpoch;
+                          final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
+                          return AuthNetworkImage(
+                            imageUrl: '$baseUrl/media/${media.id}/cover$buster',
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Icon(Icons.music_note,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 20),
+                            ),
+                          );
+                        }(),
                       ),
                     ),
                   ),
@@ -158,7 +177,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   ),
                   // Volume slider
                   SizedBox(
-                    width: 80,
+                    width: 140,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -199,6 +218,9 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     tooltip: l.close,
                     onPressed: () {
                       ref.read(playbackCoordinatorProvider.notifier).stop();
+                      if (widget.disableTap) {
+                        Navigator.of(context).maybePop();
+                      }
                     },
                     iconSize: 20,
                     padding: EdgeInsets.zero,

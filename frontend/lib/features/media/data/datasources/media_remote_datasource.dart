@@ -117,4 +117,12 @@ class MediaRemoteDataSource {
     checkResponse(response, 'Failed to update progress');
     return WatchProgress.fromJson(response.body!);
   }
+
+  /// Uploads a cover image for a media item.
+  Future<void> uploadCover(int mediaId, String filePath) async {
+    final cover = await MultipartFile.fromPath('cover', filePath);
+    final Response<Map<String, dynamic>> response =
+        await apiClient.uploadCover(mediaId, cover);
+    checkResponse(response, 'Failed to upload cover');
+  }
 }

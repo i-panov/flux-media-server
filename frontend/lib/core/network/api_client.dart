@@ -103,6 +103,13 @@ abstract class ApiClient extends ChopperService {
   @Get(path: '/media/{id}/thumb')
   Future<Response<Uint8List>> getThumbnail(@Path('id') int id);
 
+  @Put(path: '/media/{id}/cover')
+  @multipart
+  Future<Response<Map<String, dynamic>>> uploadCover(
+    @Path('id') int id,
+    @PartFile('cover') MultipartFile cover,
+  );
+
   // Libraries
   @Get(path: '/libraries')
   Future<Response<List<dynamic>>> getLibraries();
