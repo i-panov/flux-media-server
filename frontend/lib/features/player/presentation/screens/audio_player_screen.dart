@@ -317,7 +317,7 @@ class _PlayerControlsState extends ConsumerState<_PlayerControls> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return playbackState.maybeWhen(
-      playing: (m, type, isPaused, position, duration) {
+      playing: (m, type, isPaused, position, duration, speed, savedPosition) {
         if (type != 'audio') return const SizedBox.shrink();
         final sliderValue = position.inSeconds.toDouble().clamp(
           0.0,
@@ -445,8 +445,15 @@ class _PlayerControlsState extends ConsumerState<_PlayerControls> {
   }
 
   String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    final seconds = d.inSeconds.remainder(60);
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:'
+          '${minutes.toString().padLeft(2, '0')}:'
+          '${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
   }
 }

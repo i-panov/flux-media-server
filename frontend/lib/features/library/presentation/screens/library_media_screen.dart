@@ -75,19 +75,19 @@ class _LibraryMediaScreenState extends ConsumerState<LibraryMediaScreen> {
             child: Row(
               children: [
                 ChoiceChip(
-                  label: const Text('All'),
+                  label: Text(l.all),
                   selected: typeFilter == null,
                   onSelected: (_) => ref.read(libraryMediaTypeFilterProvider.notifier).state = null,
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('Video'),
+                  label: Text(l.video),
                   selected: typeFilter == 'video',
                   onSelected: (_) => ref.read(libraryMediaTypeFilterProvider.notifier).state = 'video',
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('Audio'),
+                  label: Text(l.audio),
                   selected: typeFilter == 'audio',
                   onSelected: (_) => ref.read(libraryMediaTypeFilterProvider.notifier).state = 'audio',
                 ),

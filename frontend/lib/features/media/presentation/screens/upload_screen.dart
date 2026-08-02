@@ -126,7 +126,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         );
       } on TimeoutException {
         firstError ??= 'Upload timed out. The file may be too large or the connection is too slow.';
-      } catch (e) {
+      } on Exception catch (e) {
         firstError ??= e.toString();
       }
 
@@ -240,7 +240,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child:             SizedBox(
+            child: SizedBox(
               width: double.infinity,
               child: Tooltip(
                 message: l.selectFiles,

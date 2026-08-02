@@ -4,10 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/utils/platform_detection.dart';
-import 'package:flux_media_server/features/player/presentation/widgets/pip_manager.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 final videoControllerProvider = Provider.autoDispose<VideoController>((ref) {
@@ -32,19 +31,22 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _resumeDialogShown = false;
-  late final PlayerNotifier _playerNotifier;
+  late final PlaybackCoordinator _coordinator;
 
   @override
   void initState() {
     super.initState();
-    _playerNotifier = ref.read(playerProvider.notifier);
+    _coordinator = ref.read(playbackCoordinatorProvider.notifier);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Allow all orientations — video aspect ratio determines the best fit.
     SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playerNotifier.play(widget.media);
+      _coordinator.play(widget.media);
     });
   }
 
@@ -60,14 +62,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              ref.read(playerProvider.notifier).startFromBeginning();
+              _coordinator.startFromBeginning();
             },
             child: Text(l.startFromBeginning),
           ),
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              ref.read(playerProvider.notifier).seekToSavedPosition();
+              _coordinator.seekToSavedPosition();
             },
             child: Text(l.play),
           ),
@@ -78,12 +80,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
-    if (PipManager.isActive) {
-      PipManager.exitPip();
-    }
     // Stop playback (also persists watch progress) when leaving the screen,
     // e.g. via system back button which bypasses the in-app back button.
-    _playerNotifier.stop();
+    _coordinator.stop();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -97,11 +96,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final state = ref.watch(playerProvider);
+    final state = ref.watch(playbackCoordinatorProvider);
     final videoController = ref.watch(videoControllerProvider);
 
     // Show resume dialog once when savedPosition is set.
-    if (state is PlayerNotifierPlaying &&
+    if (state is PlaybackPlaying &&
+        state.type == 'video' &&
         state.savedPosition != null &&
         !_resumeDialogShown) {
       _resumeDialogShown = true;
@@ -118,7 +118,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         initial: () => const Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
-        playing: (media, isPaused, position, duration, speed, savedPosition) {
+        playing: (media, type, isPaused, position, duration, speed, savedPosition) {
+          if (type != 'video') {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            );
+          }
           return Stack(
             children: [
               Positioned.fill(
@@ -152,7 +157,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       tooltip: '-10s',
                       onPressed: () {
                         final newPos = position - const Duration(seconds: 10);
-                        ref.read(playerProvider.notifier).seek(newPos);
+                        _coordinator.seek(newPos);
                       },
                     ),
                     const SizedBox(width: 16),
@@ -161,16 +166,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       tooltip: '+10s',
                       onPressed: () {
                         final newPos = position + const Duration(seconds: 10);
-                        ref.read(playerProvider.notifier).seek(newPos);
+                        _coordinator.seek(newPos);
                       },
                     ),
                     const SizedBox(width: 24),
                     _ControlButton(
                       label: '${speed}x',
-                      tooltip: l.play,
+                      tooltip: l.speed,
                       onPressed: () {
                         final next = speed >= 2.0 ? 0.5 : speed + 0.5;
-                        ref.read(playerProvider.notifier).setSpeed(next);
+                        _coordinator.setSpeed(next);
                       },
                     ),
                   ],
@@ -194,45 +199,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () {
-                      ref.read(playerProvider.notifier).reset();
-                      ref.read(playerProvider.notifier).play(widget.media);
+                      _coordinator.reset();
+                      _coordinator.play(widget.media);
                     },
                     child: Text(l.replay),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 8,
-              left: 8,
-              child: IconButton(
-                color: Colors.white,
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.maybePop(),
-              ),
-            ),
-          ],
-        ),
-        error: (message) => Stack(
-          children: [
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    message,
-                    style: const TextStyle(color: Colors.white),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: () {
-                      ref.read(playerProvider.notifier).reset();
-                      ref.read(playerProvider.notifier).play(widget.media);
-                    },
-                    child: Text(l.retry),
                   ),
                 ],
               ),

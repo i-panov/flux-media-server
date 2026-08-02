@@ -1,6 +1,7 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 abstract class CollectionsRepository {
   Future<Either<Failure, List<Collection>>> getCollections();
@@ -21,4 +22,8 @@ abstract class CollectionsRepository {
   Future<Either<Failure, List<CollectionItem>>> getCollectionItems(
     int collectionId,
   );
+
+  /// Fetches full media items for a collection.
+  /// The API returns media objects directly for collection items.
+  Future<Either<Failure, List<Media>>> getCollectionItemsFull(int collectionId);
 }

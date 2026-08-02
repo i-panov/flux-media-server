@@ -67,8 +67,18 @@ Future<Either<Failure, T>> safeRepositoryCall<T>(
   try {
     return Right(await call());
   } on TokenRefreshedException {
-    // Token was just refreshed — retry with the new token (wrapped in safeApiCall)
-    return safeApiCall(() async => Right(await call()));
+    // Token was just refreshed — retry with the new token.
+    try {
+      return Right(await call());
+    } on AuthException catch (e) {
+      return Left(AuthFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
   } on AuthException catch (e) {
     return Left(AuthFailure(message: e.message));
   } on ServerException catch (e) {

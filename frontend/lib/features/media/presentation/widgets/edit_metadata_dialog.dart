@@ -120,7 +120,7 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
                 controller: _titleController,
                 decoration: InputDecoration(labelText: l.name),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    (v == null || v.trim().isEmpty) ? l.requiredField : null,
               ),
               TextFormField(
                 controller: _artistController,
@@ -141,7 +141,7 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
               ),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description'),
+                decoration: InputDecoration(labelText: l.description),
                 maxLines: 3,
               ),
             ],

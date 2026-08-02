@@ -24,7 +24,7 @@ mixin _$ScanStatus {
   int get libraryId => throw _privateConstructorUsedError;
   bool get running => throw _privateConstructorUsedError;
   @JsonKey(name: 'started_at')
-  String? get startedAt => throw _privateConstructorUsedError;
+  DateTime? get startedAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'last_error')
   String? get lastError => throw _privateConstructorUsedError;
 
@@ -43,7 +43,7 @@ abstract class $ScanStatusCopyWith<$Res> {
   $Res call(
       {@JsonKey(name: 'library_id') int libraryId,
       bool running,
-      @JsonKey(name: 'started_at') String? startedAt,
+      @JsonKey(name: 'started_at') DateTime? startedAt,
       @JsonKey(name: 'last_error') String? lastError});
 }
 
@@ -77,7 +77,7 @@ class _$ScanStatusCopyWithImpl<$Res, $Val extends ScanStatus>
       startedAt: freezed == startedAt
           ? _value.startedAt
           : startedAt // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as DateTime?,
       lastError: freezed == lastError
           ? _value.lastError
           : lastError // ignore: cast_nullable_to_non_nullable
@@ -97,7 +97,7 @@ abstract class _$$ScanStatusImplCopyWith<$Res>
   $Res call(
       {@JsonKey(name: 'library_id') int libraryId,
       bool running,
-      @JsonKey(name: 'started_at') String? startedAt,
+      @JsonKey(name: 'started_at') DateTime? startedAt,
       @JsonKey(name: 'last_error') String? lastError});
 }
 
@@ -129,7 +129,7 @@ class __$$ScanStatusImplCopyWithImpl<$Res>
       startedAt: freezed == startedAt
           ? _value.startedAt
           : startedAt // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as DateTime?,
       lastError: freezed == lastError
           ? _value.lastError
           : lastError // ignore: cast_nullable_to_non_nullable
@@ -157,7 +157,7 @@ class _$ScanStatusImpl implements _ScanStatus {
   final bool running;
   @override
   @JsonKey(name: 'started_at')
-  final String? startedAt;
+  final DateTime? startedAt;
   @override
   @JsonKey(name: 'last_error')
   final String? lastError;
@@ -204,7 +204,7 @@ abstract class _ScanStatus implements ScanStatus {
   const factory _ScanStatus(
       {@JsonKey(name: 'library_id') required final int libraryId,
       required final bool running,
-      @JsonKey(name: 'started_at') final String? startedAt,
+      @JsonKey(name: 'started_at') final DateTime? startedAt,
       @JsonKey(name: 'last_error') final String? lastError}) = _$ScanStatusImpl;
 
   factory _ScanStatus.fromJson(Map<String, dynamic> json) =
@@ -217,7 +217,7 @@ abstract class _ScanStatus implements ScanStatus {
   bool get running;
   @override
   @JsonKey(name: 'started_at')
-  String? get startedAt;
+  DateTime? get startedAt;
   @override
   @JsonKey(name: 'last_error')
   String? get lastError;

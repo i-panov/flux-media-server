@@ -90,7 +90,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,
           orElse: () => Media(
-            id: mediaId, title: '', year: 0, type: 'audio',
+            id: mediaId, title: '', year: null, type: 'audio',
             filePath: '', fileSize: 0, description: null, duration: null,
             thumbnailUrl: null, artist: null, album: null, genre: null, metadata: null,
           ),

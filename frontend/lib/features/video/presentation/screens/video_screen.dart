@@ -176,7 +176,6 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         orElse: () => Media(
           id: p.mediaId,
           title: 'Unknown',
-          year: 0,
           type: 'video',
           filePath: '',
           fileSize: 0,
@@ -416,7 +415,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,
           orElse: () => Media(
-            id: mediaId, title: '', year: 0, type: 'video',
+            id: mediaId, title: '', year: null, type: 'video',
             filePath: '', fileSize: 0, description: null, duration: null,
             thumbnailUrl: null, artist: null, album: null, genre: null, metadata: null,
           ),

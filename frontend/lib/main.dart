@@ -42,19 +42,20 @@ void main() async {
   );
 }
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Checking authentication...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(l?.checkingAuthentication ?? 'Checking authentication...'),
           ],
         ),
       ),

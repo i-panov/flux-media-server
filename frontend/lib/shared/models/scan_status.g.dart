@@ -10,7 +10,9 @@ _$ScanStatusImpl _$$ScanStatusImplFromJson(Map<String, dynamic> json) =>
     _$ScanStatusImpl(
       libraryId: (json['library_id'] as num).toInt(),
       running: json['running'] as bool,
-      startedAt: json['started_at'] as String?,
+      startedAt: json['started_at'] == null
+          ? null
+          : DateTime.parse(json['started_at'] as String),
       lastError: json['last_error'] as String?,
     );
 
@@ -18,6 +20,6 @@ Map<String, dynamic> _$$ScanStatusImplToJson(_$ScanStatusImpl instance) =>
     <String, dynamic>{
       'library_id': instance.libraryId,
       'running': instance.running,
-      'started_at': instance.startedAt,
+      'started_at': instance.startedAt?.toIso8601String(),
       'last_error': instance.lastError,
     };

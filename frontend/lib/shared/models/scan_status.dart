@@ -10,7 +10,7 @@ class ScanStatus with _$ScanStatus {
   const factory ScanStatus({
     @JsonKey(name: 'library_id') required int libraryId,
     required bool running,
-    @JsonKey(name: 'started_at') String? startedAt,
+    @JsonKey(name: 'started_at') DateTime? startedAt,
     @JsonKey(name: 'last_error') String? lastError,
   }) = _ScanStatus;
 

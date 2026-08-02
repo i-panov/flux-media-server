@@ -4,6 +4,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/collections/data/datasources/collections_remote_datasource.dart';
 import 'package:flux_media_server/features/collections/domain/repositories/collections_repository.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 class CollectionsRepositoryImpl implements CollectionsRepository {
   CollectionsRepositoryImpl(this.remoteDataSource);
@@ -48,4 +49,8 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
     int collectionId,
   ) =>
       safeRepositoryCall(() => remoteDataSource.getCollectionItems(collectionId));
+
+  @override
+  Future<Either<Failure, List<Media>>> getCollectionItemsFull(int collectionId) =>
+      safeRepositoryCall(() => remoteDataSource.getCollectionItemsFull(collectionId));
 }

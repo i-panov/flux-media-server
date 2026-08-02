@@ -8,13 +8,17 @@ final downloadsProvider = FutureProvider<List<Media>>((ref) async {
   final mediaRepository = ref.watch(mediaRepositoryProvider);
   final ids = await cacheService.getCachedIds();
   if (ids.isEmpty) return [];
-  final results = <Media>[];
-  for (final id in ids) {
-    final result = await mediaRepository.getMediaDetail(id);
+
+  // Parallel fetch instead of sequential N+1 queries
+  final futures = ids.map((id) => mediaRepository.getMediaDetail(id));
+  final results = await Future.wait(futures);
+
+  final mediaList = <Media>[];
+  for (final result in results) {
     result.fold(
       (_) {},
-      (media) => results.add(media),
+      (media) => mediaList.add(media),
     );
   }
-  return results;
+  return mediaList;
 });

@@ -7,6 +7,7 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// Mini-player bar shown above the bottom navigation bar during audio playback.
@@ -38,8 +39,10 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    // Select only the fields this widget needs so position/duration ticks
-    // don't rebuild the mini-player every second.
+    final l = AppLocalizations.of(context)!;
+    // Watch the full state but only rebuild when the selected fields change.
+    // Position updates every second cause the progress bar and time labels
+    // to update, which is intentional for the mini-player UI.
     final playbackInfo =
         ref.watch(playbackCoordinatorProvider.select((state) {
       return switch (state) {
@@ -141,7 +144,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   ),
                   IconButton(
                     icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
-                    tooltip: isPaused ? 'Play' : 'Pause',
+                    tooltip: isPaused ? l.play : l.pause,
                     onPressed: () {
                       if (isPaused) {
                         ref.read(playbackCoordinatorProvider.notifier).resume();
@@ -193,7 +196,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
-                    tooltip: 'Close',
+                    tooltip: l.close,
                     onPressed: () {
                       ref.read(playbackCoordinatorProvider.notifier).stop();
                     },

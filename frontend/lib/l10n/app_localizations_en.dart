@@ -374,4 +374,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addedToQueue => 'Added to queue';
+
+  @override
+  String get all => 'All';
+
+  @override
+  String get video => 'Video';
+
+  @override
+  String get audio => 'Audio';
+
+  @override
+  String get requiredField => 'Required';
+
+  @override
+  String get description => 'Description';
+
+  @override
+  String get speed => 'Speed';
+
+  @override
+  String get pause => 'Pause';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get checkingAuthentication => 'Checking authentication...';
 }

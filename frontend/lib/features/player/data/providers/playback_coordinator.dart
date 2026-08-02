@@ -8,7 +8,6 @@ import 'package:flux_media_server/features/media/presentation/providers/media_li
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
-import 'package:flux_media_server/features/player/presentation/providers/player_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -23,6 +22,8 @@ class PlaybackState with _$PlaybackState {
     @Default(false) bool isPaused,
     @Default(Duration.zero) Duration position,
     Duration? duration,
+    @Default(1.0) double speed,
+    Duration? savedPosition,
   }) = PlaybackPlaying;
   const factory PlaybackState.completed() = PlaybackCompleted;
 }
@@ -90,7 +91,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
 
     if (media.type == 'audio') {
       // Mutual exclusion: stop video playback before starting audio.
-      await _ref.read(playerProvider.notifier).stop();
       await _videoPlayer.stop();
 
       // Start audio playback
@@ -127,11 +127,21 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       await _videoPlayer.open(url, httpHeaders: headers);
       await _videoPlayer.play();
 
+      // Load saved position for resume dialog (video only).
+      final resumePosition = await _loadSavedPosition(media.id);
+
       state = PlaybackState.playing(
         media: media,
         type: 'video',
         isPaused: false,
+        savedPosition: resumePosition != null && resumePosition > const Duration(seconds: 5)
+            ? resumePosition
+            : null,
       );
+
+      if (resumePosition != null && resumePosition <= const Duration(seconds: 5)) {
+        await _videoPlayer.seek(resumePosition);
+      }
 
       _subscribeToStream(_videoPlayer.positionStream, (pos) {
         if (state is PlaybackPlaying) {
@@ -179,6 +189,23 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   void _subscribeToStream<T>(Stream<T> stream, void Function(T) onNext) {
     final sub = stream.listen(onNext);
     _subscriptions.add(sub);
+  }
+
+  /// Returns the saved watch position for [mediaId], or null if there is
+  /// none (or the media was already completed).
+  Future<Duration?> _loadSavedPosition(int mediaId) async {
+    final result = await _ref.read(mediaRepositoryProvider).getProgress();
+    return result.fold(
+      (_) => null,
+      (progressList) {
+        for (final p in progressList) {
+          if (p.mediaId == mediaId && !p.completed && p.position > 0) {
+            return Duration(seconds: p.position);
+          }
+        }
+        return null;
+      },
+    );
   }
 
   /// Saves watch progress to the backend. Best-effort: errors are logged
@@ -260,6 +287,38 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     }
   }
 
+  /// Sets playback speed (video only).
+  Future<void> setSpeed(double speed) async {
+    if (state is PlaybackPlaying) {
+      final current = state as PlaybackPlaying;
+      if (current.media.type == 'video') {
+        await _videoPlayer.player.setRate(speed);
+        state = current.copyWith(speed: speed);
+      }
+    }
+  }
+
+  /// Seeks to the saved position (from the resume dialog).
+  Future<void> seekToSavedPosition() async {
+    if (state is PlaybackPlaying) {
+      final current = state as PlaybackPlaying;
+      final saved = current.savedPosition;
+      if (saved != null) {
+        await _videoPlayer.seek(saved);
+        state = current.copyWith(savedPosition: null);
+      }
+    }
+  }
+
+  /// Starts playback from the beginning (from the resume dialog).
+  Future<void> startFromBeginning() async {
+    if (state is PlaybackPlaying) {
+      final current = state as PlaybackPlaying;
+      await _videoPlayer.seek(Duration.zero);
+      state = current.copyWith(savedPosition: null);
+    }
+  }
+
   Future<void> setVolume(double volume) async {
     await _audioPlayer.setVolume(volume);
   }
@@ -291,6 +350,14 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
 /// Provider for audio player datasource.
 final audioPlayerDatasourceProvider = Provider<AudioPlayerDatasource>((ref) {
   final ds = AudioPlayerDatasource();
+  ref.onDispose(ds.dispose);
+  return ds;
+});
+
+/// Provider for video player datasource.
+final videoPlayerDatasourceProvider =
+    Provider.autoDispose<VideoPlayerDatasource>((ref) {
+  final ds = VideoPlayerDatasource();
   ref.onDispose(ds.dispose);
   return ds;
 });

@@ -5,6 +5,10 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 
+// Version is read from pubspec.yaml via package_info_plus in production.
+// For now, keep it as a single source of truth here.
+const String appVersion = '1.0.0';
+
 @RoutePage()
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -33,8 +37,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _serverUrlController.text = url;
       }
     });
-
-    _serverUrlController.text = settingsState.settings.serverUrl ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -173,7 +175,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('${l.version}: 1.0.0'),
+              child: Text('${l.version}: $appVersion'),
             ),
           ),
         ],

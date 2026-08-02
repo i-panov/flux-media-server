@@ -22,7 +22,7 @@ Media _$MediaFromJson(Map<String, dynamic> json) {
 mixin _$Media {
   int get id => throw _privateConstructorUsedError;
   String get title => throw _privateConstructorUsedError;
-  int get year => throw _privateConstructorUsedError;
+  int? get year => throw _privateConstructorUsedError;
   String get type => throw _privateConstructorUsedError;
   @JsonKey(name: 'file_path')
   String get filePath => throw _privateConstructorUsedError;
@@ -52,7 +52,7 @@ abstract class $MediaCopyWith<$Res> {
   $Res call(
       {int id,
       String title,
-      int year,
+      int? year,
       String type,
       @JsonKey(name: 'file_path') String filePath,
       @JsonKey(name: 'file_size') int fileSize,
@@ -83,7 +83,7 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
   $Res call({
     Object? id = null,
     Object? title = null,
-    Object? year = null,
+    Object? year = freezed,
     Object? type = null,
     Object? filePath = null,
     Object? fileSize = null,
@@ -105,10 +105,10 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
           ? _value.title
           : title // ignore: cast_nullable_to_non_nullable
               as String,
-      year: null == year
+      year: freezed == year
           ? _value.year
           : year // ignore: cast_nullable_to_non_nullable
-              as int,
+              as int?,
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
@@ -179,7 +179,7 @@ abstract class _$$MediaImplCopyWith<$Res> implements $MediaCopyWith<$Res> {
   $Res call(
       {int id,
       String title,
-      int year,
+      int? year,
       String type,
       @JsonKey(name: 'file_path') String filePath,
       @JsonKey(name: 'file_size') int fileSize,
@@ -209,7 +209,7 @@ class __$$MediaImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? title = null,
-    Object? year = null,
+    Object? year = freezed,
     Object? type = null,
     Object? filePath = null,
     Object? fileSize = null,
@@ -231,10 +231,10 @@ class __$$MediaImplCopyWithImpl<$Res>
           ? _value.title
           : title // ignore: cast_nullable_to_non_nullable
               as String,
-      year: null == year
+      year: freezed == year
           ? _value.year
           : year // ignore: cast_nullable_to_non_nullable
-              as int,
+              as int?,
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
@@ -289,7 +289,7 @@ class _$MediaImpl implements _Media {
   const _$MediaImpl(
       {required this.id,
       required this.title,
-      required this.year,
+      this.year,
       required this.type,
       @JsonKey(name: 'file_path') this.filePath = '',
       @JsonKey(name: 'file_size') required this.fileSize,
@@ -310,7 +310,7 @@ class _$MediaImpl implements _Media {
   @override
   final String title;
   @override
-  final int year;
+  final int? year;
   @override
   final String type;
   @override
@@ -408,7 +408,7 @@ abstract class _Media implements Media {
   const factory _Media(
       {required final int id,
       required final String title,
-      required final int year,
+      final int? year,
       required final String type,
       @JsonKey(name: 'file_path') final String filePath,
       @JsonKey(name: 'file_size') required final int fileSize,
@@ -428,7 +428,7 @@ abstract class _Media implements Media {
   @override
   String get title;
   @override
-  int get year;
+  int? get year;
   @override
   String get type;
   @override

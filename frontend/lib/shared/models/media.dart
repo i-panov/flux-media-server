@@ -11,7 +11,7 @@ class Media with _$Media {
   const factory Media({
     required int id,
     required String title,
-    required int year,
+    int? year,
     required String type,
     @JsonKey(name: 'file_path') @Default('') String filePath,
     @JsonKey(name: 'file_size') required int fileSize,

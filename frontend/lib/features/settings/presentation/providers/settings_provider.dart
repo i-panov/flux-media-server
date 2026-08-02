@@ -88,7 +88,5 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  final notifier = SettingsNotifier(ref.watch(settingsRepositoryProvider));
-  notifier.init();
-  return notifier;
+  return SettingsNotifier(ref.watch(settingsRepositoryProvider));
 });

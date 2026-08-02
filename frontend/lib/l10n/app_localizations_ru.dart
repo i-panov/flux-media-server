@@ -375,4 +375,31 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get addedToQueue => 'Добавлено в очередь';
+
+  @override
+  String get all => 'Все';
+
+  @override
+  String get video => 'Видео';
+
+  @override
+  String get audio => 'Аудио';
+
+  @override
+  String get requiredField => 'Обязательное поле';
+
+  @override
+  String get description => 'Описание';
+
+  @override
+  String get speed => 'Скорость';
+
+  @override
+  String get pause => 'Пауза';
+
+  @override
+  String get close => 'Закрыть';
+
+  @override
+  String get checkingAuthentication => 'Проверка авторизации...';
 }

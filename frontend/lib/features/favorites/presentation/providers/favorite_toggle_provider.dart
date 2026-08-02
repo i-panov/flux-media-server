@@ -30,8 +30,6 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
           (_) {
             _ref.invalidate(favoritesProvider(null));
             _ref.invalidate(favoritesProvider(type));
-            _ref.invalidate(favoritesProvider('video'));
-            _ref.invalidate(favoritesProvider('audio'));
           },
         );
       } else {
@@ -43,8 +41,6 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
           (_) {
             _ref.invalidate(favoritesProvider(null));
             _ref.invalidate(favoritesProvider(type));
-            _ref.invalidate(favoritesProvider('video'));
-            _ref.invalidate(favoritesProvider('audio'));
           },
         );
       }
@@ -57,7 +53,9 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
 }
 
 /// Provider for toggling favorite status of a specific media item.
+/// autoDispose: prevents memory leaks when navigating away from screens
+/// that use favorite toggles (e.g., infinite scroll grids).
 final favoriteToggleProvider =
-    StateNotifierProvider.family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
+    StateNotifierProvider.autoDispose.family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
   (ref, mediaId) => FavoriteToggleNotifier(ref),
 );
