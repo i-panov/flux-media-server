@@ -240,6 +240,11 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 				existing.ThumbnailURL = thumbPath
 			}
 
+			// Extract embedded cover art (if file has one).
+			if coverPath := s.thumbService.ExtractCover(existing.ID, path); coverPath != "" {
+				existing.CoverURL = coverPath
+			}
+
 			if err := s.mediaRepo.Update(ctx, existing); err != nil {
 				log.Printf("Error updating changed file %s: %v", path, err)
 			} else {
@@ -337,6 +342,14 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 			media.ThumbnailURL = thumbPath
 			if err := s.mediaRepo.Update(ctx, media); err != nil {
 				log.Printf("Error updating media thumbnail for %s: %v", path, err)
+			}
+		}
+
+		// Extract embedded cover art (if file has one).
+		if coverPath := s.thumbService.ExtractCover(media.ID, path); coverPath != "" {
+			media.CoverURL = coverPath
+			if err := s.mediaRepo.Update(ctx, media); err != nil {
+				log.Printf("Error updating media cover for %s: %v", path, err)
 			}
 		}
 

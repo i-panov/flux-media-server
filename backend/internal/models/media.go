@@ -23,6 +23,7 @@ type Media struct {
 	FileHash     string         `gorm:"index" json:"file_hash"`
 	QuickHash    string         `gorm:"index" json:"quick_hash"`
 	ThumbnailURL string         `json:"thumbnail_url"`
+	CoverURL     string         `json:"cover_url"`
 	MetadataID   *uint          `json:"metadata_id,omitempty"`
 	Metadata     *Metadata      `json:"metadata,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`

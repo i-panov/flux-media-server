@@ -52,3 +52,34 @@ func (h *ThumbHandler) Get(c *fiber.Ctx) error {
 
 	return c.SendFile(thumbPath)
 }
+
+// GetCover returns the embedded cover art for a media item (audio only).
+func (h *ThumbHandler) GetCover(c *fiber.Ctx) error {
+	mediaID, err := c.ParamsInt("id")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
+	}
+
+	ctx := c.UserContext()
+	media, err := h.mediaRepo.FindByID(ctx, uint(mediaID))
+	if err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Media not found")
+	}
+
+	// Check if cover URL is set.
+	if media.CoverURL == "" {
+		return response.Error(c, fiber.StatusNotFound, "Cover not available")
+	}
+
+	// Determine content type from extension.
+	ext := filepath.Ext(media.CoverURL)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+
+	c.Set("Content-Type", contentType)
+	c.Set("Cache-Control", "public, max-age=86400")
+
+	return c.SendFile(media.CoverURL)
+}

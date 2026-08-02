@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,15 +8,16 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
-import 'package:flux_media_server/core/utils/platform_detection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 final videoControllerProvider = Provider.autoDispose<VideoController>((ref) {
   final datasource = ref.watch(videoPlayerDatasourceProvider);
+  // Disable hardware acceleration on Linux — GPU rendering is unreliable
+  // without CUDA/proprietary drivers (causes blue screen).
   return VideoController(
     datasource.player,
     configuration: VideoControllerConfiguration(
-      enableHardwareAcceleration: !isRunningInWSL,
+      enableHardwareAcceleration: !Platform.isLinux,
     ),
   );
 });

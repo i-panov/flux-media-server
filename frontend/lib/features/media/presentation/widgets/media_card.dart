@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -26,8 +27,29 @@ class MediaCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final baseUrl = ref.watch(baseUrlProvider);
-    final thumbnailUrl = '$baseUrl/media/${media.id}/thumb';
     final colorScheme = Theme.of(context).colorScheme;
+    final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
+    final imageUrl = hasCover
+        ? '$baseUrl/media/${media.id}/cover'
+        : '$baseUrl/media/${media.id}/thumb';
+
+    Widget imageWidget = AuthNetworkImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => const Center(
+        child: SkeletonWidget(width: double.infinity, height: double.infinity),
+      ),
+      errorWidget: (_, __, ___) => const Center(
+        child: Icon(Icons.broken_image, size: 48),
+      ),
+    );
+
+    // For files without cover, show programmatic placeholder for audio.
+    if (!hasCover && media.type == 'audio') {
+      imageWidget = const Center(
+        child: AudioPlaceholder(size: 120),
+      );
+    }
 
     return RepaintBoundary(
       child: Card(
@@ -40,16 +62,7 @@ class MediaCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: AuthNetworkImage(
-                      imageUrl: thumbnailUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => const Center(
-                        child: SkeletonWidget(width: double.infinity, height: double.infinity),
-                      ),
-                      errorWidget: (_, __, ___) => const Center(
-                        child: Icon(Icons.broken_image, size: 48),
-                      ),
-                    ),
+                    child: imageWidget,
                   ),
                   Padding(
                     padding: const EdgeInsets.all(8),

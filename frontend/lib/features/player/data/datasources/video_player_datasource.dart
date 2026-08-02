@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 /// Data source wrapping media_kit's [Player] for video playback.
 class VideoPlayerDatasource {

@@ -208,6 +208,14 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 		}
 	}
 
+	// Extract embedded cover art (if file has one).
+	if coverPath := h.thumbSvc.ExtractCover(media.ID, filePath); coverPath != "" {
+		media.CoverURL = coverPath
+		if err := h.mediaRepo.Update(ctx, media); err != nil {
+			log.Printf("upload: update media cover: %v", err)
+		}
+	}
+
 	return media, nil
 }
 

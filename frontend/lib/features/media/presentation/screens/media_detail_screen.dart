@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
@@ -40,9 +41,26 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     }
   }
 
-  String _thumbnailUrl() {
+  String _imageUrl() {
     final baseUrl = ref.read(baseUrlProvider);
-    return '$baseUrl/media/${widget.mediaId}/thumb';
+    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
+      loaded: (m) => m,
+      orElse: () => null,
+    );
+    if (media == null) return '$baseUrl/media/${widget.mediaId}/thumb';
+    // Use embedded cover if available, thumbnail otherwise
+    if (media.coverUrl != null && media.coverUrl!.isNotEmpty) {
+      return '$baseUrl/media/${media.id}/cover';
+    }
+    return '$baseUrl/media/${media.id}/thumb';
+  }
+
+  bool _hasCover() {
+    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
+      loaded: (m) => m,
+      orElse: () => null,
+    );
+    return media != null && media.coverUrl != null && media.coverUrl!.isNotEmpty;
   }
 
   Future<void> _toggleFavorite() async {
@@ -108,24 +126,29 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         loaded: (media) => Stack(
           children: [
-            // Backdrop image
-            Hero(
-              tag: 'media-thumb-${media.id}',
-              child: AuthNetworkImage(
-                imageUrl: _thumbnailUrl(),
-                fit: BoxFit.cover,
-                height: 300,
-                width: double.infinity,
-                placeholder: (_, __) => const SizedBox(
+            // Backdrop image / placeholder
+            if (_hasCover())
+              Hero(
+                tag: 'media-thumb-${media.id}',
+                child: AuthNetworkImage(
+                  imageUrl: _imageUrl(),
+                  fit: BoxFit.cover,
                   height: 300,
-                  child: Center(child: CircularProgressIndicator()),
+                  width: double.infinity,
+                  placeholder: (_, __) => const SizedBox(
+                    height: 300,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox(
+                    height: 300,
+                    child: Center(child: Icon(Icons.broken_image, size: 64)),
+                  ),
                 ),
-                errorWidget: (_, __, ___) => const SizedBox(
-                  height: 300,
-                  child: Center(child: Icon(Icons.broken_image, size: 64)),
-                ),
+              )
+            else if (media.type == 'audio')
+              const Center(
+                child: AudioPlaceholder(size: 200),
               ),
-            ),
             // Gradient overlay
             Positioned(
               top: 0,

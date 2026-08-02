@@ -34,6 +34,8 @@ mixin _$Media {
   int? get duration => throw _privateConstructorUsedError;
   @JsonKey(name: 'thumbnail_url')
   String? get thumbnailUrl => throw _privateConstructorUsedError;
+  @JsonKey(name: 'cover_url')
+  String? get coverUrl => throw _privateConstructorUsedError;
   String? get artist => throw _privateConstructorUsedError;
   String? get album => throw _privateConstructorUsedError;
   String? get genre => throw _privateConstructorUsedError;
@@ -62,6 +64,7 @@ abstract class $MediaCopyWith<$Res> {
       String? description,
       int? duration,
       @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
+      @JsonKey(name: 'cover_url') String? coverUrl,
       String? artist,
       String? album,
       String? genre,
@@ -94,6 +97,7 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
     Object? description = freezed,
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
+    Object? coverUrl = freezed,
     Object? artist = freezed,
     Object? album = freezed,
     Object? genre = freezed,
@@ -140,6 +144,10 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
       thumbnailUrl: freezed == thumbnailUrl
           ? _value.thumbnailUrl
           : thumbnailUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      coverUrl: freezed == coverUrl
+          ? _value.coverUrl
+          : coverUrl // ignore: cast_nullable_to_non_nullable
               as String?,
       artist: freezed == artist
           ? _value.artist
@@ -195,6 +203,7 @@ abstract class _$$MediaImplCopyWith<$Res> implements $MediaCopyWith<$Res> {
       String? description,
       int? duration,
       @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
+      @JsonKey(name: 'cover_url') String? coverUrl,
       String? artist,
       String? album,
       String? genre,
@@ -226,6 +235,7 @@ class __$$MediaImplCopyWithImpl<$Res>
     Object? description = freezed,
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
+    Object? coverUrl = freezed,
     Object? artist = freezed,
     Object? album = freezed,
     Object? genre = freezed,
@@ -273,6 +283,10 @@ class __$$MediaImplCopyWithImpl<$Res>
           ? _value.thumbnailUrl
           : thumbnailUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      coverUrl: freezed == coverUrl
+          ? _value.coverUrl
+          : coverUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
       artist: freezed == artist
           ? _value.artist
           : artist // ignore: cast_nullable_to_non_nullable
@@ -311,6 +325,7 @@ class _$MediaImpl implements _Media {
       this.description,
       this.duration,
       @JsonKey(name: 'thumbnail_url') this.thumbnailUrl,
+      @JsonKey(name: 'cover_url') this.coverUrl,
       this.artist,
       this.album,
       this.genre,
@@ -345,6 +360,9 @@ class _$MediaImpl implements _Media {
   @JsonKey(name: 'thumbnail_url')
   final String? thumbnailUrl;
   @override
+  @JsonKey(name: 'cover_url')
+  final String? coverUrl;
+  @override
   final String? artist;
   @override
   final String? album;
@@ -358,7 +376,7 @@ class _$MediaImpl implements _Media {
 
   @override
   String toString() {
-    return 'Media(id: $id, title: $title, filename: $filename, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, artist: $artist, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash)';
+    return 'Media(id: $id, title: $title, filename: $filename, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artist: $artist, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash)';
   }
 
   @override
@@ -382,6 +400,8 @@ class _$MediaImpl implements _Media {
                 other.duration == duration) &&
             (identical(other.thumbnailUrl, thumbnailUrl) ||
                 other.thumbnailUrl == thumbnailUrl) &&
+            (identical(other.coverUrl, coverUrl) ||
+                other.coverUrl == coverUrl) &&
             (identical(other.artist, artist) || other.artist == artist) &&
             (identical(other.album, album) || other.album == album) &&
             (identical(other.genre, genre) || other.genre == genre) &&
@@ -405,6 +425,7 @@ class _$MediaImpl implements _Media {
       description,
       duration,
       thumbnailUrl,
+      coverUrl,
       artist,
       album,
       genre,
@@ -437,6 +458,7 @@ abstract class _Media implements Media {
       final String? description,
       final int? duration,
       @JsonKey(name: 'thumbnail_url') final String? thumbnailUrl,
+      @JsonKey(name: 'cover_url') final String? coverUrl,
       final String? artist,
       final String? album,
       final String? genre,
@@ -469,6 +491,9 @@ abstract class _Media implements Media {
   @override
   @JsonKey(name: 'thumbnail_url')
   String? get thumbnailUrl;
+  @override
+  @JsonKey(name: 'cover_url')
+  String? get coverUrl;
   @override
   String? get artist;
   @override

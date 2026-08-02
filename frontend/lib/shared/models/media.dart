@@ -19,6 +19,7 @@ class Media with _$Media {
     String? description,
     int? duration,
     @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
+    @JsonKey(name: 'cover_url') String? coverUrl,
     String? artist,
     String? album,
     String? genre,

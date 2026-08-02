@@ -231,6 +231,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)
 	media.Get("/:id/thumb", thumbHandler.Get)
+	media.Get("/:id/cover", thumbHandler.GetCover)
 
 	library := api.Group("/libraries")
 	library.Get("", libraryHandler.List)
