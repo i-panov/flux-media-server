@@ -402,4 +402,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get checkingAuthentication => 'Проверка авторизации...';
+
+  @override
+  String get useFilename => 'Из имени файла';
 }

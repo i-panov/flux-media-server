@@ -9,6 +9,7 @@ part of 'media.dart';
 _$MediaImpl _$$MediaImplFromJson(Map<String, dynamic> json) => _$MediaImpl(
       id: (json['id'] as num).toInt(),
       title: json['title'] as String,
+      filename: json['filename'] as String? ?? '',
       year: (json['year'] as num?)?.toInt(),
       type: json['type'] as String,
       filePath: json['file_path'] as String? ?? '',
@@ -29,6 +30,7 @@ Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'title': instance.title,
+      'filename': instance.filename,
       'year': instance.year,
       'type': instance.type,
       'file_path': instance.filePath,

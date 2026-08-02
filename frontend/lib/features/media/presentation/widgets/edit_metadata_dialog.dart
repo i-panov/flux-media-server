@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/utils/filename_parser.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -59,6 +60,8 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
   late final TextEditingController _descriptionController;
   final _formKey = GlobalKey<FormState>();
 
+  String? _originalFilename;
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +72,23 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
     _yearController = TextEditingController(text: widget.media.year.toString());
     _descriptionController =
         TextEditingController(text: widget.media.description ?? '');
+    _originalFilename = widget.media.filename.isNotEmpty
+        ? widget.media.filename
+        : null;
+  }
+
+  /// Parse the original filename to extract title and year, then fill
+  /// the title and year fields (non-destructive).
+  void _fillFromFilename() {
+    if (_originalFilename == null) return;
+    final parsed = FilenameParser.parse(_originalFilename!);
+    if (parsed.title.isNotEmpty) {
+      _titleController.text = parsed.title;
+    }
+    if (parsed.year != null) {
+      _yearController.text = parsed.year.toString();
+    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -144,6 +164,40 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
                 decoration: InputDecoration(labelText: l.description),
                 maxLines: 3,
               ),
+
+              // Original filename section (only shown if available).
+              if (_originalFilename != null) ...[
+                const SizedBox(height: 12),
+                Divider(height: 1),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.insert_drive_file, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _originalFilename!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _fillFromFilename,
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: Text(l.useFilename),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

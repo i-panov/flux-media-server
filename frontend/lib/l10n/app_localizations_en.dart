@@ -401,4 +401,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkingAuthentication => 'Checking authentication...';
+
+  @override
+  String get useFilename => 'From filename';
 }

@@ -254,5 +254,7 @@
   "close": "Закрыть",
   "@close": {},
   "checkingAuthentication": "Проверка авторизации...",
-  "@checkingAuthentication": {}
+  "@checkingAuthentication": {},
+  "useFilename": "Из имени файла",
+  "@useFilename": {}
 }

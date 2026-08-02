@@ -213,6 +213,7 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 
 			title, year := metadata.ParseFilename(filepath.Base(path))
 			existing.Title = title
+			existing.Filename = filepath.Base(path)
 			existing.Year = year
 			existing.FileSize = info.Size()
 			existing.FileHash = fullHash
@@ -285,6 +286,7 @@ func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.Me
 
 		media := &models.Media{
 			Title:     title,
+			Filename:  filepath.Base(path),
 			Year:      year,
 			Type:      mediaType,
 			FilePath:  path,

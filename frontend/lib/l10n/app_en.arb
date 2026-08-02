@@ -304,5 +304,7 @@
   "close": "Close",
   "@close": {},
   "checkingAuthentication": "Checking authentication...",
-  "@checkingAuthentication": {}
+  "@checkingAuthentication": {},
+  "useFilename": "From filename",
+  "@useFilename": {}
 }

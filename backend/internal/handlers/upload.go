@@ -152,10 +152,10 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 		return nil, fiber.NewError(fiber.StatusConflict, "Duplicate file")
 	}
 
-	// Parse filename.
+	// Parse filename for metadata
 	title, year := metadata.ParseFilenameUpload(filename)
 
-	// Determine media type.
+	// Determine media type
 	mediaType := services.DetermineMediaType(filePath)
 
 	info, _ := os.Stat(filePath)
@@ -166,6 +166,7 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 
 	media := &models.Media{
 		Title:    title,
+		Filename: filename,
 		Year:     year,
 		Type:     mediaType,
 		FilePath: filePath,

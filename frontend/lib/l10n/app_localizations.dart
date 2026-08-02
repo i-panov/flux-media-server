@@ -829,6 +829,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Checking authentication...'**
   String get checkingAuthentication;
+
+  /// No description provided for @useFilename.
+  ///
+  /// In en, this message translates to:
+  /// **'From filename'**
+  String get useFilename;
 }
 
 class _AppLocalizationsDelegate
