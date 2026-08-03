@@ -76,11 +76,13 @@ func New(cfg *config.Config, version string) (*App, error) {
 	)
 
 	smtpClient := email.NewSMTPClient(email.SMTPConfig{
-		Host:     cfg.Auth.SMTP.Host,
-		Port:     cfg.Auth.SMTP.Port,
-		Username: cfg.Auth.SMTP.Username,
-		Password: cfg.Auth.SMTP.Password,
-		From:     cfg.Auth.SMTP.From,
+		Host:        cfg.Auth.SMTP.Host,
+		Port:        cfg.Auth.SMTP.Port,
+		Username:    cfg.Auth.SMTP.Username,
+		Password:    cfg.Auth.SMTP.Password,
+		From:        cfg.Auth.SMTP.From,
+		RequireTLS:  cfg.Auth.SMTP.RequireTLS,
+		ImplicitTLS: cfg.Auth.SMTP.ImplicitTLS,
 	})
 
 	scanner := services.NewScannerService(libraryRepo, mediaRepo, cfg)
@@ -321,14 +323,15 @@ func New(cfg *config.Config, version string) (*App, error) {
 	}, nil
 }
 
-// Listen starts the HTTP server on the configured port.
+// Listen starts the HTTP server on the configured host and port.
 func (a *App) Listen() error {
+	host := a.Config.Server.Host
 	port := a.Config.Server.Port
 	if port == 0 {
 		port = 8080
 	}
-	log.Printf("Flux Media Server %s starting on port %d", a.Version, port)
-	return a.Fiber.Listen(fmt.Sprintf(":%d", port))
+	log.Printf("Flux Media Server %s starting on %s:%d", a.Version, host, port)
+	return a.Fiber.Listen(fmt.Sprintf("%s:%d", host, port))
 }
 
 // getClientIP extracts the real client IP from proxy headers, falling back

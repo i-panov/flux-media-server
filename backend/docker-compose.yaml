@@ -1,0 +1,15 @@
+services:
+  flux-server:
+    build: .
+    container_name: flux-media-server
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8095}:8095"
+    volumes:
+      - ${MEDIA_PATH}:/mnt/media/Flux:rw
+      - ./configs/config.yaml:/app/configs/config.yaml:ro
+    environment:
+      - CONFIG_PATH=/app/configs/config.yaml
+    # Note: the server binds server.host from config.yaml. For container use
+    # it must be "0.0.0.0" (publishing the port above only reaches a process
+    # bound to all interfaces inside the container).

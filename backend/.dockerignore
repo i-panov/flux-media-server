@@ -3,3 +3,4 @@ data/
 flux-server
 .git
 .gitignore
+configs/config.yaml

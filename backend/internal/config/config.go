@@ -41,12 +41,13 @@ type AuthConfig struct {
 }
 
 type SMTPConfig struct {
-	Host       string `yaml:"host"`
-	Port       int    `yaml:"port"`
-	Username   string `yaml:"username"`
-	Password   string `yaml:"password"`
-	From       string `yaml:"from"`
-	RequireTLS bool   `yaml:"require_tls"`
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	Username    string `yaml:"username"`
+	Password    string `yaml:"password"`
+	From        string `yaml:"from"`
+	RequireTLS  bool   `yaml:"require_tls"`
+	ImplicitTLS bool   `yaml:"implicit_tls"`
 }
 
 type ScannerConfig struct {

@@ -16,12 +16,13 @@ import (
 const smtpTimeout = 15 * time.Second
 
 type SMTPConfig struct {
-	Host       string
-	Port       int
-	Username   string
-	Password   string
-	From       string
-	RequireTLS bool
+	Host        string
+	Port        int
+	Username    string
+	Password    string
+	From        string
+	RequireTLS  bool
+	ImplicitTLS bool
 }
 
 type SMTPClient struct {
@@ -65,17 +66,35 @@ func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
 		fromAddr = c.config.Username
 	}
 
-	return sendMailWithTimeout(addr, auth, fromAddr, []string{to}, []byte(msg), c.config.RequireTLS)
+	return sendMailWithTimeout(c.config, addr, auth, fromAddr, []string{to}, []byte(msg))
 }
 
 // sendMailWithTimeout is smtp.SendMail with a connection-level deadline.
-func sendMailWithTimeout(addr string, auth smtp.Auth, from string, to []string, msg []byte, requireTLS bool) error {
+// With ImplicitTLS set (SMTPS, e.g. port 465) TLS is established immediately
+// after the TCP connect; otherwise the connection starts in plaintext and is
+// upgraded via STARTTLS when the server advertises it.
+func sendMailWithTimeout(cfg SMTPConfig, addr string, auth smtp.Auth, from string, to []string, msg []byte) error {
 	conn, err := net.DialTimeout("tcp", addr, smtpTimeout)
 	if err != nil {
 		return err
 	}
 
-	client, err := smtp.NewClient(conn, hostOf(addr))
+	host := hostOf(addr)
+
+	if cfg.ImplicitTLS {
+		tlsConn := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+		if err := tlsConn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
+			conn.Close()
+			return err
+		}
+		if err := tlsConn.Handshake(); err != nil {
+			conn.Close()
+			return err
+		}
+		conn = tlsConn
+	}
+
+	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		conn.Close()
 		return err
@@ -86,13 +105,15 @@ func sendMailWithTimeout(addr string, auth smtp.Auth, from string, to []string, 
 		return err
 	}
 
-	if ok, _ := client.Extension("STARTTLS"); ok {
-		tlsConfig := &tls.Config{ServerName: hostOf(addr), MinVersion: tls.VersionTLS12}
-		if err := client.StartTLS(tlsConfig); err != nil {
-			return err
+	if !cfg.ImplicitTLS {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+			if err := client.StartTLS(tlsConfig); err != nil {
+				return err
+			}
+		} else if cfg.RequireTLS {
+			return fmt.Errorf("smtp: server %s does not support STARTTLS", host)
 		}
-	} else if requireTLS {
-		return fmt.Errorf("smtp: server %s does not support STARTTLS", hostOf(addr))
 	}
 
 	if auth != nil {

@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev
 
@@ -19,7 +19,7 @@ RUN apk add --no-cache ca-certificates tzdata ffmpeg
 WORKDIR /app
 
 COPY --from=builder /build/flux-server .
-COPY --from=builder /build/configs/config.example.yaml ./configs/config.yaml
+COPY --from=builder /build/configs/config.example.yaml ./configs/config.example.yaml
 
 # Run as an unprivileged user: a remote file-write vulnerability must not
 # give root inside the container.
@@ -29,12 +29,12 @@ RUN adduser -D -u 1000 flux \
 
 USER flux
 
-EXPOSE 8080
+EXPOSE 8095
 
-VOLUME ["/app/data", "/app/media"]
+VOLUME ["/app/data"]
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8095/api/health || exit 1
 
 ENTRYPOINT ["./flux-server"]
-CMD ["-config", "configs/config.yaml"]
+CMD ["-config", "/app/configs/config.yaml"]

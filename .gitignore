@@ -11,4 +11,5 @@ backend/data/
 
 # Local config (contains secrets)
 backend/configs/config.yaml
+backend/.env
 /.idea/
