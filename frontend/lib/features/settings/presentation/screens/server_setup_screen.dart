@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,8 +16,17 @@ class ServerSetupScreen extends ConsumerStatefulWidget {
 }
 
 class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
-  final _controller = TextEditingController(text: 'http://localhost:8080');
+  final _controller = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _isChecking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load the current server URL from settings (loaded at app startup)
+    final currentUrl = ref.read(settingsProvider).settings.serverUrl;
+    _controller.text = currentUrl ?? 'http://localhost:8080';
+  }
 
   @override
   void dispose() {
@@ -26,11 +37,38 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
   Future<void> _save() async {
     if (_formKey.currentState!.validate()) {
       final url = _controller.text.trim();
-      await ref.read(settingsProvider.notifier).setServerUrl(
-            url.endsWith('/') ? url.substring(0, url.length - 1) : url,
-          );
-      if (!mounted) return;
-      context.router.replace(const LoginRoute());
+      final baseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+
+      setState(() => _isChecking = true);
+      try {
+        // Check if server is reachable
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 5);
+        final request = await client.getUrl(Uri.parse('$baseUrl/api/health'));
+        final response = await request.close();
+        client.close();
+
+        if (response.statusCode != HttpStatus.ok) {
+          throw Exception('Сервер вернул статус ${response.statusCode}');
+        }
+
+        // Server is reachable, save URL and proceed
+        await ref.read(settingsProvider.notifier).setServerUrl(baseUrl);
+        if (!mounted) return;
+        context.router.replace(const LoginRoute());
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Не удалось подключиться к серверу: ${e.toString()}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _isChecking = false);
+        }
+      }
     }
   }
 
@@ -89,8 +127,14 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: _save,
-                    child: Text(l.connect),
+                    onPressed: _isChecking ? null : _save,
+                    child: _isChecking
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(l.connect),
                   ),
                 ),
               ],

@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Flux Media Server';
+  String get appTitle => 'Flux';
 
   @override
   String get videoTab => 'Video';

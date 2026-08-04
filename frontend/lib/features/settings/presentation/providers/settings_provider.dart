@@ -42,6 +42,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 
   final SettingsRepository _repository;
 
+  /// Loads settings from the repository. Called at app startup.
   Future<void> init() async {
     final settings = await _repository.getSettings();
     state = SettingsState(settings: settings);

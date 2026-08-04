@@ -18,7 +18,12 @@ class SettingsLocalDataSource {
 
   String? getServerUrl() => _prefs.getString(_keyServerUrl);
 
-  Future<void> setServerUrl(String url) => _prefs.setString(_keyServerUrl, url);
+  Future<void> setServerUrl(String url) async {
+    final success = await _prefs.setString(_keyServerUrl, url);
+    if (!success) {
+      throw Exception('Failed to save server URL to SharedPreferences');
+    }
+  }
 
   String getLocale() => _prefs.getString(_keyLocale) ?? 'en';
 

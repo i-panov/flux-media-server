@@ -23,10 +23,12 @@ void main() async {
     ],
   );
 
+  // Load settings synchronously at app startup so they're available
+  // before any provider that depends on them is created
+  await container.read(settingsProvider.notifier).init();
+
   if (serverUrl != null) {
-    await container.read(settingsProvider.notifier).init();
-    final settings = container.read(settingsProvider).settings;
-    if (settings.authToken != null) {
+    if (container.read(settingsProvider).settings.authToken != null) {
       // Non-blocking: splash screen handles loading state
       unawaited(container.read(authProvider.notifier).checkAuthStatus());
     }
@@ -119,7 +121,7 @@ class _FluxAppState extends ConsumerState<FluxApp> {
             ref.read(settingsProvider).settings.authToken != null);
 
     return MaterialApp.router(
-      title: 'Flux Media Server',
+      title: 'Flux',
       theme: ThemeData(
         colorSchemeSeed: Colors.deepPurple,
         useMaterial3: true,

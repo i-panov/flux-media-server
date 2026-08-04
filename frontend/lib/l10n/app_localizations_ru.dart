@@ -9,7 +9,7 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
-  String get appTitle => 'Flux Media Server';
+  String get appTitle => 'Flux';
 
   @override
   String get videoTab => 'Видео';
