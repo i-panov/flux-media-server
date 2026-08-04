@@ -135,6 +135,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get delete => 'Delete';
 
   @override
+  String get deleteMediaConfirmation =>
+      'Delete this media file permanently? This cannot be undone.';
+
+  @override
   String get deleteLibrary => 'Delete Library';
 
   @override

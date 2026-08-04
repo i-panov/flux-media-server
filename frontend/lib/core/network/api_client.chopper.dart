@@ -108,6 +108,17 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> deleteMedia(int id) {
+    final Uri $url = Uri.parse('/media/${id}');
+    final Request $request = Request(
+      'DELETE',
+      $url,
+      client.baseUrl,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> checkHash(Map<String, dynamic> body) {
     final Uri $url = Uri.parse('/media/check-hash');
     final $body = body;

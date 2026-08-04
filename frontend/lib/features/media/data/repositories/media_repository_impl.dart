@@ -42,6 +42,10 @@ class MediaRepositoryImpl implements MediaRepository {
       });
 
   @override
+  Future<Either<Failure, void>> deleteMedia(int id) =>
+      safeRepositoryCall(() => remoteDataSource.deleteMedia(id));
+
+  @override
   Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
       checkHash(String hash) =>
           safeRepositoryCall(() => remoteDataSource.checkHash(hash));

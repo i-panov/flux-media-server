@@ -350,6 +350,12 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get delete;
 
+  /// No description provided for @deleteMediaConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this media file permanently? This cannot be undone.'**
+  String get deleteMediaConfirmation;
+
   /// No description provided for @deleteLibrary.
   ///
   /// In en, this message translates to:

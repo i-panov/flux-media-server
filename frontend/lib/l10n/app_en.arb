@@ -84,6 +84,8 @@
   "@create": {},
   "delete": "Delete",
   "@delete": {},
+  "deleteMediaConfirmation": "Delete this media file permanently? This cannot be undone.",
+  "@deleteMediaConfirmation": {},
   "deleteLibrary": "Delete Library",
   "@deleteLibrary": {},
   "scanning": "Scanning...",

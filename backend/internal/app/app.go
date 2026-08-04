@@ -233,7 +233,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Post("/upload", requireAdmin, uploadHandler.Upload)
 	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Put("/:id", requireAdmin, mediaHandler.Update)
-	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
+	media.Delete("/:id", mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)
 	media.Get("/:id/thumb", thumbHandler.Get)
 	media.Get("/:id/cover", thumbHandler.GetCover)

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -188,6 +189,35 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 	}
 
 	ctx := c.UserContext()
+
+	// Get media record to find file path.
+	media, err := h.mediaRepo.FindByID(ctx, uint(id))
+	if err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Media not found")
+	}
+
+	// Delete file from disk.
+	if media.FilePath != "" {
+		if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Delete: remove file %s: %v", media.FilePath, err)
+		}
+	}
+
+	// Delete thumbnail.
+	if media.ThumbnailURL != "" {
+		if err := os.Remove(media.ThumbnailURL); err != nil && !os.IsNotExist(err) {
+			log.Printf("Delete: remove thumbnail %s: %v", media.ThumbnailURL, err)
+		}
+	}
+
+	// Delete cover.
+	if media.CoverURL != "" {
+		if err := os.Remove(media.CoverURL); err != nil && !os.IsNotExist(err) {
+			log.Printf("Delete: remove cover %s: %v", media.CoverURL, err)
+		}
+	}
+
+	// Delete record from database.
 	if err := h.mediaRepo.Delete(ctx, uint(id)); err != nil {
 		log.Printf("Delete: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete media")

@@ -156,6 +156,50 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     }
   }
 
+  Future<void> _delete() async {
+    final l = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.delete),
+        content: Text(l.deleteMediaConfirmation),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final deleteMedia = ref.read(deleteMediaProvider);
+    final result = await deleteMedia(widget.mediaId);
+
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l.errorLabel}: ${failure.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (_) {
+        ref.invalidate(mediaListProvider('video'));
+        ref.invalidate(mediaListProvider('audio'));
+        context.maybePop();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -442,6 +486,16 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                       onPressed: () =>
                           showEditMetadataDialog(context, ref, media),
                       tooltip: l.edit,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    child: IconButton(
+                      color: Colors.red,
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: _delete,
+                      tooltip: l.delete,
                     ),
                   ),
                 ],

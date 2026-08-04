@@ -46,6 +46,12 @@ class MediaRemoteDataSource {
     return response.body!;
   }
 
+  /// Deletes a media item by [id] (file + database record).
+  Future<void> deleteMedia(int id) async {
+    final response = await apiClient.deleteMedia(id);
+    checkResponse(response, 'Failed to delete media');
+  }
+
   /// Checks if a file with the given [hash] already exists on the server.
   Future<({bool exists, int? mediaId, String? title})> checkHash(
     String hash,

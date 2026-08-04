@@ -439,6 +439,12 @@ func DetermineMediaType(filePath string) string {
 	for _, s := range data.Streams {
 		switch s.CodecType {
 		case "video":
+			// Skip embedded cover art (mjpeg, png, jpeg, bmp) — it's not real video.
+			codec := strings.ToLower(s.CodecName)
+			if codec == "mjpeg" || codec == "png" || codec == "jpegls" ||
+				codec == "bmp" || codec == "gif" || codec == "tiff" {
+				continue
+			}
 			hasVideo = true
 		case "audio":
 			hasAudio = true

@@ -5,6 +5,7 @@ import 'package:flux_media_server/features/media/data/datasources/media_remote_d
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/domain/usecases/check_media_hash.dart';
+import 'package:flux_media_server/features/media/domain/usecases/delete_media.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
@@ -39,6 +40,10 @@ final uploadMediaProvider = Provider<UploadMedia>((ref) {
 
 final uploadCoverProvider = Provider<UploadCover>((ref) {
   return UploadCover(ref.watch(mediaRepositoryProvider));
+});
+
+final deleteMediaProvider = Provider<DeleteMedia>((ref) {
+  return DeleteMedia(ref.watch(mediaRepositoryProvider));
 });
 
 /// Current search query. Empty string means no search.

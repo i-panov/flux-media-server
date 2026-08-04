@@ -135,6 +135,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get delete => 'Удалить';
 
   @override
+  String get deleteMediaConfirmation =>
+      'Удалить этот медиафайл без возможности восстановления?';
+
+  @override
   String get deleteLibrary => 'Удалить библиотеку';
 
   @override
