@@ -913,6 +913,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter translation here...'**
   String get addTranslationHere;
+
+  /// No description provided for @offlineMode.
+  ///
+  /// In en, this message translates to:
+  /// **'No server connection. Showing downloaded content only.'**
+  String get offlineMode;
 }
 
 class _AppLocalizationsDelegate

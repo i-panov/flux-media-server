@@ -1,7 +1,9 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/code_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/login_screen.dart';
 import 'package:flux_media_server/features/audio/presentation/screens/audio_screen.dart';
@@ -58,14 +60,15 @@ class AppRouter extends _$AppRouter {
 }
 
 @RoutePage()
-class MainScreen extends StatelessWidget {
+class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context)!;
     final width = MediaQuery.of(context).size.width;
     final isWide = width >= 900;
+    final isOffline = ref.watch(isOfflineProvider);
 
     return PopScope(
       canPop: false,
@@ -75,11 +78,11 @@ class MainScreen extends StatelessWidget {
           SystemNavigator.pop();
         }
       },
-      child: _buildLayout(isWide, l),
+      child: _buildLayout(isWide, l, isOffline),
     );
   }
 
-  Widget _buildLayout(bool isWide, AppLocalizations l) {
+  Widget _buildLayout(bool isWide, AppLocalizations l, bool isOffline) {
     // Build localized destinations.
     final destinations = [
       (icon: Icons.movie_outlined, selectedIcon: Icons.movie, label: l.videoTab),
@@ -89,18 +92,19 @@ class MainScreen extends StatelessWidget {
     ];
 
     if (isWide) {
-      return _WideLayout(destinations: destinations, settingsLabel: l.settings);
+      return _WideLayout(destinations: destinations, settingsLabel: l.settings, isOffline: isOffline);
     }
-    return _NarrowLayout(destinations: destinations);
+    return _NarrowLayout(destinations: destinations, isOffline: isOffline);
   }
 }
 
 /// Desktop/tablet layout with NavigationRail on the left.
 class _WideLayout extends StatelessWidget {
-  const _WideLayout({required this.destinations, required this.settingsLabel});
+  const _WideLayout({required this.destinations, required this.settingsLabel, required this.isOffline});
 
   final List<({IconData icon, IconData selectedIcon, String label})> destinations;
   final String settingsLabel;
+  final bool isOffline;
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +152,7 @@ class _WideLayout extends StatelessWidget {
               Expanded(
                 child: Column(
                   children: [
+                    if (isOffline) _offlineBanner(context),
                     Expanded(child: child),
                     const AudioMiniPlayer(),
                   ],
@@ -161,39 +166,71 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
+Widget _offlineBanner(BuildContext context) {
+  final l = AppLocalizations.of(context)!;
+  return MaterialBanner(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    leading: const Icon(Icons.cloud_off, color: Colors.white),
+    backgroundColor: Colors.orange.shade800,
+    content: Text(
+      l.offlineMode,
+      style: const TextStyle(color: Colors.white),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () {},
+        child: Text(
+          l.retry,
+          style: const TextStyle(color: Colors.white),
+        ),
+      ),
+    ],
+  );
+}
+
 /// Mobile layout with bottom NavigationBar.
 class _NarrowLayout extends StatelessWidget {
-  const _NarrowLayout({required this.destinations});
+  const _NarrowLayout({required this.destinations, required this.isOffline});
 
   final List<({IconData icon, IconData selectedIcon, String label})> destinations;
+  final bool isOffline;
 
   @override
   Widget build(BuildContext context) {
-    return AutoTabsScaffold(
+    return AutoTabsRouter(
       routes: const [
         VideoRoute(),
         AudioRoute(),
         LibraryRoute(),
         DownloadsRoute(),
       ],
-      bottomNavigationBuilder: (context, tabsRouter) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AudioMiniPlayer(),
-            NavigationBar(
-              selectedIndex: tabsRouter.activeIndex,
-              onDestinationSelected: tabsRouter.setActiveIndex,
-              destinations: [
-                for (final d in destinations)
-                  NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: d.label,
-                  ),
-              ],
-            ),
-          ],
+      builder: (context, child) {
+        final tabsRouter = AutoTabsRouter.of(context);
+        return Scaffold(
+          body: Column(
+            children: [
+              if (isOffline) _offlineBanner(context),
+              Expanded(child: child),
+            ],
+          ),
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AudioMiniPlayer(),
+              NavigationBar(
+                selectedIndex: tabsRouter.activeIndex,
+                onDestinationSelected: tabsRouter.setActiveIndex,
+                destinations: [
+                  for (final d in destinations)
+                    NavigationDestination(
+                      icon: Icon(d.icon),
+                      selectedIcon: Icon(d.selectedIcon),
+                      label: d.label,
+                    ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );

@@ -444,4 +444,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addTranslationHere => 'Enter translation here...';
+
+  @override
+  String get offlineMode =>
+      'No server connection. Showing downloaded content only.';
 }

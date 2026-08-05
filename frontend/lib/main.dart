@@ -114,6 +114,9 @@ class _FluxAppState extends ConsumerState<FluxApp> {
       final authState = ref.read(authProvider);
       if (authState is AuthAuthenticated) {
         widget.router.replaceAll([const MainRoute()]);
+      } else if (authState is AuthError && widget.hasServerUrl) {
+        // Server unreachable — enter offline mode, show downloaded content.
+        widget.router.replaceAll([const MainRoute()]);
       } else if (authState is! AuthLoading && widget.hasServerUrl) {
         widget.router.replace(const LoginRoute());
       }
@@ -131,6 +134,16 @@ class _FluxAppState extends ConsumerState<FluxApp> {
           if (!mounted) return;
           widget.router.replaceAll([const MainRoute()]);
         });
+      } else if (next is AuthError && widget.hasServerUrl) {
+        // Server unreachable — enter offline mode.
+        final shouldRedirect = previous is AuthLoading ||
+            previous is AuthAuthenticated;
+        if (shouldRedirect) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            widget.router.replaceAll([const MainRoute()]);
+          });
+        }
       } else if (next is AuthInitial && widget.hasServerUrl) {
         if (previous is AuthAuthenticated || previous is AuthLoading) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -138,11 +151,6 @@ class _FluxAppState extends ConsumerState<FluxApp> {
             widget.router.replace(const LoginRoute());
           });
         }
-      } else if (next is AuthError && widget.hasServerUrl && previous is AuthLoading) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          widget.router.replace(const LoginRoute());
-        });
       }
     });
 

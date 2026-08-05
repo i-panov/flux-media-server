@@ -445,4 +445,8 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get addTranslationHere => 'Введите перевод...';
+
+  @override
+  String get offlineMode =>
+      'Нет подключения к серверу. Показывается только скачанный контент.';
 }

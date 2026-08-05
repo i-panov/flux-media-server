@@ -279,5 +279,7 @@
   "addLyricsHere": "Введите текст песни...",
   "@addLyricsHere": {},
   "addTranslationHere": "Введите перевод...",
-  "@addTranslationHere": {}
+  "@addTranslationHere": {},
+  "offlineMode": "Нет подключения к серверу. Показывается только скачанный контент.",
+  "@offlineMode": {}
 }

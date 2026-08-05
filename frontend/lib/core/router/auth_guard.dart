@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 
 /// Protects routes that require authentication.
 class AuthGuard extends AutoRouteGuard {
@@ -14,9 +15,18 @@ class AuthGuard extends AutoRouteGuard {
     final authState = _container.read(authProvider);
     if (authState is AuthAuthenticated) {
       resolver.next();
+    } else if (authState is AuthError) {
+      // Offline mode — we have a stored server URL but can't reach it.
+      // Allow navigation to show offline/downloaded content.
+      final settings = _container.read(settingsProvider);
+      if (settings.settings.serverUrl != null &&
+          settings.settings.authToken != null) {
+        resolver.next();
+      } else {
+        resolver.next(false);
+        router.replace(const ServerSetupRoute());
+      }
     } else {
-      // Abort the guarded navigation (so the resolver always completes),
-      // then redirect to login.
       resolver.next(false);
       router.replace(const LoginRoute());
     }

@@ -332,5 +332,7 @@
   "addLyricsHere": "Enter lyrics here...",
   "@addLyricsHere": {},
   "addTranslationHere": "Enter translation here...",
-  "@addTranslationHere": {}
+  "@addTranslationHere": {},
+  "offlineMode": "No server connection. Showing downloaded content only.",
+  "@offlineMode": {}
 }
