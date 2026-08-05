@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,6 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/router/auth_guard.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/player/data/audio_handler.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:media_kit/media_kit.dart';
@@ -19,15 +24,39 @@ void main() async {
   final keyPrefix = kDebugMode ? 'debug_' : 'release_';
   final serverUrl = prefs.getString('${keyPrefix}server_url');
 
+  // Initialize audio_service for background playback + system media controls.
+  final audioHandler = await AudioService.init(
+    builder: () => FluxAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'ru.ithub24.flux.channel.audio',
+      androidNotificationChannelName: 'Flux Audio Playback',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+    ),
+  );
+
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
+      audioHandlerProvider.overrideWithValue(audioHandler),
     ],
   );
 
   // Load settings synchronously at app startup so they're available
   // before any provider that depends on them is created
   await container.read(settingsProvider.notifier).init();
+
+  // Wire up audio handler callbacks to the play queue.
+  audioHandler.onNext = () => container.read(playQueueProvider.notifier).next();
+  audioHandler.onPrevious = () => container.read(playQueueProvider.notifier).previous();
+  audioHandler.onToggleFavorite = () {
+    final state = container.read(playbackCoordinatorProvider);
+    if (state is PlaybackPlaying) {
+      container
+          .read(favoriteToggleProvider(state.media.id).notifier)
+          .toggle(state.media.id, state.media.type);
+    }
+  };
 
   if (serverUrl != null) {
     if (container.read(settingsProvider).settings.authToken != null) {

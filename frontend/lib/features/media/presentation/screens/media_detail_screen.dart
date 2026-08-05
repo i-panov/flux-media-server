@@ -33,15 +33,6 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   void initState() {
     super.initState();
     ref.read(mediaDetailProvider(widget.mediaId).notifier).load(widget.mediaId);
-    _initFavoriteState();
-  }
-
-  Future<void> _initFavoriteState() async {
-    final favorites = await ref.read(favoritesProvider(null).future);
-    final isFav = favorites.any((f) => f.mediaId == widget.mediaId);
-    if (mounted) {
-      ref.read(favoriteToggleProvider(widget.mediaId).notifier).init(isFav);
-    }
   }
 
   String _imageUrl() {

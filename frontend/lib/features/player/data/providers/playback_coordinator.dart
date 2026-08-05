@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
@@ -93,8 +94,24 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       // Mutual exclusion: stop video playback before starting audio.
       await _videoPlayer.stop();
 
-      // Start audio playback
-      await _audioPlayer.open(url, httpHeaders: headers);
+      // Build cover art URL for system notification.
+      final coverUrl = (media.coverUrl != null && media.coverUrl!.isNotEmpty)
+          ? '$_baseUrl/media/${media.id}/cover'
+          : (media.thumbnailUrl != null && media.thumbnailUrl!.isNotEmpty
+              ? '$_baseUrl/media/${media.id}/thumb'
+              : null);
+
+      // Start audio playback with metadata for the system notification.
+      await _audioPlayer.loadSource(
+        url: url,
+        title: media.title,
+        artist: media.artist,
+        artUri: coverUrl,
+        duration: media.duration != null
+            ? Duration(seconds: media.duration!)
+            : null,
+        httpHeaders: headers,
+      );
       await _audioPlayer.play();
 
       state = PlaybackState.playing(
@@ -347,9 +364,15 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   }
 }
 
+/// Provider for the audio handler (initialized in main.dart via AudioService.init).
+final audioHandlerProvider = Provider<FluxAudioHandler>((ref) {
+  throw UnimplementedError('audioHandlerProvider must be overridden in main()');
+});
+
 /// Provider for audio player datasource.
 final audioPlayerDatasourceProvider = Provider<AudioPlayerDatasource>((ref) {
-  final ds = AudioPlayerDatasource();
+  final handler = ref.watch(audioHandlerProvider);
+  final ds = AudioPlayerDatasource(handler);
   ref.onDispose(ds.dispose);
   return ds;
 });

@@ -78,6 +78,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get play => 'Воспроизвести';
 
   @override
+  String get previous => 'Предыдущий';
+
+  @override
+  String get next => 'Следующий';
+
+  @override
   String get duration => 'Длительность';
 
   @override

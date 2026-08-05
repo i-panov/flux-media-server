@@ -2,60 +2,86 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 
 /// Notifier that toggles favorite status for a media item.
-/// Optimistically updates the UI, then calls the API.
+/// Optimistically updates the UI based on the actual provider state.
+///
+/// NOT autoDispose: the toggle may be called via ref.read (e.g. from cards in
+/// lists) where no one watches the state. Without autoDispose the notifier
+/// survives the toggle and correctly retains its state.
 class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
-  FavoriteToggleNotifier(this._ref) : super(const AsyncValue.data(false));
+  FavoriteToggleNotifier(this._ref, this._mediaId) : super(const AsyncValue.data(false));
 
   final Ref _ref;
+  final int _mediaId;
 
-  /// Initializes the toggle state for a media item.
-  void init(bool isFavorite) {
-    state = AsyncValue.data(isFavorite);
+  /// Returns the actual favorite state from the cached [favoriteMediaIdsProvider].
+  Future<bool> _isFavorited() async {
+    try {
+      final ids = await _ref.read(favoriteMediaIdsProvider('video').future);
+      if (ids.contains(_mediaId)) return true;
+      final ids2 = await _ref.read(favoriteMediaIdsProvider('audio').future).timeout(
+            const Duration(seconds: 1),
+            onTimeout: () => <int>{},
+          );
+      return ids2.contains(_mediaId);
+    } catch (_) {
+      return false;
+    }
   }
 
-  /// Toggles favorite status. [mediaId] is the media to toggle.
-  /// [type] is 'video' or 'audio'.
+  /// Toggles favorite status. [type] is 'video' or 'audio'.
   Future<void> toggle(int mediaId, String type) async {
-    final currentState = state.valueOrNull ?? false;
+    if (!mounted) return;
+
+    // Read the real state directly – do not trust the cached bool.
+    final currentState = await _isFavorited();
+    if (!mounted) return;
+
     // Optimistic update
     state = AsyncValue.data(!currentState);
 
     try {
       if (currentState) {
-        // Remove favorite
         final removeFavorite = _ref.read(removeFavoriteProvider);
         final result = await removeFavorite(mediaId);
+        if (!mounted) return;
         result.fold(
-          (failure) => state = AsyncValue.error(failure.message, StackTrace.current),
+          (failure) {
+            if (!mounted) return;
+            state = AsyncValue.error(failure.message, StackTrace.current);
+          },
           (_) {
             _ref.invalidate(favoritesProvider(null));
             _ref.invalidate(favoritesProvider(type));
+            _ref.invalidate(favoriteMediaIdsProvider(type));
           },
         );
       } else {
-        // Add favorite
         final addFavorite = _ref.read(addFavoriteProvider);
         final result = await addFavorite(mediaId);
+        if (!mounted) return;
         result.fold(
-          (failure) => state = AsyncValue.error(failure.message, StackTrace.current),
+          (failure) {
+            if (!mounted) return;
+            state = AsyncValue.error(failure.message, StackTrace.current);
+          },
           (_) {
             _ref.invalidate(favoritesProvider(null));
             _ref.invalidate(favoritesProvider(type));
+            _ref.invalidate(favoriteMediaIdsProvider(type));
           },
         );
       }
     } catch (e, st) {
-      // Revert on error
-      state = AsyncValue.data(currentState);
-      state = AsyncValue.error(e, st);
+      if (!mounted) return;
+      state = AsyncValue.error(e.toString(), st);
     }
   }
 }
 
 /// Provider for toggling favorite status of a specific media item.
-/// autoDispose: prevents memory leaks when navigating away from screens
-/// that use favorite toggles (e.g., infinite scroll grids).
+/// Not auto-disposed so that [toggle] can be called via [ref.read] without
+/// the notifier being garbage-collected mid-operation.
 final favoriteToggleProvider =
-    StateNotifierProvider.autoDispose.family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
-  (ref, mediaId) => FavoriteToggleNotifier(ref),
+    StateNotifierProvider.family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
+  (ref, mediaId) => FavoriteToggleNotifier(ref, mediaId),
 );

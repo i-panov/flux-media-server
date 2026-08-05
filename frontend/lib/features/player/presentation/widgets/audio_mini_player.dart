@@ -8,6 +8,8 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -207,6 +209,18 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       ],
                     ),
                   ),
+                  // Previous track
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous),
+                    tooltip: l.previous,
+                    onPressed: () {
+                      ref.read(playQueueProvider.notifier).previous();
+                    },
+                    iconSize: 24,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  // Play/pause
                   IconButton(
                     icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
                     tooltip: isPaused ? l.play : l.pause,
@@ -218,6 +232,17 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       }
                     },
                     iconSize: 28,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  // Next track
+                  IconButton(
+                    icon: const Icon(Icons.skip_next),
+                    tooltip: l.next,
+                    onPressed: () {
+                      ref.read(playQueueProvider.notifier).next();
+                    },
+                    iconSize: 24,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -261,6 +286,23 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       ),
                     ),
                   ],
+                  // Favorite
+                  IconButton(
+                    icon: Icon(
+                      ref.watch(favoriteToggleProvider(media.id)).valueOrNull ?? false
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                    ),
+                    tooltip: l.favorites,
+                    onPressed: () {
+                      ref
+                          .read(favoriteToggleProvider(media.id).notifier)
+                          .toggle(media.id, media.type);
+                    },
+                    iconSize: 20,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
                     tooltip: l.close,

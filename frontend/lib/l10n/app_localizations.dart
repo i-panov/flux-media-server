@@ -236,6 +236,18 @@ abstract class AppLocalizations {
   /// **'Play'**
   String get play;
 
+  /// No description provided for @previous.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get previous;
+
+  /// No description provided for @next.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get next;
+
   /// No description provided for @duration.
   ///
   /// In en, this message translates to:

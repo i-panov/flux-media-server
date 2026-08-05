@@ -78,6 +78,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get play => 'Play';
 
   @override
+  String get previous => 'Previous';
+
+  @override
+  String get next => 'Next';
+
+  @override
   String get duration => 'Duration';
 
   @override
