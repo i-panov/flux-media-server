@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +16,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  final serverUrl = prefs.getString('server_url');
+  final keyPrefix = kDebugMode ? 'debug_' : 'release_';
+  final serverUrl = prefs.getString('${keyPrefix}server_url');
 
   final container = ProviderContainer(
     overrides: [

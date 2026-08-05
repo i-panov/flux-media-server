@@ -216,6 +216,44 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     final isDownloading = downloadState is DownloadDownloading;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: state.maybeWhen(
+        loaded: (_) => AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            color: Colors.white,
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.maybePop(),
+            tooltip: l.mediaDetail,
+          ),
+          actions: [
+            IconButton(
+              color: Colors.white,
+              icon: const Icon(Icons.image),
+              onPressed: _changeCover,
+              tooltip: l.changeCover,
+            ),
+            IconButton(
+              color: Colors.white,
+              icon: const Icon(Icons.edit),
+              onPressed: () => showEditMetadataDialog(
+                context,
+                ref,
+                state.maybeWhen(loaded: (m) => m, orElse: () => null!),
+              ),
+              tooltip: l.edit,
+            ),
+            IconButton(
+              color: Colors.red,
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _delete,
+              tooltip: l.delete,
+            ),
+          ],
+        ),
+        orElse: () => null,
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         loaded: (media) => Stack(
@@ -445,57 +483,6 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 8,
-              left: 8,
-              child: CircleAvatar(
-                backgroundColor: Colors.black54,
-                child: IconButton(
-                  color: Colors.white,
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.maybePop(),
-                  tooltip: l.mediaDetail,
-                ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.black54,
-                    child: IconButton(
-                      color: Colors.white,
-                      icon: const Icon(Icons.image),
-                      onPressed: _changeCover,
-                      tooltip: l.changeCover,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: Colors.black54,
-                    child: IconButton(
-                      color: Colors.white,
-                      icon: const Icon(Icons.edit),
-                      onPressed: () =>
-                          showEditMetadataDialog(context, ref, media),
-                      tooltip: l.edit,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: Colors.black54,
-                    child: IconButton(
-                      color: Colors.red,
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: _delete,
-                      tooltip: l.delete,
                     ),
                   ),
                 ],

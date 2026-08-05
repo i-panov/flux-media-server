@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flux_media_server/features/auth/presentation/screens/code_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/login_screen.dart';
@@ -66,6 +67,19 @@ class MainScreen extends StatelessWidget {
     final width = MediaQuery.of(context).size.width;
     final isWide = width >= 900;
 
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          // Exit the app instead of navigating back to ServerSetup.
+          SystemNavigator.pop();
+        }
+      },
+      child: _buildLayout(isWide, l),
+    );
+  }
+
+  Widget _buildLayout(bool isWide, AppLocalizations l) {
     // Build localized destinations.
     final destinations = [
       (icon: Icons.movie_outlined, selectedIcon: Icons.movie, label: l.videoTab),

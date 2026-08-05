@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -17,13 +19,18 @@ class OfflineCacheService {
   final Ref _ref;
   final String _baseUrl;
 
+  /// Prefix for file names so debug and release builds don't share cached files.
+  static final String _prefix = kDebugMode ? 'debug_' : 'release_';
+
+  String _fileName(int mediaId) => '${_prefix}flux_media_$mediaId';
+
   String? get _authToken => _ref.read(settingsProvider).settings.authToken;
 
   /// Returns the local file path for a cached media item, or null if not cached.
   Future<String?> getLocalPath(int mediaId) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/flux_media_$mediaId');
+      final file = File('${dir.path}/${_fileName(mediaId)}');
       if (await file.exists()) {
         return file.path;
       }
@@ -52,7 +59,7 @@ class OfflineCacheService {
 
       final client = http.Client();
       final dir = await getApplicationDocumentsDirectory();
-      final localFile = File('${dir.path}/flux_media_${media.id}');
+      final localFile = File('${dir.path}/${_fileName(media.id)}');
       final partFile = File('${localFile.path}.part');
 
       try {
@@ -134,7 +141,7 @@ class OfflineCacheService {
   Future<void> remove(int mediaId) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/flux_media_$mediaId');
+      final file = File('${dir.path}/${_fileName(mediaId)}');
       if (await file.exists()) {
         await file.delete();
       }
@@ -153,10 +160,10 @@ class OfflineCacheService {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final files = dir.listSync();
+      final pattern = RegExp('${_prefix}flux_media_(\d+)');
       return files
-          .where((f) => f.path.contains('flux_media_'))
           .map((f) {
-            final match = RegExp(r'flux_media_(\d+)').firstMatch(f.path);
+            final match = pattern.firstMatch(f.path);
             return match != null ? int.parse(match.group(1)!) : null;
           })
           .whereType<int>()
@@ -209,6 +216,7 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
         },
       );
       state = const DownloadState.downloaded();
+      ref.invalidate(downloadsProvider);
     } catch (e, st) {
       AppLogger.error('Download failed', e, st);
       state = DownloadState.error(e.toString());
@@ -219,6 +227,7 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
   Future<void> remove(int mediaId) async {
     await _cacheService.remove(mediaId);
     state = const DownloadState.idle();
+    ref.invalidate(downloadsProvider);
   }
 }
 

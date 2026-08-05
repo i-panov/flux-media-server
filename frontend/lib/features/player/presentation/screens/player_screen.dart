@@ -132,7 +132,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               Positioned.fill(
                 child: Video(
                   controller: videoController,
-                  controls: MaterialDesktopVideoControls,
+                  controls: Platform.isAndroid || Platform.isIOS
+                      ? MaterialVideoControls
+                      : MaterialDesktopVideoControls,
                 ),
               ),
               Positioned(

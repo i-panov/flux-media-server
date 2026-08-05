@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,13 @@ class AudioMiniPlayer extends ConsumerStatefulWidget {
   ConsumerState<AudioMiniPlayer> createState() => _AudioMiniPlayerState();
 }
 
+String _formatDuration(Duration? d) {
+  if (d == null) return '0:00';
+  final m = d.inMinutes.remainder(60);
+  final s = d.inSeconds.remainder(60);
+  return '$m:${s.toString().padLeft(2, '0')}';
+}
+
 class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
   double _volume = 100.0;
   StreamSubscription<double>? _volumeSub;
@@ -30,10 +38,13 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
   @override
   void initState() {
     super.initState();
-    final audioDs = ref.read(audioPlayerDatasourceProvider);
-    _volumeSub = audioDs.volumeStream.listen((v) {
-      if (mounted) setState(() => _volume = v);
-    });
+    // Volume slider is desktop-only; no need to track volume on mobile.
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+      final audioDs = ref.read(audioPlayerDatasourceProvider);
+      _volumeSub = audioDs.volumeStream.listen((v) {
+        if (mounted) setState(() => _volume = v);
+      });
+    }
   }
 
   @override
@@ -44,8 +55,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    // Watch the full state but only rebuild when the selected fields change.
+    final l = AppLocalizations.of(context)!;    // Watch the full state but only rebuild when the selected fields change.
     // Position updates every second cause the progress bar and time labels
     // to update, which is intentional for the mini-player UI.
     final playbackInfo =
@@ -77,9 +87,45 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LinearProgressIndicator(
-          value: progress,
-          minHeight: 2,
+        // Seek bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              Text(
+                _formatDuration(position),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                  ),
+                  child: Slider(
+                    value: progress.clamp(0.0, 1.0),
+                    onChanged: (value) {
+                      if (duration != null && duration > Duration.zero) {
+                        final newPos = Duration(
+                          microseconds:
+                              (value * duration.inMicroseconds).toInt(),
+                        );
+                        ref
+                            .read(playbackCoordinatorProvider.notifier)
+                            .seek(newPos);
+                      }
+                    },
+                  ),
+                ),
+              ),
+              Text(
+                _formatDuration(duration),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
         Container(
           decoration: BoxDecoration(
@@ -175,44 +221,46 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
-                  // Volume slider
-                  SizedBox(
-                    width: 140,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _volume == 0
-                              ? Icons.volume_off
-                              : _volume < 50
-                                  ? Icons.volume_down
-                                  : Icons.volume_up,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        Expanded(
-                          child: SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              activeTrackColor: Theme.of(context).colorScheme.primary,
-                              inactiveTrackColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                              thumbColor: Theme.of(context).colorScheme.primary,
-                              overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                              trackHeight: 3,
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                            ),
-                            child: Slider(
-                              value: _volume,
-                              min: 0,
-                              max: 100,
-                              onChanged: (value) {
-                                ref.read(playbackCoordinatorProvider.notifier).setVolume(value);
-                              },
+                  // Volume slider — desktop only (mobile uses physical buttons).
+                  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) ...[
+                    SizedBox(
+                      width: 140,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _volume == 0
+                                ? Icons.volume_off
+                                : _volume < 50
+                                    ? Icons.volume_down
+                                    : Icons.volume_up,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          Expanded(
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                activeTrackColor: Theme.of(context).colorScheme.primary,
+                                inactiveTrackColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                thumbColor: Theme.of(context).colorScheme.primary,
+                                overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                trackHeight: 3,
+                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                              ),
+                              child: Slider(
+                                value: _volume,
+                                min: 0,
+                                max: 100,
+                                onChanged: (value) {
+                                  ref.read(playbackCoordinatorProvider.notifier).setVolume(value);
+                                },
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
                     tooltip: l.close,
