@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
-import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/downloads_invalidator_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -160,14 +160,15 @@ class OfflineCacheService {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final files = dir.listSync();
-      final pattern = RegExp('${_prefix}flux_media_(\d+)');
-      return files
-          .map((f) {
-            final match = pattern.firstMatch(f.path);
-            return match != null ? int.parse(match.group(1)!) : null;
-          })
-          .whereType<int>()
-          .toList();
+      final pattern = RegExp(r'flux_media_(\d+)');
+      final ids = <int>[];
+      for (final f in files) {
+        final match = pattern.firstMatch(f.path);
+        if (match != null) {
+          ids.add(int.parse(match.group(1)!));
+        }
+      }
+      return ids;
     } catch (e) {
       AppLogger.error('Error listing cached files', e);
       return [];
@@ -216,7 +217,7 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
         },
       );
       state = const DownloadState.downloaded();
-      ref.invalidate(downloadsProvider);
+      ref.read(downloadsInvalidatorProvider.notifier).state++;
     } catch (e, st) {
       AppLogger.error('Download failed', e, st);
       state = DownloadState.error(e.toString());
@@ -227,7 +228,7 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
   Future<void> remove(int mediaId) async {
     await _cacheService.remove(mediaId);
     state = const DownloadState.idle();
-    ref.invalidate(downloadsProvider);
+    ref.read(downloadsInvalidatorProvider.notifier).state++;
   }
 }
 

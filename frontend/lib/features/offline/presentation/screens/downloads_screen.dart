@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
@@ -20,6 +21,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final downloadsState = ref.watch(downloadsProvider);
+    AppLogger.info('DownloadsScreen build: state=$downloadsState');
 
     return Scaffold(
       appBar: AppBar(
@@ -37,7 +39,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
               Text(e.toString(), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => ref.invalidate(downloadsProvider),
+                onPressed: () => ref.read(downloadsProvider.notifier).refresh(),
                 child: Text(l.retry),
               ),
             ],
@@ -74,8 +76,9 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 onFavorite: null,
                 isDownloaded: true,
                 onDownload: () async {
-                  await ref.read(offlineCacheServiceProvider).remove(media.id);
-                  ref.invalidate(downloadsProvider);
+                  await ref
+                      .read(downloadNotifierProvider(media.id).notifier)
+                      .remove(media.id);
                 },
               );
             },
