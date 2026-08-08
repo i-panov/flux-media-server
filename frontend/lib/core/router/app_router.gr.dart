@@ -62,12 +62,6 @@ abstract class _$AppRouter extends RootStackRouter {
         ),
       );
     },
-    DownloadsRoute.name: (routeData) {
-      return AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: const DownloadsScreen(),
-      );
-    },
     LibraryMediaRoute.name: (routeData) {
       final args = routeData.argsAs<LibraryMediaRouteArgs>();
       return AutoRoutePage<dynamic>(
@@ -314,20 +308,6 @@ class CollectionDetailRouteArgs {
   String toString() {
     return 'CollectionDetailRouteArgs{key: $key, collection: $collection}';
   }
-}
-
-/// generated route for
-/// [DownloadsScreen]
-class DownloadsRoute extends PageRouteInfo<void> {
-  const DownloadsRoute({List<PageRouteInfo>? children})
-      : super(
-          DownloadsRoute.name,
-          initialChildren: children,
-        );
-
-  static const String name = 'DownloadsRoute';
-
-  static const PageInfo<void> page = PageInfo<void>(name);
 }
 
 /// generated route for

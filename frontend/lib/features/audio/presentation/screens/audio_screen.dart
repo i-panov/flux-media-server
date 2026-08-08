@@ -13,6 +13,7 @@ import 'package:flux_media_server/features/favorites/presentation/providers/favo
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
@@ -164,7 +165,13 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     final mediaList = mediaListState.valueOrNull ?? MediaListResult(items: <Media>[].toIList(), total: 0);
     final favorites = favoritesState.valueOrNull ?? [];
 
-    if (mediaList.items.isEmpty) {
+    // Downloaded tracks — shown as main list when offline, as a section when online.
+    final downloadsState = ref.watch(downloadsProvider);
+    final downloadedMedia = downloadsState.valueOrNull ?? [];
+    final downloadedAudio = downloadedMedia.where((m) => m.type == 'audio').toList();
+
+    // Offline + no server media → show downloaded only.
+    if (mediaList.items.isEmpty && downloadedAudio.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -278,31 +285,86 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
               ),
             ),
           ],
-          SliverToBoxAdapter(
-            child: _SectionHeader(
-              icon: Icons.music_note,
-              title: l.allTracks,
-            ),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => AudioTrackRow(
-                media: allTracks[index],
-                isFavorite: favoriteMediaIds.contains(allTracks[index].id),
-                onPlay: () => _playTrack(allTracks, index),
-                onFavorite: () => _toggleFavorite(allTracks[index].id),
-                onDownload: () => _toggleDownload(allTracks[index].id),
-                onAddToQueue: () => _addToQueue(allTracks[index]),
-                onAddToCollection: () => showAddToCollectionDialog(
-                    context, ref, allTracks[index].id),
-                onEditMetadata: () =>
-                    showEditMetadataDialog(context, ref, allTracks[index]),
-                onDetails: () => context.router
-                    .push(MediaDetailRoute(mediaId: allTracks[index].id)),
+          if (downloadedAudio.isNotEmpty && !isOffline) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(
+                icon: Icons.download,
+                title: l.downloads,
               ),
-              childCount: allTracks.length,
             ),
-          ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => AudioTrackRow(
+                  media: downloadedAudio[index],
+                  isFavorite: favoriteMediaIds.contains(downloadedAudio[index].id),
+                  onPlay: () => _playTrack(downloadedAudio, index),
+                  onFavorite: () => _toggleFavorite(downloadedAudio[index].id),
+                  onDownload: () => _toggleDownload(downloadedAudio[index].id),
+                  onAddToQueue: () => _addToQueue(downloadedAudio[index]),
+                  onAddToCollection: () => showAddToCollectionDialog(
+                      context, ref, downloadedAudio[index].id),
+                  onEditMetadata: () =>
+                      showEditMetadataDialog(context, ref, downloadedAudio[index]),
+                  onDetails: () => context.router
+                      .push(MediaDetailRoute(mediaId: downloadedAudio[index].id)),
+                ),
+                childCount: downloadedAudio.length,
+              ),
+            ),
+          ],
+          // Offline mode: show downloaded as the only list.
+          if (isOffline && downloadedAudio.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(
+                icon: Icons.download,
+                title: l.downloads,
+              ),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => AudioTrackRow(
+                  media: downloadedAudio[index],
+                  isFavorite: false,
+                  onPlay: () => _playTrack(downloadedAudio, index),
+                  onFavorite: null,
+                  onDownload: () => _toggleDownload(downloadedAudio[index].id),
+                  onAddToQueue: () => _addToQueue(downloadedAudio[index]),
+                  onAddToCollection: null,
+                  onEditMetadata: null,
+                  onDetails: () => context.router
+                      .push(MediaDetailRoute(mediaId: downloadedAudio[index].id)),
+                ),
+                childCount: downloadedAudio.length,
+              ),
+            ),
+          ],
+          if (!isOffline) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(
+                icon: Icons.music_note,
+                title: l.allTracks,
+              ),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => AudioTrackRow(
+                  media: allTracks[index],
+                  isFavorite: favoriteMediaIds.contains(allTracks[index].id),
+                  onPlay: () => _playTrack(allTracks, index),
+                  onFavorite: () => _toggleFavorite(allTracks[index].id),
+                  onDownload: () => _toggleDownload(allTracks[index].id),
+                  onAddToQueue: () => _addToQueue(allTracks[index]),
+                  onAddToCollection: () => showAddToCollectionDialog(
+                      context, ref, allTracks[index].id),
+                  onEditMetadata: () =>
+                      showEditMetadataDialog(context, ref, allTracks[index]),
+                  onDetails: () => context.router
+                      .push(MediaDetailRoute(mediaId: allTracks[index].id)),
+                ),
+                childCount: allTracks.length,
+              ),
+            ),
+          ],
         ],
       ),
     );

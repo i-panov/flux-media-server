@@ -12,6 +12,7 @@ import 'package:flux_media_server/features/media/presentation/providers/watch_pr
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/horizontal_video_row.dart';
@@ -155,6 +156,11 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     final watchProgress = watchProgressState.valueOrNull ?? [];
     final favorites = favoritesState.valueOrNull ?? [];
     final collections = collectionsState.valueOrNull ?? [];
+
+    // Downloaded videos.
+    final downloadsState = ref.watch(downloadsProvider);
+    final downloadedMedia = downloadsState.valueOrNull ?? [];
+    final downloadedVideo = downloadedMedia.where((m) => m.type == 'video').toList();
 
     // Get favorite media IDs
     final favoriteMediaIds = favorites
@@ -312,8 +318,49 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
             ),
           ),
 
+        // Downloaded section
+        if (downloadedVideo.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.download, size: 20, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(l.downloads, style: Theme.of(context).textTheme.titleMedium),
+                ],
+              ),
+            ),
+          ),
+        if (downloadedVideo.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6),
+                childAspectRatio: 0.7,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final media = downloadedVideo[index];
+                  return MediaCard(
+                    media: media,
+                    onTap: () => context.router.push(MediaDetailRoute(mediaId: media.id)),
+                    isFavorite: favoriteMediaIds.contains(media.id),
+                    onFavorite: isOffline ? null : () => _toggleFavorite(media.id),
+                    isDownloaded: true,
+                    onDownload: () => _toggleDownload(media.id),
+                  );
+                },
+                childCount: downloadedVideo.length,
+              ),
+            ),
+          ),
+
         // All Movies section
-        if (gridItems.isEmpty && continueWatchingItems.isEmpty && recentlyAdded.isEmpty && favoriteVideos.isEmpty)
+        if (gridItems.isEmpty && continueWatchingItems.isEmpty && recentlyAdded.isEmpty && favoriteVideos.isEmpty && downloadedVideo.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Center(

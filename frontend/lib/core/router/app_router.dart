@@ -17,7 +17,6 @@ import 'package:flux_media_server/features/player/presentation/screens/player_sc
 import 'package:flux_media_server/features/player/presentation/screens/audio_player_screen.dart';
 import 'package:flux_media_server/features/player/presentation/widgets/audio_mini_player.dart';
 import 'package:flux_media_server/features/collections/presentation/screens/collection_detail_screen.dart';
-import 'package:flux_media_server/features/offline/presentation/screens/downloads_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/server_setup_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/settings_screen.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -45,7 +44,6 @@ class AppRouter extends _$AppRouter {
             AutoRoute(page: VideoRoute.page, initial: true, keepHistory: false),
             AutoRoute(page: AudioRoute.page, keepHistory: false),
             AutoRoute(page: LibraryRoute.page),
-            AutoRoute(page: DownloadsRoute.page),
           ],
         ),
         AutoRoute(page: LibraryMediaRoute.page, guards: [authGuard]),
@@ -88,7 +86,6 @@ class MainScreen extends ConsumerWidget {
       (icon: Icons.movie_outlined, selectedIcon: Icons.movie, label: l.videoTab),
       (icon: Icons.music_note_outlined, selectedIcon: Icons.music_note, label: l.audioTab),
       (icon: Icons.folder_outlined, selectedIcon: Icons.folder, label: l.libraries),
-      (icon: Icons.download_outlined, selectedIcon: Icons.download, label: l.downloads),
     ];
 
     if (isWide) {
@@ -113,7 +110,6 @@ class _WideLayout extends StatelessWidget {
         VideoRoute(),
         AudioRoute(),
         LibraryRoute(),
-        DownloadsRoute(),
       ],
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
@@ -202,7 +198,6 @@ class _NarrowLayout extends StatelessWidget {
         VideoRoute(),
         AudioRoute(),
         LibraryRoute(),
-        DownloadsRoute(),
       ],
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
