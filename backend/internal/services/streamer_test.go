@@ -12,22 +12,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"flux/internal/models"
-	"flux/internal/repository"
+	"flux/internal/config"
 )
 
-func setupStreamer(t *testing.T, libs []models.MediaLibrary) *StreamerService {
+func setupStreamer(t *testing.T, mediaPaths ...string) *StreamerService {
 	t.Helper()
-	db, err := repository.InitDB(":memory:")
-	require.NoError(t, err)
-	require.NoError(t, repository.AutoMigrate(db))
-
-	repo := repository.NewLibraryRepository(db)
-	ctx := context.Background()
-	for i := range libs {
-		require.NoError(t, repo.Create(ctx, &libs[i]))
+	var paths []config.MediaPath
+	for _, p := range mediaPaths {
+		paths = append(paths, config.MediaPath{Path: p, Type: "video"})
 	}
-	return NewStreamerService(repo)
+	cfg := &config.Config{Media: config.MediaConfig{}}
+	cfg.Media.VideoPath = paths[0].Path
+	return NewStreamerService(cfg)
 }
 
 func TestIsPathAllowed(t *testing.T) {
@@ -41,45 +37,29 @@ func TestIsPathAllowed(t *testing.T) {
 	outsideFile := filepath.Join(dir, "secret.txt")
 	require.NoError(t, os.WriteFile(outsideFile, []byte("x"), 0644))
 
-	s := setupStreamer(t, []models.MediaLibrary{
-		{Name: "Video", Path: libDir, Type: "video", Enabled: true},
-	})
+	s := setupStreamer(t, libDir)
 	ctx := context.Background()
 
 	allowed, err := s.IsPathAllowed(ctx, realFile)
 	require.NoError(t, err)
-	assert.True(t, allowed, "file inside enabled library must be allowed")
+	assert.True(t, allowed, "file inside media path must be allowed")
 
 	allowed, err = s.IsPathAllowed(ctx, outsideFile)
 	require.NoError(t, err)
-	assert.False(t, allowed, "file outside any library must be rejected")
+	assert.False(t, allowed, "file outside any media path must be rejected")
 
-	// Traversal that resolves outside the library.
+	// Traversal that resolves outside the media path.
 	allowed, err = s.IsPathAllowed(ctx, filepath.Join(libDir, "..", "secret.txt"))
 	require.NoError(t, err)
-	assert.False(t, allowed, "traversal outside library must be rejected")
+	assert.False(t, allowed, "traversal outside media path must be rejected")
 
-	// Symlink pointing outside the library must be rejected.
+	// Symlink pointing outside the media path must be rejected.
 	link := filepath.Join(libDir, "evil.mp4")
 	if err := os.Symlink(outsideFile, link); err == nil {
 		allowed, err = s.IsPathAllowed(ctx, link)
 		require.NoError(t, err)
-		assert.False(t, allowed, "symlink escaping the library must be rejected")
+		assert.False(t, allowed, "symlink escaping the media path must be rejected")
 	}
-}
-
-func TestIsPathAllowedDisabledLibrary(t *testing.T) {
-	dir := t.TempDir()
-	realFile := filepath.Join(dir, "movie.mp4")
-	require.NoError(t, os.WriteFile(realFile, []byte("x"), 0644))
-
-	s := setupStreamer(t, []models.MediaLibrary{
-		{Name: "Video", Path: dir, Type: "video", Enabled: false},
-	})
-
-	allowed, err := s.IsPathAllowed(context.Background(), realFile)
-	require.NoError(t, err)
-	assert.False(t, allowed, "disabled library must not serve files")
 }
 
 func TestParseRangeHeader(t *testing.T) {
@@ -139,9 +119,7 @@ func TestStream(t *testing.T) {
 	require.NoError(t, os.WriteFile(filePath, content, 0644))
 
 	app := fiber.New()
-	s := setupStreamer(t, []models.MediaLibrary{
-		{Name: "Video", Path: libDir, Type: "video", Enabled: true},
-	})
+	s := setupStreamer(t, libDir)
 
 	app.Get("/stream", func(c *fiber.Ctx) error {
 		return s.Stream(c, filePath)
@@ -163,9 +141,7 @@ func TestStreamNotFound(t *testing.T) {
 	require.NoError(t, os.MkdirAll(libDir, 0755))
 
 	app := fiber.New()
-	s := setupStreamer(t, []models.MediaLibrary{
-		{Name: "Video", Path: libDir, Type: "video", Enabled: true},
-	})
+	s := setupStreamer(t, libDir)
 
 	app.Get("/stream", func(c *fiber.Ctx) error {
 		return s.Stream(c, filepath.Join(libDir, "nonexistent.mp4"))

@@ -7,8 +7,8 @@ class FavoritesRemoteDataSource {
 
   final ApiClient apiClient;
 
-  Future<List<Favorite>> getFavorites({String? type}) async {
-    final response = await apiClient.getFavorites(type: type);
+  Future<List<Favorite>> getFavorites() async {
+    final response = await apiClient.getFavorites();
     checkResponse(response, 'Failed to fetch favorites');
     final body = response.body!;
     final items = body['items'] as List<dynamic>;

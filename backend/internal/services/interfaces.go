@@ -22,16 +22,15 @@ type OTPStoreInterface interface {
 	Stop()
 }
 
-// ScannerInterface defines the interface for library scanning operations.
+// ScannerInterface defines the interface for scanning operations.
 type ScannerInterface interface {
-	ScanLibrary(ctx context.Context, libraryID uint) error
+	ScanPath(ctx context.Context, path, mediaType string) error
 	ScanAll(ctx context.Context) error
-	GetScanStatus(libraryID uint) *ScanStatus
+	GetScanStatus(key string) *ScanStatus
 }
 
-// ScanStatus represents the current state of a library scan.
+// ScanStatus represents the current state of a scan.
 type ScanStatus struct {
-	LibraryID uint   `json:"library_id"`
 	Running   bool   `json:"running"`
 	StartedAt string `json:"started_at,omitempty"`
 	Error     string `json:"last_error,omitempty"`

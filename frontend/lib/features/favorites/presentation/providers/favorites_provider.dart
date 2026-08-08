@@ -31,11 +31,11 @@ final removeFavoriteProvider = Provider<RemoveFavorite>((ref) {
   return RemoveFavorite(ref.watch(favoritesRepositoryProvider));
 });
 
-/// Fetches favorites, optionally filtered by type.
+/// Fetches all favorites for the current user.
 final favoritesProvider =
-    FutureProvider.autoDispose.family<List<Favorite>, String?>((ref, type) async {
+    FutureProvider.autoDispose<List<Favorite>>((ref) async {
   final getFavorites = ref.watch(getFavoritesProvider);
-  final result = await getFavorites(GetFavoritesParams(type: type));
+  final result = await getFavorites(const GetFavoritesParams());
   return result.fold(
     (failure) => throw Exception(failure.message),
     (favorites) => favorites,
@@ -44,8 +44,8 @@ final favoritesProvider =
 
 /// Tracks favorite media IDs for quick lookup.
 final favoriteMediaIdsProvider =
-    FutureProvider.autoDispose.family<Set<int>, String>((ref, type) async {
-  final favorites = await ref.watch(favoritesProvider(type).future);
+    FutureProvider.autoDispose<Set<int>>((ref) async {
+  final favorites = await ref.watch(favoritesProvider.future);
   return favorites
       .where((f) => f.mediaId != null)
       .map((f) => f.mediaId!)

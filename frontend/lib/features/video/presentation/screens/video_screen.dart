@@ -62,7 +62,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     // Fetch all data in parallel
     final mediaListState = ref.watch(mediaListProvider(_mediaType));
     final watchProgressState = ref.watch(watchProgressProvider);
-    final favoritesState = ref.watch(favoritesProvider('video'));
+    final favoritesState = ref.watch(favoritesProvider);
     final collectionsState = ref.watch(collectionsProvider);
 
     return Scaffold(
@@ -171,7 +171,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     // Continue Watching: incomplete progress for items in the current list.
     final mediaIds = mediaList.items.map((m) => m.id).toSet();
     final continueWatchingProgress = watchProgress
-        .where((p) => !p.completed && mediaIds.contains(p.mediaId))
+        .where((p) => mediaIds.contains(p.mediaId))
         .take(10)
         .toList();
     final continueWatchingIds = continueWatchingProgress
@@ -189,7 +189,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           filePath: '',
           fileSize: 0,
           description: null,
-          duration: p.duration,
+          duration: null,
           thumbnailUrl: null,
           artist: null,
           album: null,
@@ -451,7 +451,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
   }
 
   void _toggleFavorite(int mediaId) {
-    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId, 'video');
+    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId);
   }
 
   void _toggleDownload(int mediaId) {

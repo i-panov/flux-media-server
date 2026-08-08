@@ -18,7 +18,6 @@ import (
 	"flux/internal/email"
 	"flux/internal/handlers"
 	"flux/internal/middleware"
-	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/services"
 )
@@ -55,7 +54,6 @@ func New(cfg *config.Config, version string) (*App, error) {
 	userRepo := repository.NewUserRepository(db)
 	mediaRepo := repository.NewMediaRepository(db)
 	progressRepo := repository.NewProgressRepository(db)
-	libraryRepo := repository.NewLibraryRepository(db)
 	favRepo := repository.NewFavoriteRepository(db)
 	colRepo := repository.NewCollectionRepository(db)
 	colItemRepo := repository.NewCollectionItemRepository(db)
@@ -85,8 +83,8 @@ func New(cfg *config.Config, version string) (*App, error) {
 		ImplicitTLS: cfg.Auth.SMTP.ImplicitTLS,
 	})
 
-	scanner := services.NewScannerService(libraryRepo, mediaRepo, cfg)
-	streamer := services.NewStreamerService(libraryRepo)
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	streamer := services.NewStreamerService(cfg)
 	thumbSvc := services.NewThumbnailService(cfg.Media.ThumbnailPath)
 
 	// File watcher for automatic library monitoring.
@@ -99,29 +97,14 @@ func New(cfg *config.Config, version string) (*App, error) {
 	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
-	uploadHandler := handlers.NewUploadHandler(libraryRepo, mediaRepo, scanner, thumbSvc, handlers.UploadConfig{
+	uploadHandler := handlers.NewUploadHandler(mediaRepo, scanner, thumbSvc, cfg.Media, handlers.UploadConfig{
 		MaxFileSize: cfg.Server.MaxUploadSize,
 	})
 
-	// Auto-create default libraries if they don't exist.
-	if _, err := libraryRepo.FindByPath(context.Background(), cfg.Media.VideoPath); err != nil {
-		libraryRepo.Create(context.Background(), &models.MediaLibrary{
-			Name:    "Video",
-			Path:    cfg.Media.VideoPath,
-			Type:    "video",
-			Enabled: true,
-		})
-		os.MkdirAll(cfg.Media.VideoPath, 0755)
-	}
-	if _, err := libraryRepo.FindByPath(context.Background(), cfg.Media.AudioPath); err != nil {
-		libraryRepo.Create(context.Background(), &models.MediaLibrary{
-			Name:    "Audio",
-			Path:    cfg.Media.AudioPath,
-			Type:    "audio",
-			Enabled: true,
-		})
-		os.MkdirAll(cfg.Media.AudioPath, 0755)
-	}
+	// Ensure media directories exist.
+	os.MkdirAll(cfg.Media.VideoPath, 0755)
+	os.MkdirAll(cfg.Media.AudioPath, 0755)
+
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
 	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo)
@@ -268,18 +251,15 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	// Start file watcher if enabled.
 	if watcherService != nil {
-		libraries, err := libraryRepo.FindAll(context.Background())
-		if err == nil {
-			var paths []string
-			for _, lib := range libraries {
-				if lib.Enabled {
-					paths = append(paths, lib.Path)
-				}
+		var paths []string
+		for _, mp := range cfg.Media.MediaPaths() {
+			if mp.Path != "" {
+				paths = append(paths, mp.Path)
 			}
-			if len(paths) > 0 {
-				if err := watcherService.StartWithPaths(paths); err != nil {
-					log.Printf("Warning: failed to start file watcher: %v", err)
-				}
+		}
+		if len(paths) > 0 {
+			if err := watcherService.StartWithPaths(paths); err != nil {
+				log.Printf("Warning: failed to start file watcher: %v", err)
 			}
 		}
 	}

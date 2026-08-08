@@ -32,7 +32,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
   int _downloadTotal = 0;
 
   void _toggleFavorite(int mediaId) {
-    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId, 'audio');
+    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId);
   }
 
   void _playTrack(List<Media> queue, int index) {
@@ -105,7 +105,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     final l = AppLocalizations.of(context)!;
 
     final mediaListState = ref.watch(mediaListProvider(_mediaType));
-    final favoritesState = ref.watch(favoritesProvider('audio'));
+    final favoritesState = ref.watch(favoritesProvider);
 
     return Scaffold(
       appBar: AppBar(

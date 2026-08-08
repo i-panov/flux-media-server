@@ -12,8 +12,6 @@ class WatchProgress with _$WatchProgress {
     @JsonKey(name: 'user_id') required int userId,
     @JsonKey(name: 'media_id') required int mediaId,
     required int position,
-    required int duration,
-    required bool completed,
   }) = _WatchProgress;
 
   factory WatchProgress.fromJson(Map<String, dynamic> json) => _$WatchProgressFromJson(json);

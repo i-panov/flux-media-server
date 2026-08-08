@@ -63,7 +63,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
   }
 
   void _toggleFavorite(int mediaId) {
-    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId, 'audio');
+    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId);
   }
 
   void _toggleDownload(int mediaId) {
@@ -92,7 +92,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     final isNarrow = MediaQuery.of(context).size.width < 900;
 
     final mediaListState = ref.watch(mediaListProvider(_mediaType));
-    final favoritesState = ref.watch(favoritesProvider('audio'));
+    final favoritesState = ref.watch(favoritesProvider);
 
     return Scaffold(
       appBar: AppBar(

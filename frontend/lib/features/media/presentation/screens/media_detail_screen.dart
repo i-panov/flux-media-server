@@ -67,10 +67,8 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     );
     if (media == null) return;
 
-    final type = media.type; // 'video' or 'audio'
     await ref.read(favoriteToggleProvider(widget.mediaId).notifier).toggle(
           widget.mediaId,
-          type,
         );
   }
 

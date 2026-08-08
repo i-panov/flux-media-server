@@ -12,8 +12,6 @@ _$WatchProgressImpl _$$WatchProgressImplFromJson(Map<String, dynamic> json) =>
       userId: (json['user_id'] as num).toInt(),
       mediaId: (json['media_id'] as num).toInt(),
       position: (json['position'] as num).toInt(),
-      duration: (json['duration'] as num).toInt(),
-      completed: json['completed'] as bool,
     );
 
 Map<String, dynamic> _$$WatchProgressImplToJson(_$WatchProgressImpl instance) =>
@@ -22,6 +20,4 @@ Map<String, dynamic> _$$WatchProgressImplToJson(_$WatchProgressImpl instance) =>
       'user_id': instance.userId,
       'media_id': instance.mediaId,
       'position': instance.position,
-      'duration': instance.duration,
-      'completed': instance.completed,
     };

@@ -16,20 +16,15 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
   /// Returns the actual favorite state from the cached [favoriteMediaIdsProvider].
   Future<bool> _isFavorited() async {
     try {
-      final ids = await _ref.read(favoriteMediaIdsProvider('video').future);
-      if (ids.contains(_mediaId)) return true;
-      final ids2 = await _ref.read(favoriteMediaIdsProvider('audio').future).timeout(
-            const Duration(seconds: 1),
-            onTimeout: () => <int>{},
-          );
-      return ids2.contains(_mediaId);
+      final ids = await _ref.read(favoriteMediaIdsProvider.future);
+      return ids.contains(_mediaId);
     } catch (_) {
       return false;
     }
   }
 
-  /// Toggles favorite status. [type] is 'video' or 'audio'.
-  Future<void> toggle(int mediaId, String type) async {
+  /// Toggles favorite status.
+  Future<void> toggle(int mediaId) async {
     if (!mounted) return;
 
     // Read the real state directly – do not trust the cached bool.
@@ -50,9 +45,8 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
             state = AsyncValue.error(failure.message, StackTrace.current);
           },
           (_) {
-            _ref.invalidate(favoritesProvider(null));
-            _ref.invalidate(favoritesProvider(type));
-            _ref.invalidate(favoriteMediaIdsProvider(type));
+            _ref.invalidate(favoritesProvider);
+            _ref.invalidate(favoriteMediaIdsProvider);
           },
         );
       } else {
@@ -65,9 +59,8 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
             state = AsyncValue.error(failure.message, StackTrace.current);
           },
           (_) {
-            _ref.invalidate(favoritesProvider(null));
-            _ref.invalidate(favoritesProvider(type));
-            _ref.invalidate(favoriteMediaIdsProvider(type));
+            _ref.invalidate(favoritesProvider);
+            _ref.invalidate(favoriteMediaIdsProvider);
           },
         );
       }

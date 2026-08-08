@@ -82,7 +82,6 @@ abstract class ApiClient extends ChopperService {
     @Query('q') String? q,
     @Query('limit') int? limit,
     @Query('offset') int? offset,
-    @Query('library_id') int? libraryId,
   });
 
   @Get(path: '/media/{id}')
@@ -121,9 +120,7 @@ abstract class ApiClient extends ChopperService {
   Future<Response<Map<String, dynamic>>> removeFavorite(@Path('id') int id);
 
   @Get(path: '/favorites')
-  Future<Response<Map<String, dynamic>>> getFavorites({
-    @Query('type') String? type,
-  });
+  Future<Response<Map<String, dynamic>>> getFavorites();
 
   @Post(path: '/favorites/artist')
   Future<Response<Map<String, dynamic>>> addArtistFavorite(

@@ -11,8 +11,8 @@ class FavoritesRepositoryImpl implements FavoritesRepository {
   final FavoritesRemoteDataSource remoteDataSource;
 
   @override
-  Future<Either<Failure, List<Favorite>>> getFavorites({String? type}) =>
-      safeRepositoryCall(() => remoteDataSource.getFavorites(type: type));
+  Future<Either<Failure, List<Favorite>>> getFavorites() =>
+      safeRepositoryCall(() => remoteDataSource.getFavorites());
 
   @override
   Future<Either<Failure, Favorite>> addFavorite(int mediaId) =>

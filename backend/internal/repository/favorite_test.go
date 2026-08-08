@@ -21,16 +21,14 @@ func TestFavoriteStore_CreateAndFindByUser(t *testing.T) {
 	mediaID := uint(10)
 	fav := &models.Favorite{
 		UserID:  1,
-		Type:    "video",
 		MediaID: &mediaID,
 	}
 	require.NoError(t, store.Create(ctx, fav))
 
-	favs, total, err := store.FindByUser(ctx, 1, "video", 50, 0)
+	favs, total, err := store.FindByUser(ctx, 1, 50, 0)
 	assert.NoError(t, err)
 	assert.Len(t, favs, 1)
 	assert.Equal(t, int64(1), total)
-	assert.Equal(t, "video", favs[0].Type)
 }
 
 func TestFavoriteStore_FindByUserAndMedia(t *testing.T) {
@@ -44,7 +42,6 @@ func TestFavoriteStore_FindByUserAndMedia(t *testing.T) {
 	mediaID := uint(10)
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:  1,
-		Type:    "video",
 		MediaID: &mediaID,
 	}))
 
@@ -65,7 +62,6 @@ func TestFavoriteStore_IsFavorited(t *testing.T) {
 	mediaID := uint(10)
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:  1,
-		Type:    "video",
 		MediaID: &mediaID,
 	}))
 
@@ -89,7 +85,6 @@ func TestFavoriteStore_Delete(t *testing.T) {
 	mediaID := uint(10)
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:  1,
-		Type:    "video",
 		MediaID: &mediaID,
 	}))
 
@@ -111,7 +106,6 @@ func TestFavoriteStore_ArtistFavorite(t *testing.T) {
 	artist := "Pink Floyd"
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:     1,
-		Type:       "artist",
 		ArtistName: &artist,
 	}))
 

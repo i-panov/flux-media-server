@@ -35,16 +35,14 @@ func (h *FavoriteHandler) AddFavorite(c *fiber.Ctx) error {
 
 	ctx := c.UserContext()
 
-	// Verify media exists and determine type
-	media, err := h.mediaRepo.FindByID(ctx, uint(mediaID))
-	if err != nil {
+	// Verify media exists
+	if _, err := h.mediaRepo.FindByID(ctx, uint(mediaID)); err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Media not found")
 	}
 
 	mediaIDUint := uint(mediaID)
 	fav := &models.Favorite{
 		UserID:  userID,
-		Type:    media.Type,
 		MediaID: &mediaIDUint,
 	}
 
@@ -88,7 +86,6 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	favType := c.Query("type")
 	limit := c.QueryInt("limit", 50)
 	offset := c.QueryInt("offset", 0)
 	if limit <= 0 {
@@ -102,7 +99,7 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 	}
 
 	ctx := c.UserContext()
-	favs, total, err := h.favRepo.FindByUser(ctx, userID, favType, limit, offset)
+	favs, total, err := h.favRepo.FindByUser(ctx, userID, limit, offset)
 	if err != nil {
 		log.Printf("FindByUser favorites: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch favorites")
@@ -137,7 +134,6 @@ func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 
 	fav := &models.Favorite{
 		UserID:     userID,
-		Type:       "artist",
 		ArtistName: &req.Artist,
 	}
 

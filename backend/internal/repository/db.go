@@ -55,7 +55,6 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&models.MediaLibrary{}, // must be before Media (FK constraint)
 		&models.Media{},
 		&models.Metadata{},
 		&models.User{},
@@ -69,9 +68,11 @@ func AutoMigrate(db *gorm.DB) error {
 }
 
 // RunMigrations applies schema fixes that AutoMigrate cannot perform
-// (dropping/replacing wrong indexes, deduplicating data). Must run BEFORE
-// AutoMigrate so that the correct indexes can be created afterwards.
+// (dropping/replacing wrong indexes, deduplicating data, dropping columns/tables).
+// Must run BEFORE AutoMigrate so that the correct indexes can be created afterwards.
 func RunMigrations(db *gorm.DB) error {
+	// --- Phase 1: fix indexes and dedupe (from earlier migrations) ---
+
 	// favorites: the old unique index on artist_name alone made every second
 	// media-like fail ('' collided globally). Drop it and normalize '' to
 	// NULL so the new composite (user_id, artist_name) index works.
@@ -104,6 +105,42 @@ func RunMigrations(db *gorm.DB) error {
 			SELECT MAX(id) FROM collection_items GROUP BY collection_id, media_id)`).Error; err != nil {
 			return fmt.Errorf("dedupe collection_items: %w", err)
 		}
+		// Deduplicate by (collection_id, position) before adding the unique
+		// index idx_collection_position. Keep the newest row per position.
+		if err := db.Exec(`DELETE FROM collection_items WHERE id NOT IN (
+			SELECT MAX(id) FROM collection_items GROUP BY collection_id, position)`).Error; err != nil {
+			return fmt.Errorf("dedupe collection_items by position: %w", err)
+		}
+	}
+
+	// --- Phase 2: drop redundant columns and tables ---
+
+	// media: drop library_id (FK to media_libraries, no longer needed).
+	if err := dropColumnIfExists(db, "media", "library_id"); err != nil {
+		return fmt.Errorf("drop media.library_id: %w", err)
+	}
+
+	// watch_progresses: drop duration (duplicates media.duration) and completed
+	// (can be derived from position vs duration).
+	if err := dropColumnIfExists(db, "watch_progresses", "duration"); err != nil {
+		return fmt.Errorf("drop watch_progresses.duration: %w", err)
+	}
+	if err := dropColumnIfExists(db, "watch_progresses", "completed"); err != nil {
+		return fmt.Errorf("drop watch_progresses.completed: %w", err)
+	}
+
+	// favorites: drop type (redundant — media type is in the media table;
+	// artist favorites are identified by artist_name IS NOT NULL).
+	if err := dropColumnIfExists(db, "favorites", "type"); err != nil {
+		return fmt.Errorf("drop favorites.type: %w", err)
+	}
+
+	// media_libraries: drop the entire table (replaced by config paths).
+	if tableExists(db, "media_libraries") {
+		log.Printf("migration: dropping table media_libraries")
+		if err := db.Exec("DROP TABLE IF EXISTS media_libraries").Error; err != nil {
+			return fmt.Errorf("drop media_libraries: %w", err)
+		}
 	}
 
 	return nil
@@ -114,6 +151,62 @@ func tableExists(db *gorm.DB, table string) bool {
 	var count int64
 	db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&count)
 	return count > 0
+}
+
+// columnExists reports whether a column exists in the given table.
+func columnExists(db *gorm.DB, table, column string) bool {
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?", table, column).Scan(&count)
+	return count > 0
+}
+
+// dropColumnIfExists drops a column from a table if it exists.
+// First drops any indexes that reference the column (SQLite does not do
+// this automatically with ALTER TABLE DROP COLUMN).
+// Uses ALTER TABLE DROP COLUMN (SQLite >= 3.35.0).
+func dropColumnIfExists(db *gorm.DB, table, column string) error {
+	if !columnExists(db, table, column) {
+		return nil
+	}
+
+	// Drop all indexes that include this column.
+	if err := dropIndexesOnColumn(db, table, column); err != nil {
+		return fmt.Errorf("drop indexes on %s.%s: %w", table, column, err)
+	}
+
+	log.Printf("migration: dropping column %s.%s", table, column)
+	return db.Exec("ALTER TABLE " + table + " DROP COLUMN " + column).Error
+}
+
+// dropIndexesOnColumn drops every index (unique or not) on table that
+// includes the given column.
+func dropIndexesOnColumn(db *gorm.DB, table, column string) error {
+	var indexes []struct {
+		Name   string
+		Unique bool `gorm:"column:unique"`
+	}
+	if err := db.Raw("PRAGMA index_list(" + table + ")").Scan(&indexes).Error; err != nil {
+		return err
+	}
+
+	for _, idx := range indexes {
+		var cols []struct {
+			Name string
+		}
+		if err := db.Raw("PRAGMA index_info(" + idx.Name + ")").Scan(&cols).Error; err != nil {
+			return err
+		}
+		for _, c := range cols {
+			if c.Name == column {
+				log.Printf("migration: dropping index %s on %s (references %s)", idx.Name, table, column)
+				if err := db.Exec("DROP INDEX IF EXISTS " + idx.Name).Error; err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // dropUniqueIndexesOnColumn drops every unique index on table whose only

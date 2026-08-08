@@ -5,8 +5,7 @@ import 'package:flux_media_server/features/favorites/domain/repositories/favorit
 import 'package:flux_media_server/shared/models/favorite.dart';
 
 class GetFavoritesParams {
-  const GetFavoritesParams({this.type});
-  final String? type;
+  const GetFavoritesParams();
 }
 
 class GetFavorites
@@ -16,6 +15,6 @@ class GetFavorites
 
   @override
   Future<Either<Failure, List<Favorite>>> call(GetFavoritesParams params) {
-    return repository.getFavorites(type: params.type);
+    return repository.getFavorites();
   }
 }

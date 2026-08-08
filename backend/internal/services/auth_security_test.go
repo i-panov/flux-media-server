@@ -142,19 +142,6 @@ func TestSanitizeFilename(t *testing.T) {
 	}
 }
 
-func TestLibraryPathFromName(t *testing.T) {
-	base := "/data/video"
-
-	p, err := LibraryPathFromName(base, "My Movies")
-	require.NoError(t, err)
-	assert.Equal(t, "/data/video/My_Movies", p)
-
-	for _, bad := range []string{"../../etc", "..", ".", "a/b", `a\b`, ""} {
-		_, err := LibraryPathFromName(base, bad)
-		assert.Error(t, err, "name %q must be rejected", bad)
-	}
-}
-
 func TestIsSubPath(t *testing.T) {
 	assert.True(t, IsSubPath("/data/video", "/data/video/a.mp4"))
 	assert.True(t, IsSubPath("/data/video", "/data/video"))

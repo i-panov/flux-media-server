@@ -21,7 +21,7 @@ import (
 	"flux/internal/repository"
 )
 
-// ErrScanInProgress is returned when a scan for the same library is already running.
+// ErrScanInProgress is returned when a scan for the same path is already running.
 var ErrScanInProgress = errors.New("scan already in progress")
 
 const quickHashChunk = 1024 * 1024 // 1MB head/tail for quick hash
@@ -38,91 +38,73 @@ func IsAllowedExtension(ext string) bool {
 }
 
 type ScannerService struct {
-	libraryRepo   repository.LibraryRepository
 	mediaRepo     repository.MediaRepository
 	config        *config.Config
 	metaExtractor *MetadataExtractor
 	thumbService  *ThumbnailService
 
 	mu       sync.RWMutex
-	statuses map[uint]*ScanStatus
+	statuses map[string]*ScanStatus
 }
 
 func NewScannerService(
-	libraryRepo repository.LibraryRepository,
 	mediaRepo repository.MediaRepository,
 	config *config.Config,
 ) *ScannerService {
 	return &ScannerService{
-		libraryRepo:   libraryRepo,
 		mediaRepo:     mediaRepo,
 		config:        config,
 		metaExtractor: NewMetadataExtractor(),
 		thumbService:  NewThumbnailService(config.Media.ThumbnailPath),
-		statuses:      make(map[uint]*ScanStatus),
+		statuses:      make(map[string]*ScanStatus),
 	}
 }
 
 func (s *ScannerService) ScanAll(ctx context.Context) error {
-	libraries, err := s.libraryRepo.FindAll(ctx)
-	if err != nil {
-		return err
-	}
-
-	for _, lib := range libraries {
-		if lib.Enabled {
-			if err := s.ScanLibrary(ctx, lib.ID); err != nil {
-				log.Printf("Error scanning library %s: %v", lib.Name, err)
-			}
+	paths := s.config.Media.MediaPaths()
+	for _, mp := range paths {
+		if err := s.ScanPath(ctx, mp.Path, mp.Type); err != nil {
+			log.Printf("Error scanning %s: %v", mp.Path, err)
 		}
 	}
-
 	return nil
 }
 
-func (s *ScannerService) GetScanStatus(libraryID uint) *ScanStatus {
+func (s *ScannerService) GetScanStatus(key string) *ScanStatus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if st, ok := s.statuses[libraryID]; ok {
+	if st, ok := s.statuses[key]; ok {
 		cp := *st
 		return &cp
 	}
-	return &ScanStatus{LibraryID: libraryID, Running: false}
+	return &ScanStatus{Running: false}
 }
 
-func (s *ScannerService) ScanLibrary(ctx context.Context, libraryID uint) error {
-	// Reject concurrent scans of the same library: parallel walks would race
-	// on statuses and on find-then-create against the unique file_path index.
+func (s *ScannerService) ScanPath(ctx context.Context, path, mediaType string) error {
+	// Reject concurrent scans of the same path.
 	s.mu.Lock()
-	if st, ok := s.statuses[libraryID]; ok && st.Running {
+	if st, ok := s.statuses[path]; ok && st.Running {
 		s.mu.Unlock()
 		return ErrScanInProgress
 	}
-	s.statuses[libraryID] = &ScanStatus{
-		LibraryID: libraryID,
+	s.statuses[path] = &ScanStatus{
 		Running:   true,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	s.mu.Unlock()
 
-	library, err := s.libraryRepo.FindByID(ctx, libraryID)
-
 	var scanErr error
+	seen, err := s.scanPathWalk(ctx, path, mediaType)
 	if err != nil {
 		scanErr = err
 	} else {
-		var seen map[string]struct{}
-		seen, scanErr = s.scanLibraryWalk(ctx, library)
-		if scanErr == nil {
-			// Remove DB records whose files disappeared from disk.
-			if err := s.sweepDeleted(ctx, library, seen); err != nil {
-				log.Printf("Sweep deleted files for library %s: %v", library.Name, err)
-			}
+		if err := s.sweepDeleted(ctx, path, seen); err != nil {
+			log.Printf("Sweep deleted files for %s: %v", path, err)
 		}
 	}
 
 	s.mu.Lock()
-	st := s.statuses[libraryID]
+	st := s.statuses[path]
 	st.Running = false
 	if scanErr != nil {
 		st.Error = scanErr.Error()
@@ -134,33 +116,33 @@ func (s *ScannerService) ScanLibrary(ctx context.Context, libraryID uint) error 
 	return scanErr
 }
 
-// sweepDeleted removes media records under the library path whose files were
+// sweepDeleted removes media records under the given path whose files were
 // not seen during the scan (i.e. deleted from disk).
-func (s *ScannerService) sweepDeleted(ctx context.Context, library *models.MediaLibrary, seen map[string]struct{}) error {
+func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen map[string]struct{}) error {
 	all, _, err := s.mediaRepo.FindAll(ctx, map[string]interface{}{}, 0, 0)
 	if err != nil {
 		return err
 	}
 
 	for _, m := range all {
-		if !IsSubPath(library.Path, m.FilePath) {
+		if !IsSubPath(scanPath, m.FilePath) {
 			continue
 		}
 		if _, ok := seen[m.FilePath]; !ok {
 			if err := s.mediaRepo.Delete(ctx, m.ID); err != nil {
 				log.Printf("Sweep: delete media %d (%s): %v", m.ID, m.FilePath, err)
 			} else {
-				log.Printf("Sweep: removed missing file from library: %s", m.FilePath)
+				log.Printf("Sweep: removed missing file: %s", m.FilePath)
 			}
 		}
 	}
 	return nil
 }
 
-func (s *ScannerService) scanLibraryWalk(ctx context.Context, library *models.MediaLibrary) (map[string]struct{}, error) {
+func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath, mediaType string) (map[string]struct{}, error) {
 	seen := make(map[string]struct{})
 
-	err := filepath.Walk(library.Path, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
 		// Honour context cancellation so a shutdown/abort does not block.
 		select {
 		case <-ctx.Done():

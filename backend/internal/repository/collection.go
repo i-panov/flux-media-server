@@ -75,6 +75,18 @@ func (r *CollectionItemStore) FindMediaByCollection(ctx context.Context, collect
 }
 
 func (r *CollectionItemStore) Add(ctx context.Context, item *models.CollectionItem) error {
+	// Auto-assign next position if not explicitly set (0 = default).
+	if item.Position == 0 {
+		var maxPos *int
+		r.db.WithContext(ctx).
+			Model(&models.CollectionItem{}).
+			Where("collection_id = ?", item.CollectionID).
+			Select("MAX(position)").
+			Scan(&maxPos)
+		if maxPos != nil {
+			item.Position = *maxPos + 1
+		}
+	}
 	return r.db.WithContext(ctx).Create(item).Error
 }
 

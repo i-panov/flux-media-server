@@ -76,7 +76,6 @@ final class _$ApiClient extends ApiClient {
     String? q,
     int? limit,
     int? offset,
-    int? libraryId,
   }) {
     final Uri $url = Uri.parse('/media');
     final Map<String, dynamic> $params = <String, dynamic>{
@@ -85,7 +84,6 @@ final class _$ApiClient extends ApiClient {
       'q': q,
       'limit': limit,
       'offset': offset,
-      'library_id': libraryId,
     };
     final Request $request = Request(
       'GET',
@@ -213,14 +211,12 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
-  Future<Response<Map<String, dynamic>>> getFavorites({String? type}) {
+  Future<Response<Map<String, dynamic>>> getFavorites() {
     final Uri $url = Uri.parse('/favorites');
-    final Map<String, dynamic> $params = <String, dynamic>{'type': type};
     final Request $request = Request(
       'GET',
       $url,
       client.baseUrl,
-      parameters: $params,
     );
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }

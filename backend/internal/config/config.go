@@ -62,6 +62,20 @@ type MediaConfig struct {
 	AudioPath     string `yaml:"audio_path"`
 }
 
+// MediaPath represents a scan path with its media type.
+type MediaPath struct {
+	Path string
+	Type string // "video" or "audio"
+}
+
+// MediaPaths returns all configured media paths with their types.
+func (m MediaConfig) MediaPaths() []MediaPath {
+	return []MediaPath{
+		{Path: m.VideoPath, Type: "video"},
+		{Path: m.AudioPath, Type: "audio"},
+	}
+}
+
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

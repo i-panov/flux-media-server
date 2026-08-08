@@ -18,7 +18,6 @@ class MediaRepositoryImpl implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-    int? libraryId,
   }) =>
       safeRepositoryCall(() async {
         final result = await remoteDataSource.getMediaList(
@@ -27,7 +26,6 @@ class MediaRepositoryImpl implements MediaRepository {
           q: q,
           limit: limit,
           offset: offset,
-          libraryId: libraryId,
         );
         final mediaList =
             result.items.map((json) => Media.fromJson(json)).toList();
@@ -77,14 +75,10 @@ class MediaRepositoryImpl implements MediaRepository {
   Future<Either<Failure, WatchProgress>> updateProgress(
     int mediaId, {
     int? position,
-    int? duration,
-    bool? completed,
   }) =>
       safeRepositoryCall(() => remoteDataSource.updateProgress(
             mediaId,
             position: position,
-            duration: duration,
-            completed: completed,
           ));
 
   @override

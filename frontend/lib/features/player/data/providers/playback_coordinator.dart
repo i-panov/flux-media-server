@@ -224,7 +224,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       (_) => null,
       (progressList) {
         for (final p in progressList) {
-          if (p.mediaId == mediaId && !p.completed && p.position > 0) {
+          if (p.mediaId == mediaId && p.position > 0) {
             return Duration(seconds: p.position);
           }
         }
@@ -241,16 +241,11 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     Duration duration, {
     bool? completed,
   }) async {
-    if (position <= Duration.zero && completed != true) return;
+    if (position <= Duration.zero) return;
     try {
-      final isCompleted = completed ??
-          (duration.inSeconds > 0 &&
-              position.inSeconds >= duration.inSeconds * 0.9);
       await _ref.read(mediaRepositoryProvider).updateProgress(
             mediaId,
             position: position.inSeconds,
-            duration: duration.inSeconds,
-            completed: isCompleted,
           );
     } on Exception catch (e) {
       developer.log('Failed to save progress: $e');

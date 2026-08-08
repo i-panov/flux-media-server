@@ -11,7 +11,6 @@ class GetMediaListParams {
     this.q,
     this.limit,
     this.offset,
-    this.libraryId,
   });
 
   final String? type;
@@ -19,7 +18,6 @@ class GetMediaListParams {
   final String? q;
   final int? limit;
   final int? offset;
-  final int? libraryId;
 }
 
 class GetMediaList
@@ -38,7 +36,6 @@ class GetMediaList
       q: params.q,
       limit: params.limit,
       offset: params.offset,
-      libraryId: params.libraryId,
     );
   }
 }

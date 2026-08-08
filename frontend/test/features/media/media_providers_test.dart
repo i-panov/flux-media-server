@@ -25,7 +25,6 @@ class FakeMediaRepository implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-    int? libraryId,
   })? onGetMediaList;
   Future<Either<Failure, Media>> Function(int)? onGetMediaDetail;
 
@@ -36,9 +35,8 @@ class FakeMediaRepository implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-    int? libraryId,
   }) =>
-      onGetMediaList!(type: type, year: year, q: q, limit: limit, offset: offset, libraryId: libraryId);
+      onGetMediaList!(type: type, year: year, q: q, limit: limit, offset: offset);
 
   @override
   Future<Either<Failure, Media>> getMediaDetail(int id) =>
@@ -72,16 +70,12 @@ class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, WatchProgress>> updateProgress(
     int mediaId, {
     int? position,
-    int? duration,
-    bool? completed,
   }) async =>
       const Right(WatchProgress(
         id: 0,
         userId: 0,
         mediaId: 0,
         position: 0,
-        duration: 0,
-        completed: false,
       ));
 
   @override
@@ -112,7 +106,7 @@ void main() {
     test('loads media list', () async {
       final items = [_fakeMedia(1), _fakeMedia(2)];
       fakeRepo.onGetMediaList =
-          ({type, year, q, limit, offset, libraryId}) async => Right((items: items, total: 2));
+          ({type, year, q, limit, offset}) async => Right((items: items, total: 2));
 
       final result = await container.read(mediaListProvider('video').future);
       expect(result.items, hasLength(2));
@@ -122,13 +116,13 @@ void main() {
     test('loadMore appends items', () async {
       final first = [_fakeMedia(1), _fakeMedia(2)];
       fakeRepo.onGetMediaList =
-          ({type, year, q, limit, offset, libraryId}) async => Right((items: first, total: 4));
+          ({type, year, q, limit, offset}) async => Right((items: first, total: 4));
 
       await container.read(mediaListProvider('video').future);
 
       final second = [_fakeMedia(3), _fakeMedia(4)];
       fakeRepo.onGetMediaList =
-          ({type, year, q, limit, offset, libraryId}) async => Right((items: second, total: 4));
+          ({type, year, q, limit, offset}) async => Right((items: second, total: 4));
 
       await container.read(mediaListProvider('video').notifier).loadMore();
 

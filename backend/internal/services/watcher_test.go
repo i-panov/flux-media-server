@@ -19,8 +19,8 @@ type MockScanner struct {
 	scanCalled chan bool
 }
 
-func (m *MockScanner) ScanLibrary(ctx context.Context, libraryID uint) error {
-	args := m.Called(ctx, libraryID)
+func (m *MockScanner) ScanPath(ctx context.Context, path, mediaType string) error {
+	args := m.Called(ctx, path, mediaType)
 	return args.Error(0)
 }
 
@@ -38,8 +38,8 @@ func (m *MockScanner) ScanAll(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockScanner) GetScanStatus(libraryID uint) *services.ScanStatus {
-	args := m.Called(libraryID)
+func (m *MockScanner) GetScanStatus(key string) *services.ScanStatus {
+	args := m.Called(key)
 	return args.Get(0).(*services.ScanStatus)
 }
 

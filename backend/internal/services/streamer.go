@@ -10,16 +10,16 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"flux/internal/repository"
+	"flux/internal/config"
 	"flux/internal/response"
 )
 
 type StreamerService struct {
-	libraryRepo repository.LibraryRepository
+	mediaPaths []config.MediaPath
 }
 
-func NewStreamerService(libraryRepo repository.LibraryRepository) *StreamerService {
-	return &StreamerService{libraryRepo: libraryRepo}
+func NewStreamerService(cfg *config.Config) *StreamerService {
+	return &StreamerService{mediaPaths: cfg.Media.MediaPaths()}
 }
 
 func (s *StreamerService) IsPathAllowed(ctx context.Context, filePath string) (bool, error) {
@@ -35,21 +35,15 @@ func (s *StreamerService) IsPathAllowed(ctx context.Context, filePath string) (b
 		resolvedPath = absPath
 	}
 
-	libraries, err := s.libraryRepo.FindAll(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	for _, lib := range libraries {
-		// Disabled libraries must not serve files.
-		if !lib.Enabled {
+	for _, mp := range s.mediaPaths {
+		if mp.Path == "" {
 			continue
 		}
-		absLibPath, err := filepath.Abs(lib.Path)
+		absLibPath, err := filepath.Abs(mp.Path)
 		if err != nil {
 			continue
 		}
-		// Also resolve symlinks for library path
+		// Also resolve symlinks for media path
 		resolvedLibPath, err := filepath.EvalSymlinks(absLibPath)
 		if err != nil {
 			resolvedLibPath = absLibPath

@@ -297,7 +297,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     onPressed: () {
                       ref
                           .read(favoriteToggleProvider(media.id).notifier)
-                          .toggle(media.id, media.type);
+                          .toggle(media.id);
                     },
                     iconSize: 20,
                     padding: EdgeInsets.zero,

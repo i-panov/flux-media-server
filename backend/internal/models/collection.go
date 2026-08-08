@@ -15,8 +15,8 @@ type Collection struct {
 // CollectionItem links a media item to a collection.
 type CollectionItem struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
-	CollectionID uint      `gorm:"index;uniqueIndex:idx_collection_media" json:"collection_id"`
+	CollectionID uint      `gorm:"index;uniqueIndex:idx_collection_media;uniqueIndex:idx_collection_position" json:"collection_id"`
 	MediaID      uint      `gorm:"index;uniqueIndex:idx_collection_media" json:"media_id"`
-	Position     int       `gorm:"default:0" json:"position"`
+	Position     int       `gorm:"default:0;uniqueIndex:idx_collection_position" json:"position"`
 	AddedAt      time.Time `json:"added_at"`
 }

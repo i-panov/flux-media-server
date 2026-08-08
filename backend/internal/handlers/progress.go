@@ -23,9 +23,7 @@ func NewProgressHandler(progressRepo repository.ProgressRepository) *ProgressHan
 }
 
 type UpdateProgressRequest struct {
-	Position  int  `json:"position"`
-	Duration  int  `json:"duration"`
-	Completed bool `json:"completed"`
+	Position int `json:"position"`
 }
 
 func (h *ProgressHandler) List(c *fiber.Ctx) error {
@@ -76,11 +74,8 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	if req.Position < 0 || req.Duration < 0 {
-		return response.Error(c, fiber.StatusBadRequest, "Position and duration must be non-negative")
-	}
-	if req.Duration > 0 && req.Position > req.Duration {
-		return response.Error(c, fiber.StatusBadRequest, "Position must not exceed duration")
+	if req.Position < 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Position must be non-negative")
 	}
 
 	ctx := c.UserContext()
@@ -97,8 +92,6 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 	}
 
 	progress.Position = req.Position
-	progress.Duration = req.Duration
-	progress.Completed = req.Completed
 
 	if err := h.progressRepo.Upsert(ctx, progress); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to update progress")

@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_media_server/shared/models/library.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/metadata.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
@@ -83,28 +82,6 @@ void main() {
     });
   });
 
-  group('MediaLibrary', () {
-    test('fromJson parses correctly', () {
-      final json = {
-        'id': 1,
-        'name': 'Movies',
-        'path': '/media/movies',
-        'type': 'movie',
-        'enabled': true,
-        'scan_interval': 30,
-      };
-
-      final lib = MediaLibrary.fromJson(json);
-
-      expect(lib.id, 1);
-      expect(lib.name, 'Movies');
-      expect(lib.path, '/media/movies');
-      expect(lib.type, 'movie');
-      expect(lib.enabled, true);
-      expect(lib.scanInterval, 30);
-    });
-  });
-
   group('WatchProgress', () {
     test('fromJson parses correctly', () {
       final json = {
@@ -112,8 +89,6 @@ void main() {
         'user_id': 1,
         'media_id': 1,
         'position': 3600,
-        'duration': 7200,
-        'completed': false,
       };
 
       final progress = WatchProgress.fromJson(json);
@@ -122,8 +97,6 @@ void main() {
       expect(progress.userId, 1);
       expect(progress.mediaId, 1);
       expect(progress.position, 3600);
-      expect(progress.duration, 7200);
-      expect(progress.completed, false);
     });
   });
 

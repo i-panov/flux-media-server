@@ -59,28 +59,10 @@ func TestWatchProgressFields(t *testing.T) {
 		UserID:    1,
 		MediaID:   1,
 		Position:  1800,
-		Duration:  3600,
-		Completed: false,
 		UpdatedAt: time.Now(),
 	}
-	if wp.Position != 1800 || wp.Completed != false {
+	if wp.Position != 1800 {
 		t.Errorf("WatchProgress fields not properly set: %+v", wp)
-	}
-}
-
-func TestMediaLibraryFields(t *testing.T) {
-	ml := MediaLibrary{
-		ID:           1,
-		Name:         "Movies",
-		Path:         "/movies",
-		Type:         "movie",
-		Enabled:      true,
-		ScanInterval: 60,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-	}
-	if ml.Path != "/movies" || ml.ScanInterval != 60 {
-		t.Errorf("MediaLibrary fields not properly set: %+v", ml)
 	}
 }
 
@@ -89,11 +71,10 @@ func TestFavoriteFields(t *testing.T) {
 	f := Favorite{
 		ID:        1,
 		UserID:    1,
-		Type:      "video",
 		MediaID:   &mediaID,
 		CreatedAt: time.Now(),
 	}
-	if f.ID != 1 || f.Type != "video" || *f.MediaID != 5 {
+	if f.ID != 1 || *f.MediaID != 5 {
 		t.Errorf("Favorite fields not properly set: %+v", f)
 	}
 
@@ -101,7 +82,6 @@ func TestFavoriteFields(t *testing.T) {
 	f2 := Favorite{
 		ID:         2,
 		UserID:     1,
-		Type:       "artist",
 		MediaID:    nil,
 		ArtistName: &artist,
 		CreatedAt:  time.Now(),

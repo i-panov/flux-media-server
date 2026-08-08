@@ -24,12 +24,14 @@ class ContinueWatchingRow extends StatelessWidget {
   final ValueChanged<int>? onDownloadToggled;
 
   double _progress((Media, WatchProgress) item) {
-    if (item.$2.duration == 0) return 0;
-    return item.$2.position / item.$2.duration;
+    final duration = item.$1.duration ?? 0;
+    if (duration == 0) return 0;
+    return item.$2.position / duration;
   }
 
   bool _isCompleted((Media, WatchProgress) item) {
-    return item.$2.completed;
+    final duration = item.$1.duration ?? 0;
+    return duration > 0 && item.$2.position >= duration * 0.9;
   }
 
   String _formatDuration(Duration duration) {
@@ -73,7 +75,7 @@ class ContinueWatchingRow extends StatelessWidget {
               final progress = _progress(item);
               final completed = _isCompleted(item);
               final remaining = Duration(
-                  seconds: item.$2.duration - item.$2.position);
+                  seconds: (item.$1.duration ?? 0) - item.$2.position);
 
               return SizedBox(
                 width: 160,

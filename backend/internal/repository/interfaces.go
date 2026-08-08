@@ -27,16 +27,6 @@ type MediaRepository interface {
 	Delete(ctx context.Context, id uint) error
 }
 
-// LibraryRepository defines data access methods for MediaLibrary entities.
-type LibraryRepository interface {
-	FindAll(ctx context.Context) ([]models.MediaLibrary, error)
-	FindByID(ctx context.Context, id uint) (*models.MediaLibrary, error)
-	FindByPath(ctx context.Context, path string) (*models.MediaLibrary, error)
-	Create(ctx context.Context, library *models.MediaLibrary) error
-	Update(ctx context.Context, library *models.MediaLibrary) error
-	Delete(ctx context.Context, id uint) error
-}
-
 // ProgressRepository defines data access methods for WatchProgress entities.
 type ProgressRepository interface {
 	FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.WatchProgress, int64, error)
@@ -47,7 +37,7 @@ type ProgressRepository interface {
 
 // FavoriteRepository defines data access methods for Favorite entities.
 type FavoriteRepository interface {
-	FindByUser(ctx context.Context, userID uint, favType string, limit, offset int) ([]models.Favorite, int64, error)
+	FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.Favorite, int64, error)
 	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error)
 	FindByUserAndArtist(ctx context.Context, userID uint, artistName string) (*models.Favorite, error)
 	IsFavorited(ctx context.Context, userID, mediaID uint) (bool, error)

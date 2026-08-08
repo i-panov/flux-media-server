@@ -10,7 +10,6 @@ class Favorite with _$Favorite {
   const factory Favorite({
     required int id,
     @JsonKey(name: 'user_id') required int userId,
-    required String type, // video, audio, artist
     @JsonKey(name: 'media_id') int? mediaId,
     @JsonKey(name: 'artist_name') String? artistName,
     @JsonKey(name: 'created_at') required DateTime createdAt,

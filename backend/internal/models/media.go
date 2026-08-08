@@ -8,7 +8,6 @@ import (
 
 type Media struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
-	LibraryID    uint           `gorm:"not null;index;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"library_id"`
 	Title        string         `gorm:"index" json:"title"`
 	Filename     string         `gorm:"index" json:"filename"`
 	Year         int            `json:"year"`

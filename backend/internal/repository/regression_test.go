@@ -22,21 +22,21 @@ func TestFavoriteStore_MultipleMediaFavorites(t *testing.T) {
 	ctx := context.Background()
 
 	m1, m2 := uint(10), uint(11)
-	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, Type: "video", MediaID: &m1}))
-	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, Type: "video", MediaID: &m2}),
+	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, MediaID: &m1}))
+	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, MediaID: &m2}),
 		"second media favorite of the same user must succeed")
 
 	// Duplicate favorite must still be rejected by the unique index.
-	err = store.Create(ctx, &models.Favorite{UserID: 1, Type: "video", MediaID: &m1})
+	err = store.Create(ctx, &models.Favorite{UserID: 1, MediaID: &m1})
 	assert.Error(t, err, "duplicate favorite must fail")
 
 	// Another user can favorite the same media.
-	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 2, Type: "video", MediaID: &m1}))
+	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 2, MediaID: &m1}))
 
 	// Artist favorites of different users don't collide.
 	a := "Pink Floyd"
-	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, Type: "artist", ArtistName: &a}))
-	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 2, Type: "artist", ArtistName: &a}))
+	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, ArtistName: &a}))
+	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 2, ArtistName: &a}))
 }
 
 // Regression test: watch progress must have a composite unique index on
@@ -47,10 +47,10 @@ func TestProgressStore_UpsertNoDuplicates(t *testing.T) {
 	require.NoError(t, AutoMigrate(db))
 
 	// Direct duplicate insert must fail on the unique index.
-	p1 := &models.WatchProgress{UserID: 1, MediaID: 10, Position: 5, Duration: 100}
+	p1 := &models.WatchProgress{UserID: 1, MediaID: 10, Position: 5}
 	require.NoError(t, db.Create(p1).Error)
 
-	p2 := &models.WatchProgress{UserID: 1, MediaID: 10, Position: 7, Duration: 100}
+	p2 := &models.WatchProgress{UserID: 1, MediaID: 10, Position: 7}
 	err = db.Create(p2).Error
 	assert.Error(t, err, "duplicate (user_id, media_id) progress must be rejected by unique index")
 }

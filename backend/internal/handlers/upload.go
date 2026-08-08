@@ -6,11 +6,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
+	"flux/internal/config"
 	"flux/internal/metadata"
 	"flux/internal/models"
 	"flux/internal/repository"
@@ -20,12 +20,12 @@ import (
 
 // UploadHandler handles file uploads.
 type UploadHandler struct {
-	libraryRepo repository.LibraryRepository
-	mediaRepo   repository.MediaRepository
-	scanner     services.ScannerInterface
-	thumbSvc    *services.ThumbnailService
-	extractor   *services.MetadataExtractor
-	config      UploadConfig
+	mediaRepo repository.MediaRepository
+	scanner   services.ScannerInterface
+	thumbSvc  *services.ThumbnailService
+	extractor *services.MetadataExtractor
+	config    UploadConfig
+	mediaCfg  config.MediaConfig
 }
 
 // UploadConfig holds upload-specific configuration.
@@ -35,19 +35,19 @@ type UploadConfig struct {
 
 // NewUploadHandler creates a new UploadHandler.
 func NewUploadHandler(
-	libraryRepo repository.LibraryRepository,
 	mediaRepo repository.MediaRepository,
 	scanner services.ScannerInterface,
 	thumbSvc *services.ThumbnailService,
+	mediaCfg config.MediaConfig,
 	config UploadConfig,
 ) *UploadHandler {
 	return &UploadHandler{
-		libraryRepo: libraryRepo,
-		mediaRepo:   mediaRepo,
-		scanner:     scanner,
-		thumbSvc:    thumbSvc,
-		extractor:   services.NewMetadataExtractor(),
-		config:      config,
+		mediaRepo: mediaRepo,
+		scanner:   scanner,
+		thumbSvc:  thumbSvc,
+		extractor: services.NewMetadataExtractor(),
+		mediaCfg:  mediaCfg,
+		config:    config,
 	}
 }
 
@@ -55,36 +55,17 @@ func NewUploadHandler(
 func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	// Resolve library: either by library_id, or by media_type (auto-find default).
-	var library *models.MediaLibrary
-	libraryIDStr := c.FormValue("library_id")
-	if libraryIDStr != "" {
-		libID, err := strconv.Atoi(libraryIDStr)
-		if err != nil || libID <= 0 {
-			return response.Error(c, fiber.StatusBadRequest, "library_id must be a positive number")
-		}
-		library, err = h.libraryRepo.FindByID(ctx, uint(libID))
-		if err != nil {
-			return response.Error(c, fiber.StatusNotFound, "Library not found")
-		}
-	} else {
-		mediaType := c.FormValue("media_type")
-		if mediaType == "" {
-			mediaType = "video"
-		}
-		libs, err := h.libraryRepo.FindAll(ctx)
-		if err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Failed to find libraries")
-		}
-		for _, lib := range libs {
-			if lib.Type == mediaType && lib.Enabled {
-				library = &lib
-				break
-			}
-		}
-		if library == nil {
-			return response.Error(c, fiber.StatusNotFound, "No enabled library found for type: "+mediaType)
-		}
+	// Resolve destination path by media_type.
+	mediaType := c.FormValue("media_type")
+	if mediaType == "" {
+		mediaType = "video"
+	}
+	destPath := h.mediaCfg.VideoPath
+	if mediaType == "audio" {
+		destPath = h.mediaCfg.AudioPath
+	}
+	if destPath == "" {
+		return response.Error(c, fiber.StatusInternalServerError, "No path configured for media type: "+mediaType)
 	}
 
 	// Get uploaded file.
@@ -115,15 +96,15 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "File type not allowed: "+ext)
 	}
 
-	// Ensure library directory exists.
-	if err := os.MkdirAll(library.Path, 0755); err != nil {
-		log.Printf("upload: mkdir %s: %v", library.Path, err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to create library directory")
+	// Ensure destination directory exists.
+	if err := os.MkdirAll(destPath, 0755); err != nil {
+		log.Printf("upload: mkdir %s: %v", destPath, err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to create directory")
 	}
 
-	// Save file to library path.
-	dstPath := filepath.Join(library.Path, filename)
-	if !services.IsSubPath(library.Path, dstPath) {
+	// Save file to destination path.
+	dstPath := filepath.Join(destPath, filename)
+	if !services.IsSubPath(destPath, dstPath) {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid filename")
 	}
 
@@ -138,7 +119,7 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	}
 
 	// Create media record using scanner logic (hash, metadata, thumbnail).
-	media, err := h.createMediaFromUpload(ctx, dstPath, filename, library)
+	media, err := h.createMediaFromUpload(ctx, dstPath, filename)
 	if err != nil {
 		log.Printf("upload: create media: %v", err)
 		// Remove the orphaned file so we don't leave untracked data on disk.
@@ -156,7 +137,7 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 }
 
 // createMediaFromUpload creates a media record from an uploaded file.
-func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, filename string, library *models.MediaLibrary) (*models.Media, error) {
+func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, filename string) (*models.Media, error) {
 	// Compute hashes.
 	hash, err := services.HashFile(filePath)
 	if err != nil {
