@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
@@ -36,6 +37,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _resumeDialogShown = false;
   late final PlaybackCoordinator _coordinator;
 
+  /// Visibility of custom overlay controls (back button, seek ±10s, speed).
+  bool _overlayVisible = true;
+  Timer? _hideTimer;
+
+  /// Auto-hide delay — matches MaterialVideoControls default (3s).
+  static const _hideDelay = Duration(seconds: 3);
+
+  void _showOverlay() {
+    _hideTimer?.cancel();
+    setState(() => _overlayVisible = true);
+    _hideTimer = Timer(_hideDelay, () {
+      if (mounted) setState(() => _overlayVisible = false);
+    });
+  }
+
+  void _toggleOverlay() {
+    if (_overlayVisible) {
+      _hideTimer?.cancel();
+      setState(() => _overlayVisible = false);
+    } else {
+      _showOverlay();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +75,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     ]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _coordinator.play(widget.media);
+      _showOverlay();
     });
   }
 
@@ -83,6 +109,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
     // Stop playback (also persists watch progress) when leaving the screen,
     // e.g. via system back button which bypasses the in-app back button.
     _coordinator.stop();
@@ -137,53 +164,81 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       : MaterialDesktopVideoControls,
                 ),
               ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: IconButton(
-                  color: Colors.white,
-                  icon: const Icon(Icons.arrow_back),
-                  tooltip: l.mediaDetail,
-                  onPressed: () async {
-                    await ref.read(videoPlayerDatasourceProvider).player.pause();
-                    if (context.mounted) context.maybePop();
-                  },
+              // Transparent tap catcher — toggles overlay visibility.
+              // translucent allows MaterialVideoControls underneath to also
+              // receive the tap so its own controls stay in sync.
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _toggleOverlay,
                 ),
               ),
-              Positioned(
-                bottom: 80,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _ControlButton(
-                      icon: Icons.replay_10,
-                      tooltip: '-10s',
-                      onPressed: () {
-                        final newPos = position - const Duration(seconds: 10);
-                        _coordinator.seek(newPos);
-                      },
-                    ),
-                    const SizedBox(width: 16),
-                    _ControlButton(
-                      icon: Icons.forward_10,
-                      tooltip: '+10s',
-                      onPressed: () {
-                        final newPos = position + const Duration(seconds: 10);
-                        _coordinator.seek(newPos);
-                      },
-                    ),
-                    const SizedBox(width: 24),
-                    _ControlButton(
-                      label: '${speed}x',
-                      tooltip: l.speed,
-                      onPressed: () {
-                        final next = speed >= 2.0 ? 0.5 : speed + 0.5;
-                        _coordinator.setSpeed(next);
-                      },
-                    ),
-                  ],
+              AnimatedOpacity(
+                opacity: _overlayVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: IgnorePointer(
+                  ignoring: !_overlayVisible,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: IconButton(
+                          color: Colors.white,
+                          icon: const Icon(Icons.arrow_back),
+                          tooltip: l.mediaDetail,
+                          onPressed: () async {
+                            await ref
+                                .read(videoPlayerDatasourceProvider)
+                                .player
+                                .pause();
+                            if (context.mounted) context.maybePop();
+                          },
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 80,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _ControlButton(
+                              icon: Icons.replay_10,
+                              tooltip: '-10s',
+                              onPressed: () {
+                                final newPos =
+                                    position - const Duration(seconds: 10);
+                                _coordinator.seek(newPos);
+                                _showOverlay();
+                              },
+                            ),
+                            const SizedBox(width: 16),
+                            _ControlButton(
+                              icon: Icons.forward_10,
+                              tooltip: '+10s',
+                              onPressed: () {
+                                final newPos =
+                                    position + const Duration(seconds: 10);
+                                _coordinator.seek(newPos);
+                                _showOverlay();
+                              },
+                            ),
+                            const SizedBox(width: 24),
+                            _ControlButton(
+                              label: '${speed}x',
+                              tooltip: l.speed,
+                              onPressed: () {
+                                final next = speed >= 2.0 ? 0.5 : speed + 0.5;
+                                _coordinator.setSpeed(next);
+                                _showOverlay();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
