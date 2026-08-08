@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 part 'media_detail_provider.freezed.dart';
@@ -16,18 +17,36 @@ class MediaDetailState with _$MediaDetailState {
 }
 
 class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
-  MediaDetailNotifier({required GetMediaDetail getMediaDetail})
-      : _getMediaDetail = getMediaDetail,
+  MediaDetailNotifier({
+    required GetMediaDetail getMediaDetail,
+    required Ref ref,
+  })  : _getMediaDetail = getMediaDetail,
+        _ref = ref,
         super(const MediaDetailState.loading());
 
   final GetMediaDetail _getMediaDetail;
+  final Ref _ref;
 
   Future<void> load(int id) async {
     state = const MediaDetailState.loading();
     final result = await _getMediaDetail(id);
-    result.fold(
-      (failure) => state = MediaDetailState.error(message: failure.message),
-      (media) => state = MediaDetailState.loaded(media: media),
+    await result.fold<Future<void>>(
+      (failure) async {
+        // API failed — try local metadata (offline mode).
+        final cacheService = _ref.read(offlineCacheServiceProvider);
+        final cachedMedia = await cacheService.getCachedMedia();
+        final local = cachedMedia.where((m) => m.id == id).firstOrNull;
+        if (local != null) {
+          state = MediaDetailState.loaded(media: local);
+        } else {
+          state = MediaDetailState.error(message: failure.message);
+        }
+      },
+      (media) async {
+        // Persist metadata for offline access.
+        _ref.read(offlineCacheServiceProvider).saveMetadata(media);
+        state = MediaDetailState.loaded(media: media);
+      },
     );
   }
 
@@ -44,5 +63,6 @@ final mediaDetailProvider = StateNotifierProvider.autoDispose
     .family<MediaDetailNotifier, MediaDetailState, int>(
   (ref, mediaId) => MediaDetailNotifier(
     getMediaDetail: ref.watch(getMediaDetailUseCaseProvider),
+    ref: ref,
   ),
 );

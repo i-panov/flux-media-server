@@ -5,10 +5,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/features/lyrics/domain/usecases/get_lyrics.dart';
+import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_invalidator_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
+import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// Manages offline media downloads.
@@ -23,8 +27,12 @@ class OfflineCacheService {
   static final String _prefix = kDebugMode ? 'debug_' : 'release_';
 
   String _fileName(int mediaId) => '${_prefix}flux_media_$mediaId';
+  static String _metaKey(int mediaId) => '${_prefix}flux_meta_$mediaId';
+  static String _lyricsKey(int mediaId) => '${_prefix}flux_lyrics_$mediaId';
 
   String? get _authToken => _ref.read(settingsProvider).settings.authToken;
+
+  SharedPreferences get _prefs => _ref.read(sharedPreferencesProvider);
 
   /// Returns the local file path for a cached media item, or null if not cached.
   Future<String?> getLocalPath(int mediaId) async {
@@ -94,6 +102,10 @@ class OfflineCacheService {
           await localFile.delete();
         }
         await partFile.rename(localFile.path);
+
+        // Save media metadata for offline access.
+        await saveMetadata(media);
+
         return localFile.path;
       } catch (e) {
         if (await partFile.exists()) {
@@ -137,7 +149,37 @@ class OfflineCacheService {
     return null;
   }
 
-  /// Removes a downloaded media file.
+  /// Saves media metadata to SharedPreferences for offline access.
+  Future<void> saveMetadata(Media media) async {
+    try {
+      await _prefs.setString(_metaKey(media.id), jsonEncode(media.toJson()));
+    } catch (e) {
+      AppLogger.error('Error saving metadata', e);
+    }
+  }
+
+  /// Saves lyrics to SharedPreferences for offline access.
+  Future<void> saveLyrics(int mediaId, Lyrics lyrics) async {
+    try {
+      await _prefs.setString(_lyricsKey(mediaId), jsonEncode(lyrics.toJson()));
+    } catch (e) {
+      AppLogger.error('Error saving lyrics', e);
+    }
+  }
+
+  /// Returns locally cached lyrics, or null if not saved.
+  Lyrics? getCachedLyrics(int mediaId) {
+    final jsonStr = _prefs.getString(_lyricsKey(mediaId));
+    if (jsonStr == null) return null;
+    try {
+      return Lyrics.fromJson(jsonDecode(jsonStr) as Map<String, dynamic>);
+    } catch (e) {
+      AppLogger.error('Error reading cached lyrics', e);
+      return null;
+    }
+  }
+
+  /// Removes a downloaded media file, its metadata and lyrics.
   Future<void> remove(int mediaId) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
@@ -145,6 +187,8 @@ class OfflineCacheService {
       if (await file.exists()) {
         await file.delete();
       }
+      await _prefs.remove(_metaKey(mediaId));
+      await _prefs.remove(_lyricsKey(mediaId));
     } catch (e) {
       AppLogger.error('Error removing cached file', e);
     }
@@ -171,6 +215,29 @@ class OfflineCacheService {
       return ids;
     } catch (e) {
       AppLogger.error('Error listing cached files', e);
+      return [];
+    }
+  }
+
+  /// Returns cached media items by reading metadata from SharedPreferences.
+  /// Works offline — no API calls.
+  Future<List<Media>> getCachedMedia() async {
+    try {
+      final ids = await getCachedIds();
+      final mediaList = <Media>[];
+      for (final id in ids) {
+        final jsonStr = _prefs.getString(_metaKey(id));
+        if (jsonStr == null) continue;
+        try {
+          final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+          mediaList.add(Media.fromJson(json));
+        } catch (e) {
+          AppLogger.error('Error reading cached metadata for media $id', e);
+        }
+      }
+      return mediaList;
+    } catch (e) {
+      AppLogger.error('Error listing cached media', e);
       return [];
     }
   }
@@ -217,6 +284,21 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
         },
       );
       state = const DownloadState.downloaded();
+
+      // Try to fetch and cache lyrics for offline access.
+      try {
+        final getLyrics = ref.read(getLyricsProvider);
+        final result = await getLyrics(media.id);
+        result.fold(
+          (_) => null,
+          (lyrics) {
+            if (lyrics != null) {
+              _cacheService.saveLyrics(media.id, lyrics);
+            }
+          },
+        );
+      } catch (_) {}
+
       ref.read(downloadsInvalidatorProvider.notifier).state++;
     } catch (e, st) {
       AppLogger.error('Download failed', e, st);

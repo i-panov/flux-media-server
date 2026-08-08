@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/artist_card.dart';
@@ -132,7 +133,8 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (mediaListState.hasError || favoritesState.hasError) {
+    final isOffline = ref.watch(isOfflineProvider);
+    if (!isOffline && (mediaListState.hasError || favoritesState.hasError)) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

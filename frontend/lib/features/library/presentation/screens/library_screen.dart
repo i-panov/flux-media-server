@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -19,6 +20,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final l = AppLocalizations.of(context)!;
     final libraryState = ref.watch(libraryProvider);
     final notifier = ref.read(libraryProvider.notifier);
+    final isOffline = ref.watch(isOfflineProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -32,21 +34,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         },
         child: libraryState.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('${l.errorLoadingLibraries}: $e'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => ref.invalidate(libraryProvider),
-                  child: Text(l.retry),
+          error: (e, _) => isOffline
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.folder_off_outlined,
+                          size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      Text(l.noMediaFound),
+                    ],
+                  ),
+                )
+              : Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('${l.errorLoadingLibraries}: $e'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => ref.invalidate(libraryProvider),
+                        child: Text(l.retry),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
           data: (libraries) {
             if (libraries.isEmpty) {
               return ListView(

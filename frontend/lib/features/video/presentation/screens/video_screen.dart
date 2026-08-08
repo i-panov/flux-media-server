@@ -3,6 +3,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
@@ -112,11 +113,13 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Show error state
-    if (mediaListState.hasError ||
-        watchProgressState.hasError ||
-        favoritesState.hasError ||
-        collectionsState.hasError) {
+    // Show error state (but not in offline mode — banner is enough)
+    final isOffline = ref.watch(isOfflineProvider);
+    if (!isOffline &&
+        (mediaListState.hasError ||
+            watchProgressState.hasError ||
+            favoritesState.hasError ||
+            collectionsState.hasError)) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

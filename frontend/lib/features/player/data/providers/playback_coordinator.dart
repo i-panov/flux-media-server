@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
@@ -84,9 +85,12 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     _cancelSubscriptions();
     _cancelProgressTimer();
 
-    final url = '$_baseUrl/media/${media.id}/stream';
+    // Use local file if downloaded, otherwise stream from server.
+    final cacheService = _ref.read(offlineCacheServiceProvider);
+    final localPath = await cacheService.getLocalPath(media.id);
+    final url = localPath ?? '$_baseUrl/media/${media.id}/stream';
     final token = _ref.read(settingsProvider).settings.authToken;
-    final headers = token != null
+    final headers = localPath == null && token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : null;
 
@@ -95,11 +99,15 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       await _videoPlayer.stop();
 
       // Build cover art URL for system notification.
-      final coverUrl = (media.coverUrl != null && media.coverUrl!.isNotEmpty)
-          ? '$_baseUrl/media/${media.id}/cover'
-          : (media.thumbnailUrl != null && media.thumbnailUrl!.isNotEmpty
-              ? '$_baseUrl/media/${media.id}/thumb'
-              : null);
+      // Skip when offline — no server to fetch from.
+      String? coverUrl;
+      if (localPath == null) {
+        coverUrl = (media.coverUrl != null && media.coverUrl!.isNotEmpty)
+            ? '$_baseUrl/media/${media.id}/cover'
+            : (media.thumbnailUrl != null && media.thumbnailUrl!.isNotEmpty
+                ? '$_baseUrl/media/${media.id}/thumb'
+                : null);
+      }
 
       // Start audio playback with metadata for the system notification.
       await _audioPlayer.loadSource(
