@@ -78,15 +78,15 @@ func TestFavoriteFields(t *testing.T) {
 		t.Errorf("Favorite fields not properly set: %+v", f)
 	}
 
-	artist := "Pink Floyd"
+	artistID := uint(7)
 	f2 := Favorite{
-		ID:         2,
-		UserID:     1,
-		MediaID:    nil,
-		ArtistName: &artist,
-		CreatedAt:  time.Now(),
+		ID:       2,
+		UserID:   1,
+		MediaID:  nil,
+		ArtistID: &artistID,
+		CreatedAt: time.Now(),
 	}
-	if f2.ArtistName == nil || *f2.ArtistName != "Pink Floyd" || f2.MediaID != nil {
+	if f2.ArtistID == nil || *f2.ArtistID != 7 || f2.MediaID != nil {
 		t.Errorf("Artist favorite fields not properly set: %+v", f2)
 	}
 }

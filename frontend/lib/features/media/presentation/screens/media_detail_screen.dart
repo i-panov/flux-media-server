@@ -316,11 +316,10 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                               .bodyLarge
                               ?.copyWith(color: Colors.white70),
                         ),
-                        if (media.artist != null &&
-                            media.artist!.isNotEmpty) ...[
+                        if (media.artists.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            media.artist!,
+                            media.artists.map((a) => a.name).join(', '),
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium

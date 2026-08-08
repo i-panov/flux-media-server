@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"path/filepath"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -84,7 +85,7 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 	var req struct {
 		Title       *string  `json:"title"`
 		Description *string  `json:"description"`
-		Artist      *string  `json:"artist"`
+		Artists     *[]string `json:"artists"`
 		Album       *string  `json:"album"`
 		Genre       *string  `json:"genre"`
 		Year        *int     `json:"year"`
@@ -102,8 +103,15 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 	if req.Description != nil {
 		media.Description = *req.Description
 	}
-	if req.Artist != nil {
-		media.Artist = *req.Artist
+	if req.Artists != nil {
+		// Build Artist slice from names; repository will find-or-create.
+		media.Artists = make([]models.Artist, 0, len(*req.Artists))
+		for _, name := range *req.Artists {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				media.Artists = append(media.Artists, models.Artist{Name: name})
+			}
+		}
 	}
 	if req.Album != nil {
 		media.Album = *req.Album

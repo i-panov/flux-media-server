@@ -21,6 +21,7 @@ abstract class _$AppRouter extends RootStackRouter {
         routeData: routeData,
         child: ArtistPage(
           key: args.key,
+          artistId: args.artistId,
           artistName: args.artistName,
         ),
       );
@@ -130,12 +131,14 @@ abstract class _$AppRouter extends RootStackRouter {
 class ArtistRoute extends PageRouteInfo<ArtistRouteArgs> {
   ArtistRoute({
     Key? key,
+    required int artistId,
     required String artistName,
     List<PageRouteInfo>? children,
   }) : super(
           ArtistRoute.name,
           args: ArtistRouteArgs(
             key: key,
+            artistId: artistId,
             artistName: artistName,
           ),
           initialChildren: children,
@@ -149,16 +152,19 @@ class ArtistRoute extends PageRouteInfo<ArtistRouteArgs> {
 class ArtistRouteArgs {
   const ArtistRouteArgs({
     this.key,
+    required this.artistId,
     required this.artistName,
   });
 
   final Key? key;
 
+  final int artistId;
+
   final String artistName;
 
   @override
   String toString() {
-    return 'ArtistRouteArgs{key: $key, artistName: $artistName}';
+    return 'ArtistRouteArgs{key: $key, artistId: $artistId, artistName: $artistName}';
   }
 }
 

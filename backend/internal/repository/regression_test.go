@@ -34,9 +34,11 @@ func TestFavoriteStore_MultipleMediaFavorites(t *testing.T) {
 	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 2, MediaID: &m1}))
 
 	// Artist favorites of different users don't collide.
-	a := "Pink Floyd"
-	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, ArtistName: &a}))
-	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 2, ArtistName: &a}))
+	artistStore := NewArtistRepository(db)
+	a, err := artistStore.FindOrCreateByName(ctx, "Pink Floyd")
+	require.NoError(t, err)
+	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 1, ArtistID: &a.ID}))
+	require.NoError(t, store.Create(ctx, &models.Favorite{UserID: 2, ArtistID: &a.ID}))
 }
 
 // Regression test: watch progress must have a composite unique index on

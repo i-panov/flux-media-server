@@ -1,3 +1,4 @@
+import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/metadata.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -20,7 +21,7 @@ class Media with _$Media {
     int? duration,
     @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
     @JsonKey(name: 'cover_url') String? coverUrl,
-    String? artist,
+    @Default(<Artist>[]) List<Artist> artists,
     String? album,
     String? genre,
     Metadata? metadata,

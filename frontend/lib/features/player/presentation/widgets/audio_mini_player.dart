@@ -199,7 +199,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         Text(
-                          media.artist ?? '',
+                          media.artists.map((a) => a.name).join(', '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(

@@ -22,6 +22,7 @@ func setupFavoriteTestApp(t *testing.T) *fiber.App {
 
 	favRepo := repository.NewFavoriteRepository(db)
 	mediaRepo := repository.NewMediaRepository(db)
+	artistRepo := repository.NewArtistRepository(db)
 
 	// Create a test media item
 	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
@@ -30,12 +31,22 @@ func setupFavoriteTestApp(t *testing.T) *fiber.App {
 		FilePath: "/test.mkv",
 	}))
 
-	handler := NewFavoriteHandler(favRepo, mediaRepo)
+	// Create a test artist
+	artist, err := artistRepo.FindOrCreateByName(context.Background(), "Pink Floyd")
+	require.NoError(t, err)
+
+	handler := NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	app := fiber.New()
 
 	// Simulate authenticated user
 	app.Use(func(c *fiber.Ctx) error {
 		c.Locals("user_id", uint(1))
+		return c.Next()
+	})
+
+	app.Use(func(c *fiber.Ctx) error {
+		// Store artist ID in locals for test access
+		c.Locals("test_artist_id", artist.ID)
 		return c.Next()
 	})
 
@@ -100,7 +111,8 @@ func TestFavoriteHandler_ListFavorites(t *testing.T) {
 func TestFavoriteHandler_AddArtistFavorite(t *testing.T) {
 	app := setupFavoriteTestApp(t)
 
-	body, _ := json.Marshal(map[string]string{"artist": "Pink Floyd"})
+	// Artist ID 1 = "Pink Floyd", created in setup.
+	body, _ := json.Marshal(map[string]uint{"artist_id": 1})
 	req := httptest.NewRequest("POST", "/api/favorites/artist", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
@@ -111,15 +123,15 @@ func TestFavoriteHandler_AddArtistFavorite(t *testing.T) {
 func TestFavoriteHandler_RemoveArtistFavorite(t *testing.T) {
 	app := setupFavoriteTestApp(t)
 
-	// Add artist favorite
-	body, _ := json.Marshal(map[string]string{"artist": "Pink Floyd"})
+	// Add artist favorite (artist ID 1 = "Pink Floyd")
+	body, _ := json.Marshal(map[string]uint{"artist_id": 1})
 	req := httptest.NewRequest("POST", "/api/favorites/artist", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	_, err := app.Test(req)
 	require.NoError(t, err)
 
 	// Remove
-	req = httptest.NewRequest("DELETE", "/api/favorites/artist?artist=Pink+Floyd", nil)
+	req = httptest.NewRequest("DELETE", "/api/favorites/artist?artist_id=1", nil)
 	resp, err := app.Test(req)
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)

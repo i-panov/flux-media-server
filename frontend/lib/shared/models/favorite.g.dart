@@ -11,7 +11,7 @@ _$FavoriteImpl _$$FavoriteImplFromJson(Map<String, dynamic> json) =>
       id: (json['id'] as num).toInt(),
       userId: (json['user_id'] as num).toInt(),
       mediaId: (json['media_id'] as num?)?.toInt(),
-      artistName: json['artist_name'] as String?,
+      artistId: (json['artist_id'] as num?)?.toInt(),
       createdAt: DateTime.parse(json['created_at'] as String),
     );
 
@@ -20,6 +20,6 @@ Map<String, dynamic> _$$FavoriteImplToJson(_$FavoriteImpl instance) =>
       'id': instance.id,
       'user_id': instance.userId,
       'media_id': instance.mediaId,
-      'artist_name': instance.artistName,
+      'artist_id': instance.artistId,
       'created_at': instance.createdAt.toIso8601String(),
     };

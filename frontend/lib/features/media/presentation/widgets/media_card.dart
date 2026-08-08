@@ -78,11 +78,11 @@ class MediaCard extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
-                        if (media.artist != null && media.artist!.isNotEmpty)
+                        if (media.artists.isNotEmpty)
                           ...[
                             const SizedBox(height: 2),
                             Text(
-                              media.artist!,
+                              media.artists.map((a) => a.name).join(', '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)

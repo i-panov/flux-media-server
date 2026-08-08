@@ -144,9 +144,9 @@ class AudioTrackRow extends ConsumerWidget {
                                 : null,
                           ),
                     ),
-                    if (media.artist != null && media.artist!.isNotEmpty)
+                    if (media.artists.isNotEmpty)
                       Text(
-                        media.artist!,
+                        media.artists.map((a) => a.name).join(', '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(

@@ -13,12 +13,13 @@ import (
 )
 
 type FavoriteHandler struct {
-	favRepo   repository.FavoriteRepository
-	mediaRepo repository.MediaRepository
+	favRepo    repository.FavoriteRepository
+	mediaRepo  repository.MediaRepository
+	artistRepo repository.ArtistRepository
 }
 
-func NewFavoriteHandler(favRepo repository.FavoriteRepository, mediaRepo repository.MediaRepository) *FavoriteHandler {
-	return &FavoriteHandler{favRepo: favRepo, mediaRepo: mediaRepo}
+func NewFavoriteHandler(favRepo repository.FavoriteRepository, mediaRepo repository.MediaRepository, artistRepo repository.ArtistRepository) *FavoriteHandler {
+	return &FavoriteHandler{favRepo: favRepo, mediaRepo: mediaRepo, artistRepo: artistRepo}
 }
 
 // AddFavorite adds a media item to the user's favorites.
@@ -121,20 +122,21 @@ func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Artist string `json:"artist"`
+		ArtistID uint `json:"artist_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
-	if req.Artist == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Artist name is required")
+	if req.ArtistID == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "artist_id is required")
 	}
 
 	ctx := c.UserContext()
 
+	artistID := req.ArtistID
 	fav := &models.Favorite{
-		UserID:     userID,
-		ArtistName: &req.Artist,
+		UserID:   userID,
+		ArtistID: &artistID,
 	}
 
 	if err := h.favRepo.Create(ctx, fav); err != nil {
@@ -152,14 +154,14 @@ func (h *FavoriteHandler) RemoveArtistFavorite(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	artist := c.Query("artist")
-	if artist == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Artist query parameter is required")
+	artistID := c.QueryInt("artist_id")
+	if artistID == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "artist_id query parameter is required")
 	}
 
 	ctx := c.UserContext()
 
-	if err := h.favRepo.DeleteArtist(ctx, userID, artist); err != nil {
+	if err := h.favRepo.DeleteArtist(ctx, userID, uint(artistID)); err != nil {
 		log.Printf("DeleteArtist favorite: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to remove artist favorite")
 	}

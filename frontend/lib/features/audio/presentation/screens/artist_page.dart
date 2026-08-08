@@ -17,8 +17,9 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class ArtistPage extends ConsumerStatefulWidget {
-  const ArtistPage({super.key, required this.artistName});
+  const ArtistPage({super.key, required this.artistId, required this.artistName});
 
+  final int artistId;
   final String artistName;
 
   @override
@@ -52,7 +53,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     if (mediaList == null) return;
 
     final tracks = mediaList.items
-        .where((m) => m.type == 'audio' && m.artist == widget.artistName)
+        .where((m) => m.type == 'audio' && m.artists.any((a) => a.id == widget.artistId))
         .toList();
     if (tracks.isEmpty) return;
 
@@ -92,7 +93,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
           orElse: () => Media(
             id: mediaId, title: '', year: null, type: 'audio',
             filePath: '', fileSize: 0, description: null, duration: null,
-            thumbnailUrl: null, artist: null, album: null, genre: null, metadata: null,
+            thumbnailUrl: null, album: null, genre: null, metadata: null,
           ),
         );
         ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
@@ -181,7 +182,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         .toSet();
 
     final allTracks = mediaList.items
-        .where((Media m) => m.type == 'audio' && m.artist == widget.artistName)
+        .where((Media m) => m.type == 'audio' && m.artists.any((a) => a.id == widget.artistId))
         .toList();
 
     if (allTracks.isEmpty) {

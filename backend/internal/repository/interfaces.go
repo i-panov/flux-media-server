@@ -35,16 +35,22 @@ type ProgressRepository interface {
 	Delete(ctx context.Context, userID, mediaID uint) error
 }
 
+// ArtistRepository defines data access methods for Artist entities.
+type ArtistRepository interface {
+	FindAll(ctx context.Context) ([]models.Artist, error)
+	FindOrCreateByName(ctx context.Context, name string) (*models.Artist, error)
+}
+
 // FavoriteRepository defines data access methods for Favorite entities.
 type FavoriteRepository interface {
 	FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.Favorite, int64, error)
 	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error)
-	FindByUserAndArtist(ctx context.Context, userID uint, artistName string) (*models.Favorite, error)
+	FindByUserAndArtist(ctx context.Context, userID, artistID uint) (*models.Favorite, error)
 	IsFavorited(ctx context.Context, userID, mediaID uint) (bool, error)
-	IsArtistFavorited(ctx context.Context, userID uint, artistName string) (bool, error)
+	IsArtistFavorited(ctx context.Context, userID, artistID uint) (bool, error)
 	Create(ctx context.Context, favorite *models.Favorite) error
 	Delete(ctx context.Context, userID, mediaID uint) error
-	DeleteArtist(ctx context.Context, userID uint, artistName string) error
+	DeleteArtist(ctx context.Context, userID, artistID uint) error
 }
 
 // CollectionRepository defines data access methods for Collection entities.

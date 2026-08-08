@@ -236,14 +236,27 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
-  Future<Response<Map<String, dynamic>>> removeArtistFavorite(String artist) {
+  Future<Response<Map<String, dynamic>>> removeArtistFavorite(int artistId) {
     final Uri $url = Uri.parse('/favorites/artist');
-    final Map<String, dynamic> $params = <String, dynamic>{'artist': artist};
+    final Map<String, dynamic> $params = <String, dynamic>{
+      'artist_id': artistId
+    };
     final Request $request = Request(
       'DELETE',
       $url,
       client.baseUrl,
       parameters: $params,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> getArtists() {
+    final Uri $url = Uri.parse('/artists');
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
     );
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }

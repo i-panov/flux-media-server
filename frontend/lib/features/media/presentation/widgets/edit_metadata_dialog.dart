@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/filename_parser.dart';
+import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 Future<void> showEditMetadataDialog(
@@ -41,19 +43,19 @@ Future<void> showEditMetadataDialog(
   );
 }
 
-class _EditMetadataDialog extends StatefulWidget {
+class _EditMetadataDialog extends ConsumerStatefulWidget {
   const _EditMetadataDialog({required this.media, required this.l});
 
   final Media media;
   final AppLocalizations l;
 
   @override
-  State<_EditMetadataDialog> createState() => _EditMetadataDialogState();
+  ConsumerState<_EditMetadataDialog> createState() => _EditMetadataDialogState();
 }
 
-class _EditMetadataDialogState extends State<_EditMetadataDialog> {
+class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
   late final TextEditingController _titleController;
-  late final TextEditingController _artistController;
+  late final List<TextEditingController> _artistControllers;
   late final TextEditingController _albumController;
   late final TextEditingController _genreController;
   late final TextEditingController _yearController;
@@ -66,7 +68,11 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.media.title);
-    _artistController = TextEditingController(text: widget.media.artist ?? '');
+    _artistControllers = widget.media.artists.isNotEmpty
+        ? widget.media.artists
+            .map((a) => TextEditingController(text: a.name))
+            .toList()
+        : [TextEditingController()];
     _albumController = TextEditingController(text: widget.media.album ?? '');
     _genreController = TextEditingController(text: widget.media.genre ?? '');
     _yearController = TextEditingController(text: widget.media.year.toString());
@@ -91,10 +97,25 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
     if (mounted) setState(() {});
   }
 
+  void _addArtistField() {
+    setState(() {
+      _artistControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeArtistField(int index) {
+    setState(() {
+      _artistControllers[index].dispose();
+      _artistControllers.removeAt(index);
+    });
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
-    _artistController.dispose();
+    for (final c in _artistControllers) {
+      c.dispose();
+    }
     _albumController.dispose();
     _genreController.dispose();
     _yearController.dispose();
@@ -106,9 +127,11 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
     final data = <String, dynamic>{
       'title': _titleController.text.trim(),
     };
-    if (_artistController.text.trim().isNotEmpty) {
-      data['artist'] = _artistController.text.trim();
-    }
+    final artistNames = _artistControllers
+        .map((c) => c.text.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+    data['artists'] = artistNames;
     if (_albumController.text.trim().isNotEmpty) {
       data['album'] = _albumController.text.trim();
     }
@@ -128,6 +151,8 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
   @override
   Widget build(BuildContext context) {
     final l = widget.l;
+    final artistsAsync = ref.watch(artistsProvider);
+
     return AlertDialog(
       title: Text(l.editMetadata),
       content: SingleChildScrollView(
@@ -142,9 +167,12 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? l.requiredField : null,
               ),
-              TextFormField(
-                controller: _artistController,
-                decoration: InputDecoration(labelText: l.artist),
+              // --- Artists group ---
+              const SizedBox(height: 8),
+              artistsAsync.when(
+                data: (artists) => _buildArtistsGroup(l, artists),
+                loading: () => _buildArtistsGroup(l, const []),
+                error: (_, __) => _buildArtistsGroup(l, const []),
               ),
               TextFormField(
                 controller: _albumController,
@@ -216,6 +244,123 @@ class _EditMetadataDialogState extends State<_EditMetadataDialog> {
           child: Text(l.save),
         ),
       ],
+    );
+  }
+
+  /// Builds the group of artist fields with autocomplete and add/remove buttons.
+  Widget _buildArtistsGroup(AppLocalizations l, List<Artist> allArtists) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(l.artists, style: Theme.of(context).textTheme.labelMedium),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                tooltip: l.artist,
+                onPressed: _addArtistField,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ..._artistControllers.asMap().entries.map((entry) {
+            final index = entry.key;
+            final controller = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: _ArtistField(
+                controller: controller,
+                allArtists: allArtists,
+                onRemove: _artistControllers.length > 1
+                    ? () => _removeArtistField(index)
+                    : null,
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+/// A single artist text field with autocomplete dropdown.
+class _ArtistField extends StatelessWidget {
+  const _ArtistField({
+    required this.controller,
+    required this.allArtists,
+    this.onRemove,
+  });
+
+  final TextEditingController controller;
+  final List<Artist> allArtists;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return RawAutocomplete<String>(
+      textEditingController: controller,
+      focusNode: FocusNode(),
+      optionsBuilder: (textEditingValue) {
+        final query = textEditingValue.text.trim().toLowerCase();
+        if (query.isEmpty) return const Iterable<String>.empty();
+        return allArtists
+            .where((a) => a.name.toLowerCase().contains(query))
+            .map((a) => a.name)
+            .take(10);
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (context, index) {
+                  final option = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    title: Text(option),
+                    onTap: () => onSelected(option),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          onSubmitted: (_) => onFieldSubmitted(),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: const OutlineInputBorder(),
+            suffixIcon: onRemove != null
+                ? IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: onRemove,
+                    visualDensity: VisualDensity.compact,
+                  )
+                : null,
+          ),
+        );
+      },
     );
   }
 }

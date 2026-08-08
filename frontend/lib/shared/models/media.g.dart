@@ -18,7 +18,10 @@ _$MediaImpl _$$MediaImplFromJson(Map<String, dynamic> json) => _$MediaImpl(
       duration: (json['duration'] as num?)?.toInt(),
       thumbnailUrl: json['thumbnail_url'] as String?,
       coverUrl: json['cover_url'] as String?,
-      artist: json['artist'] as String?,
+      artists: (json['artists'] as List<dynamic>?)
+              ?.map((e) => Artist.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const <Artist>[],
       album: json['album'] as String?,
       genre: json['genre'] as String?,
       metadata: json['metadata'] == null
@@ -43,7 +46,7 @@ Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
       'duration': instance.duration,
       'thumbnail_url': instance.thumbnailUrl,
       'cover_url': instance.coverUrl,
-      'artist': instance.artist,
+      'artists': instance.artists,
       'album': instance.album,
       'genre': instance.genre,
       'metadata': instance.metadata,

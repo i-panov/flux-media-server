@@ -42,10 +42,10 @@ func (r *FavoriteStore) FindByUserAndMedia(ctx context.Context, userID, mediaID 
 	return &fav, err
 }
 
-func (r *FavoriteStore) FindByUserAndArtist(ctx context.Context, userID uint, artistName string) (*models.Favorite, error) {
+func (r *FavoriteStore) FindByUserAndArtist(ctx context.Context, userID, artistID uint) (*models.Favorite, error) {
 	var fav models.Favorite
 	err := r.db.WithContext(ctx).
-		Where("user_id = ? AND artist_name = ?", userID, artistName).
+		Where("user_id = ? AND artist_id = ?", userID, artistID).
 		First(&fav).Error
 	return &fav, err
 }
@@ -58,10 +58,10 @@ func (r *FavoriteStore) IsFavorited(ctx context.Context, userID, mediaID uint) (
 	return count > 0, err
 }
 
-func (r *FavoriteStore) IsArtistFavorited(ctx context.Context, userID uint, artistName string) (bool, error) {
+func (r *FavoriteStore) IsArtistFavorited(ctx context.Context, userID, artistID uint) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&models.Favorite{}).
-		Where("user_id = ? AND artist_name = ?", userID, artistName).
+		Where("user_id = ? AND artist_id = ?", userID, artistID).
 		Count(&count).Error
 	return count > 0, err
 }
@@ -80,9 +80,9 @@ func (r *FavoriteStore) Delete(ctx context.Context, userID, mediaID uint) error 
 	return result.Error
 }
 
-func (r *FavoriteStore) DeleteArtist(ctx context.Context, userID uint, artistName string) error {
+func (r *FavoriteStore) DeleteArtist(ctx context.Context, userID, artistID uint) error {
 	result := r.db.WithContext(ctx).
-		Where("user_id = ? AND artist_name = ?", userID, artistName).
+		Where("user_id = ? AND artist_id = ?", userID, artistID).
 		Delete(&models.Favorite{})
 	if result.RowsAffected == 0 {
 		return errors.New("artist favorite not found")

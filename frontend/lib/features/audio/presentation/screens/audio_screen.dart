@@ -78,7 +78,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
           orElse: () => Media(
             id: mediaId, title: '', year: null, type: 'audio',
             filePath: '', fileSize: 0, description: null, duration: null,
-            thumbnailUrl: null, artist: null, album: null, genre: null, metadata: null,
+            thumbnailUrl: null, album: null, genre: null, metadata: null,
           ),
         );
         ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
@@ -197,12 +197,15 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
         .take(10)
         .toList();
 
-    final artists = mediaList.items
-        .where((Media m) => m.artist != null && m.artist!.isNotEmpty)
-        .map((Media m) => m.artist!)
-        .toSet()
-        .toList()
-          ..sort();
+    // Collect unique artists from all media items.
+    final artistMap = <int, String>{};
+    for (final m in mediaList.items) {
+      for (final a in m.artists) {
+        artistMap.putIfAbsent(a.id, () => a.name);
+      }
+    }
+    final artists = artistMap.entries.toList()
+      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
 
     final allTracks = mediaList.items.toList();
 
@@ -276,9 +279,11 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                   itemBuilder: (context, index) {
                     final artist = artists[index];
                     return ArtistCard(
-                      name: artist,
-                      onTap: () =>
-                          context.router.push(ArtistRoute(artistName: artist)),
+                      name: artist.value,
+                      onTap: () => context.router.push(ArtistRoute(
+                        artistId: artist.key,
+                        artistName: artist.value,
+                      )),
                     );
                   },
                 ),

@@ -36,7 +36,7 @@ mixin _$Media {
   String? get thumbnailUrl => throw _privateConstructorUsedError;
   @JsonKey(name: 'cover_url')
   String? get coverUrl => throw _privateConstructorUsedError;
-  String? get artist => throw _privateConstructorUsedError;
+  List<Artist> get artists => throw _privateConstructorUsedError;
   String? get album => throw _privateConstructorUsedError;
   String? get genre => throw _privateConstructorUsedError;
   Metadata? get metadata => throw _privateConstructorUsedError;
@@ -67,7 +67,7 @@ abstract class $MediaCopyWith<$Res> {
       int? duration,
       @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
       @JsonKey(name: 'cover_url') String? coverUrl,
-      String? artist,
+      List<Artist> artists,
       String? album,
       String? genre,
       Metadata? metadata,
@@ -101,7 +101,7 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
     Object? coverUrl = freezed,
-    Object? artist = freezed,
+    Object? artists = null,
     Object? album = freezed,
     Object? genre = freezed,
     Object? metadata = freezed,
@@ -153,10 +153,10 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
           ? _value.coverUrl
           : coverUrl // ignore: cast_nullable_to_non_nullable
               as String?,
-      artist: freezed == artist
-          ? _value.artist
-          : artist // ignore: cast_nullable_to_non_nullable
-              as String?,
+      artists: null == artists
+          ? _value.artists
+          : artists // ignore: cast_nullable_to_non_nullable
+              as List<Artist>,
       album: freezed == album
           ? _value.album
           : album // ignore: cast_nullable_to_non_nullable
@@ -212,7 +212,7 @@ abstract class _$$MediaImplCopyWith<$Res> implements $MediaCopyWith<$Res> {
       int? duration,
       @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
       @JsonKey(name: 'cover_url') String? coverUrl,
-      String? artist,
+      List<Artist> artists,
       String? album,
       String? genre,
       Metadata? metadata,
@@ -245,7 +245,7 @@ class __$$MediaImplCopyWithImpl<$Res>
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
     Object? coverUrl = freezed,
-    Object? artist = freezed,
+    Object? artists = null,
     Object? album = freezed,
     Object? genre = freezed,
     Object? metadata = freezed,
@@ -297,10 +297,10 @@ class __$$MediaImplCopyWithImpl<$Res>
           ? _value.coverUrl
           : coverUrl // ignore: cast_nullable_to_non_nullable
               as String?,
-      artist: freezed == artist
-          ? _value.artist
-          : artist // ignore: cast_nullable_to_non_nullable
-              as String?,
+      artists: null == artists
+          ? _value._artists
+          : artists // ignore: cast_nullable_to_non_nullable
+              as List<Artist>,
       album: freezed == album
           ? _value.album
           : album // ignore: cast_nullable_to_non_nullable
@@ -340,12 +340,13 @@ class _$MediaImpl implements _Media {
       this.duration,
       @JsonKey(name: 'thumbnail_url') this.thumbnailUrl,
       @JsonKey(name: 'cover_url') this.coverUrl,
-      this.artist,
+      final List<Artist> artists = const <Artist>[],
       this.album,
       this.genre,
       this.metadata,
       @JsonKey(name: 'file_hash') this.fileHash = '',
-      @JsonKey(name: 'updated_at') this.updatedAt});
+      @JsonKey(name: 'updated_at') this.updatedAt})
+      : _artists = artists;
 
   factory _$MediaImpl.fromJson(Map<String, dynamic> json) =>
       _$$MediaImplFromJson(json);
@@ -377,8 +378,15 @@ class _$MediaImpl implements _Media {
   @override
   @JsonKey(name: 'cover_url')
   final String? coverUrl;
+  final List<Artist> _artists;
   @override
-  final String? artist;
+  @JsonKey()
+  List<Artist> get artists {
+    if (_artists is EqualUnmodifiableListView) return _artists;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_artists);
+  }
+
   @override
   final String? album;
   @override
@@ -394,7 +402,7 @@ class _$MediaImpl implements _Media {
 
   @override
   String toString() {
-    return 'Media(id: $id, title: $title, filename: $filename, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artist: $artist, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash, updatedAt: $updatedAt)';
+    return 'Media(id: $id, title: $title, filename: $filename, year: $year, type: $type, filePath: $filePath, fileSize: $fileSize, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artists: $artists, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash, updatedAt: $updatedAt)';
   }
 
   @override
@@ -420,7 +428,7 @@ class _$MediaImpl implements _Media {
                 other.thumbnailUrl == thumbnailUrl) &&
             (identical(other.coverUrl, coverUrl) ||
                 other.coverUrl == coverUrl) &&
-            (identical(other.artist, artist) || other.artist == artist) &&
+            const DeepCollectionEquality().equals(other._artists, _artists) &&
             (identical(other.album, album) || other.album == album) &&
             (identical(other.genre, genre) || other.genre == genre) &&
             (identical(other.metadata, metadata) ||
@@ -446,7 +454,7 @@ class _$MediaImpl implements _Media {
       duration,
       thumbnailUrl,
       coverUrl,
-      artist,
+      const DeepCollectionEquality().hash(_artists),
       album,
       genre,
       metadata,
@@ -480,7 +488,7 @@ abstract class _Media implements Media {
       final int? duration,
       @JsonKey(name: 'thumbnail_url') final String? thumbnailUrl,
       @JsonKey(name: 'cover_url') final String? coverUrl,
-      final String? artist,
+      final List<Artist> artists,
       final String? album,
       final String? genre,
       final Metadata? metadata,
@@ -517,7 +525,7 @@ abstract class _Media implements Media {
   @JsonKey(name: 'cover_url')
   String? get coverUrl;
   @override
-  String? get artist;
+  List<Artist> get artists;
   @override
   String? get album;
   @override

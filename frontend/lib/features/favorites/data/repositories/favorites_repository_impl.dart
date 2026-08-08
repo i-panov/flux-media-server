@@ -23,10 +23,10 @@ class FavoritesRepositoryImpl implements FavoritesRepository {
       safeRepositoryCall(() => remoteDataSource.removeFavorite(mediaId));
 
   @override
-  Future<Either<Failure, Favorite>> addArtistFavorite(String artistName) =>
-      safeRepositoryCall(() => remoteDataSource.addArtistFavorite(artistName));
+  Future<Either<Failure, Favorite>> addArtistFavorite(int artistId) =>
+      safeRepositoryCall(() => remoteDataSource.addArtistFavorite(artistId));
 
   @override
-  Future<Either<Failure, void>> removeArtistFavorite(String artistName) =>
-      safeRepositoryCall(() => remoteDataSource.removeArtistFavorite(artistName));
+  Future<Either<Failure, void>> removeArtistFavorite(int artistId) =>
+      safeRepositoryCall(() => remoteDataSource.removeArtistFavorite(artistId));
 }

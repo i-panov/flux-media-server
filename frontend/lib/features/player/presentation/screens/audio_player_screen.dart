@@ -521,7 +521,7 @@ class _QueueTab extends ConsumerWidget {
                 ? TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)
                 : null,
           ),
-          subtitle: item.artist != null && item.artist!.isNotEmpty ? Text(item.artist!) : null,
+          subtitle: item.artists.isNotEmpty ? Text(item.artists.map((a) => a.name).join(', ')) : null,
           trailing: IconButton(
             icon: const Icon(Icons.close, size: 20),
             onPressed: () => ref.read(playQueueProvider.notifier).removeAt(index),

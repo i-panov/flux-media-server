@@ -129,8 +129,12 @@ abstract class ApiClient extends ChopperService {
 
   @Delete(path: '/favorites/artist')
   Future<Response<Map<String, dynamic>>> removeArtistFavorite(
-    @Query('artist') String artist,
+    @Query('artist_id') int artistId,
   );
+
+  // Artists
+  @Get(path: '/artists')
+  Future<Response<Map<String, dynamic>>> getArtists();
 
   // Collections
   @Post(path: '/collections')

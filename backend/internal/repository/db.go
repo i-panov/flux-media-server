@@ -54,6 +54,7 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
+	db.SetupJoinTable(&models.Media{}, "Artists", &models.MediaArtist{})
 	return db.AutoMigrate(
 		&models.Media{},
 		&models.Metadata{},
@@ -64,6 +65,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.CollectionItem{},
 		&models.Lyrics{},
 		&models.RefreshToken{},
+		&models.Artist{},
 	)
 }
 
@@ -79,7 +81,7 @@ func RunMigrations(db *gorm.DB) error {
 	if err := dropUniqueIndexesOnColumn(db, "favorites", "artist_name"); err != nil {
 		return fmt.Errorf("migrate favorites indexes: %w", err)
 	}
-	if tableExists(db, "favorites") {
+	if tableExists(db, "favorites") && columnExists(db, "favorites", "artist_name") {
 		if err := db.Exec("UPDATE favorites SET artist_name = NULL WHERE artist_name = ''").Error; err != nil {
 			return fmt.Errorf("migrate favorites data: %w", err)
 		}
@@ -140,6 +142,78 @@ func RunMigrations(db *gorm.DB) error {
 		log.Printf("migration: dropping table media_libraries")
 		if err := db.Exec("DROP TABLE IF EXISTS media_libraries").Error; err != nil {
 			return fmt.Errorf("drop media_libraries: %w", err)
+		}
+	}
+
+	// --- Phase 3: extract artists from media.artist into the artists table ---
+
+	// Only needed while the legacy media.artist column still exists.
+	if columnExists(db, "media", "artist") {
+		if !tableExists(db, "artists") {
+			log.Printf("migration: creating artists table")
+			if err := db.Exec(`CREATE TABLE IF NOT EXISTS artists (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL UNIQUE,
+				created_at DATETIME,
+				updated_at DATETIME
+			)`).Error; err != nil {
+				return fmt.Errorf("create artists: %w", err)
+			}
+		}
+		if !tableExists(db, "media_artists") {
+			log.Printf("migration: creating media_artists table")
+			if err := db.Exec(`CREATE TABLE IF NOT EXISTS media_artists (
+				media_id INTEGER NOT NULL,
+				artist_id INTEGER NOT NULL,
+				position INTEGER DEFAULT 0,
+				PRIMARY KEY (media_id, artist_id)
+			)`).Error; err != nil {
+				return fmt.Errorf("create media_artists: %w", err)
+			}
+		}
+
+		// 1. Collect distinct non-empty artist names from media.
+		if err := db.Exec(`INSERT OR IGNORE INTO artists (name, created_at, updated_at)
+			SELECT DISTINCT TRIM(artist), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+			FROM media WHERE artist IS NOT NULL AND TRIM(artist) <> ''`).Error; err != nil {
+			return fmt.Errorf("migrate artists from media: %w", err)
+		}
+
+		// 2. Collect distinct artist names from favorites (may not exist in media).
+		if columnExists(db, "favorites", "artist_name") {
+			if err := db.Exec(`INSERT OR IGNORE INTO artists (name, created_at, updated_at)
+				SELECT DISTINCT TRIM(artist_name), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+				FROM favorites WHERE artist_name IS NOT NULL AND TRIM(artist_name) <> ''`).Error; err != nil {
+				return fmt.Errorf("migrate artists from favorites: %w", err)
+			}
+		}
+
+		// 3. Link media to artists.
+		if err := db.Exec(`INSERT OR IGNORE INTO media_artists (media_id, artist_id, position)
+			SELECT m.id, a.id, 0
+			FROM media m JOIN artists a ON TRIM(m.artist) = a.name
+			WHERE m.artist IS NOT NULL AND TRIM(m.artist) <> ''`).Error; err != nil {
+			return fmt.Errorf("link media_artists: %w", err)
+		}
+
+		// 4. Re-point favorites from artist_name to artist_id.
+		if columnExists(db, "favorites", "artist_name") && !columnExists(db, "favorites", "artist_id") {
+			if err := db.Exec("ALTER TABLE favorites ADD COLUMN artist_id INTEGER").Error; err != nil {
+				return fmt.Errorf("add favorites.artist_id: %w", err)
+			}
+			if err := db.Exec(`UPDATE favorites SET artist_id = (
+				SELECT id FROM artists WHERE name = favorites.artist_name
+			) WHERE artist_name IS NOT NULL AND TRIM(artist_name) <> ''`).Error; err != nil {
+				return fmt.Errorf("migrate favorites.artist_id: %w", err)
+			}
+			if err := dropColumnIfExists(db, "favorites", "artist_name"); err != nil {
+				return fmt.Errorf("drop favorites.artist_name: %w", err)
+			}
+		}
+
+		// 5. Drop the legacy media.artist column.
+		if err := dropColumnIfExists(db, "media", "artist"); err != nil {
+			return fmt.Errorf("drop media.artist: %w", err)
 		}
 	}
 

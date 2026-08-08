@@ -28,15 +28,15 @@ class FavoritesRemoteDataSource {
     checkResponse(response, 'Failed to remove favorite');
   }
 
-  Future<Favorite> addArtistFavorite(String artistName) async {
+  Future<Favorite> addArtistFavorite(int artistId) async {
     final response =
-        await apiClient.addArtistFavorite({'artist': artistName});
+        await apiClient.addArtistFavorite({'artist_id': artistId});
     checkResponse(response, 'Failed to add artist favorite');
     return Favorite.fromJson(response.body!);
   }
 
-  Future<void> removeArtistFavorite(String artistName) async {
-    final response = await apiClient.removeArtistFavorite(artistName);
+  Future<void> removeArtistFavorite(int artistId) async {
+    final response = await apiClient.removeArtistFavorite(artistId);
     checkResponse(response, 'Failed to remove artist favorite');
   }
 }

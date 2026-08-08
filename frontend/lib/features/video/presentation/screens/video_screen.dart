@@ -190,11 +190,10 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           fileSize: 0,
           description: null,
           duration: null,
-          thumbnailUrl: null,
-          artist: null,
-          album: null,
-          genre: null,
-          metadata: null,
+           thumbnailUrl: null,
+           album: null,
+           genre: null,
+           metadata: null,
         ),
       );
       return (media, p);
@@ -467,7 +466,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           orElse: () => Media(
             id: mediaId, title: '', year: null, type: 'video',
             filePath: '', fileSize: 0, description: null, duration: null,
-            thumbnailUrl: null, artist: null, album: null, genre: null, metadata: null,
+            thumbnailUrl: null, album: null, genre: null, metadata: null,
           ),
         );
         ref.read(downloadNotifierProvider(mediaId).notifier).download(media);

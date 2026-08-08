@@ -6,6 +6,6 @@ abstract class FavoritesRepository {
   Future<Either<Failure, List<Favorite>>> getFavorites();
   Future<Either<Failure, Favorite>> addFavorite(int mediaId);
   Future<Either<Failure, void>> removeFavorite(int mediaId);
-  Future<Either<Failure, Favorite>> addArtistFavorite(String artistName);
-  Future<Either<Failure, void>> removeArtistFavorite(String artistName);
+  Future<Either<Failure, Favorite>> addArtistFavorite(int artistId);
+  Future<Either<Failure, void>> removeArtistFavorite(int artistId);
 }

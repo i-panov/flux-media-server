@@ -182,7 +182,7 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 			media.Duration = fileMeta.Duration
 		}
 		if fileMeta.Artist != "" {
-			media.Artist = fileMeta.Artist
+			media.Artists = []models.Artist{{Name: fileMeta.Artist}}
 		}
 		if fileMeta.Album != "" {
 			media.Album = fileMeta.Album

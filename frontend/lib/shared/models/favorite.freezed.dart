@@ -25,8 +25,8 @@ mixin _$Favorite {
   int get userId => throw _privateConstructorUsedError;
   @JsonKey(name: 'media_id')
   int? get mediaId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'artist_name')
-  String? get artistName => throw _privateConstructorUsedError;
+  @JsonKey(name: 'artist_id')
+  int? get artistId => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
   DateTime get createdAt => throw _privateConstructorUsedError;
 
@@ -45,7 +45,7 @@ abstract class $FavoriteCopyWith<$Res> {
       {int id,
       @JsonKey(name: 'user_id') int userId,
       @JsonKey(name: 'media_id') int? mediaId,
-      @JsonKey(name: 'artist_name') String? artistName,
+      @JsonKey(name: 'artist_id') int? artistId,
       @JsonKey(name: 'created_at') DateTime createdAt});
 }
 
@@ -65,7 +65,7 @@ class _$FavoriteCopyWithImpl<$Res, $Val extends Favorite>
     Object? id = null,
     Object? userId = null,
     Object? mediaId = freezed,
-    Object? artistName = freezed,
+    Object? artistId = freezed,
     Object? createdAt = null,
   }) {
     return _then(_value.copyWith(
@@ -81,10 +81,10 @@ class _$FavoriteCopyWithImpl<$Res, $Val extends Favorite>
           ? _value.mediaId
           : mediaId // ignore: cast_nullable_to_non_nullable
               as int?,
-      artistName: freezed == artistName
-          ? _value.artistName
-          : artistName // ignore: cast_nullable_to_non_nullable
-              as String?,
+      artistId: freezed == artistId
+          ? _value.artistId
+          : artistId // ignore: cast_nullable_to_non_nullable
+              as int?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -105,7 +105,7 @@ abstract class _$$FavoriteImplCopyWith<$Res>
       {int id,
       @JsonKey(name: 'user_id') int userId,
       @JsonKey(name: 'media_id') int? mediaId,
-      @JsonKey(name: 'artist_name') String? artistName,
+      @JsonKey(name: 'artist_id') int? artistId,
       @JsonKey(name: 'created_at') DateTime createdAt});
 }
 
@@ -123,7 +123,7 @@ class __$$FavoriteImplCopyWithImpl<$Res>
     Object? id = null,
     Object? userId = null,
     Object? mediaId = freezed,
-    Object? artistName = freezed,
+    Object? artistId = freezed,
     Object? createdAt = null,
   }) {
     return _then(_$FavoriteImpl(
@@ -139,10 +139,10 @@ class __$$FavoriteImplCopyWithImpl<$Res>
           ? _value.mediaId
           : mediaId // ignore: cast_nullable_to_non_nullable
               as int?,
-      artistName: freezed == artistName
-          ? _value.artistName
-          : artistName // ignore: cast_nullable_to_non_nullable
-              as String?,
+      artistId: freezed == artistId
+          ? _value.artistId
+          : artistId // ignore: cast_nullable_to_non_nullable
+              as int?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -158,7 +158,7 @@ class _$FavoriteImpl implements _Favorite {
       {required this.id,
       @JsonKey(name: 'user_id') required this.userId,
       @JsonKey(name: 'media_id') this.mediaId,
-      @JsonKey(name: 'artist_name') this.artistName,
+      @JsonKey(name: 'artist_id') this.artistId,
       @JsonKey(name: 'created_at') required this.createdAt});
 
   factory _$FavoriteImpl.fromJson(Map<String, dynamic> json) =>
@@ -173,15 +173,15 @@ class _$FavoriteImpl implements _Favorite {
   @JsonKey(name: 'media_id')
   final int? mediaId;
   @override
-  @JsonKey(name: 'artist_name')
-  final String? artistName;
+  @JsonKey(name: 'artist_id')
+  final int? artistId;
   @override
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
   @override
   String toString() {
-    return 'Favorite(id: $id, userId: $userId, mediaId: $mediaId, artistName: $artistName, createdAt: $createdAt)';
+    return 'Favorite(id: $id, userId: $userId, mediaId: $mediaId, artistId: $artistId, createdAt: $createdAt)';
   }
 
   @override
@@ -192,8 +192,8 @@ class _$FavoriteImpl implements _Favorite {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.userId, userId) || other.userId == userId) &&
             (identical(other.mediaId, mediaId) || other.mediaId == mediaId) &&
-            (identical(other.artistName, artistName) ||
-                other.artistName == artistName) &&
+            (identical(other.artistId, artistId) ||
+                other.artistId == artistId) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt));
   }
@@ -201,7 +201,7 @@ class _$FavoriteImpl implements _Favorite {
   @JsonKey(ignore: true)
   @override
   int get hashCode =>
-      Object.hash(runtimeType, id, userId, mediaId, artistName, createdAt);
+      Object.hash(runtimeType, id, userId, mediaId, artistId, createdAt);
 
   @JsonKey(ignore: true)
   @override
@@ -222,7 +222,7 @@ abstract class _Favorite implements Favorite {
           {required final int id,
           @JsonKey(name: 'user_id') required final int userId,
           @JsonKey(name: 'media_id') final int? mediaId,
-          @JsonKey(name: 'artist_name') final String? artistName,
+          @JsonKey(name: 'artist_id') final int? artistId,
           @JsonKey(name: 'created_at') required final DateTime createdAt}) =
       _$FavoriteImpl;
 
@@ -238,8 +238,8 @@ abstract class _Favorite implements Favorite {
   @JsonKey(name: 'media_id')
   int? get mediaId;
   @override
-  @JsonKey(name: 'artist_name')
-  String? get artistName;
+  @JsonKey(name: 'artist_id')
+  int? get artistId;
   @override
   @JsonKey(name: 'created_at')
   DateTime get createdAt;

@@ -113,7 +113,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       await _audioPlayer.loadSource(
         url: url,
         title: media.title,
-        artist: media.artist,
+        artist: media.artists.map((a) => a.name).join(', '),
         artUri: coverUrl,
         duration: media.duration != null
             ? Duration(seconds: media.duration!)

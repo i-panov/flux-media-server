@@ -59,6 +59,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	colItemRepo := repository.NewCollectionItemRepository(db)
 	lyricsRepo := repository.NewLyricsRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+	artistRepo := repository.NewArtistRepository(db)
 
 	// Services
 	otpStore := services.NewOTPStore(
@@ -107,9 +108,10 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
-	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo)
+	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo)
+	artistHandler := handlers.NewArtistHandler(artistRepo)
 
 	// Fiber app
 	fiberApp := fiber.New(fiber.Config{
@@ -235,6 +237,9 @@ func New(cfg *config.Config, version string) (*App, error) {
 	api.Get("/favorites", favoriteHandler.ListFavorites)
 	api.Post("/favorites/artist", favoriteHandler.AddArtistFavorite)
 	api.Delete("/favorites/artist", favoriteHandler.RemoveArtistFavorite)
+
+	// Artists
+	api.Get("/artists", artistHandler.List)
 
 	// Collections
 	api.Post("/collections", collectionHandler.Create)

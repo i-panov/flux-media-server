@@ -207,7 +207,7 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath, mediaType s
 					existing.Duration = fileMeta.Duration
 				}
 				if fileMeta.Artist != "" {
-					existing.Artist = fileMeta.Artist
+					existing.Artists = []models.Artist{{Name: fileMeta.Artist}}
 				}
 				if fileMeta.Album != "" {
 					existing.Album = fileMeta.Album
@@ -293,8 +293,8 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath, mediaType s
 			if media.Duration == 0 && fileMeta.Duration > 0 {
 				media.Duration = fileMeta.Duration
 			}
-			if media.Artist == "" && fileMeta.Artist != "" {
-				media.Artist = fileMeta.Artist
+			if len(media.Artists) == 0 && fileMeta.Artist != "" {
+				media.Artists = []models.Artist{{Name: fileMeta.Artist}}
 			}
 			if media.Album == "" && fileMeta.Album != "" {
 				media.Album = fileMeta.Album
@@ -307,8 +307,8 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath, mediaType s
 				media.Title = fileMeta.Title
 			}
 			// Build description from artist/album for audio.
-			if mediaType == "audio" && media.Artist != "" {
-				desc := media.Artist
+			if mediaType == "audio" && len(media.Artists) > 0 {
+				desc := media.Artists[0].Name
 				if media.Album != "" {
 					desc += " — " + media.Album
 				}

@@ -101,25 +101,29 @@ func TestFavoriteStore_ArtistFavorite(t *testing.T) {
 	require.NoError(t, AutoMigrate(db))
 
 	store := NewFavoriteRepository(db)
+	artistStore := NewArtistRepository(db)
 	ctx := context.Background()
 
-	artist := "Pink Floyd"
+	artist, err := artistStore.FindOrCreateByName(ctx, "Pink Floyd")
+	require.NoError(t, err)
+	require.NotNil(t, artist)
+
 	require.NoError(t, store.Create(ctx, &models.Favorite{
-		UserID:     1,
-		ArtistName: &artist,
+		UserID:   1,
+		ArtistID: &artist.ID,
 	}))
 
-	found, err := store.FindByUserAndArtist(ctx, 1, "Pink Floyd")
+	found, err := store.FindByUserAndArtist(ctx, 1, artist.ID)
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 
-	isFav, err := store.IsArtistFavorited(ctx, 1, "Pink Floyd")
+	isFav, err := store.IsArtistFavorited(ctx, 1, artist.ID)
 	assert.NoError(t, err)
 	assert.True(t, isFav)
 
-	require.NoError(t, store.DeleteArtist(ctx, 1, "Pink Floyd"))
+	require.NoError(t, store.DeleteArtist(ctx, 1, artist.ID))
 
-	isFav, err = store.IsArtistFavorited(ctx, 1, "Pink Floyd")
+	isFav, err = store.IsArtistFavorited(ctx, 1, artist.ID)
 	assert.NoError(t, err)
 	assert.False(t, isFav)
 }
