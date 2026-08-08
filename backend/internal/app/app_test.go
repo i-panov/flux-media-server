@@ -227,69 +227,6 @@ func TestMediaListEmpty(t *testing.T) {
 	assert.Equal(t, float64(0), body["total"])
 }
 
-// --- Libraries ---
-
-func TestLibraryCRUD(t *testing.T) {
-	application := newTestApp(t)
-	token := getAuthToken(t, application, "lib@example.com")
-
-	// Create
-	b, _ := json.Marshal(map[string]interface{}{"name": "Movies", "type": "video"})
-	req := testReq("POST", "/api/libraries", bytes.NewReader(b))
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := application.Fiber.Test(req)
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
-
-	var created map[string]interface{}
-	parseResp(t, resp, &created)
-	assert.Equal(t, "Movies", created["name"])
-
-	// List
-	resp2, err := application.Fiber.Test(authReq("GET", "/api/libraries", token))
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusOK, resp2.StatusCode)
-
-	var list []map[string]interface{}
-	parseResp(t, resp2, &list)
-	assert.GreaterOrEqual(t, len(list), 1)
-	found := false
-	for _, l := range list {
-		if l["name"] == "Movies" {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Expected to find 'Movies' in library list")
-}
-
-// --- Scan status ---
-
-func TestScanStatus(t *testing.T) {
-	application := newTestApp(t)
-	token := getAuthToken(t, application, "scan@example.com")
-
-	// Create library
-	b, _ := json.Marshal(map[string]interface{}{"name": "TV", "type": "video"})
-	req := testReq("POST", "/api/libraries", bytes.NewReader(b))
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := application.Fiber.Test(req)
-	require.NoError(t, err)
-	require.Equal(t, fiber.StatusCreated, resp.StatusCode)
-	resp.Body.Close()
-
-	// Check scan status
-	resp2, err := application.Fiber.Test(authReq("GET", "/api/libraries/1/scan-status", token))
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusOK, resp2.StatusCode)
-
-	var status map[string]interface{}
-	parseResp(t, resp2, &status)
-	assert.Equal(t, false, status["running"])
-}
-
 // --- OTPStore limits ---
 
 func TestOTPStoreFull(t *testing.T) {

@@ -53,12 +53,12 @@ class MediaRepositoryImpl implements MediaRepository {
   @override
   Future<Either<Failure, Media>> uploadFile({
     required String filePath,
-    required int libraryId,
+    required String mediaType,
     required String fileName,
   }) =>
       safeRepositoryCall(() => remoteDataSource.uploadFile(
             filePath: filePath,
-            libraryId: libraryId,
+            mediaType: mediaType,
             fileName: fileName,
           ));
 

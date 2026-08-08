@@ -133,14 +133,14 @@ final class _$ApiClient extends ApiClient {
 
   @override
   Future<Response<Map<String, dynamic>>> uploadMedia(
-    int libraryId,
+    String mediaType,
     MultipartFile file,
   ) {
     final Uri $url = Uri.parse('/media/upload');
     final List<PartValue> $parts = <PartValue>[
-      PartValue<int>(
-        'library_id',
-        libraryId,
+      PartValue<String>(
+        'media_type',
+        mediaType,
       ),
       PartValueFile<MultipartFile>(
         'file',
@@ -186,80 +186,6 @@ final class _$ApiClient extends ApiClient {
       client.baseUrl,
       parts: $parts,
       multipart: true,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<List<dynamic>>> getLibraries() {
-    final Uri $url = Uri.parse('/libraries');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
-    return client.send<List<dynamic>, List<dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> createLibrary(
-      Map<String, dynamic> body) {
-    final Uri $url = Uri.parse('/libraries');
-    final $body = body;
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> updateLibrary(
-    int id,
-    Map<String, dynamic> body,
-  ) {
-    final Uri $url = Uri.parse('/libraries/${id}');
-    final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> deleteLibrary(int id) {
-    final Uri $url = Uri.parse('/libraries/${id}');
-    final Request $request = Request(
-      'DELETE',
-      $url,
-      client.baseUrl,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> scanLibrary(int id) {
-    final Uri $url = Uri.parse('/libraries/${id}/scan');
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> getScanStatus(int id) {
-    final Uri $url = Uri.parse('/libraries/${id}/scan-status');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
     );
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }

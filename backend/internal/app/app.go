@@ -91,10 +91,8 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	// File watcher for automatic library monitoring.
 	var watcherService *services.WatcherService
-	var watcherInterface services.WatcherInterface
 	if cfg.Scanner.WatchEnabled {
 		watcherService = services.NewWatcherService(scanner)
-		watcherInterface = watcherService
 	}
 
 	// Handlers
@@ -104,7 +102,6 @@ func New(cfg *config.Config, version string) (*App, error) {
 	uploadHandler := handlers.NewUploadHandler(libraryRepo, mediaRepo, scanner, thumbSvc, handlers.UploadConfig{
 		MaxFileSize: cfg.Server.MaxUploadSize,
 	})
-	libraryHandler := handlers.NewLibraryHandler(libraryRepo, scanner, watcherInterface, cfg)
 
 	// Auto-create default libraries if they don't exist.
 	if _, err := libraryRepo.FindByPath(context.Background(), cfg.Media.VideoPath); err != nil {
@@ -238,14 +235,6 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Get("/:id/thumb", thumbHandler.Get)
 	media.Get("/:id/cover", thumbHandler.GetCover)
 	media.Put("/:id/cover", requireAdmin, thumbHandler.UploadCover)
-
-	library := api.Group("/libraries")
-	library.Get("", libraryHandler.List)
-	library.Post("", requireAdmin, libraryHandler.Create)
-	library.Put("/:id", requireAdmin, libraryHandler.Update)
-	library.Delete("/:id", requireAdmin, libraryHandler.Delete)
-	library.Post("/:id/scan", requireAdmin, libraryHandler.Scan)
-	library.Get("/:id/scan-status", libraryHandler.ScanStatus)
 
 	progress := api.Group("/progress")
 	progress.Get("", progressHandler.List)

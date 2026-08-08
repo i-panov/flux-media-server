@@ -11,7 +11,6 @@ import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart
 import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
@@ -83,7 +82,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         _ref.invalidate(mediaListProvider('audio'));
         _ref.invalidate(favoritesProvider);
         _ref.invalidate(collectionsProvider);
-        _ref.invalidate(libraryProvider);
         _ref.invalidate(watchProgressProvider);
         state = AuthState.authenticated(user: data.user);
       },
@@ -115,7 +113,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(mediaListProvider('audio'));
     _ref.invalidate(favoritesProvider);
     _ref.invalidate(collectionsProvider);
-    _ref.invalidate(libraryProvider);
     _ref.invalidate(watchProgressProvider);
     _ref.invalidate(settingsProvider);
     state = const AuthState.initial();

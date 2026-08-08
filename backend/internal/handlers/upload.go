@@ -53,21 +53,38 @@ func NewUploadHandler(
 
 // Upload handles multipart file upload.
 func (h *UploadHandler) Upload(c *fiber.Ctx) error {
-	// Parse library_id from form.
-	libraryIDStr := c.FormValue("library_id")
-	if libraryIDStr == "" {
-		return response.Error(c, fiber.StatusBadRequest, "library_id is required")
-	}
-
-	libID, err := strconv.Atoi(libraryIDStr)
-	if err != nil || libID <= 0 {
-		return response.Error(c, fiber.StatusBadRequest, "library_id must be a positive number")
-	}
-
 	ctx := c.UserContext()
-	library, err := h.libraryRepo.FindByID(ctx, uint(libID))
-	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Library not found")
+
+	// Resolve library: either by library_id, or by media_type (auto-find default).
+	var library *models.MediaLibrary
+	libraryIDStr := c.FormValue("library_id")
+	if libraryIDStr != "" {
+		libID, err := strconv.Atoi(libraryIDStr)
+		if err != nil || libID <= 0 {
+			return response.Error(c, fiber.StatusBadRequest, "library_id must be a positive number")
+		}
+		library, err = h.libraryRepo.FindByID(ctx, uint(libID))
+		if err != nil {
+			return response.Error(c, fiber.StatusNotFound, "Library not found")
+		}
+	} else {
+		mediaType := c.FormValue("media_type")
+		if mediaType == "" {
+			mediaType = "video"
+		}
+		libs, err := h.libraryRepo.FindAll(ctx)
+		if err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to find libraries")
+		}
+		for _, lib := range libs {
+			if lib.Type == mediaType && lib.Enabled {
+				library = &lib
+				break
+			}
+		}
+		if library == nil {
+			return response.Error(c, fiber.StatusNotFound, "No enabled library found for type: "+mediaType)
+		}
 	}
 
 	// Get uploaded file.

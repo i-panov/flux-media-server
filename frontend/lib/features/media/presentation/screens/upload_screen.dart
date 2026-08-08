@@ -5,11 +5,9 @@ import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/features/library/presentation/providers/library_provider.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
-import 'package:flux_media_server/shared/models/library.dart';
 
 @RoutePage()
 class UploadScreen extends ConsumerStatefulWidget {
@@ -22,12 +20,10 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
-  MediaLibrary? _selectedLibrary;
   bool _isUploading = false;
   File? _selectedFile;
   String? _selectedFileName;
   int? _selectedFileSize;
-  String? _selectedFileExt;
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
@@ -46,12 +42,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       _selectedFile = File(file.path!);
       _selectedFileName = file.name;
       _selectedFileSize = file.size;
-      _selectedFileExt = file.extension;
     });
   }
 
   Future<void> _startUpload() async {
-    if (_selectedFile == null || _selectedLibrary == null) return;
+    if (_selectedFile == null) return;
 
     final l = AppLocalizations.of(context)!;
 
@@ -83,7 +78,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     final result = await uploadMedia(
       UploadMediaParams(
         filePath: _selectedFile!.path,
-        libraryId: _selectedLibrary!.id,
+        mediaType: widget.mediaType,
         fileName: _selectedFileName!,
       ),
     );
@@ -118,7 +113,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final librariesAsync = ref.watch(libraryProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -134,52 +128,6 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       ),
       body: Column(
         children: [
-          librariesAsync.when(
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('${l.errorLoadingLibraries}: $e'),
-            ),
-            data: (libraries) {
-              final filtered = libraries
-                  .where((lib) => lib.type == widget.mediaType)
-                  .toList();
-
-              if (_selectedLibrary == null && filtered.isNotEmpty) {
-                _selectedLibrary = filtered.first;
-              }
-
-              if (filtered.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(l.noLibrariesYet),
-                );
-              }
-
-              if (filtered.length == 1) {
-                return const SizedBox.shrink();
-              }
-
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: DropdownButtonFormField<MediaLibrary>(
-                  value: _selectedLibrary,
-                  decoration: InputDecoration(
-                    labelText: l.libraries,
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: filtered
-                      .map((lib) => DropdownMenuItem(
-                            value: lib,
-                            child: Text(lib.name),
-                          ))
-                      .toList(),
-                  onChanged: (lib) => setState(() => _selectedLibrary = lib),
-                ),
-              );
-            },
-          ),
-
           const SizedBox(height: 24),
 
           // File picker button.

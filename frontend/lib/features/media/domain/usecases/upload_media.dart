@@ -7,12 +7,12 @@ import 'package:flux_media_server/shared/models/media.dart';
 class UploadMediaParams {
   const UploadMediaParams({
     required this.filePath,
-    required this.libraryId,
+    required this.mediaType,
     required this.fileName,
   });
 
   final String filePath;
-  final int libraryId;
+  final String mediaType;
   final String fileName;
 }
 
@@ -25,7 +25,7 @@ class UploadMedia extends UseCase<Either<Failure, Media>, UploadMediaParams> {
   Future<Either<Failure, Media>> call(UploadMediaParams params) {
     return repository.uploadFile(
       filePath: params.filePath,
-      libraryId: params.libraryId,
+      mediaType: params.mediaType,
       fileName: params.fileName,
     );
   }

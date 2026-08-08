@@ -52,7 +52,7 @@ class FakeMediaRepository implements MediaRepository {
   @override
   Future<Either<Failure, Media>> uploadFile({
     required String filePath,
-    required int libraryId,
+    required String mediaType,
     required String fileName,
   }) async =>
       Right(_fakeMedia(0, fileName));

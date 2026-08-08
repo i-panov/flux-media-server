@@ -62,22 +62,6 @@ abstract class _$AppRouter extends RootStackRouter {
         ),
       );
     },
-    LibraryMediaRoute.name: (routeData) {
-      final args = routeData.argsAs<LibraryMediaRouteArgs>();
-      return AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: LibraryMediaScreen(
-          key: args.key,
-          library: args.library,
-        ),
-      );
-    },
-    LibraryRoute.name: (routeData) {
-      return AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: const LibraryScreen(),
-      );
-    },
     LoginRoute.name: (routeData) {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
@@ -308,58 +292,6 @@ class CollectionDetailRouteArgs {
   String toString() {
     return 'CollectionDetailRouteArgs{key: $key, collection: $collection}';
   }
-}
-
-/// generated route for
-/// [LibraryMediaScreen]
-class LibraryMediaRoute extends PageRouteInfo<LibraryMediaRouteArgs> {
-  LibraryMediaRoute({
-    Key? key,
-    required MediaLibrary library,
-    List<PageRouteInfo>? children,
-  }) : super(
-          LibraryMediaRoute.name,
-          args: LibraryMediaRouteArgs(
-            key: key,
-            library: library,
-          ),
-          initialChildren: children,
-        );
-
-  static const String name = 'LibraryMediaRoute';
-
-  static const PageInfo<LibraryMediaRouteArgs> page =
-      PageInfo<LibraryMediaRouteArgs>(name);
-}
-
-class LibraryMediaRouteArgs {
-  const LibraryMediaRouteArgs({
-    this.key,
-    required this.library,
-  });
-
-  final Key? key;
-
-  final MediaLibrary library;
-
-  @override
-  String toString() {
-    return 'LibraryMediaRouteArgs{key: $key, library: $library}';
-  }
-}
-
-/// generated route for
-/// [LibraryScreen]
-class LibraryRoute extends PageRouteInfo<void> {
-  const LibraryRoute({List<PageRouteInfo>? children})
-      : super(
-          LibraryRoute.name,
-          initialChildren: children,
-        );
-
-  static const String name = 'LibraryRoute';
-
-  static const PageInfo<void> page = PageInfo<void>(name);
 }
 
 /// generated route for

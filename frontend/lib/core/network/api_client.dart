@@ -99,7 +99,7 @@ abstract class ApiClient extends ChopperService {
   @Post(path: '/media/upload')
   @multipart
   Future<Response<Map<String, dynamic>>> uploadMedia(
-    @Part('library_id') int libraryId,
+    @Part('media_type') String mediaType,
     @PartFile('file') MultipartFile file,
   );
 
@@ -112,30 +112,6 @@ abstract class ApiClient extends ChopperService {
     @Path('id') int id,
     @PartFile('cover') MultipartFile cover,
   );
-
-  // Libraries
-  @Get(path: '/libraries')
-  Future<Response<List<dynamic>>> getLibraries();
-
-  @Post(path: '/libraries')
-  Future<Response<Map<String, dynamic>>> createLibrary(
-    @Body() Map<String, dynamic> body,
-  );
-
-  @Put(path: '/libraries/{id}')
-  Future<Response<Map<String, dynamic>>> updateLibrary(
-    @Path('id') int id,
-    @Body() Map<String, dynamic> body,
-  );
-
-  @Delete(path: '/libraries/{id}')
-  Future<Response<Map<String, dynamic>>> deleteLibrary(@Path('id') int id);
-
-  @Post(path: '/libraries/{id}/scan', optionalBody: true)
-  Future<Response<Map<String, dynamic>>> scanLibrary(@Path('id') int id);
-
-  @Get(path: '/libraries/{id}/scan-status')
-  Future<Response<Map<String, dynamic>>> getScanStatus(@Path('id') int id);
 
   // Favorites
   @Post(path: '/media/{id}/favorite', optionalBody: true)

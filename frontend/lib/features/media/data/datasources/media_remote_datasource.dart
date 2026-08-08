@@ -71,10 +71,10 @@ class MediaRemoteDataSource {
     return (exists: false, mediaId: null, title: null);
   }
 
-  /// Uploads a file to the specified library.
+  /// Uploads a file to the default library for the given media type.
   Future<Media> uploadFile({
     required String filePath,
-    required int libraryId,
+    required String mediaType,
     required String fileName,
   }) async {
     final file = await MultipartFile.fromPath(
@@ -83,7 +83,7 @@ class MediaRemoteDataSource {
       filename: fileName,
     );
     final Response<Map<String, dynamic>> response = await apiClient.uploadMedia(
-      libraryId,
+      mediaType,
       file,
     );
     checkResponse(response, 'Failed to upload file');
