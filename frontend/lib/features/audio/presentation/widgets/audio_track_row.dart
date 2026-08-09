@@ -39,7 +39,9 @@ class AudioTrackRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final baseUrl = ref.watch(baseUrlProvider);
-    final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
+    final hasCover =
+        (media.coverUrl?.isNotEmpty ?? false) ||
+        (media.thumbnailUrl?.isNotEmpty ?? false);
     final cacheBuster = media.updatedAt?.millisecondsSinceEpoch;
     final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
     final imageUrl = hasCover

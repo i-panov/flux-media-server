@@ -58,15 +58,6 @@ class CollectionsRemoteDataSource {
     checkResponse(response, 'Failed to remove item from collection');
   }
 
-  Future<List<CollectionItem>> getCollectionItems(int collectionId) async {
-    final response = await apiClient.getCollectionItems(collectionId);
-    checkResponse(response, 'Failed to fetch collection items');
-    final body = response.body!;
-    return body
-        .map((json) => CollectionItem.fromJson(json as Map<String, dynamic>))
-        .toList();
-  }
-
   Future<List<Media>> getCollectionItemsFull(int collectionId) async {
     final response = await apiClient.getCollectionItems(collectionId);
     checkResponse(response, 'Failed to fetch collection items');

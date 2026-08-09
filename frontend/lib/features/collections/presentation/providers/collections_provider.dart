@@ -7,7 +7,6 @@ import 'package:flux_media_server/features/collections/domain/repositories/colle
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/create_collection.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/delete_collection.dart';
-import 'package:flux_media_server/features/collections/domain/usecases/get_collection_items.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/get_collection_items_full.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/get_collections.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/remove_collection_item.dart';
@@ -45,10 +44,6 @@ final removeCollectionItemProvider = Provider<RemoveCollectionItem>((ref) {
   return RemoveCollectionItem(ref.watch(collectionsRepositoryProvider));
 });
 
-final getCollectionItemsProvider = Provider<GetCollectionItems>((ref) {
-  return GetCollectionItems(ref.watch(collectionsRepositoryProvider));
-});
-
 final getCollectionItemsFullProvider = Provider<GetCollectionItemsFull>((ref) {
   return GetCollectionItemsFull(ref.watch(collectionsRepositoryProvider));
 });
@@ -63,19 +58,6 @@ final collectionsProvider =
     (collections) => collections,
   );
 });
-
-/// Fetches items for a specific collection.
-final collectionItemsProvider =
-    FutureProvider.autoDispose.family<List<CollectionItem>, int>(
-  (ref, collectionId) async {
-    final getItems = ref.watch(getCollectionItemsProvider);
-    final result = await getItems(collectionId);
-    return result.fold(
-      (failure) => throw Exception(failure.message),
-      (items) => items,
-    );
-  },
-);
 
 /// Fetches full media items for a specific collection (API returns
 /// Media objects).

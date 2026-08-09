@@ -19,9 +19,6 @@ abstract class CollectionsRepository {
     int collectionId,
     int mediaId,
   );
-  Future<Either<Failure, List<CollectionItem>>> getCollectionItems(
-    int collectionId,
-  );
 
   /// Fetches full media items for a collection.
   /// The API returns media objects directly for collection items.

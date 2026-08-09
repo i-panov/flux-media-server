@@ -55,7 +55,7 @@ void main() async {
       if (state is PlaybackPlaying) {
         container
             .read(favoriteToggleProvider(state.media.id).notifier)
-            .toggle(state.media.id);
+            .toggle();
       }
     };
 

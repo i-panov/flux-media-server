@@ -56,65 +56,76 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     final l = AppLocalizations.of(context)!;
 
-    setState(() => _isUploading = true);
+    try {
+      setState(() => _isUploading = true);
 
-    // Compute hash for duplicate check.
-    final stream = _selectedFile!.openRead();
-    final hash = await sha256.bind(stream).first;
+      // Compute hash for duplicate check.
+      final stream = _selectedFile!.openRead();
+      final hash = await sha256.bind(stream).first;
 
-    // Check duplicate.
-    final checkMediaHash = ref.read(checkMediaHashProvider);
-    final checkResult = await checkMediaHash(hash.toString());
-    final exists = checkResult.fold((_) => false, (data) => data.exists);
+      // Check duplicate.
+      final checkMediaHash = ref.read(checkMediaHashProvider);
+      final checkResult = await checkMediaHash(hash.toString());
+      final exists = checkResult.fold((_) => false, (data) => data.exists);
 
-    if (exists) {
-      setState(() => _isUploading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.fileAlreadyExists),
-            backgroundColor: Colors.orange,
-          ),
-        );
+      if (exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l.fileAlreadyExists),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
       }
-      return;
+
+      final uploadMedia = ref.read(uploadMediaProvider);
+      final result = await uploadMedia(
+        UploadMediaParams(
+          filePath: _selectedFile!.path,
+          mediaType: widget.mediaType,
+          fileName: _selectedFileName!,
+        ),
+      );
+
+      if (!mounted) return;
+
+      result.fold(
+        (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l.failedToAdd(failure.message)),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+        (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l.uploadSuccess),
+              backgroundColor: Colors.green,
+            ),
+          );
+          ref
+            ..invalidate(mediaListProvider('video'))
+            ..invalidate(mediaListProvider('audio'));
+          context.router.maybePop();
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l.failedToAdd(l.errorLabel)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
     }
-
-    final uploadMedia = ref.read(uploadMediaProvider);
-    final result = await uploadMedia(
-      UploadMediaParams(
-        filePath: _selectedFile!.path,
-        mediaType: widget.mediaType,
-        fileName: _selectedFileName!,
-      ),
-    );
-
-    setState(() => _isUploading = false);
-
-    if (!mounted) return;
-
-    result.fold(
-      (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.failedToAdd(failure.message)),
-            backgroundColor: Colors.red,
-          ),
-        );
-      },
-      (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.uploadSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
-        ref
-          ..invalidate(mediaListProvider('video'))
-          ..invalidate(mediaListProvider('audio'));
-        context.router.maybePop();
-      },
-    );
   }
 
   @override

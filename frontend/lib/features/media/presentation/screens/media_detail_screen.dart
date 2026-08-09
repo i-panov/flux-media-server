@@ -69,9 +69,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
         );
     if (media == null) return;
 
-    await ref.read(favoriteToggleProvider(widget.mediaId).notifier).toggle(
-          widget.mediaId,
-        );
+    await ref.read(favoriteToggleProvider(widget.mediaId).notifier).toggle();
   }
 
   Future<void> _addToCollection() async {

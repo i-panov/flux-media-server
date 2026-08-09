@@ -471,7 +471,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
   }
 
   void _toggleFavorite(int mediaId) {
-    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId);
+    ref.read(favoriteToggleProvider(mediaId).notifier).toggle();
   }
 
   void _toggleDownload(int mediaId) {

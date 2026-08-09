@@ -56,14 +56,6 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
       );
 
   @override
-  Future<Either<Failure, List<CollectionItem>>> getCollectionItems(
-    int collectionId,
-  ) =>
-      safeRepositoryCall(
-        () => remoteDataSource.getCollectionItems(collectionId),
-      );
-
-  @override
   Future<Either<Failure, List<Media>>> getCollectionItemsFull(
     int collectionId,
   ) =>

@@ -332,9 +332,9 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     ),
                     tooltip: l.favorites,
                     onPressed: () {
-                      ref
-                          .read(favoriteToggleProvider(media.id).notifier)
-                          .toggle(media.id);
+                    ref
+                        .read(favoriteToggleProvider(media.id).notifier)
+                        .toggle();
                     },
                     iconSize: 20,
                     padding: EdgeInsets.zero,

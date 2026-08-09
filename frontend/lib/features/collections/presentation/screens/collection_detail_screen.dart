@@ -150,10 +150,19 @@ class _CollectionDetailScreenState
             onPressed: () async {
               Navigator.pop(ctx);
               final deleteCollection = ref.read(deleteCollectionProvider);
-              await deleteCollection(widget.collection.id);
-              ref.invalidate(collectionsProvider);
+              final result = await deleteCollection(widget.collection.id);
               if (context.mounted) {
-                await context.router.maybePop();
+                result.fold(
+                  (failure) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l.failedToAdd(failure.message))),
+                    );
+                  },
+                  (_) {
+                    ref.invalidate(collectionsProvider);
+                    context.router.maybePop();
+                  },
+                );
               }
             },
             child: Text(l.delete, style: const TextStyle(color: Colors.red)),

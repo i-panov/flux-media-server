@@ -83,18 +83,29 @@ class _AddToCollectionDialogState
     setState(() => _loading = true);
     try {
       final addCollectionItem = ref.read(addCollectionItemProvider);
-      await addCollectionItem(
+      final result = await addCollectionItem(
         AddCollectionItemParams(
           collectionId: collection.id,
           mediaId: widget.mediaId,
         ),
       );
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.addedToCollection(collection.name))),
-        );
-      }
+      result.fold(
+        (failure) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l.failedToAdd(failure.message))),
+            );
+          }
+        },
+        (_) {
+          if (mounted) {
+            Navigator.pop(context, true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l.addedToCollection(collection.name))),
+            );
+          }
+        },
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

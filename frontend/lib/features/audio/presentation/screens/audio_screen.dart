@@ -44,8 +44,8 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent * 0.8) {
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent * 0.8) {
       ref.read(mediaListProvider(_mediaType).notifier).loadMore();
     }
   }
@@ -63,7 +63,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
   }
 
   void _toggleFavorite(int mediaId) {
-    ref.read(favoriteToggleProvider(mediaId).notifier).toggle(mediaId);
+    ref.read(favoriteToggleProvider(mediaId).notifier).toggle();
   }
 
   void _toggleDownload(int mediaId) {
