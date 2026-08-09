@@ -10,6 +10,8 @@ import (
 
 	"github.com/dhowden/tag"
 	"gopkg.in/vansante/go-ffprobe.v2"
+
+	"flux/internal/models"
 )
 
 // FileMetadata holds metadata extracted from a media file.
@@ -138,7 +140,7 @@ func extractVideoFromData(data *ffprobe.ProbeData) *FileMetadata {
 }
 
 // DetermineMediaTypeFromProbe returns the media type from probe stream data.
-func DetermineMediaTypeFromProbe(data *ffprobe.ProbeData) string {
+func DetermineMediaTypeFromProbe(data *ffprobe.ProbeData) models.MediaType {
 	hasVideo := false
 	hasAudio := false
 	for _, s := range data.Streams {
@@ -150,7 +152,7 @@ func DetermineMediaTypeFromProbe(data *ffprobe.ProbeData) string {
 		}
 	}
 	if hasAudio && !hasVideo {
-		return "audio"
+		return models.MediaTypeAudio
 	}
-	return "video"
+	return models.MediaTypeVideo
 }

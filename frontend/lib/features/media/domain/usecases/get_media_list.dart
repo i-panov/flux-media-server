@@ -1,8 +1,8 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/usecases/usecase.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:fpdart/fpdart.dart';
 
 class GetMediaListParams {
   const GetMediaListParams({
@@ -20,8 +20,8 @@ class GetMediaListParams {
   final int? offset;
 }
 
-class GetMediaList
-    extends UseCase<Either<Failure, ({List<Media> items, int total})>, GetMediaListParams> {
+class GetMediaList extends UseCase<
+    Either<Failure, ({List<Media> items, int total})>, GetMediaListParams> {
   GetMediaList(this.repository);
 
   final MediaRepository repository;

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/create_collection.dart';
+import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 
@@ -29,7 +29,8 @@ class _AddToCollectionDialog extends ConsumerStatefulWidget {
       _AddToCollectionDialogState();
 }
 
-class _AddToCollectionDialogState extends ConsumerState<_AddToCollectionDialog> {
+class _AddToCollectionDialogState
+    extends ConsumerState<_AddToCollectionDialog> {
   bool _loading = false;
 
   @override
@@ -44,7 +45,7 @@ class _AddToCollectionDialogState extends ConsumerState<_AddToCollectionDialog> 
         child: collectionsState.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Text(l.failedToAdd(e.toString())),
-              data: (collections) {
+          data: (collections) {
             return ListView.builder(
               shrinkWrap: true,
               itemCount: collections.length + 1,
@@ -60,7 +61,7 @@ class _AddToCollectionDialogState extends ConsumerState<_AddToCollectionDialog> 
                 return ListTile(
                   leading: const Icon(Icons.folder),
                   title: Text(collection.name),
-                  subtitle: Text(collection.type),
+                  subtitle: Text(collection.type.value),
                   onTap: _loading ? null : () => _addToCollection(collection),
                 );
               },
@@ -128,12 +129,12 @@ class _AddToCollectionDialogState extends ConsumerState<_AddToCollectionDialog> 
         ],
       ),
     );
-    if (created == true && nameController.text.isNotEmpty) {
+    if ((created ?? false) && nameController.text.isNotEmpty) {
       setState(() => _loading = true);
       try {
         final createCollection = ref.read(createCollectionProvider);
         final collection = await createCollection(
-          CreateCollectionParams(name: nameController.text, type: 'custom'),
+          CreateCollectionParams(name: nameController.text, type: 'video'),
         );
         collection.fold(
           (failure) {

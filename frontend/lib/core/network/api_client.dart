@@ -3,13 +3,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:chopper/chopper.dart';
+import 'package:flux_media_server/core/network/interceptors/auth_interceptor.dart';
+import 'package:flux_media_server/core/network/interceptors/safe_logging_interceptor.dart';
+import 'package:flux_media_server/core/network/interceptors/token_refresh_interceptor.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart' show MultipartFile;
 import 'package:http/io_client.dart' show IOClient;
-
-import 'interceptors/auth_interceptor.dart';
-import 'interceptors/safe_logging_interceptor.dart';
-import 'interceptors/token_refresh_interceptor.dart';
 
 part 'api_client.chopper.dart';
 
@@ -45,7 +44,7 @@ abstract class ApiClient extends ChopperService {
       baseUrl: Uri.parse(baseUrl ?? 'http://localhost:8080/api'),
       services: [_$ApiClient()],
       client: _createHttpClient(),
-      converter: JsonConverter(),
+      converter: const JsonConverter(),
       interceptors: [
         if (authInterceptor != null) authInterceptor,
         if (tokenRefreshInterceptor != null) tokenRefreshInterceptor,

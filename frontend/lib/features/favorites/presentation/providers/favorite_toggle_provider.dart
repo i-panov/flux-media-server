@@ -8,12 +8,14 @@ import 'package:flux_media_server/features/favorites/presentation/providers/favo
 /// lists) where no one watches the state. Without autoDispose the notifier
 /// survives the toggle and correctly retains its state.
 class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
-  FavoriteToggleNotifier(this._ref, this._mediaId) : super(const AsyncValue.data(false));
+  FavoriteToggleNotifier(this._ref, this._mediaId)
+      : super(const AsyncValue.data(false));
 
   final Ref _ref;
   final int _mediaId;
 
-  /// Returns the actual favorite state from the cached [favoriteMediaIdsProvider].
+  /// Returns the actual favorite state from the cached
+  /// [favoriteMediaIdsProvider].
   Future<bool> _isFavorited() async {
     try {
       final ids = await _ref.read(favoriteMediaIdsProvider.future);
@@ -45,8 +47,9 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
             state = AsyncValue.error(failure.message, StackTrace.current);
           },
           (_) {
-            _ref.invalidate(favoritesProvider);
-            _ref.invalidate(favoriteMediaIdsProvider);
+            _ref
+              ..invalidate(favoritesProvider)
+              ..invalidate(favoriteMediaIdsProvider);
           },
         );
       } else {
@@ -59,8 +62,9 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
             state = AsyncValue.error(failure.message, StackTrace.current);
           },
           (_) {
-            _ref.invalidate(favoritesProvider);
-            _ref.invalidate(favoriteMediaIdsProvider);
+            _ref
+              ..invalidate(favoritesProvider)
+              ..invalidate(favoriteMediaIdsProvider);
           },
         );
       }
@@ -72,9 +76,9 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
 }
 
 /// Provider for toggling favorite status of a specific media item.
-/// Not auto-disposed so that [toggle] can be called via [ref.read] without
+/// Not auto-disposed so that `toggle` can be called via `ref.read` without
 /// the notifier being garbage-collected mid-operation.
 final favoriteToggleProvider =
     StateNotifierProvider.family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
-  (ref, mediaId) => FavoriteToggleNotifier(ref, mediaId),
+  FavoriteToggleNotifier.new,
 );

@@ -34,7 +34,7 @@ Future<T> safeApiCall<T>(Future<T> Function() call) async {
     return await call();
   } on TokenRefreshedException {
     // Token was refreshed — retry with the new token
-    return await call();
+    return call();
   } on AuthException {
     rethrow;
   } on ServerException {
@@ -43,7 +43,9 @@ Future<T> safeApiCall<T>(Future<T> Function() call) async {
     rethrow;
   } on SocketException catch (e) {
     if (e.message.contains('Broken pipe') || e.message.contains('errno = 32')) {
-      throw const ServerException(message: 'File too large for server to accept');
+      throw const ServerException(
+        message: 'File too large for server to accept',
+      );
     }
     throw const NetworkException(message: 'No internet connection');
   } on HttpException {

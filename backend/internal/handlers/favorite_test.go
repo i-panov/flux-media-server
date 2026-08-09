@@ -27,7 +27,7 @@ func setupFavoriteTestApp(t *testing.T) *fiber.App {
 	// Create a test media item
 	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
 		Title:    "Test Movie",
-		Type:     "video",
+		Type:     models.MediaTypeVideo,
 		FilePath: "/test.mkv",
 	}))
 

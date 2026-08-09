@@ -3,17 +3,16 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
-import 'package:flux_media_server/features/lyrics/domain/usecases/get_lyrics.dart';
 import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_invalidator_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages offline media downloads.
 /// Files are stored in the app's documents directory.
@@ -23,8 +22,9 @@ class OfflineCacheService {
   final Ref _ref;
   final String _baseUrl;
 
-  /// Prefix for file names so debug and release builds don't share cached files.
-  static final String _prefix = kDebugMode ? 'debug_' : 'release_';
+  /// Prefix for file names so debug and release builds don't share
+  /// cached files.
+  static const String _prefix = kDebugMode ? 'debug_' : 'release_';
 
   String _fileName(int mediaId) => '${_prefix}flux_media_$mediaId';
   static String _metaKey(int mediaId) => '${_prefix}flux_meta_$mediaId';
@@ -34,12 +34,13 @@ class OfflineCacheService {
 
   SharedPreferences get _prefs => _ref.read(sharedPreferencesProvider);
 
-  /// Returns the local file path for a cached media item, or null if not cached.
+  /// Returns the local file path for a cached media item, or null if
+  /// not cached.
   Future<String?> getLocalPath(int mediaId) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/${_fileName(mediaId)}');
-      if (await file.exists()) {
+      if (file.existsSync()) {
         return file.path;
       }
     } catch (e) {
@@ -87,7 +88,7 @@ class OfflineCacheService {
         final total = response.contentLength;
         final sink = partFile.openWrite();
 
-        int received = 0;
+        var received = 0;
         try {
           await response.stream.map((chunk) {
             received += chunk.length;
@@ -98,19 +99,19 @@ class OfflineCacheService {
           await sink.close();
         }
 
-        if (await localFile.exists()) {
-          await localFile.delete();
+        if (localFile.existsSync()) {
+          localFile.deleteSync();
         }
-        await partFile.rename(localFile.path);
+        partFile.renameSync(localFile.path);
 
         // Save media metadata for offline access.
         await saveMetadata(media);
 
         return localFile.path;
       } catch (e) {
-        if (await partFile.exists()) {
+        if (partFile.existsSync()) {
           try {
-            await partFile.delete();
+            partFile.deleteSync();
           } on Exception {
             // Best-effort cleanup of the partial file.
           }
@@ -184,8 +185,8 @@ class OfflineCacheService {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/${_fileName(mediaId)}');
-      if (await file.exists()) {
-        await file.delete();
+      if (file.existsSync()) {
+        file.deleteSync();
       }
       await _prefs.remove(_metaKey(mediaId));
       await _prefs.remove(_lyricsKey(mediaId));
@@ -266,13 +267,15 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
   Future<void> checkStatus(int mediaId) async {
     final cached = await _cacheService.isCached(mediaId);
     if (state is! DownloadDownloading) {
-      state = cached ? const DownloadState.downloaded() : const DownloadState.idle();
+      state = cached
+          ? const DownloadState.downloaded()
+          : const DownloadState.idle();
     }
   }
 
   /// Starts downloading the media item with progress tracking.
   Future<void> download(Media media) async {
-    state = const DownloadState.downloading(progress: 0.0);
+    state = const DownloadState.downloading();
     try {
       await _cacheService.download(
         media,
@@ -318,7 +321,8 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
 sealed class DownloadState {
   const DownloadState();
   const factory DownloadState.idle() = DownloadIdle;
-  const factory DownloadState.downloading({double progress}) = DownloadDownloading;
+  const factory DownloadState.downloading({double progress}) =
+      DownloadDownloading;
   const factory DownloadState.downloaded() = DownloadDownloaded;
   const factory DownloadState.error(String message) = DownloadError;
 }

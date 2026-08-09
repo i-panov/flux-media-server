@@ -1,3 +1,4 @@
+import 'package:flux_media_server/shared/models/media.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 // ignore_for_file: invalid_annotation_target
@@ -11,7 +12,7 @@ class Collection with _$Collection {
     required int id,
     @JsonKey(name: 'user_id') required int userId,
     required String name,
-    required String type,
+    @MediaTypeConverter() required MediaType type,
     @JsonKey(name: 'created_at') required DateTime createdAt,
     @JsonKey(name: 'updated_at') required DateTime updatedAt,
   }) = _Collection;

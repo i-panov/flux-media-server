@@ -12,7 +12,7 @@ type Media struct {
 	Filename     string         `gorm:"index" json:"filename"`
 	Year         int            `json:"year"`
 	Description  string         `gorm:"index" json:"description"`
-	Type         string         `gorm:"index" json:"type"` // movie, episode, audio
+	Type         MediaType      `gorm:"index;type:text" json:"type"` // video, audio
 	Artists      []Artist       `gorm:"many2many:media_artists;" json:"artists"`
 	Album        string         `gorm:"index" json:"album"`
 	Genre        string         `json:"genre"`

@@ -1,9 +1,9 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/favorites/data/datasources/favorites_remote_datasource.dart';
 import 'package:flux_media_server/features/favorites/domain/repositories/favorites_repository.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
+import 'package:fpdart/fpdart.dart';
 
 class FavoritesRepositoryImpl implements FavoritesRepository {
   FavoritesRepositoryImpl(this.remoteDataSource);
@@ -12,7 +12,7 @@ class FavoritesRepositoryImpl implements FavoritesRepository {
 
   @override
   Future<Either<Failure, List<Favorite>>> getFavorites() =>
-      safeRepositoryCall(() => remoteDataSource.getFavorites());
+      safeRepositoryCall(remoteDataSource.getFavorites);
 
   @override
   Future<Either<Failure, Favorite>> addFavorite(int mediaId) =>

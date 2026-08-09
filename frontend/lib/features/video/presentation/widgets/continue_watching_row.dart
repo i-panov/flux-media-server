@@ -7,9 +7,9 @@ import 'package:flux_media_server/shared/models/progress.dart';
 /// A row of media cards with progress bar overlay for "Continue Watching".
 class ContinueWatchingRow extends StatelessWidget {
   const ContinueWatchingRow({
-    super.key,
     required this.items,
     required this.onItemTapped,
+    super.key,
     this.isFavoriteMap = const {},
     this.onFavoriteToggled,
     this.isDownloadedMap = const {},
@@ -39,10 +39,14 @@ class ContinueWatchingRow extends StatelessWidget {
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
 
+    final h = hours.toString().padLeft(2, '0');
+    final m = minutes.toString().padLeft(2, '0');
+    final s = seconds.toString().padLeft(2, '0');
+
     if (hours > 0) {
-      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+      return '$h:$m:$s';
     }
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    return '$m:$s';
   }
 
   @override
@@ -55,11 +59,16 @@ class ContinueWatchingRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             children: [
-              Icon(Icons.history,
-                  size: 20, color: Theme.of(context).colorScheme.primary),
+              Icon(
+                Icons.history,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
-              Text(l.continueWatching,
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                l.continueWatching,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ],
           ),
         ),
@@ -75,7 +84,8 @@ class ContinueWatchingRow extends StatelessWidget {
               final progress = _progress(item);
               final completed = _isCompleted(item);
               final remaining = Duration(
-                  seconds: (item.$1.duration ?? 0) - item.$2.position);
+                seconds: (item.$1.duration ?? 0) - item.$2.position,
+              );
 
               return SizedBox(
                 width: 160,
@@ -93,66 +103,70 @@ class ContinueWatchingRow extends StatelessWidget {
                           ? () => onDownloadToggled!(item.$1.id)
                           : null,
                     ),
-                  // Progress bar at bottom
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: LinearProgressIndicator(
-                      value: completed ? 1.0 : progress.clamp(0.0, 1.0),
-                      minHeight: 4,
-                      backgroundColor: Colors.black26,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        completed
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.amber,
+                    // Progress bar at bottom
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: LinearProgressIndicator(
+                        value: completed ? 1.0 : progress.clamp(0.0, 1.0),
+                        minHeight: 4,
+                        backgroundColor: Colors.black26,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          completed
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.amber,
+                        ),
                       ),
                     ),
-                  ),
-                  // Remaining time overlay
-                  if (!completed && progress > 0.05)
-                    Positioned(
-                      bottom: 4,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '-${_formatDuration(remaining)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                    // Remaining time overlay
+                    if (!completed && progress > 0.05)
+                      Positioned(
+                        bottom: 4,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '-${_formatDuration(remaining)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  // "Completed" badge
-                  if (completed)
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          l.done,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                    // "Completed" badge
+                    if (completed)
+                      Positioned(
+                        top: 4,
+                        left: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            l.done,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               );

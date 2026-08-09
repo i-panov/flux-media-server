@@ -8,8 +8,8 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 class MediaCard extends ConsumerWidget {
   const MediaCard({
-    super.key,
     required this.media,
+    super.key,
     this.onTap,
     this.isFavorite = false,
     this.onFavorite,
@@ -48,7 +48,7 @@ class MediaCard extends ConsumerWidget {
     );
 
     // For files without cover, show programmatic placeholder for audio.
-    if (!hasCover && media.type == 'audio') {
+    if (!hasCover && media.type == MediaType.audio) {
       imageWidget = const Center(
         child: AudioPlaceholder(size: 120),
       );
@@ -78,21 +78,18 @@ class MediaCard extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
-                        if (media.artists.isNotEmpty)
-                          ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              media.artists.map((a) => a.name).join(', '),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: colorScheme.primary,
-                                  ),
-                            ),
-                          ],
+                        if (media.artists.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            media.artists.map((a) => a.name).join(', '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.primary,
+                                    ),
+                          ),
+                        ],
                         const SizedBox(height: 2),
                         Text(
                           '${media.year}',
@@ -147,9 +144,8 @@ class MediaCard extends ConsumerWidget {
                               ? Icons.check_circle
                               : Icons.cloud_download_outlined,
                           size: 16,
-                          color: isDownloaded
-                              ? colorScheme.primary
-                              : Colors.white,
+                          color:
+                              isDownloaded ? colorScheme.primary : Colors.white,
                         ),
                       ),
                     ),

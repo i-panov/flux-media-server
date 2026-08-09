@@ -6,7 +6,7 @@ Media _fakeMedia([int id = 1]) => Media(
       id: id,
       title: 'Test Media $id',
       year: 2024,
-      type: 'movie',
+      type: MediaType.video,
       filePath: '/test$id.mp4',
       fileSize: 1024,
     );
@@ -22,7 +22,7 @@ void main() {
     test('copyWith creates new state with updated values', () {
       const state = PlayQueueState();
       final newState = state.copyWith(items: [_fakeMedia()], currentIndex: 0);
-      
+
       expect(newState.items, hasLength(1));
       expect(newState.currentIndex, 0);
     });
@@ -38,12 +38,14 @@ void main() {
     });
 
     test('hasNext returns true when there are more items', () {
-      final state = PlayQueueState(items: [_fakeMedia(1), _fakeMedia(2)], currentIndex: 0);
+      final state =
+          PlayQueueState(items: [_fakeMedia(), _fakeMedia(2)], currentIndex: 0);
       expect(state.hasNext, isTrue);
     });
 
     test('hasPrevious returns true when not at first item', () {
-      final state = PlayQueueState(items: [_fakeMedia(1), _fakeMedia(2)], currentIndex: 1);
+      final state =
+          PlayQueueState(items: [_fakeMedia(), _fakeMedia(2)], currentIndex: 1);
       expect(state.hasPrevious, isTrue);
     });
   });
@@ -51,17 +53,20 @@ void main() {
   group('PlayQueueState methods', () {
     test('add to queue', () {
       const state = PlayQueueState();
-      final newState = state.copyWith(items: [...state.items, _fakeMedia(1)]);
-      
+      final newState = state.copyWith(items: [...state.items, _fakeMedia()]);
+
       expect(newState.items, hasLength(1));
       expect(newState.items[0].id, 1);
     });
 
     test('remove from queue', () {
-      final state = PlayQueueState(items: [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)], currentIndex: 0);
+      final state = PlayQueueState(
+        items: [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
+        currentIndex: 0,
+      );
       final items = List<Media>.from(state.items)..removeAt(1); // Remove media2
       final newState = state.copyWith(items: items, currentIndex: 0);
-      
+
       expect(newState.items, hasLength(2));
       expect(newState.items[0].id, 1);
       expect(newState.items[1].id, 3);
@@ -69,15 +74,16 @@ void main() {
 
     test('clear queue', () {
       const newState = PlayQueueState();
-      
+
       expect(newState.items, isEmpty);
       expect(newState.currentIndex, -1);
     });
 
     test('play next from queue', () {
-      final state = PlayQueueState(items: [_fakeMedia(), _fakeMedia(2)], currentIndex: 0);
+      final state =
+          PlayQueueState(items: [_fakeMedia(), _fakeMedia(2)], currentIndex: 0);
       final newState = state.copyWith(currentIndex: 1);
-      
+
       expect(newState.currentIndex, 1);
     });
   });

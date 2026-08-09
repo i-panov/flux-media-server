@@ -13,13 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"flux/internal/config"
+	"flux/internal/models"
 )
 
 func setupStreamer(t *testing.T, mediaPaths ...string) *StreamerService {
 	t.Helper()
 	var paths []config.MediaPath
 	for _, p := range mediaPaths {
-		paths = append(paths, config.MediaPath{Path: p, Type: "video"})
+		paths = append(paths, config.MediaPath{Path: p, Type: models.MediaTypeVideo})
 	}
 	cfg := &config.Config{Media: config.MediaConfig{}}
 	cfg.Media.VideoPath = paths[0].Path

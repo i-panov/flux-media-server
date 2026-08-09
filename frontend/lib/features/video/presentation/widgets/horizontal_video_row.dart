@@ -5,11 +5,11 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// A horizontal scrollable row of media cards with a section title.
 class HorizontalVideoRow extends StatelessWidget {
   const HorizontalVideoRow({
-    super.key,
     required this.title,
     required this.icon,
     required this.items,
     required this.onItemTapped,
+    super.key,
     this.isFavoriteMap = const {},
     this.onFavoriteToggled,
     this.isDownloadedMap = const {},
@@ -34,11 +34,16 @@ class HorizontalVideoRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             children: [
-              Icon(icon,
-                  size: 20, color: Theme.of(context).colorScheme.primary),
+              Icon(
+                icon,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
-              Text(title,
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ],
           ),
         ),

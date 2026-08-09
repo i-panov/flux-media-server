@@ -37,8 +37,9 @@ Future<void> showEditMetadataDialog(
       ref
           .read(mediaDetailProvider(media.id).notifier)
           .updateMedia(updatedMedia);
-      ref.invalidate(mediaListProvider('video'));
-      ref.invalidate(mediaListProvider('audio'));
+      ref
+        ..invalidate(mediaListProvider('video'))
+        ..invalidate(mediaListProvider('audio'));
     },
   );
 }
@@ -50,7 +51,8 @@ class _EditMetadataDialog extends ConsumerStatefulWidget {
   final AppLocalizations l;
 
   @override
-  ConsumerState<_EditMetadataDialog> createState() => _EditMetadataDialogState();
+  ConsumerState<_EditMetadataDialog> createState() =>
+      _EditMetadataDialogState();
 }
 
 class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
@@ -78,9 +80,8 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     _yearController = TextEditingController(text: widget.media.year.toString());
     _descriptionController =
         TextEditingController(text: widget.media.description ?? '');
-    _originalFilename = widget.media.filename.isNotEmpty
-        ? widget.media.filename
-        : null;
+    _originalFilename =
+        widget.media.filename.isNotEmpty ? widget.media.filename : null;
   }
 
   /// Parse the original filename to extract title and year, then fill
@@ -196,11 +197,15 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
               // Original filename section (only shown if available).
               if (_originalFilename != null) ...[
                 const SizedBox(height: 12),
-                Divider(height: 1),
+                const Divider(height: 1),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.insert_drive_file, size: 16, color: Colors.grey[600]),
+                    Icon(
+                      Icons.insert_drive_file,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -219,7 +224,10 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
                       icon: const Icon(Icons.edit, size: 16),
                       label: Text(l.useFilename),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         textStyle: const TextStyle(fontSize: 12),
                       ),
                     ),

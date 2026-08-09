@@ -19,9 +19,9 @@ class LyricsRemoteDataSource {
   Future<Lyrics> upsertLyrics(
     int mediaId, {
     required String lyricsText,
+    required String source,
     String? translation,
     String? syncData,
-    required String source,
   }) async {
     final response = await apiClient.upsertLyrics(mediaId, {
       'lyrics_text': lyricsText,

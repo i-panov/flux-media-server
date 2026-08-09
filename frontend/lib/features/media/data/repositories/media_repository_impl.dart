@@ -1,10 +1,10 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
+import 'package:fpdart/fpdart.dart';
 
 class MediaRepositoryImpl implements MediaRepository {
   MediaRepositoryImpl(this.remoteDataSource);
@@ -27,8 +27,7 @@ class MediaRepositoryImpl implements MediaRepository {
           limit: limit,
           offset: offset,
         );
-        final mediaList =
-            result.items.map((json) => Media.fromJson(json)).toList();
+        final mediaList = result.items.map(Media.fromJson).toList();
         return (items: mediaList, total: result.total);
       });
 
@@ -54,15 +53,17 @@ class MediaRepositoryImpl implements MediaRepository {
     required String mediaType,
     required String fileName,
   }) =>
-      safeRepositoryCall(() => remoteDataSource.uploadFile(
-            filePath: filePath,
-            mediaType: mediaType,
-            fileName: fileName,
-          ));
+      safeRepositoryCall(
+        () => remoteDataSource.uploadFile(
+          filePath: filePath,
+          mediaType: mediaType,
+          fileName: fileName,
+        ),
+      );
 
   @override
   Future<Either<Failure, List<WatchProgress>>> getProgress() =>
-      safeRepositoryCall(() => remoteDataSource.getProgress());
+      safeRepositoryCall(remoteDataSource.getProgress);
 
   @override
   Future<Either<Failure, Media>> updateMetadata(
@@ -76,10 +77,12 @@ class MediaRepositoryImpl implements MediaRepository {
     int mediaId, {
     int? position,
   }) =>
-      safeRepositoryCall(() => remoteDataSource.updateProgress(
-            mediaId,
-            position: position,
-          ));
+      safeRepositoryCall(
+        () => remoteDataSource.updateProgress(
+          mediaId,
+          position: position,
+        ),
+      );
 
   @override
   Future<Either<Failure, void>> uploadCover(int mediaId, String filePath) =>

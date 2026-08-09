@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
@@ -12,6 +11,7 @@ import 'package:flux_media_server/features/player/data/datasources/video_player_
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'playback_coordinator.freezed.dart';
 
@@ -78,8 +78,11 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     // Save progress of the current playback before switching.
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      await _saveProgress(current.media.id, current.position,
-          current.duration ?? Duration.zero);
+      await _saveProgress(
+        current.media.id,
+        current.position,
+        current.duration ?? Duration.zero,
+      );
     }
 
     _cancelSubscriptions();
@@ -94,7 +97,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
         ? <String, String>{'Authorization': 'Bearer $token'}
         : null;
 
-    if (media.type == 'audio') {
+    if (media.type == MediaType.audio) {
       // Mutual exclusion: stop video playback before starting audio.
       await _videoPlayer.stop();
 
@@ -115,9 +118,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
         title: media.title,
         artist: media.artists.map((a) => a.name).join(', '),
         artUri: coverUrl,
-        duration: media.duration != null
-            ? Duration(seconds: media.duration!)
-            : null,
+        duration:
+            media.duration != null ? Duration(seconds: media.duration!) : null,
         httpHeaders: headers,
       );
       await _audioPlayer.play();
@@ -125,7 +127,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       state = PlaybackState.playing(
         media: media,
         type: 'audio',
-        isPaused: false,
       );
 
       _subscribeToStream(_audioPlayer.positionStream, (pos) {
@@ -158,13 +159,14 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       state = PlaybackState.playing(
         media: media,
         type: 'video',
-        isPaused: false,
-        savedPosition: resumePosition != null && resumePosition > const Duration(seconds: 5)
+        savedPosition: resumePosition != null &&
+                resumePosition > const Duration(seconds: 5)
             ? resumePosition
             : null,
       );
 
-      if (resumePosition != null && resumePosition <= const Duration(seconds: 5)) {
+      if (resumePosition != null &&
+          resumePosition <= const Duration(seconds: 5)) {
         await _videoPlayer.seek(resumePosition);
       }
 
@@ -193,12 +195,14 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     if (!completed) return;
     final current = state;
     if (current is PlaybackPlaying) {
-      unawaited(_saveProgress(
-        current.media.id,
-        current.duration ?? current.position,
-        current.duration ?? Duration.zero,
-        completed: true,
-      ));
+      unawaited(
+        _saveProgress(
+          current.media.id,
+          current.duration ?? current.position,
+          current.duration ?? Duration.zero,
+          completed: true,
+        ),
+      );
     }
     _cancelProgressTimer();
 
@@ -258,11 +262,13 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       final current = state;
       if (current is PlaybackPlaying && !current.isPaused) {
-        unawaited(_saveProgress(
-          current.media.id,
-          current.position,
-          current.duration ?? Duration.zero,
-        ));
+        unawaited(
+          _saveProgress(
+            current.media.id,
+            current.position,
+            current.duration ?? Duration.zero,
+          ),
+        );
       }
     });
   }
@@ -270,7 +276,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   Future<void> pause() async {
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      if (current.media.type == 'audio') {
+      if (current.media.type == MediaType.audio) {
         await _audioPlayer.pause();
       } else {
         await _videoPlayer.pause();
@@ -287,7 +293,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   Future<void> resume() async {
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      if (current.media.type == 'audio') {
+      if (current.media.type == MediaType.audio) {
         await _audioPlayer.play();
       } else {
         await _videoPlayer.play();
@@ -299,7 +305,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   Future<void> seek(Duration position) async {
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      if (current.media.type == 'audio') {
+      if (current.media.type == MediaType.audio) {
         await _audioPlayer.seek(position);
       } else {
         await _videoPlayer.seek(position);
@@ -311,7 +317,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   Future<void> setSpeed(double speed) async {
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      if (current.media.type == 'video') {
+      if (current.media.type == MediaType.video) {
         await _videoPlayer.player.setRate(speed);
         state = current.copyWith(speed: speed);
       }
@@ -353,7 +359,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
         current.position,
         current.duration ?? Duration.zero,
       );
-      if (current.media.type == 'audio') {
+      if (current.media.type == MediaType.audio) {
         await _audioPlayer.stop();
       } else {
         await _videoPlayer.stop();
@@ -367,7 +373,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   }
 }
 
-/// Provider for the audio handler (initialized in main.dart via AudioService.init).
+/// Provider for the audio handler (initialized in main.dart via
+/// AudioService.init).
 final audioHandlerProvider = Provider<FluxAudioHandler>((ref) {
   throw UnimplementedError('audioHandlerProvider must be overridden in main()');
 });

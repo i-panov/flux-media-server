@@ -8,8 +8,8 @@ import 'package:flux_media_server/features/settings/presentation/providers/setti
 /// such as `/api/media/:id/thumb`.
 class AuthNetworkImage extends ConsumerWidget {
   const AuthNetworkImage({
-    super.key,
     required this.imageUrl,
+    super.key,
     this.fit,
     this.width,
     this.height,

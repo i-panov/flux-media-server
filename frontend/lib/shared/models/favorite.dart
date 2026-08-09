@@ -10,9 +10,9 @@ class Favorite with _$Favorite {
   const factory Favorite({
     required int id,
     @JsonKey(name: 'user_id') required int userId,
+    @JsonKey(name: 'created_at') required DateTime createdAt,
     @JsonKey(name: 'media_id') int? mediaId,
     @JsonKey(name: 'artist_id') int? artistId,
-    @JsonKey(name: 'created_at') required DateTime createdAt,
   }) = _Favorite;
 
   factory Favorite.fromJson(Map<String, dynamic> json) =>

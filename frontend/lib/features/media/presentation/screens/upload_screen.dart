@@ -11,7 +11,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class UploadScreen extends ConsumerStatefulWidget {
-  const UploadScreen({super.key, required this.mediaType});
+  const UploadScreen({required this.mediaType, super.key});
 
   final String mediaType;
 
@@ -25,9 +25,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   String? _selectedFileName;
   int? _selectedFileSize;
 
+  String _formatSize(int bytes) {
+    if (bytes > 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  }
+
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
       type: FileType.custom,
       allowedExtensions: widget.mediaType == 'audio'
           ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
@@ -91,7 +97,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${l.failedToAdd(failure.message)}'),
+            content: Text(l.failedToAdd(failure.message)),
             backgroundColor: Colors.red,
           ),
         );
@@ -103,8 +109,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        ref.invalidate(mediaListProvider('video'));
-        ref.invalidate(mediaListProvider('audio'));
+        ref
+          ..invalidate(mediaListProvider('video'))
+          ..invalidate(mediaListProvider('audio'));
         context.router.maybePop();
       },
     );
@@ -137,7 +144,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: _isUploading ? null : _pickFile,
-                icon: Icon(_selectedFile != null ? Icons.check_circle : Icons.attach_file),
+                icon: Icon(
+                  _selectedFile != null
+                      ? Icons.check_circle
+                      : Icons.attach_file,
+                ),
                 label: Text(
                   _selectedFileName ?? l.selectFiles,
                   overflow: TextOverflow.ellipsis,
@@ -149,9 +160,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           if (_selectedFileSize != null) ...[
             const SizedBox(height: 8),
             Text(
-              _selectedFileSize! > 1024 * 1024
-                  ? '${(_selectedFileSize! / (1024 * 1024)).toStringAsFixed(1)} MB'
-                  : '${(_selectedFileSize! / 1024).toStringAsFixed(1)} KB',
+              _formatSize(_selectedFileSize!),
               style: TextStyle(color: Colors.grey[600], fontSize: 13),
             ),
           ],
@@ -169,9 +178,16 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.cloud_upload_outlined, size: 64, color: Colors.grey),
+                    const Icon(
+                      Icons.cloud_upload_outlined,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(height: 16),
-                    Text(l.noFilesSelected, style: const TextStyle(color: Colors.grey)),
+                    Text(
+                      l.noFilesSelected,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
                   ],
                 ),
               ),

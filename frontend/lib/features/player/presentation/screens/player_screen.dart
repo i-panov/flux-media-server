@@ -5,11 +5,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/l10n/app_localizations.dart';
-import 'package:media_kit_video/media_kit_video.dart';
-import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 final videoControllerProvider = Provider.autoDispose<VideoController>((ref) {
   final datasource = ref.watch(videoPlayerDatasourceProvider);
@@ -25,7 +25,7 @@ final videoControllerProvider = Provider.autoDispose<VideoController>((ref) {
 
 @RoutePage()
 class PlayerScreen extends ConsumerStatefulWidget {
-  const PlayerScreen({super.key, required this.media});
+  const PlayerScreen({required this.media, super.key});
 
   final Media media;
 
@@ -131,7 +131,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
     // Show resume dialog once when savedPosition is set.
     if (state is PlaybackPlaying &&
-        state.type == 'video' &&
+        state.type == MediaType.video.value &&
         state.savedPosition != null &&
         !_resumeDialogShown) {
       _resumeDialogShown = true;
@@ -148,7 +148,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         initial: () => const Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
-        playing: (media, type, isPaused, position, duration, speed, savedPosition) {
+        playing:
+            (media, type, isPaused, position, duration, speed, savedPosition) {
           if (type != 'video') {
             return const Center(
               child: CircularProgressIndicator(color: Colors.white),
@@ -192,7 +193,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 .read(videoPlayerDatasourceProvider)
                                 .player
                                 .pause();
-                            if (context.mounted) context.maybePop();
+                            if (context.mounted) await context.maybePop();
                           },
                         ),
                       ),
@@ -259,8 +260,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () {
-                      _coordinator.reset();
-                      _coordinator.play(widget.media);
+                      _coordinator
+                        ..reset()
+                        ..play(widget.media);
                     },
                     child: Text(l.replay),
                   ),
@@ -285,10 +287,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
 class _ControlButton extends StatelessWidget {
   const _ControlButton({
+    required this.onPressed,
     this.icon,
     this.label,
     this.tooltip,
-    required this.onPressed,
   });
 
   final IconData? icon;

@@ -8,7 +8,8 @@ final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
   return AuthInterceptor(ref);
 });
 
-final tokenRefreshInterceptorProvider = Provider<TokenRefreshInterceptor>((ref) {
+final tokenRefreshInterceptorProvider =
+    Provider<TokenRefreshInterceptor>((ref) {
   return TokenRefreshInterceptor(ref);
 });
 

@@ -11,7 +11,7 @@ _$CollectionImpl _$$CollectionImplFromJson(Map<String, dynamic> json) =>
       id: (json['id'] as num).toInt(),
       userId: (json['user_id'] as num).toInt(),
       name: json['name'] as String,
-      type: json['type'] as String,
+      type: const MediaTypeConverter().fromJson(json['type'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -21,7 +21,7 @@ Map<String, dynamic> _$$CollectionImplToJson(_$CollectionImpl instance) =>
       'id': instance.id,
       'user_id': instance.userId,
       'name': instance.name,
-      'type': instance.type,
+      'type': const MediaTypeConverter().toJson(instance.type),
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
     };

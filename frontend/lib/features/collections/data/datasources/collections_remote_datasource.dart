@@ -40,7 +40,10 @@ class CollectionsRemoteDataSource {
     checkResponse(response, 'Failed to delete collection');
   }
 
-  Future<CollectionItem> addCollectionItem(int collectionId, int mediaId) async {
+  Future<CollectionItem> addCollectionItem(
+    int collectionId,
+    int mediaId,
+  ) async {
     final response = await apiClient.addCollectionItem(
       collectionId,
       {'media_id': mediaId},

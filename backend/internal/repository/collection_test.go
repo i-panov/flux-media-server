@@ -21,7 +21,7 @@ func TestCollectionStore_CreateAndFindByUser(t *testing.T) {
 	require.NoError(t, store.Create(ctx, &models.Collection{
 		UserID: 1,
 		Name:   "Want to Watch",
-		Type:   "video",
+		Type:   models.MediaTypeVideo,
 	}))
 
 	cols, err := store.FindByUser(ctx, 1)

@@ -21,17 +21,16 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  final keyPrefix = kDebugMode ? 'debug_' : 'release_';
+  const keyPrefix = kDebugMode ? 'debug_' : 'release_';
   final serverUrl = prefs.getString('${keyPrefix}server_url');
 
   // Initialize audio_service for background playback + system media controls.
   final audioHandler = await AudioService.init(
-    builder: () => FluxAudioHandler(),
+    builder: FluxAudioHandler.new,
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'ru.ithub24.flux.channel.audio',
       androidNotificationChannelName: 'Flux Audio Playback',
       androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
     ),
   );
 
@@ -47,16 +46,18 @@ void main() async {
   await container.read(settingsProvider.notifier).init();
 
   // Wire up audio handler callbacks to the play queue.
-  audioHandler.onNext = () => container.read(playQueueProvider.notifier).next();
-  audioHandler.onPrevious = () => container.read(playQueueProvider.notifier).previous();
-  audioHandler.onToggleFavorite = () {
-    final state = container.read(playbackCoordinatorProvider);
-    if (state is PlaybackPlaying) {
-      container
-          .read(favoriteToggleProvider(state.media.id).notifier)
-          .toggle(state.media.id);
-    }
-  };
+  final queue = container.read(playQueueProvider.notifier);
+  audioHandler
+    ..onNext = queue.next
+    ..onPrevious = queue.previous
+    ..onToggleFavorite = () {
+      final state = container.read(playbackCoordinatorProvider);
+      if (state is PlaybackPlaying) {
+        container
+            .read(favoriteToggleProvider(state.media.id).notifier)
+            .toggle(state.media.id);
+      }
+    };
 
   if (serverUrl != null) {
     if (container.read(settingsProvider).settings.authToken != null) {
@@ -136,8 +137,8 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         });
       } else if (next is AuthError && widget.hasServerUrl) {
         // Server unreachable — enter offline mode.
-        final shouldRedirect = previous is AuthLoading ||
-            previous is AuthAuthenticated;
+        final shouldRedirect =
+            previous is AuthLoading || previous is AuthAuthenticated;
         if (shouldRedirect) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
@@ -180,9 +181,7 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: widget.router.config(),
-      builder: showSplash
-          ? (context, child) => const SplashScreen()
-          : null,
+      builder: showSplash ? (context, child) => const SplashScreen() : null,
     );
   }
 }

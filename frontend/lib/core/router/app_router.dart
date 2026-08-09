@@ -2,24 +2,23 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:flux_media_server/core/providers/is_offline_provider.dart';
+import 'package:flux_media_server/features/audio/presentation/screens/artist_page.dart';
+import 'package:flux_media_server/features/audio/presentation/screens/audio_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/code_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/login_screen.dart';
-import 'package:flux_media_server/features/audio/presentation/screens/audio_screen.dart';
-import 'package:flux_media_server/features/audio/presentation/screens/artist_page.dart';
-import 'package:flux_media_server/features/video/presentation/screens/video_screen.dart';
+import 'package:flux_media_server/features/collections/presentation/screens/collection_detail_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/media_detail_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/upload_screen.dart';
-import 'package:flux_media_server/features/player/presentation/screens/player_screen.dart';
 import 'package:flux_media_server/features/player/presentation/screens/audio_player_screen.dart';
+import 'package:flux_media_server/features/player/presentation/screens/player_screen.dart';
 import 'package:flux_media_server/features/player/presentation/widgets/audio_mini_player.dart';
-import 'package:flux_media_server/features/collections/presentation/screens/collection_detail_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/server_setup_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/settings_screen.dart';
+import 'package:flux_media_server/features/video/presentation/screens/video_screen.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
-import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 part 'app_router.gr.dart';
 
@@ -78,12 +77,24 @@ class MainScreen extends ConsumerWidget {
   Widget _buildLayout(bool isWide, AppLocalizations l, bool isOffline) {
     // Build localized destinations.
     final destinations = [
-      (icon: Icons.movie_outlined, selectedIcon: Icons.movie, label: l.videoTab),
-      (icon: Icons.music_note_outlined, selectedIcon: Icons.music_note, label: l.audioTab),
+      (
+        icon: Icons.movie_outlined,
+        selectedIcon: Icons.movie,
+        label: l.videoTab
+      ),
+      (
+        icon: Icons.music_note_outlined,
+        selectedIcon: Icons.music_note,
+        label: l.audioTab
+      ),
     ];
 
     if (isWide) {
-      return _WideLayout(destinations: destinations, settingsLabel: l.settings, isOffline: isOffline);
+      return _WideLayout(
+        destinations: destinations,
+        settingsLabel: l.settings,
+        isOffline: isOffline,
+      );
     }
     return _NarrowLayout(destinations: destinations, isOffline: isOffline);
   }
@@ -91,9 +102,14 @@ class MainScreen extends ConsumerWidget {
 
 /// Desktop/tablet layout with NavigationRail on the left.
 class _WideLayout extends StatelessWidget {
-  const _WideLayout({required this.destinations, required this.settingsLabel, required this.isOffline});
+  const _WideLayout({
+    required this.destinations,
+    required this.settingsLabel,
+    required this.isOffline,
+  });
 
-  final List<({IconData icon, IconData selectedIcon, String label})> destinations;
+  final List<({IconData icon, IconData selectedIcon, String label})>
+      destinations;
   final String settingsLabel;
   final bool isOffline;
 
@@ -130,7 +146,8 @@ class _WideLayout extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.settings_outlined),
                           tooltip: settingsLabel,
-                          onPressed: () => AutoRouter.of(context).push(const SettingsRoute()),
+                          onPressed: () => AutoRouter.of(context)
+                              .push(const SettingsRoute()),
                         ),
                       ],
                     ),
@@ -181,7 +198,8 @@ Widget _offlineBanner(BuildContext context) {
 class _NarrowLayout extends StatelessWidget {
   const _NarrowLayout({required this.destinations, required this.isOffline});
 
-  final List<({IconData icon, IconData selectedIcon, String label})> destinations;
+  final List<({IconData icon, IconData selectedIcon, String label})>
+      destinations;
   final bool isOffline;
 
   @override
@@ -223,4 +241,3 @@ class _NarrowLayout extends StatelessWidget {
     );
   }
 }
-

@@ -80,7 +80,7 @@ func (s *ScannerService) GetScanStatus(key string) *ScanStatus {
 	return &ScanStatus{Running: false}
 }
 
-func (s *ScannerService) ScanPath(ctx context.Context, path, mediaType string) error {
+func (s *ScannerService) ScanPath(ctx context.Context, path string, mediaType models.MediaType) error {
 	// Reject concurrent scans of the same path.
 	s.mu.Lock()
 	if st, ok := s.statuses[path]; ok && st.Running {
@@ -139,7 +139,7 @@ func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen
 	return nil
 }
 
-func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath, mediaType string) (map[string]struct{}, error) {
+func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, mediaType models.MediaType) (map[string]struct{}, error) {
 	seen := make(map[string]struct{})
 
 	err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
@@ -263,7 +263,7 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath, mediaType s
 		probeData, probeErr := ffprobe.ProbeURL(probeCtx, path)
 		probeCancel()
 
-		mediaType := "video"
+		mediaType := models.MediaTypeVideo
 		if probeErr == nil {
 			mediaType = DetermineMediaTypeFromProbe(probeData)
 		} else {
@@ -307,7 +307,7 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath, mediaType s
 				media.Title = fileMeta.Title
 			}
 			// Build description from artist/album for audio.
-			if mediaType == "audio" && len(media.Artists) > 0 {
+			if mediaType.IsAudio() && len(media.Artists) > 0 {
 				desc := media.Artists[0].Name
 				if media.Album != "" {
 					desc += " — " + media.Album
@@ -405,7 +405,7 @@ func quickHashFile(path string) (string, error) {
 }
 
 // DetermineMediaType probes the file with ffprobe to detect its real type.
-func DetermineMediaType(filePath string) string {
+func DetermineMediaType(filePath string) models.MediaType {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -434,17 +434,17 @@ func DetermineMediaType(filePath string) string {
 	}
 
 	if hasAudio && !hasVideo {
-		return "audio"
+		return models.MediaTypeAudio
 	}
-	return "video"
+	return models.MediaTypeVideo
 }
 
 // determineMediaTypeByExt is the fallback when ffprobe is unavailable.
-func determineMediaTypeByExt(filePath string) string {
+func determineMediaTypeByExt(filePath string) models.MediaType {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	if ext == ".mp3" || ext == ".flac" || ext == ".ogg" ||
 		ext == ".m4a" || ext == ".aac" || ext == ".wav" {
-		return "audio"
+		return models.MediaTypeAudio
 	}
-	return "video"
+	return models.MediaTypeVideo
 }

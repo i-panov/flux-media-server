@@ -34,7 +34,7 @@ String _formatDuration(Duration? d) {
 }
 
 class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
-  double _volume = 100.0;
+  double _volume = 100;
   StreamSubscription<double>? _volumeSub;
 
   @override
@@ -57,29 +57,36 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;    // Watch the full state but only rebuild when the selected fields change.
+    final l = AppLocalizations.of(context)!;
+    // Watch the full state but only rebuild when the selected fields change.
     // Position updates every second cause the progress bar and time labels
     // to update, which is intentional for the mini-player UI.
-    final playbackInfo =
-        ref.watch(playbackCoordinatorProvider.select((state) {
-      return switch (state) {
-        PlaybackPlaying(
-          :final media,
-          :final type,
-          :final isPaused,
-          :final position,
-          :final duration,
-        ) =>
-          (media, type, isPaused, position, duration),
-        _ => null,
-      };
-    }));
+    final playbackInfo = ref.watch(
+      playbackCoordinatorProvider.select((state) {
+        return switch (state) {
+          PlaybackPlaying(
+            :final media,
+            :final type,
+            :final isPaused,
+            :final position,
+            :final duration,
+          ) =>
+            (media, type, isPaused, position, duration),
+          _ => null,
+        };
+      }),
+    );
     final baseUrl = ref.watch(baseUrlProvider);
 
     final info = playbackInfo;
     if (info == null) return const SizedBox.shrink();
-    final (Media media, String type, bool isPaused, Duration position,
-          Duration? duration) = info;
+    final (
+      Media media,
+      String type,
+      bool isPaused,
+      Duration position,
+      Duration? duration
+    ) = info;
     if (type != 'audio') return const SizedBox.shrink();
 
     final progress = (duration != null && duration > Duration.zero)
@@ -132,7 +139,8 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+            border:
+                Border(top: BorderSide(color: Theme.of(context).dividerColor)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: InkWell(
@@ -159,12 +167,17 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                         width: 36,
                         height: 36,
                         child: () {
-                          final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
+                          final hasCover = media.coverUrl != null &&
+                              media.coverUrl!.isNotEmpty;
                           if (!hasCover) {
-                            return const Center(child: AudioPlaceholder(size: 28));
+                            return const Center(
+                              child: AudioPlaceholder(size: 28),
+                            );
                           }
-                          final cacheBuster = media.updatedAt?.millisecondsSinceEpoch;
-                          final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
+                          final cacheBuster =
+                              media.updatedAt?.millisecondsSinceEpoch;
+                          final buster =
+                              cacheBuster != null ? '?v=$cacheBuster' : '';
                           return AuthNetworkImage(
                             imageUrl: '$baseUrl/media/${media.id}/cover$buster',
                             width: 36,
@@ -174,12 +187,16 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Icon(Icons.music_note,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 20),
+                              child: Icon(
+                                Icons.music_note,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20,
+                              ),
                             ),
                           );
                         }(),
@@ -202,9 +219,12 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                           media.artists.map((a) => a.name).join(', '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                         ),
                       ],
                     ),
@@ -246,8 +266,11 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
-                  // Volume slider — desktop only (mobile uses physical buttons).
-                  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) ...[
+                  // Volume slider — desktop only (mobile uses physical
+                  // buttons).
+                  if (Platform.isLinux ||
+                      Platform.isWindows ||
+                      Platform.isMacOS) ...[
                     SizedBox(
                       width: 140,
                       child: Row(
@@ -260,24 +283,37 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                                     ? Icons.volume_down
                                     : Icons.volume_up,
                             size: 18,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           Expanded(
                             child: SliderTheme(
                               data: SliderTheme.of(context).copyWith(
-                                activeTrackColor: Theme.of(context).colorScheme.primary,
-                                inactiveTrackColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                thumbColor: Theme.of(context).colorScheme.primary,
-                                overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                activeTrackColor:
+                                    Theme.of(context).colorScheme.primary,
+                                inactiveTrackColor: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest,
+                                thumbColor:
+                                    Theme.of(context).colorScheme.primary,
+                                overlayColor: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.1),
                                 trackHeight: 3,
-                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 5,
+                                ),
                               ),
                               child: Slider(
                                 value: _volume,
-                                min: 0,
                                 max: 100,
                                 onChanged: (value) {
-                                  ref.read(playbackCoordinatorProvider.notifier).setVolume(value);
+                                  ref
+                                      .read(
+                                        playbackCoordinatorProvider.notifier,
+                                      )
+                                      .setVolume(value);
                                 },
                               ),
                             ),
@@ -289,7 +325,8 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   // Favorite
                   IconButton(
                     icon: Icon(
-                      ref.watch(favoriteToggleProvider(media.id)).valueOrNull ?? false
+                      ref.watch(favoriteToggleProvider(media.id)).valueOrNull ??
+                              false
                           ? Icons.favorite
                           : Icons.favorite_border,
                     ),

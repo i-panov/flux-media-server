@@ -28,7 +28,7 @@ func setupCollectionTestApp(t *testing.T) *fiber.App {
 	// Create test media
 	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
 		Title:    "Test Movie",
-		Type:     "video",
+		Type:     models.MediaTypeVideo,
 		FilePath: "/test.mkv",
 	}))
 
@@ -54,7 +54,7 @@ func setupCollectionTestApp(t *testing.T) *fiber.App {
 func TestCollectionHandler_Create(t *testing.T) {
 	app := setupCollectionTestApp(t)
 
-	body, _ := json.Marshal(map[string]string{"name": "Want to Watch", "type": "video"})
+	body, _ := json.Marshal(map[string]string{"name": "Want to Watch", "type": string(models.MediaTypeVideo)})
 	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
@@ -66,7 +66,7 @@ func TestCollectionHandler_List(t *testing.T) {
 	app := setupCollectionTestApp(t)
 
 	// Create one
-	body, _ := json.Marshal(map[string]string{"name": "Horror", "type": "video"})
+	body, _ := json.Marshal(map[string]string{"name": "Horror", "type": string(models.MediaTypeVideo)})
 	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	_, err := app.Test(req)
@@ -89,7 +89,7 @@ func TestCollectionHandler_Update(t *testing.T) {
 	app := setupCollectionTestApp(t)
 
 	// Create
-	body, _ := json.Marshal(map[string]string{"name": "Old Name", "type": "video"})
+	body, _ := json.Marshal(map[string]string{"name": "Old Name", "type": string(models.MediaTypeVideo)})
 	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
@@ -113,7 +113,7 @@ func TestCollectionHandler_Delete(t *testing.T) {
 	app := setupCollectionTestApp(t)
 
 	// Create
-	body, _ := json.Marshal(map[string]string{"name": "ToDelete", "type": "video"})
+	body, _ := json.Marshal(map[string]string{"name": "ToDelete", "type": string(models.MediaTypeVideo)})
 	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
@@ -135,7 +135,7 @@ func TestCollectionHandler_AddAndRemoveItem(t *testing.T) {
 	app := setupCollectionTestApp(t)
 
 	// Create collection
-	body, _ := json.Marshal(map[string]string{"name": "My List", "type": "video"})
+	body, _ := json.Marshal(map[string]string{"name": "My List", "type": string(models.MediaTypeVideo)})
 	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)

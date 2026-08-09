@@ -25,15 +25,15 @@ func NewMediaHandler(mediaRepo repository.MediaRepository, streamer services.Str
 }
 
 type CreateMediaRequest struct {
-	Title       string `json:"title"`
-	Year        int    `json:"year"`
-	Description string `json:"description"`
-	Type        string `json:"type"`
-	FilePath    string `json:"file_path"`
+	Title       string           `json:"title"`
+	Year        int              `json:"year"`
+	Description string           `json:"description"`
+	Type        models.MediaType `json:"type"`
+	FilePath    string           `json:"file_path"`
 }
 
 func isValidMediaType(t string) bool {
-	return t == "" || t == "video" || t == "audio"
+	return t == "" || models.ParseMediaType(t).Valid()
 }
 
 func (h *MediaHandler) List(c *fiber.Ctx) error {

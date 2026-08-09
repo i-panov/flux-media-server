@@ -26,7 +26,7 @@ func setupLyricsTestApp(t *testing.T) *fiber.App {
 	// Create test media
 	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
 		Title:    "Test Song",
-		Type:     "audio",
+		Type:     models.MediaTypeAudio,
 		FilePath: "/test.mp3",
 	}))
 

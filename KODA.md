@@ -187,3 +187,7 @@ flutter run
 - JWT secret должен быть не короче 32 символов
 - Docker-образ включает ffmpeg и ca-certificates
 - Volume для данных: `/app/data`, для медиа: `/media` (read-only)
+
+## Обязательные правила
+
+- **НИКОГДА не выполнять `git commit`, `git push`, `git reset`, `git rebase`, `git merge` без явного разрешения пользователя. Безопасные операции (`git status`, `git diff`, `git log`, `git show` и т.п.) — можно.**

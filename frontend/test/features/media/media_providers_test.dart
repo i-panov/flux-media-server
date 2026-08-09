@@ -1,19 +1,21 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fpdart/fpdart.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
-import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
+import 'package:fpdart/fpdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Media _fakeMedia(int id, [String? title]) => Media(
       id: id,
       title: title ?? 'Media $id',
       year: 2024,
-      type: 'movie',
+      type: MediaType.video,
       filePath: '/path/$id.mp4',
       fileSize: 1024,
     );
@@ -36,7 +38,13 @@ class FakeMediaRepository implements MediaRepository {
     int? limit,
     int? offset,
   }) =>
-      onGetMediaList!(type: type, year: year, q: q, limit: limit, offset: offset);
+      onGetMediaList!(
+        type: type,
+        year: year,
+        q: q,
+        limit: limit,
+        offset: offset,
+      );
 
   @override
   Future<Either<Failure, Media>> getMediaDetail(int id) =>
@@ -71,20 +79,24 @@ class FakeMediaRepository implements MediaRepository {
     int mediaId, {
     int? position,
   }) async =>
-      const Right(WatchProgress(
-        id: 0,
-        userId: 0,
-        mediaId: 0,
-        position: 0,
-      ));
+      const Right(
+        WatchProgress(
+          id: 0,
+          userId: 0,
+          mediaId: 0,
+          position: 0,
+        ),
+      );
 
   @override
-  Future<Either<Failure, void>> uploadCover(int mediaId, String filePath) async =>
+  Future<Either<Failure, void>> uploadCover(
+    int mediaId,
+    String filePath,
+  ) async =>
       const Right(null);
 
   @override
-  Future<Either<Failure, void>> deleteMedia(int id) async =>
-      const Right(null);
+  Future<Either<Failure, void>> deleteMedia(int id) async => const Right(null);
 }
 
 void main() {
@@ -105,8 +117,8 @@ void main() {
 
     test('loads media list', () async {
       final items = [_fakeMedia(1), _fakeMedia(2)];
-      fakeRepo.onGetMediaList =
-          ({type, year, q, limit, offset}) async => Right((items: items, total: 2));
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          Right((items: items, total: 2));
 
       final result = await container.read(mediaListProvider('video').future);
       expect(result.items, hasLength(2));
@@ -115,14 +127,14 @@ void main() {
 
     test('loadMore appends items', () async {
       final first = [_fakeMedia(1), _fakeMedia(2)];
-      fakeRepo.onGetMediaList =
-          ({type, year, q, limit, offset}) async => Right((items: first, total: 4));
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          Right((items: first, total: 4));
 
       await container.read(mediaListProvider('video').future);
 
       final second = [_fakeMedia(3), _fakeMedia(4)];
-      fakeRepo.onGetMediaList =
-          ({type, year, q, limit, offset}) async => Right((items: second, total: 4));
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          Right((items: second, total: 4));
 
       await container.read(mediaListProvider('video').notifier).loadMore();
 
@@ -135,12 +147,16 @@ void main() {
     late ProviderContainer container;
     late FakeMediaRepository fakeRepo;
 
-    setUp(() {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
       fakeRepo = FakeMediaRepository();
       container = ProviderContainer(
         overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
           mediaRepositoryProvider.overrideWithValue(fakeRepo),
-          getMediaDetailUseCaseProvider.overrideWithValue(GetMediaDetail(fakeRepo)),
+          getMediaDetailUseCaseProvider
+              .overrideWithValue(GetMediaDetail(fakeRepo)),
         ],
       );
     });

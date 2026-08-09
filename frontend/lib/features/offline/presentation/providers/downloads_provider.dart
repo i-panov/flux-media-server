@@ -6,8 +6,7 @@ import 'package:flux_media_server/features/offline/presentation/providers/downlo
 import 'package:flux_media_server/shared/models/media.dart';
 
 class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
-  DownloadsNotifier(this._ref)
-      : super(const AsyncValue.loading()) {
+  DownloadsNotifier(this._ref) : super(const AsyncValue.loading()) {
     // Watch the invalidator counter — refresh whenever it changes.
     _ref.listen<int>(downloadsInvalidatorProvider, (_, next) {
       refresh();
@@ -41,7 +40,7 @@ class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
       }
 
       final mediaRepository = _ref.read(mediaRepositoryProvider);
-      final futures = ids.map((id) => mediaRepository.getMediaDetail(id));
+      final futures = ids.map(mediaRepository.getMediaDetail);
       final results = await Future.wait(futures);
 
       final mediaList = <Media>[];

@@ -2,25 +2,25 @@ import 'package:auto_route/auto_route.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
-import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
-import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
-import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
+import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
-import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
-import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
-import 'package:flux_media_server/features/video/presentation/widgets/horizontal_video_row.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/continue_watching_row.dart';
+import 'package:flux_media_server/features/video/presentation/widgets/horizontal_video_row.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/favorite.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
-import 'package:flux_media_server/shared/models/favorite.dart';
-import 'package:flux_media_server/shared/models/collection.dart';
 
 @RoutePage()
 class VideoScreen extends ConsumerStatefulWidget {
@@ -73,7 +73,8 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           IconButton(
             icon: const Icon(Icons.upload_outlined),
             tooltip: l.upload,
-            onPressed: () => context.router.push(UploadRoute(mediaType: 'video')),
+            onPressed: () =>
+                context.router.push(UploadRoute(mediaType: 'video')),
           ),
           if (isNarrow)
             IconButton(
@@ -139,10 +140,11 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.invalidate(mediaListProvider(_mediaType));
-                ref.invalidate(watchProgressProvider);
-                ref.invalidate(favoritesProvider);
-                ref.invalidate(collectionsProvider);
+                ref
+                  ..invalidate(mediaListProvider(_mediaType))
+                  ..invalidate(watchProgressProvider)
+                  ..invalidate(favoritesProvider)
+                  ..invalidate(collectionsProvider);
               },
               child: Text(l.retry),
             ),
@@ -152,7 +154,8 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     }
 
     // Get data
-    final mediaList = mediaListState.valueOrNull ?? MediaListResult(items: const <Media>[].toIList(), total: 0);
+    final mediaList = mediaListState.valueOrNull ??
+        MediaListResult(items: const <Media>[].toIList(), total: 0);
     final watchProgress = watchProgressState.valueOrNull ?? [];
     final favorites = favoritesState.valueOrNull ?? [];
     final collections = collectionsState.valueOrNull ?? [];
@@ -160,7 +163,8 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     // Downloaded videos.
     final downloadsState = ref.watch(downloadsProvider);
     final downloadedMedia = downloadsState.valueOrNull ?? [];
-    final downloadedVideo = downloadedMedia.where((m) => m.type == 'video').toList();
+    final downloadedVideo =
+        downloadedMedia.where((m) => m.type == MediaType.video).toList();
 
     // Get favorite media IDs
     final favoriteMediaIds = favorites
@@ -174,9 +178,8 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         .where((p) => mediaIds.contains(p.mediaId))
         .take(10)
         .toList();
-    final continueWatchingIds = continueWatchingProgress
-        .map((p) => p.mediaId)
-        .toSet();
+    final continueWatchingIds =
+        continueWatchingProgress.map((p) => p.mediaId).toSet();
 
     // Build continue watching items with progress
     final continueWatchingItems = continueWatchingProgress.map((p) {
@@ -185,15 +188,8 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         orElse: () => Media(
           id: p.mediaId,
           title: 'Unknown',
-          type: 'video',
-          filePath: '',
+          type: MediaType.video,
           fileSize: 0,
-          description: null,
-          duration: null,
-           thumbnailUrl: null,
-           album: null,
-           genre: null,
-           metadata: null,
         ),
       );
       return (media, p);
@@ -206,12 +202,15 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         .toList();
     final recentlyAddedIds = recentlyAdded.map((m) => m.id).toSet();
 
-    // Favorites: favorited items NOT already in Continue Watching or Recently Added.
+    // Favorites: favorited items NOT already in Continue Watching
+    // or Recently Added.
     final favoriteVideos = mediaList.items
-        .where((m) =>
-            favoriteMediaIds.contains(m.id) &&
-            !continueWatchingIds.contains(m.id) &&
-            !recentlyAddedIds.contains(m.id))
+        .where(
+          (m) =>
+              favoriteMediaIds.contains(m.id) &&
+              !continueWatchingIds.contains(m.id) &&
+              !recentlyAddedIds.contains(m.id),
+        )
         .take(10)
         .toList();
 
@@ -221,26 +220,26 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
       ...recentlyAddedIds,
       ...favoriteVideos.map((m) => m.id),
     };
-    final gridItems = mediaList.items
-        .where((m) => !highlightIds.contains(m.id))
-        .toList();
+    final gridItems =
+        mediaList.items.where((m) => !highlightIds.contains(m.id)).toList();
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(mediaListProvider(_mediaType));
-        ref.invalidate(watchProgressProvider);
-        ref.invalidate(favoritesProvider);
-        ref.invalidate(collectionsProvider);
+        ref
+          ..invalidate(mediaListProvider(_mediaType))
+          ..invalidate(watchProgressProvider)
+          ..invalidate(favoritesProvider)
+          ..invalidate(collectionsProvider);
         // Wait for the next stable state
         await ref.watch(mediaListProvider(_mediaType).future);
       },
       child: CustomScrollView(
-      controller: _scrollController,
-      slivers: [
-        // Search bar
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        controller: _scrollController,
+        slivers: [
+          // Search bar
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: SearchBar(
                 hintText: l.searchMedia,
                 leading: const Icon(Icons.search),
@@ -249,172 +248,190 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
                     ref.read(searchQueryProvider.notifier).state = '';
                   }
                 },
-                onSubmitted: (value) => ref.read(searchQueryProvider.notifier).state = value,
-              ),
-          ),
-        ),
-        // Continue Watching section
-        if (continueWatchingItems.isNotEmpty)
-          SliverToBoxAdapter(
-            child: ContinueWatchingRow(
-              items: continueWatchingItems,
-              onItemTapped: (id) =>
-                  context.router.push(MediaDetailRoute(mediaId: id)),
-              isFavoriteMap: {
-                for (var id in favoriteMediaIds) id: true
-              },
-              onFavoriteToggled: (id) => _toggleFavorite(id),
-              isDownloadedMap: const {},
-              onDownloadToggled: (id) => _toggleDownload(id),
-            ),
-          ),
-
-        // Recently Added section
-        if (recentlyAdded.isNotEmpty)
-          SliverToBoxAdapter(
-            child: HorizontalVideoRow(
-              title: l.recentlyAdded,
-              icon: Icons.new_releases,
-              items: recentlyAdded,
-              onItemTapped: (id) =>
-                  context.router.push(MediaDetailRoute(mediaId: id)),
-              isFavoriteMap: {
-                for (final id in favoriteMediaIds) id: true
-              },
-              onFavoriteToggled: (id) => _toggleFavorite(id),
-              isDownloadedMap: const {},
-              onDownloadToggled: (id) => _toggleDownload(id),
-            ),
-          ),
-
-        // Favorites section
-        if (favoriteVideos.isNotEmpty)
-          SliverToBoxAdapter(
-            child: HorizontalVideoRow(
-              title: l.favorites,
-              icon: Icons.favorite,
-              items: favoriteVideos,
-              onItemTapped: (id) =>
-                  context.router.push(MediaDetailRoute(mediaId: id)),
-              isFavoriteMap: {
-                for (var id in favoriteMediaIds) id: true
-              },
-              onFavoriteToggled: (id) => _toggleFavorite(id),
-              isDownloadedMap: const {},
-              onDownloadToggled: (id) => _toggleDownload(id),
-            ),
-          ),
-
-        // Collections section
-        if (collections.isNotEmpty)
-          SliverToBoxAdapter(
-            child: _CollectionsRow(
-              collections: collections,
-              onItemTapped: (id) {
-                final collection = collections.firstWhere((c) => c.id == id);
-                context.router.push(CollectionDetailRoute(collection: collection));
-              },
-            ),
-          ),
-
-        // Downloaded section
-        if (downloadedVideo.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  Icon(Icons.download, size: 20, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Text(l.downloads, style: Theme.of(context).textTheme.titleMedium),
-                ],
+                onSubmitted: (value) =>
+                    ref.read(searchQueryProvider.notifier).state = value,
               ),
             ),
           ),
-        if (downloadedVideo.isNotEmpty)
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6),
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final media = downloadedVideo[index];
-                  return MediaCard(
-                    media: media,
-                    onTap: () => context.router.push(MediaDetailRoute(mediaId: media.id)),
-                    isFavorite: favoriteMediaIds.contains(media.id),
-                    onFavorite: isOffline ? null : () => _toggleFavorite(media.id),
-                    isDownloaded: true,
-                    onDownload: () => _toggleDownload(media.id),
-                  );
+          // Continue Watching section
+          if (continueWatchingItems.isNotEmpty)
+            SliverToBoxAdapter(
+              child: ContinueWatchingRow(
+                items: continueWatchingItems,
+                onItemTapped: (id) =>
+                    context.router.push(MediaDetailRoute(mediaId: id)),
+                isFavoriteMap: {
+                  for (final id in favoriteMediaIds) id: true,
                 },
-                childCount: downloadedVideo.length,
+                onFavoriteToggled: _toggleFavorite,
+                onDownloadToggled: _toggleDownload,
               ),
             ),
-          ),
 
-        // All Movies section
-        if (gridItems.isEmpty && continueWatchingItems.isEmpty && recentlyAdded.isEmpty && favoriteVideos.isEmpty && downloadedVideo.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.video_library_outlined,
-                      size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text(
-                    l.noMediaFound,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.all(8),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount:
-                    (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6),
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final media = gridItems[index];
-                  return MediaCard(
-                    media: media,
-                    onTap: () =>
-                        context.router.push(MediaDetailRoute(mediaId: media.id)),
-                    isFavorite: favoriteMediaIds.contains(media.id),
-                    onFavorite: () => _toggleFavorite(media.id),
-                    isDownloaded: false,
-                    onDownload: () => _toggleDownload(media.id),
-                  );
+          // Recently Added section
+          if (recentlyAdded.isNotEmpty)
+            SliverToBoxAdapter(
+              child: HorizontalVideoRow(
+                title: l.recentlyAdded,
+                icon: Icons.new_releases,
+                items: recentlyAdded,
+                onItemTapped: (id) =>
+                    context.router.push(MediaDetailRoute(mediaId: id)),
+                isFavoriteMap: {
+                  for (final id in favoriteMediaIds) id: true,
                 },
-                childCount: gridItems.length,
+                onFavoriteToggled: _toggleFavorite,
+                onDownloadToggled: _toggleDownload,
               ),
             ),
-          ),
+
+          // Favorites section
+          if (favoriteVideos.isNotEmpty)
+            SliverToBoxAdapter(
+              child: HorizontalVideoRow(
+                title: l.favorites,
+                icon: Icons.favorite,
+                items: favoriteVideos,
+                onItemTapped: (id) =>
+                    context.router.push(MediaDetailRoute(mediaId: id)),
+                isFavoriteMap: {
+                  for (final id in favoriteMediaIds) id: true,
+                },
+                onFavoriteToggled: _toggleFavorite,
+                onDownloadToggled: _toggleDownload,
+              ),
+            ),
+
+          // Collections section
+          if (collections.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _CollectionsRow(
+                collections: collections,
+                onItemTapped: (id) {
+                  final collection = collections.firstWhere((c) => c.id == id);
+                  context.router
+                      .push(CollectionDetailRoute(collection: collection));
+                },
+              ),
+            ),
+
+          // Downloaded section
+          if (downloadedVideo.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.download,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      l.downloads,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (downloadedVideo.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: (MediaQuery.of(context).size.width / 180)
+                      .floor()
+                      .clamp(2, 6),
+                  childAspectRatio: 0.7,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final media = downloadedVideo[index];
+                    return MediaCard(
+                      media: media,
+                      onTap: () => context.router
+                          .push(MediaDetailRoute(mediaId: media.id)),
+                      isFavorite: favoriteMediaIds.contains(media.id),
+                      onFavorite:
+                          isOffline ? null : () => _toggleFavorite(media.id),
+                      isDownloaded: true,
+                      onDownload: () => _toggleDownload(media.id),
+                    );
+                  },
+                  childCount: downloadedVideo.length,
+                ),
+              ),
+            ),
+
+          // All Movies section
+          if (gridItems.isEmpty &&
+              continueWatchingItems.isEmpty &&
+              recentlyAdded.isEmpty &&
+              favoriteVideos.isEmpty &&
+              downloadedVideo.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.video_library_outlined,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l.noMediaFound,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.all(8),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: (MediaQuery.of(context).size.width / 180)
+                      .floor()
+                      .clamp(2, 6),
+                  childAspectRatio: 0.7,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final media = gridItems[index];
+                    return MediaCard(
+                      media: media,
+                      onTap: () => context.router
+                          .push(MediaDetailRoute(mediaId: media.id)),
+                      isFavorite: favoriteMediaIds.contains(media.id),
+                      onFavorite: () => _toggleFavorite(media.id),
+                      onDownload: () => _toggleDownload(media.id),
+                    );
+                  },
+                  childCount: gridItems.length,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildSkeletonGrid(BuildContext context) {
-    final crossAxisCount = (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6);
+    final crossAxisCount =
+        (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6);
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -430,7 +447,10 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: SkeletonWidget(width: double.infinity, height: double.infinity),
+              child: SkeletonWidget(
+                width: double.infinity,
+                height: double.infinity,
+              ),
             ),
             Padding(
               padding: EdgeInsets.all(8),
@@ -464,9 +484,10 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,
           orElse: () => Media(
-            id: mediaId, title: '', year: null, type: 'video',
-            filePath: '', fileSize: 0, description: null, duration: null,
-            thumbnailUrl: null, album: null, genre: null, metadata: null,
+            id: mediaId,
+            title: '',
+            type: MediaType.video,
+            fileSize: 0,
           ),
         );
         ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
@@ -495,11 +516,16 @@ class _CollectionsRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             children: [
-              Icon(Icons.folder,
-                  size: 20, color: Theme.of(context).colorScheme.primary),
+              Icon(
+                Icons.folder,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
-              Text(l.myCollections,
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                l.myCollections,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ],
           ),
         ),
@@ -523,9 +549,11 @@ class _CollectionsRow extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.video_library,
-                          size: 32,
-                          color: Theme.of(context).colorScheme.primary),
+                      Icon(
+                        Icons.video_library,
+                        size: 32,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         collection.name,

@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"flux/internal/models"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,14 +67,14 @@ type MediaConfig struct {
 // MediaPath represents a scan path with its media type.
 type MediaPath struct {
 	Path string
-	Type string // "video" or "audio"
+	Type models.MediaType // "video" or "audio"
 }
 
 // MediaPaths returns all configured media paths with their types.
 func (m MediaConfig) MediaPaths() []MediaPath {
 	return []MediaPath{
-		{Path: m.VideoPath, Type: "video"},
-		{Path: m.AudioPath, Type: "audio"},
+		{Path: m.VideoPath, Type: models.MediaTypeVideo},
+		{Path: m.AudioPath, Type: models.MediaTypeAudio},
 	}
 }
 

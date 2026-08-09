@@ -25,7 +25,8 @@ class FilenameParser {
     }
 
     // Pattern: Title (Year).ext  (e.g. "Matrix (1999).mp4")
-    final parenMatch = RegExp(r'^(.+)\s*\((\d{4})\)\.[^.]+$').firstMatch(filename);
+    final parenMatch =
+        RegExp(r'^(.+)\s*\((\d{4})\)\.[^.]+$').firstMatch(filename);
     if (parenMatch != null) {
       final title = parenMatch.group(1)!.trim();
       final year = int.tryParse(parenMatch.group(2)!);
@@ -33,7 +34,8 @@ class FilenameParser {
     }
 
     // Pattern: Title.S01E05.ext
-    final episodeMatch = RegExp(r'^(.+)\.S(\d{2})E(\d{2})\..+$').firstMatch(filename);
+    final episodeMatch =
+        RegExp(r'^(.+)\.S(\d{2})E(\d{2})\..+$').firstMatch(filename);
     if (episodeMatch != null) {
       final title = episodeMatch.group(1)!.replaceAll('.', ' ');
       return FilenameParseResult(title: title, year: null);

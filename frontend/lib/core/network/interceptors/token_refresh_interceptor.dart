@@ -3,9 +3,9 @@ import 'dart:convert';
 
 import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
+import 'package:http/http.dart' as http;
 
 /// Signal that a token refresh succeeded and the request should be retried.
 class TokenRefreshedException implements Exception {

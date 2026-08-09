@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flux_media_server/shared/models/user.dart';
+import 'package:fpdart/fpdart.dart';
 
 class FakeAuthRepository implements AuthRepository {
   Future<Either<Failure, String?>> Function(String)? onRequestCode;
@@ -10,7 +10,8 @@ class FakeAuthRepository implements AuthRepository {
       Function(String, String)? onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
   Future<Either<Failure, ({String token, String refreshToken})>> Function(
-      String)? onRefreshToken;
+    String,
+  )? onRefreshToken;
 
   @override
   Future<Either<Failure, String?>> requestCode(String email) =>
@@ -25,7 +26,8 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
-          String refreshToken) =>
+    String refreshToken,
+  ) =>
       onRefreshToken!(refreshToken);
 }
 
@@ -38,8 +40,8 @@ void main() {
 
   group('requestCode', () {
     test('returns Right(null) when not in debug mode', () async {
-      (repository as FakeAuthRepository).onRequestCode = (_) async =>
-          const Right<Failure, String?>(null);
+      (repository as FakeAuthRepository).onRequestCode =
+          (_) async => const Right<Failure, String?>(null);
 
       final result = await repository.requestCode('test@example.com');
 
@@ -48,8 +50,8 @@ void main() {
     });
 
     test('returns Right(debugCode) when in debug mode', () async {
-      (repository as FakeAuthRepository).onRequestCode = (_) async =>
-          const Right<Failure, String>('123456');
+      (repository as FakeAuthRepository).onRequestCode =
+          (_) async => const Right<Failure, String>('123456');
 
       final result = await repository.requestCode('test@example.com');
 
@@ -58,8 +60,10 @@ void main() {
     });
 
     test('returns Left(ServerFailure) on error', () async {
-      (repository as FakeAuthRepository).onRequestCode = (_) async =>
-          const Left<Failure, String?>(ServerFailure(message: 'Email not allowed'));
+      (repository as FakeAuthRepository).onRequestCode =
+          (_) async => const Left<Failure, String?>(
+                ServerFailure(message: 'Email not allowed'),
+              );
 
       final result = await repository.requestCode('test@example.com');
 
@@ -75,19 +79,20 @@ void main() {
     test('returns Right(token, refreshToken, user) on success', () async {
       const user = User(id: 1, email: 'test@example.com');
       (repository as FakeAuthRepository).onVerifyCode = (_, __) async =>
-          const Right<Failure, ({String token, String refreshToken, User user})>(
+          const Right<Failure,
+              ({String token, String refreshToken, User user})>(
             (token: 'jwt-123', refreshToken: 'refresh-456', user: user),
           );
 
       final result = await repository.verifyCode('test@example.com', '123456');
 
       expect(
-          result,
-          isA<
-              Right<Failure,
-                  ({String token, String refreshToken, User user})>>());
+        result,
+        isA<Right<Failure, ({String token, String refreshToken, User user})>>(),
+      );
       final data = result.getOrElse(
-        (_) => (token: '', refreshToken: '', user: const User(id: 0, email: '')),
+        (_) =>
+            (token: '', refreshToken: '', user: const User(id: 0, email: '')),
       );
       expect(data.token, 'jwt-123');
       expect(data.refreshToken, 'refresh-456');
@@ -103,10 +108,9 @@ void main() {
       final result = await repository.verifyCode('test@example.com', '000000');
 
       expect(
-          result,
-          isA<
-              Left<Failure,
-                  ({String token, String refreshToken, User user})>>());
+        result,
+        isA<Left<Failure, ({String token, String refreshToken, User user})>>(),
+      );
       expect(
         result.fold((l) => l.message, (_) => ''),
         'Invalid or expired code',
@@ -117,8 +121,8 @@ void main() {
   group('getCurrentUser', () {
     test('returns Right(user) on success', () async {
       const user = User(id: 1, email: 'test@example.com');
-      (repository as FakeAuthRepository).onGetCurrentUser = () async =>
-          const Right<Failure, User>(user);
+      (repository as FakeAuthRepository).onGetCurrentUser =
+          () async => const Right<Failure, User>(user);
 
       final result = await repository.getCurrentUser();
 

@@ -25,8 +25,8 @@ func NewCollectionHandler(
 }
 
 type CreateCollectionRequest struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name string           `json:"name"`
+	Type models.MediaType `json:"type"`
 }
 
 func (h *CollectionHandler) Create(c *fiber.Ctx) error {
@@ -43,7 +43,7 @@ func (h *CollectionHandler) Create(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Name is required")
 	}
 	if req.Type == "" {
-		req.Type = "video"
+		req.Type = models.MediaTypeVideo
 	}
 
 	ctx := c.UserContext()

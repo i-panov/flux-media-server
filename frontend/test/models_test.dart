@@ -11,7 +11,7 @@ void main() {
         'id': 1,
         'title': 'The Matrix',
         'year': 1999,
-        'type': 'movie',
+        'type': 'video',
         'file_path': '/movies/matrix.mkv',
         'file_size': 1024000,
         'description': 'A sci-fi classic',
@@ -25,7 +25,7 @@ void main() {
       expect(media.id, 1);
       expect(media.title, 'The Matrix');
       expect(media.year, 1999);
-      expect(media.type, 'movie');
+      expect(media.type, MediaType.video);
       expect(media.filePath, '/movies/matrix.mkv');
       expect(media.fileSize, 1024000);
       expect(media.description, 'A sci-fi classic');
@@ -39,7 +39,7 @@ void main() {
         'id': 2,
         'title': 'Test',
         'year': 2024,
-        'type': 'episode',
+        'type': 'video',
         'file_path': '/test.mp4',
         'file_size': 512,
       };
@@ -57,7 +57,7 @@ void main() {
         id: 1,
         title: 'Test',
         year: 2024,
-        type: 'movie',
+        type: MediaType.video,
         filePath: '/test.mp4',
         fileSize: 100,
       );
@@ -65,7 +65,7 @@ void main() {
         id: 1,
         title: 'Test',
         year: 2024,
-        type: 'movie',
+        type: MediaType.video,
         filePath: '/test.mp4',
         fileSize: 100,
       );

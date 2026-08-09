@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"flux/internal/config"
+	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/services"
 )
@@ -45,7 +46,7 @@ func TestScannerFFProbeSingleCall(t *testing.T) {
 	scanner := services.NewScannerService(mediaRepo, cfg)
 
 	ctx := context.Background()
-	err = scanner.ScanPath(ctx, tempDir, "video")
+	err = scanner.ScanPath(ctx, tempDir, models.MediaTypeVideo)
 	require.NoError(t, err)
 
 	media, err := mediaRepo.FindByPath(ctx, testFile)
@@ -72,7 +73,7 @@ func TestScannerSweepDeletedMedia(t *testing.T) {
 	scanner := services.NewScannerService(mediaRepo, cfg)
 
 	ctx := context.Background()
-	err = scanner.ScanPath(ctx, tempDir, "video")
+	err = scanner.ScanPath(ctx, tempDir, models.MediaTypeVideo)
 	require.NoError(t, err)
 
 	media, err := mediaRepo.FindByPath(ctx, testFile)
@@ -82,7 +83,7 @@ func TestScannerSweepDeletedMedia(t *testing.T) {
 	err = os.Remove(testFile)
 	require.NoError(t, err)
 
-	err = scanner.ScanPath(ctx, tempDir, "video")
+	err = scanner.ScanPath(ctx, tempDir, models.MediaTypeVideo)
 	require.NoError(t, err)
 
 	_, err = mediaRepo.FindByPath(ctx, testFile)

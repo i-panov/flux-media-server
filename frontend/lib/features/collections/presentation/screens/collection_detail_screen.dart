@@ -10,7 +10,7 @@ import 'package:flux_media_server/shared/models/collection.dart';
 
 @RoutePage()
 class CollectionDetailScreen extends ConsumerStatefulWidget {
-  const CollectionDetailScreen({super.key, required this.collection});
+  const CollectionDetailScreen({required this.collection, super.key});
 
   final Collection collection;
 
@@ -19,11 +19,13 @@ class CollectionDetailScreen extends ConsumerStatefulWidget {
       _CollectionDetailScreenState();
 }
 
-class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen> {
+class _CollectionDetailScreenState
+    extends ConsumerState<CollectionDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final itemsState = ref.watch(collectionItemsFullProvider(widget.collection.id));
+    final itemsState =
+        ref.watch(collectionItemsFullProvider(widget.collection.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -47,7 +49,8 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => ref.invalidate(
-                    collectionItemsFullProvider(widget.collection.id)),
+                  collectionItemsFullProvider(widget.collection.id),
+                ),
                 child: Text(l.retry),
               ),
             ],
@@ -81,7 +84,8 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
               final media = items[index];
               return MediaCard(
                 media: media,
-                onTap: () => context.router.push(MediaDetailRoute(mediaId: media.id)),
+                onTap: () =>
+                    context.router.push(MediaDetailRoute(mediaId: media.id)),
               );
             },
           );
@@ -102,22 +106,25 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
         mainAxisSpacing: 8,
       ),
       itemCount: crossAxisCount * 2,
-      itemBuilder: (context, index) => Card(
+      itemBuilder: (context, index) => const Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: SkeletonWidget(width: double.infinity, height: double.infinity),
+              child: SkeletonWidget(
+                width: double.infinity,
+                height: double.infinity,
+              ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SkeletonWidget(height: 14, width: double.infinity),
-                  const SizedBox(height: 6),
-                  const SkeletonWidget(height: 10, width: 60),
+                  SkeletonWidget(height: 14, width: double.infinity),
+                  SizedBox(height: 6),
+                  SkeletonWidget(height: 10, width: 60),
                 ],
               ),
             ),
@@ -146,7 +153,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
               await deleteCollection(widget.collection.id);
               ref.invalidate(collectionsProvider);
               if (context.mounted) {
-                context.router.pop();
+                await context.router.maybePop();
               }
             },
             child: Text(l.delete, style: const TextStyle(color: Colors.red)),

@@ -14,6 +14,7 @@ import (
 
 	"flux/internal/config"
 	"flux/internal/handlers"
+	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/services"
 )
@@ -86,7 +87,7 @@ func TestUploadSuccess(t *testing.T) {
 	defer cleanup()
 
 	fileContent := []byte("test file content")
-	body, contentType := createMultipartForm(t, "test.mp4", fileContent, "video")
+	body, contentType := createMultipartForm(t, "test.mp4", fileContent, string(models.MediaTypeVideo))
 
 	req := httptest.NewRequest("POST", "/api/media/upload", body)
 	req.Header.Set("Content-Type", contentType)
@@ -102,7 +103,7 @@ func TestUploadMissingFile(t *testing.T) {
 
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
-	err := writer.WriteField("media_type", "video")
+	err := writer.WriteField("media_type", string(models.MediaTypeVideo))
 	require.NoError(t, err)
 	err = writer.Close()
 	require.NoError(t, err)
@@ -120,7 +121,7 @@ func TestUploadFileTooLarge(t *testing.T) {
 	defer cleanup()
 
 	fileContent := make([]byte, 7*1024*1024)
-	body, contentType := createMultipartForm(t, "large.mp4", fileContent, "video")
+	body, contentType := createMultipartForm(t, "large.mp4", fileContent, string(models.MediaTypeVideo))
 
 	req := httptest.NewRequest("POST", "/api/media/upload", body)
 	req.Header.Set("Content-Type", contentType)

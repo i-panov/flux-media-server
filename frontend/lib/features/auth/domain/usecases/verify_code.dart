@@ -1,8 +1,8 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/usecases/usecase.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flux_media_server/shared/models/user.dart';
+import 'package:fpdart/fpdart.dart';
 
 class VerifyCodeParams {
   const VerifyCodeParams({
@@ -33,15 +33,19 @@ class VerifyCode
   final AuthRepository repository;
 
   @override
-  Future<Either<Failure, VerifyCodeResult>> call(VerifyCodeParams params) async {
+  Future<Either<Failure, VerifyCodeResult>> call(
+    VerifyCodeParams params,
+  ) async {
     final result = await repository.verifyCode(params.email, params.code);
     return result.fold(
-      (failure) => Left(failure),
-      (data) => Right(VerifyCodeResult(
-        token: data.token,
-        refreshToken: data.refreshToken,
-        user: data.user,
-      )),
+      Left.new,
+      (data) => Right(
+        VerifyCodeResult(
+          token: data.token,
+          refreshToken: data.refreshToken,
+          user: data.user,
+        ),
+      ),
     );
   }
 }

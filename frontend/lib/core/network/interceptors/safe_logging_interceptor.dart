@@ -4,7 +4,8 @@ import 'dart:developer' as developer;
 import 'package:chopper/chopper.dart';
 
 /// Logs HTTP requests and responses, masking the Authorization header.
-class SafeLoggingInterceptor implements RequestInterceptor, ResponseInterceptor {
+class SafeLoggingInterceptor
+    implements RequestInterceptor, ResponseInterceptor {
   @override
   FutureOr<Request> onRequest(Request request) {
     final safeHeaders = Map<String, String>.from(request.headers);

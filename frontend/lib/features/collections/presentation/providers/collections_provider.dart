@@ -57,7 +57,7 @@ final getCollectionItemsFullProvider = Provider<GetCollectionItemsFull>((ref) {
 final collectionsProvider =
     FutureProvider.autoDispose<List<Collection>>((ref) async {
   final getCollections = ref.watch(getCollectionsProvider);
-  final result = await getCollections(NoParams());
+  final result = await getCollections(const NoParams());
   return result.fold(
     (failure) => throw Exception(failure.message),
     (collections) => collections,
@@ -77,7 +77,8 @@ final collectionItemsProvider =
   },
 );
 
-/// Fetches full media items for a specific collection (API returns Media objects).
+/// Fetches full media items for a specific collection (API returns
+/// Media objects).
 final collectionItemsFullProvider =
     FutureProvider.autoDispose.family<List<Media>, int>(
   (ref, collectionId) async {

@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'media_detail_provider.freezed.dart';
 
@@ -44,7 +46,9 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
       },
       (media) async {
         // Persist metadata for offline access.
-        _ref.read(offlineCacheServiceProvider).saveMetadata(media);
+        unawaited(
+          _ref.read(offlineCacheServiceProvider).saveMetadata(media),
+        );
         state = MediaDetailState.loaded(media: media);
       },
     );

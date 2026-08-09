@@ -12,8 +12,8 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// Tap on cover starts/pauses playback; long-press opens the detail page.
 class AudioTrackRow extends ConsumerWidget {
   const AudioTrackRow({
-    super.key,
     required this.media,
+    super.key,
     this.isPlaying = false,
     this.isFavorite = false,
     this.onPlay,
@@ -57,8 +57,8 @@ class AudioTrackRow extends ConsumerWidget {
     };
 
     final playbackState = ref.watch(playbackCoordinatorProvider);
-    final isCurrentlyPlaying = playbackState is PlaybackPlaying &&
-        playbackState.media.id == media.id;
+    final isCurrentlyPlaying =
+        playbackState is PlaybackPlaying && playbackState.media.id == media.id;
 
     return InkWell(
       onTap: onPlay,
@@ -66,7 +66,7 @@ class AudioTrackRow extends ConsumerWidget {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         color: isCurrentlyPlaying
-            ? colorScheme.primaryContainer.withOpacity(0.3)
+            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
             : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Row(
@@ -75,7 +75,8 @@ class AudioTrackRow extends ConsumerWidget {
             GestureDetector(
               onTap: () {
                 final current = ref.read(playbackCoordinatorProvider);
-                if (current is PlaybackPlaying && current.media.id == media.id) {
+                if (current is PlaybackPlaying &&
+                    current.media.id == media.id) {
                   if (current.isPaused) {
                     ref.read(playbackCoordinatorProvider.notifier).resume();
                   } else {
@@ -91,7 +92,7 @@ class AudioTrackRow extends ConsumerWidget {
                   width: 48,
                   height: 48,
                   child: isCurrentlyPlaying
-                      ? Container(
+                      ? ColoredBox(
                           color: colorScheme.primaryContainer,
                           child: Icon(
                             Icons.equalizer,
@@ -105,15 +106,21 @@ class AudioTrackRow extends ConsumerWidget {
                               width: 48,
                               height: 48,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
+                              placeholder: (_, __) => ColoredBox(
                                 color: colorScheme.primaryContainer,
-                                child: Icon(Icons.music_note,
-                                    color: colorScheme.primary, size: 24),
+                                child: Icon(
+                                  Icons.music_note,
+                                  color: colorScheme.primary,
+                                  size: 24,
+                                ),
                               ),
-                              errorWidget: (_, __, ___) => Container(
+                              errorWidget: (_, __, ___) => ColoredBox(
                                 color: colorScheme.primaryContainer,
-                                child: Icon(Icons.music_note,
-                                    color: colorScheme.primary, size: 24),
+                                child: Icon(
+                                  Icons.music_note,
+                                  color: colorScheme.primary,
+                                  size: 24,
+                                ),
                               ),
                             )
                           : const Center(
@@ -136,12 +143,10 @@ class AudioTrackRow extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: isCurrentlyPlaying
-                                ? colorScheme.primary
-                                : null,
-                            fontWeight: isCurrentlyPlaying
-                                ? FontWeight.bold
-                                : null,
+                            color:
+                                isCurrentlyPlaying ? colorScheme.primary : null,
+                            fontWeight:
+                                isCurrentlyPlaying ? FontWeight.bold : null,
                           ),
                     ),
                     if (media.artists.isNotEmpty)
@@ -165,9 +170,8 @@ class AudioTrackRow extends ConsumerWidget {
                 size: 20,
               ),
               onPressed: onFavorite,
-              tooltip: isFavorite
-                  ? 'Remove from favorites'
-                  : 'Add to favorites',
+              tooltip:
+                  isFavorite ? 'Remove from favorites' : 'Add to favorites',
             ),
             if (onDownload != null)
               IconButton(
@@ -181,7 +185,9 @@ class AudioTrackRow extends ConsumerWidget {
                         ),
                       )
                     : Icon(
-                        isDownloaded ? Icons.check_circle : Icons.cloud_download,
+                        isDownloaded
+                            ? Icons.check_circle
+                            : Icons.cloud_download,
                         color: isDownloaded ? colorScheme.primary : null,
                         size: 20,
                       ),
@@ -211,12 +217,17 @@ class AudioTrackRow extends ConsumerWidget {
               itemBuilder: (context) => [
                 PopupMenuItem(value: 'play', child: Text(l.play)),
                 PopupMenuItem(
-                    value: 'add_to_queue', child: Text(l.addToQueue)),
+                  value: 'add_to_queue',
+                  child: Text(l.addToQueue),
+                ),
                 PopupMenuItem(
-                    value: 'add_to_collection',
-                    child: Text(l.addToCollection)),
+                  value: 'add_to_collection',
+                  child: Text(l.addToCollection),
+                ),
                 PopupMenuItem(
-                    value: 'edit_metadata', child: Text(l.editMetadata)),
+                  value: 'edit_metadata',
+                  child: Text(l.editMetadata),
+                ),
                 PopupMenuItem(value: 'details', child: Text(l.details)),
               ],
             ),

@@ -11,7 +11,7 @@ func TestMediaFields(t *testing.T) {
 		Title:        "Test",
 		Year:         2024,
 		Description:  "desc",
-		Type:         "movie",
+		Type:         MediaTypeVideo,
 		Duration:     3600,
 		FilePath:     "/test.mkv",
 		FileSize:     1024,
@@ -20,7 +20,7 @@ func TestMediaFields(t *testing.T) {
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
-	if m.ID != 1 || m.Title != "Test" || m.Type != "movie" {
+	if m.ID != 1 || m.Title != "Test" || m.Type != MediaTypeVideo {
 		t.Errorf("Media fields not properly set: %+v", m)
 	}
 }
@@ -80,10 +80,10 @@ func TestFavoriteFields(t *testing.T) {
 
 	artistID := uint(7)
 	f2 := Favorite{
-		ID:       2,
-		UserID:   1,
-		MediaID:  nil,
-		ArtistID: &artistID,
+		ID:        2,
+		UserID:    1,
+		MediaID:   nil,
+		ArtistID:  &artistID,
 		CreatedAt: time.Now(),
 	}
 	if f2.ArtistID == nil || *f2.ArtistID != 7 || f2.MediaID != nil {
@@ -96,11 +96,11 @@ func TestCollectionFields(t *testing.T) {
 		ID:        1,
 		UserID:    1,
 		Name:      "Want to Watch",
-		Type:      "video",
+		Type:      MediaTypeVideo,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	if c.Name != "Want to Watch" || c.Type != "video" {
+	if c.Name != "Want to Watch" || c.Type != MediaTypeVideo {
 		t.Errorf("Collection fields not properly set: %+v", c)
 	}
 }

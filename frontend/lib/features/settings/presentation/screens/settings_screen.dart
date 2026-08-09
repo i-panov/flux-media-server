@@ -1,9 +1,9 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 
 // Version is read from pubspec.yaml via package_info_plus in production.
 // For now, keep it as a single source of truth here.
@@ -69,9 +69,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             title: Text(l.serverUrl),
                             content: TextField(
                               controller: _serverUrlController,
-                              decoration: InputDecoration(
+                              decoration: const InputDecoration(
                                 hintText: 'https://example.com',
-                                border: const OutlineInputBorder(),
+                                border: OutlineInputBorder(),
                               ),
                             ),
                             actions: [
@@ -81,8 +81,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               FilledButton(
                                 onPressed: () {
-                                  final url =
-                                      _serverUrlController.text.trim();
+                                  final url = _serverUrlController.text.trim();
                                   if (url.isNotEmpty) {
                                     ref
                                         .read(settingsProvider.notifier)

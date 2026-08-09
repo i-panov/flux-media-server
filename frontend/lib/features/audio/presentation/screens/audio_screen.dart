@@ -76,9 +76,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,
           orElse: () => Media(
-            id: mediaId, title: '', year: null, type: 'audio',
-            filePath: '', fileSize: 0, description: null, duration: null,
-            thumbnailUrl: null, album: null, genre: null, metadata: null,
+            id: mediaId,
+            title: '',
+            type: MediaType.audio,
+            fileSize: 0,
           ),
         );
         ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
@@ -102,7 +103,8 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
           IconButton(
             icon: const Icon(Icons.upload_outlined),
             tooltip: l.upload,
-            onPressed: () => context.router.push(UploadRoute(mediaType: 'audio')),
+            onPressed: () =>
+                context.router.push(UploadRoute(mediaType: 'audio')),
           ),
           if (isNarrow)
             IconButton(
@@ -152,8 +154,9 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.invalidate(mediaListProvider(_mediaType));
-                ref.invalidate(favoritesProvider);
+                ref
+                  ..invalidate(mediaListProvider(_mediaType))
+                  ..invalidate(favoritesProvider);
               },
               child: Text(l.retry),
             ),
@@ -162,13 +165,16 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
       );
     }
 
-    final mediaList = mediaListState.valueOrNull ?? MediaListResult(items: <Media>[].toIList(), total: 0);
+    final mediaList = mediaListState.valueOrNull ??
+        MediaListResult(items: <Media>[].toIList(), total: 0);
     final favorites = favoritesState.valueOrNull ?? [];
 
-    // Downloaded tracks — shown as main list when offline, as a section when online.
+    // Downloaded tracks — shown as main list when offline,
+    // as a section when online.
     final downloadsState = ref.watch(downloadsProvider);
     final downloadedMedia = downloadsState.valueOrNull ?? [];
-    final downloadedAudio = downloadedMedia.where((m) => m.type == 'audio').toList();
+    final downloadedAudio =
+        downloadedMedia.where((m) => m.type == MediaType.audio).toList();
 
     // Offline + no server media → show downloaded only.
     if (mediaList.items.isEmpty && downloadedAudio.isEmpty) {
@@ -176,11 +182,18 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.library_music_outlined, size: 64, color: Colors.grey),
+            const Icon(
+              Icons.library_music_outlined,
+              size: 64,
+              color: Colors.grey,
+            ),
             const SizedBox(height: 16),
             Text(
               l.noMediaFound,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.grey),
             ),
           ],
         ),
@@ -211,8 +224,9 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(mediaListProvider(_mediaType));
-        ref.invalidate(favoritesProvider);
+        ref
+          ..invalidate(mediaListProvider(_mediaType))
+          ..invalidate(favoritesProvider);
         await ref.watch(mediaListProvider(_mediaType).future);
       },
       child: CustomScrollView(
@@ -251,7 +265,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                   onDownload: () => _toggleDownload(likedTracks[index].id),
                   onAddToQueue: () => _addToQueue(likedTracks[index]),
                   onAddToCollection: () => showAddToCollectionDialog(
-                      context, ref, likedTracks[index].id),
+                    context,
+                    ref,
+                    likedTracks[index].id,
+                  ),
                   onEditMetadata: () =>
                       showEditMetadataDialog(context, ref, likedTracks[index]),
                   onDetails: () => context.router
@@ -280,10 +297,12 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                     final artist = artists[index];
                     return ArtistCard(
                       name: artist.value,
-                      onTap: () => context.router.push(ArtistRoute(
-                        artistId: artist.key,
-                        artistName: artist.value,
-                      )),
+                      onTap: () => context.router.push(
+                        ArtistRoute(
+                          artistId: artist.key,
+                          artistName: artist.value,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -301,17 +320,25 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => AudioTrackRow(
                   media: downloadedAudio[index],
-                  isFavorite: favoriteMediaIds.contains(downloadedAudio[index].id),
+                  isFavorite:
+                      favoriteMediaIds.contains(downloadedAudio[index].id),
                   onPlay: () => _playTrack(downloadedAudio, index),
                   onFavorite: () => _toggleFavorite(downloadedAudio[index].id),
                   onDownload: () => _toggleDownload(downloadedAudio[index].id),
                   onAddToQueue: () => _addToQueue(downloadedAudio[index]),
                   onAddToCollection: () => showAddToCollectionDialog(
-                      context, ref, downloadedAudio[index].id),
-                  onEditMetadata: () =>
-                      showEditMetadataDialog(context, ref, downloadedAudio[index]),
-                  onDetails: () => context.router
-                      .push(MediaDetailRoute(mediaId: downloadedAudio[index].id)),
+                    context,
+                    ref,
+                    downloadedAudio[index].id,
+                  ),
+                  onEditMetadata: () => showEditMetadataDialog(
+                    context,
+                    ref,
+                    downloadedAudio[index],
+                  ),
+                  onDetails: () => context.router.push(
+                    MediaDetailRoute(mediaId: downloadedAudio[index].id),
+                  ),
                 ),
                 childCount: downloadedAudio.length,
               ),
@@ -329,15 +356,12 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => AudioTrackRow(
                   media: downloadedAudio[index],
-                  isFavorite: false,
                   onPlay: () => _playTrack(downloadedAudio, index),
-                  onFavorite: null,
                   onDownload: () => _toggleDownload(downloadedAudio[index].id),
                   onAddToQueue: () => _addToQueue(downloadedAudio[index]),
-                  onAddToCollection: null,
-                  onEditMetadata: null,
-                  onDetails: () => context.router
-                      .push(MediaDetailRoute(mediaId: downloadedAudio[index].id)),
+                  onDetails: () => context.router.push(
+                    MediaDetailRoute(mediaId: downloadedAudio[index].id),
+                  ),
                 ),
                 childCount: downloadedAudio.length,
               ),
@@ -360,7 +384,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                   onDownload: () => _toggleDownload(allTracks[index].id),
                   onAddToQueue: () => _addToQueue(allTracks[index]),
                   onAddToCollection: () => showAddToCollectionDialog(
-                      context, ref, allTracks[index].id),
+                    context,
+                    ref,
+                    allTracks[index].id,
+                  ),
                   onEditMetadata: () =>
                       showEditMetadataDialog(context, ref, allTracks[index]),
                   onDetails: () => context.router
@@ -379,19 +406,19 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: 6,
-      itemBuilder: (context, index) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+      itemBuilder: (context, index) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
-            const SkeletonWidget(width: 48, height: 48, borderRadius: 8),
-            const SizedBox(width: 12),
+            SkeletonWidget(width: 48, height: 48, borderRadius: 8),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SkeletonWidget(height: 14, width: double.infinity),
-                  const SizedBox(height: 6),
-                  const SkeletonWidget(height: 10, width: 120),
+                  SkeletonWidget(height: 14, width: double.infinity),
+                  SizedBox(height: 6),
+                  SkeletonWidget(height: 10, width: 120),
                 ],
               ),
             ),

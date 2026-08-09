@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 /// Circular card representing an artist for horizontal scroll display.
 class ArtistCard extends StatelessWidget {
   const ArtistCard({
-    super.key,
     required this.name,
+    super.key,
     this.onTap,
   });
 

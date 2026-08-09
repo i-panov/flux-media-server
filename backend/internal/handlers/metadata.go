@@ -83,15 +83,15 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 	// Pointer fields allow distinguishing "not provided" from "set to empty",
 	// so values can also be cleared.
 	var req struct {
-		Title       *string  `json:"title"`
-		Description *string  `json:"description"`
+		Title       *string   `json:"title"`
+		Description *string   `json:"description"`
 		Artists     *[]string `json:"artists"`
-		Album       *string  `json:"album"`
-		Genre       *string  `json:"genre"`
-		Year        *int     `json:"year"`
-		PosterURL   *string  `json:"poster_url"`
-		Rating      *float64 `json:"rating"`
-		Genres      *string  `json:"genres"`
+		Album       *string   `json:"album"`
+		Genre       *string   `json:"genre"`
+		Year        *int      `json:"year"`
+		PosterURL   *string   `json:"poster_url"`
+		Rating      *float64  `json:"rating"`
+		Genres      *string   `json:"genres"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")

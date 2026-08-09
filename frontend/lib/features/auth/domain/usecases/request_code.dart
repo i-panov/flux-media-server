@@ -1,7 +1,7 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/usecases/usecase.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
+import 'package:fpdart/fpdart.dart';
 
 class RequestCode extends UseCase<Either<Failure, String?>, String> {
   RequestCode(this.repository);

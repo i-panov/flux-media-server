@@ -29,8 +29,7 @@ class FavoritesRemoteDataSource {
   }
 
   Future<Favorite> addArtistFavorite(int artistId) async {
-    final response =
-        await apiClient.addArtistFavorite({'artist_id': artistId});
+    final response = await apiClient.addArtistFavorite({'artist_id': artistId});
     checkResponse(response, 'Failed to add artist favorite');
     return Favorite.fromJson(response.body!);
   }

@@ -1,7 +1,7 @@
 import 'package:flux_media_server/core/error/failures.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
+import 'package:fpdart/fpdart.dart';
 
 abstract class MediaRepository {
   Future<Either<Failure, ({List<Media> items, int total})>> getMediaList({
@@ -15,7 +15,8 @@ abstract class MediaRepository {
   Future<Either<Failure, Media>> getMediaDetail(int id);
   Future<Either<Failure, void>> deleteMedia(int id);
 
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>> checkHash(
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+      checkHash(
     String hash,
   );
 

@@ -56,16 +56,16 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Resolve destination path by media_type.
-	mediaType := c.FormValue("media_type")
+	mediaType := models.ParseMediaType(c.FormValue("media_type"))
 	if mediaType == "" {
-		mediaType = "video"
+		mediaType = models.MediaTypeVideo
 	}
 	destPath := h.mediaCfg.VideoPath
-	if mediaType == "audio" {
+	if mediaType == models.MediaTypeAudio {
 		destPath = h.mediaCfg.AudioPath
 	}
 	if destPath == "" {
-		return response.Error(c, fiber.StatusInternalServerError, "No path configured for media type: "+mediaType)
+		return response.Error(c, fiber.StatusInternalServerError, "No path configured for media type: "+string(mediaType))
 	}
 
 	// Get uploaded file.

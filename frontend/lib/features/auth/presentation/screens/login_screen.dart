@@ -32,10 +32,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         final state = ref.read(authProvider);
         if (state is AuthCodeSent) {
-          context.router.replace(CodeRoute(
-            email: state.email,
-            debugCode: state.debugCode,
-          ));
+          await context.router.replace(
+            CodeRoute(
+              email: state.email,
+              debugCode: state.debugCode,
+            ),
+          );
         }
         setState(() => _isLoading = false);
       }

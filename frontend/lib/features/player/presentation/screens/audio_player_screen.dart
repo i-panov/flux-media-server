@@ -3,17 +3,17 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
-import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
-import 'package:flux_media_server/features/player/presentation/widgets/audio_mini_player.dart';
-import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
 import 'package:flux_media_server/features/lyrics/domain/usecases/upsert_lyrics.dart';
+import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/features/player/presentation/widgets/audio_mini_player.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class AudioPlayerScreen extends ConsumerStatefulWidget {
-  const AudioPlayerScreen({super.key, required this.media});
+  const AudioPlayerScreen({required this.media, super.key});
   final Media media;
 
   @override
@@ -30,8 +30,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final playback = ref.read(playbackCoordinatorProvider);
-      final alreadyPlaying = playback is PlaybackPlaying &&
-          playback.media.id == widget.media.id;
+      final alreadyPlaying =
+          playback is PlaybackPlaying && playback.media.id == widget.media.id;
       if (!alreadyPlaying) {
         ref.read(playbackCoordinatorProvider.notifier).play(widget.media);
       }
@@ -226,9 +226,8 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
             else
               _SyncedLyricsView(
                 syncLines: syncLines,
-                playbackState: playbackState is PlaybackPlaying
-                    ? playbackState as PlaybackPlaying
-                    : null,
+                playbackState:
+                    playbackState is PlaybackPlaying ? playbackState : null,
               ),
             Positioned(
               top: 8,
@@ -254,12 +253,18 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
     for (final line in lines) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
-      final match = RegExp(r'\[(\d+):(\d+(?:\.\d+)?)\](.*)').firstMatch(trimmed);
+      final match =
+          RegExp(r'\[(\d+):(\d+(?:\.\d+)?)\](.*)').firstMatch(trimmed);
       if (match != null) {
         final minutes = int.parse(match.group(1)!);
         final seconds = double.parse(match.group(2)!);
         final text = match.group(3) ?? '';
-        result.add((time: Duration(minutes: minutes, seconds: seconds.toInt()), text: text.trim()));
+        result.add(
+          (
+            time: Duration(minutes: minutes, seconds: seconds.toInt()),
+            text: text.trim(),
+          ),
+        );
       }
     }
     return result;
@@ -276,10 +281,10 @@ class _SyncedLyricsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Duration position = playbackState?.position ?? Duration.zero;
+    final position = playbackState?.position ?? Duration.zero;
 
-    int currentLineIndex = 0;
-    for (int i = syncLines.length - 1; i >= 0; i--) {
+    var currentLineIndex = 0;
+    for (var i = syncLines.length - 1; i >= 0; i--) {
       if (position >= syncLines[i].time) {
         currentLineIndex = i;
         break;
@@ -295,18 +300,23 @@ class _SyncedLyricsView extends StatelessWidget {
           final line = entry.value;
           final isCurrentLine = index == currentLineIndex;
           final isPastLine = index < currentLineIndex;
-          final defaultStyle = Theme.of(context).textTheme.bodyLarge ?? const TextStyle();
+          final defaultStyle =
+              Theme.of(context).textTheme.bodyLarge ?? const TextStyle();
 
           TextStyle style;
           if (isCurrentLine) {
             style = Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                ) ?? defaultStyle;
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ) ??
+                defaultStyle;
           } else if (isPastLine) {
             style = defaultStyle.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-                );
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.4),
+            );
           } else {
             style = defaultStyle;
           }
@@ -495,7 +505,11 @@ class _QueueTab extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.queue_music_outlined, size: 64, color: Colors.grey),
+            const Icon(
+              Icons.queue_music_outlined,
+              size: 64,
+              color: Colors.grey,
+            ),
             const SizedBox(height: 16),
             Text(l.queueIsEmpty),
           ],
@@ -518,13 +532,19 @@ class _QueueTab extends ConsumerWidget {
           title: Text(
             item.title,
             style: isCurrent
-                ? TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)
+                ? TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  )
                 : null,
           ),
-          subtitle: item.artists.isNotEmpty ? Text(item.artists.map((a) => a.name).join(', ')) : null,
+          subtitle: item.artists.isNotEmpty
+              ? Text(item.artists.map((a) => a.name).join(', '))
+              : null,
           trailing: IconButton(
             icon: const Icon(Icons.close, size: 20),
-            onPressed: () => ref.read(playQueueProvider.notifier).removeAt(index),
+            onPressed: () =>
+                ref.read(playQueueProvider.notifier).removeAt(index),
           ),
           onTap: () {
             ref.read(playQueueProvider.notifier).setQueue(

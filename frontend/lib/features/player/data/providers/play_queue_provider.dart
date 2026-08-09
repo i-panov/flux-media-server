@@ -53,7 +53,10 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     final newIndex = index <= state.currentIndex
         ? (state.currentIndex - 1).clamp(0, items.length - 1)
         : state.currentIndex;
-    state = PlayQueueState(items: items, currentIndex: items.isEmpty ? -1 : newIndex);
+    state = PlayQueueState(
+      items: items,
+      currentIndex: items.isEmpty ? -1 : newIndex,
+    );
   }
 
   /// Clears the queue.
@@ -62,15 +65,15 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
   }
 
   /// Returns the current media item, or null if queue is empty.
-  Media? get current => state.currentIndex >= 0 && state.currentIndex < state.items.length
-      ? state.items[state.currentIndex]
-      : null;
+  Media? get current =>
+      state.currentIndex >= 0 && state.currentIndex < state.items.length
+          ? state.items[state.currentIndex]
+          : null;
 
   /// Returns upcoming items after the current one.
-  List<Media> get upcoming =>
-      state.currentIndex + 1 < state.items.length
-          ? state.items.sublist(state.currentIndex + 1)
-          : [];
+  List<Media> get upcoming => state.currentIndex + 1 < state.items.length
+      ? state.items.sublist(state.currentIndex + 1)
+      : [];
 }
 
 /// State of the play queue.

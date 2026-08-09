@@ -1,16 +1,16 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
-import 'package:fpdart/fpdart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
+import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/user.dart';
+import 'package:fpdart/fpdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeAuthRepository implements AuthRepository {
   Future<Either<Failure, String?>> Function(String)? onRequestCode;
@@ -18,7 +18,8 @@ class FakeAuthRepository implements AuthRepository {
       Function(String, String)? onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
   Future<Either<Failure, ({String token, String refreshToken})>> Function(
-      String)? onRefreshToken;
+    String,
+  )? onRefreshToken;
 
   @override
   Future<Either<Failure, String?>> requestCode(String email) =>
@@ -33,18 +34,21 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
-          String refreshToken) =>
+    String refreshToken,
+  ) =>
       onRefreshToken!(refreshToken);
 }
 
 void main() {
   // Mock the secure storage platform channel
-  const secureStorageChannel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  const secureStorageChannel =
+      MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
 
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel, (MethodCall methodCall) async {
+        .setMockMethodCallHandler(secureStorageChannel,
+            (MethodCall methodCall) async {
       if (methodCall.method == 'read') return null;
       if (methodCall.method == 'write') return null;
       if (methodCall.method == 'delete') return null;
@@ -88,11 +92,17 @@ void main() {
       fakeRepo.onRequestCode = (_) async => const Right('123456');
 
       final states = <AuthState>[];
-      container.listen<AuthState>(authProvider, (prev, next) {
-        states.add(next);
-      }, fireImmediately: true);
+      container.listen<AuthState>(
+        authProvider,
+        (prev, next) {
+          states.add(next);
+        },
+        fireImmediately: true,
+      );
 
-      await container.read(authProvider.notifier).requestCode('test@example.com');
+      await container
+          .read(authProvider.notifier)
+          .requestCode('test@example.com');
 
       expect(states, contains(isA<AuthCodeSent>()));
       final codeSent = states.whereType<AuthCodeSent>().first;
@@ -105,11 +115,17 @@ void main() {
           (_) async => const Left(ServerFailure(message: 'Email not allowed'));
 
       final states = <AuthState>[];
-      container.listen<AuthState>(authProvider, (prev, next) {
-        states.add(next);
-      }, fireImmediately: true);
+      container.listen<AuthState>(
+        authProvider,
+        (prev, next) {
+          states.add(next);
+        },
+        fireImmediately: true,
+      );
 
-      await container.read(authProvider.notifier).requestCode('test@example.com');
+      await container
+          .read(authProvider.notifier)
+          .requestCode('test@example.com');
 
       expect(states, contains(isA<AuthError>()));
       final error = states.whereType<AuthError>().first;
@@ -117,16 +133,23 @@ void main() {
     });
 
     test('verifyCode emits authenticated on success', () async {
-      final user = User(id: 1, email: 'test@example.com');
-      fakeRepo.onVerifyCode = (_, __) async =>
-          Right((token: 'jwt-token', refreshToken: 'refresh-token', user: user));
+      const user = User(id: 1, email: 'test@example.com');
+      fakeRepo.onVerifyCode = (_, __) async => const Right(
+            (token: 'jwt-token', refreshToken: 'refresh-token', user: user),
+          );
 
       final states = <AuthState>[];
-      container.listen<AuthState>(authProvider, (prev, next) {
-        states.add(next);
-      }, fireImmediately: true);
+      container.listen<AuthState>(
+        authProvider,
+        (prev, next) {
+          states.add(next);
+        },
+        fireImmediately: true,
+      );
 
-      await container.read(authProvider.notifier).verifyCode('test@example.com', '123456');
+      await container
+          .read(authProvider.notifier)
+          .verifyCode('test@example.com', '123456');
 
       expect(states, contains(isA<AuthAuthenticated>()));
       final auth = states.whereType<AuthAuthenticated>().first;
@@ -138,11 +161,17 @@ void main() {
           const Left(ServerFailure(message: 'Invalid or expired code'));
 
       final states = <AuthState>[];
-      container.listen<AuthState>(authProvider, (prev, next) {
-        states.add(next);
-      }, fireImmediately: true);
+      container.listen<AuthState>(
+        authProvider,
+        (prev, next) {
+          states.add(next);
+        },
+        fireImmediately: true,
+      );
 
-      await container.read(authProvider.notifier).verifyCode('test@example.com', '000000');
+      await container
+          .read(authProvider.notifier)
+          .verifyCode('test@example.com', '000000');
 
       expect(states, contains(isA<AuthError>()));
       final error = states.whereType<AuthError>().first;

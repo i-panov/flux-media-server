@@ -37,13 +37,14 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
   Future<void> _save() async {
     if (_formKey.currentState!.validate()) {
       final url = _controller.text.trim();
-      final baseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+      final baseUrl =
+          url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 
       setState(() => _isChecking = true);
       try {
         // Check if server is reachable
-        final client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 5);
+        final client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 5);
         final request = await client.getUrl(Uri.parse('$baseUrl/api/health'));
         final response = await request.close();
         client.close();
@@ -55,12 +56,12 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
         // Server is reachable, save URL and proceed
         await ref.read(settingsProvider.notifier).setServerUrl(baseUrl);
         if (!mounted) return;
-        context.router.replace(const LoginRoute());
+        await context.router.replace(const LoginRoute());
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Не удалось подключиться к серверу: ${e.toString()}'),
+            content: Text('Не удалось подключиться к серверу: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );

@@ -15,7 +15,7 @@ class AudioPlayerDatasource {
   Player get player => _handler.player;
 
   Future<void> open(String url, {Map<String, String>? httpHeaders}) async =>
-      await _handler.player.open(Media(url, httpHeaders: httpHeaders));
+      _handler.player.open(Media(url, httpHeaders: httpHeaders));
   Future<void> play() async => _handler.play();
   Future<void> pause() async => _handler.pause();
   Future<void> stop() async => _handler.stop();

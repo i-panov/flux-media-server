@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// A programmatic placeholder for audio files without embedded cover art.
-/// Draws a purple gradient background with a music note icon — no image file needed.
+/// Draws a purple gradient background with a music note icon — no image
+/// file needed.
 class AudioPlaceholder extends StatelessWidget {
   const AudioPlaceholder({super.key, this.size = 80});
 
@@ -10,7 +11,7 @@ class AudioPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final noteColor = colorScheme.primary.withOpacity(0.5);
+    final noteColor = colorScheme.primary.withValues(alpha: 0.5);
 
     return Container(
       width: size,

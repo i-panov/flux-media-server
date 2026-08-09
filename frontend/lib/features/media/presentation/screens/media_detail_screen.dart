@@ -3,24 +3,24 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
-import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
-import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
-import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class MediaDetailScreen extends ConsumerStatefulWidget {
-  const MediaDetailScreen({super.key, required this.mediaId});
+  const MediaDetailScreen({required this.mediaId, super.key});
 
   final int mediaId;
 
@@ -38,9 +38,9 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   String _imageUrl() {
     final baseUrl = ref.read(baseUrlProvider);
     final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-      loaded: (m) => m,
-      orElse: () => null,
-    );
+          loaded: (m) => m,
+          orElse: () => null,
+        );
     // Cache-buster: force reload when the cover changes on the server.
     final cacheBuster = media?.updatedAt?.millisecondsSinceEpoch;
     final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
@@ -54,17 +54,19 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
 
   bool _hasCover() {
     final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-      loaded: (m) => m,
-      orElse: () => null,
-    );
-    return media != null && media.coverUrl != null && media.coverUrl!.isNotEmpty;
+          loaded: (m) => m,
+          orElse: () => null,
+        );
+    return media != null &&
+        media.coverUrl != null &&
+        media.coverUrl!.isNotEmpty;
   }
 
   Future<void> _toggleFavorite() async {
     final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-      loaded: (m) => m,
-      orElse: () => null,
-    );
+          loaded: (m) => m,
+          orElse: () => null,
+        );
     if (media == null) return;
 
     await ref.read(favoriteToggleProvider(widget.mediaId).notifier).toggle(
@@ -77,6 +79,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   }
 
   Future<void> _changeCover() async {
+    final l = AppLocalizations.of(context)!;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
@@ -86,7 +89,6 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     final file = result.files.first;
     if (file.path == null) return;
 
-    final l = AppLocalizations.of(context)!;
     final uploadCover = ref.read(uploadCoverProvider);
 
     final r = await uploadCover(
@@ -99,7 +101,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${l.failedToAdd(failure.message)}'),
+            content: Text(l.failedToAdd(failure.message)),
             backgroundColor: Colors.red,
           ),
         );
@@ -112,27 +114,34 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
           ),
         );
         // Reload the media detail to refresh the cover.
-        ref.read(mediaDetailProvider(widget.mediaId).notifier).load(widget.mediaId);
+        ref
+            .read(mediaDetailProvider(widget.mediaId).notifier)
+            .load(widget.mediaId);
         // Refresh media lists so cards show the new cover.
-        ref.invalidate(mediaListProvider('video'));
-        ref.invalidate(mediaListProvider('audio'));
+        ref
+          ..invalidate(mediaListProvider('video'))
+          ..invalidate(mediaListProvider('audio'));
       },
     );
   }
 
   Future<void> _download() async {
     final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-      loaded: (m) => m,
-      orElse: () => null,
-    );
+          loaded: (m) => m,
+          orElse: () => null,
+        );
     if (media == null) return;
 
     final downloadState = ref.read(downloadNotifierProvider(widget.mediaId));
 
     if (downloadState is DownloadDownloaded) {
-      await ref.read(downloadNotifierProvider(widget.mediaId).notifier).remove(widget.mediaId);
+      await ref
+          .read(downloadNotifierProvider(widget.mediaId).notifier)
+          .remove(widget.mediaId);
     } else if (downloadState is! DownloadDownloading) {
-      await ref.read(downloadNotifierProvider(widget.mediaId).notifier).download(media);
+      await ref
+          .read(downloadNotifierProvider(widget.mediaId).notifier)
+          .download(media);
 
       if (!mounted) return;
       final newState = ref.read(downloadNotifierProvider(widget.mediaId));
@@ -182,8 +191,9 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
         );
       },
       (_) {
-        ref.invalidate(mediaListProvider('video'));
-        ref.invalidate(mediaListProvider('audio'));
+        ref
+          ..invalidate(mediaListProvider('video'))
+          ..invalidate(mediaListProvider('audio'));
         context.maybePop();
       },
     );
@@ -207,7 +217,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: state.maybeWhen(
-        loaded: (_) => AppBar(
+        loaded: (media) => AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
@@ -229,7 +239,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
               onPressed: () => showEditMetadataDialog(
                 context,
                 ref,
-                state.maybeWhen(loaded: (m) => m, orElse: () => null!),
+                media,
               ),
               tooltip: l.edit,
             ),
@@ -266,7 +276,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                   ),
                 ),
               )
-            else if (media.type == 'audio')
+            else if (media.type == MediaType.audio)
               const Center(
                 child: AudioPlaceholder(size: 200),
               ),
@@ -310,7 +320,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${media.year} · ${media.type}',
+                          '${media.year} · ${media.type.value}',
                           style: Theme.of(context)
                               .textTheme
                               .bodyLarge
@@ -326,8 +336,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                                 ?.copyWith(color: Colors.white),
                           ),
                         ],
-                        if (media.album != null &&
-                            media.album!.isNotEmpty) ...[
+                        if (media.album != null && media.album!.isNotEmpty) ...[
                           Text(
                             media.album!,
                             style: Theme.of(context)
@@ -336,8 +345,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                                 ?.copyWith(color: Colors.white60),
                           ),
                         ],
-                        if (media.genre != null &&
-                            media.genre!.isNotEmpty) ...[
+                        if (media.genre != null && media.genre!.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Chip(
                             label: Text(
@@ -361,7 +369,8 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                         if (media.duration != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            '${l.duration}: ${Duration(seconds: media.duration!).formatted}',
+                            '${l.duration}: '
+                            '${Duration(seconds: media.duration!).formatted}',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -376,7 +385,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                             message: l.play,
                             child: FilledButton.icon(
                               onPressed: () {
-                                if (media.type == 'audio') {
+                                if (media.type == MediaType.audio) {
                                   context.router
                                       .push(AudioPlayerRoute(media: media));
                                 } else {
@@ -399,7 +408,9 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                                 child: OutlinedButton.icon(
                                   onPressed: _toggleFavorite,
                                   icon: Icon(
-                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    isFavorite
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
                                     color: isFavorite ? Colors.red : null,
                                   ),
                                   label: Text(l.favorites),
@@ -422,30 +433,35 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                               child: Tooltip(
                                 message: l.download,
                                 child: OutlinedButton.icon(
-                                  onPressed: isDownloading
-                                      ? null
-                                      : _download,
+                                  onPressed: isDownloading ? null : _download,
                                   icon: isDownloading
                                       ? SizedBox(
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            value: downloadProgress > 0 ? downloadProgress : null,
+                                            value: downloadProgress > 0
+                                                ? downloadProgress
+                                                : null,
                                           ),
                                         )
                                       : Icon(
                                           downloadState is DownloadDownloaded
                                               ? Icons.check_circle
                                               : Icons.cloud_download,
-                                          color: downloadState is DownloadDownloaded
-                                              ? Theme.of(context).colorScheme.primary
+                                          color: downloadState
+                                                  is DownloadDownloaded
+                                              ? Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
                                               : null,
                                         ),
                                   label: Text(
                                     switch (downloadState) {
                                       DownloadDownloading(:final progress) =>
-                                          progress > 0 ? '${(progress * 100).toInt()}%' : l.downloading,
+                                        progress > 0
+                                            ? '${(progress * 100).toInt()}%'
+                                            : l.downloading,
                                       DownloadDownloaded() => l.downloaded,
                                       DownloadError() => l.errorLabel,
                                       _ => l.download,

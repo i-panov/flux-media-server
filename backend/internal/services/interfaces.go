@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v2"
+
+	"flux/internal/models"
 )
 
 // JWTService defines the interface for JWT token operations.
@@ -24,7 +26,7 @@ type OTPStoreInterface interface {
 
 // ScannerInterface defines the interface for scanning operations.
 type ScannerInterface interface {
-	ScanPath(ctx context.Context, path, mediaType string) error
+	ScanPath(ctx context.Context, path string, mediaType models.MediaType) error
 	ScanAll(ctx context.Context) error
 	GetScanStatus(key string) *ScanStatus
 }

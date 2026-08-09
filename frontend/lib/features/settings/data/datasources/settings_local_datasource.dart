@@ -11,7 +11,7 @@ class SettingsLocalDataSource {
   final FlutterSecureStorage _secureStorage;
 
   /// Prefix all storage keys so debug and release builds don't share data.
-  static final String _prefix = kDebugMode ? 'debug_' : 'release_';
+  static const String _prefix = kDebugMode ? 'debug_' : 'release_';
 
   static const _keyServerUrl = 'server_url';
   static const _keyAuthToken = 'auth_token';
@@ -33,7 +33,8 @@ class SettingsLocalDataSource {
 
   String getLocale() => _prefs.getString(_p(_keyLocale)) ?? 'en';
 
-  Future<void> setLocale(String locale) => _prefs.setString(_p(_keyLocale), locale);
+  Future<void> setLocale(String locale) =>
+      _prefs.setString(_p(_keyLocale), locale);
 
   Future<String?> getAuthToken() async {
     try {

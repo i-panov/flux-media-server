@@ -68,7 +68,7 @@ func TestMediaStore_PreloadArtistsWithJoinOrder(t *testing.T) {
 
 	media := &models.Media{
 		Title:    "Track",
-		Type:     "audio",
+		Type:     models.MediaTypeAudio,
 		FilePath: "/audio/track.mp3",
 	}
 	require.NoError(t, store.Create(ctx, media))
@@ -78,7 +78,7 @@ func TestMediaStore_PreloadArtistsWithJoinOrder(t *testing.T) {
 		media.ID, a2.ID, media.ID, a1.ID).Error)
 
 	// FindAll must succeed (no "no such column: media_artists.position").
-	list, _, err := store.FindAll(ctx, map[string]interface{}{"type": "audio"}, 10, 0)
+	list, _, err := store.FindAll(ctx, map[string]interface{}{"type": string(models.MediaTypeAudio)}, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.Len(t, list[0].Artists, 2, "both artists must be loaded")

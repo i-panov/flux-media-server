@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 
 /// Fetches all artists from the backend. Used by the edit metadata dialog

@@ -24,7 +24,8 @@ mixin _$Collection {
   @JsonKey(name: 'user_id')
   int get userId => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  String get type => throw _privateConstructorUsedError;
+  @MediaTypeConverter()
+  MediaType get type => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
   DateTime get createdAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'updated_at')
@@ -46,7 +47,7 @@ abstract class $CollectionCopyWith<$Res> {
       {int id,
       @JsonKey(name: 'user_id') int userId,
       String name,
-      String type,
+      @MediaTypeConverter() MediaType type,
       @JsonKey(name: 'created_at') DateTime createdAt,
       @JsonKey(name: 'updated_at') DateTime updatedAt});
 }
@@ -87,7 +88,7 @@ class _$CollectionCopyWithImpl<$Res, $Val extends Collection>
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
-              as String,
+              as MediaType,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -112,7 +113,7 @@ abstract class _$$CollectionImplCopyWith<$Res>
       {int id,
       @JsonKey(name: 'user_id') int userId,
       String name,
-      String type,
+      @MediaTypeConverter() MediaType type,
       @JsonKey(name: 'created_at') DateTime createdAt,
       @JsonKey(name: 'updated_at') DateTime updatedAt});
 }
@@ -151,7 +152,7 @@ class __$$CollectionImplCopyWithImpl<$Res>
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
-              as String,
+              as MediaType,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -171,7 +172,7 @@ class _$CollectionImpl implements _Collection {
       {required this.id,
       @JsonKey(name: 'user_id') required this.userId,
       required this.name,
-      required this.type,
+      @MediaTypeConverter() required this.type,
       @JsonKey(name: 'created_at') required this.createdAt,
       @JsonKey(name: 'updated_at') required this.updatedAt});
 
@@ -186,7 +187,8 @@ class _$CollectionImpl implements _Collection {
   @override
   final String name;
   @override
-  final String type;
+  @MediaTypeConverter()
+  final MediaType type;
   @override
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
@@ -238,7 +240,7 @@ abstract class _Collection implements Collection {
           {required final int id,
           @JsonKey(name: 'user_id') required final int userId,
           required final String name,
-          required final String type,
+          @MediaTypeConverter() required final MediaType type,
           @JsonKey(name: 'created_at') required final DateTime createdAt,
           @JsonKey(name: 'updated_at') required final DateTime updatedAt}) =
       _$CollectionImpl;
@@ -254,7 +256,8 @@ abstract class _Collection implements Collection {
   @override
   String get name;
   @override
-  String get type;
+  @MediaTypeConverter()
+  MediaType get type;
   @override
   @JsonKey(name: 'created_at')
   DateTime get createdAt;

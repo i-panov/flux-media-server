@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 /// Audio handler that wraps media_kit's [Player] and integrates with
 /// the system media notification, lock screen controls, and background
-/// audio playback via [audio_service].
+/// audio playback via `audio_service`.
 ///
 /// The underlying [Player] is exposed so that UI widgets (e.g. volume
 /// slider, seek bar) can subscribe to its streams directly.
@@ -20,16 +20,13 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   /// The media_kit player used for actual audio playback.
   final Player player;
 
-  /// Callbacks wired up from the play queue by [main.dart].
+  /// Callbacks wired up from the play queue by `main.dart`.
   Future<bool> Function()? onNext;
   Future<bool> Function()? onPrevious;
   void Function()? onToggleFavorite;
 
   /// Whether the current track is favorited (for notification icon).
   bool isFavorite = false;
-
-  /// Current media metadata for notification updates.
-  MediaItem? _currentItem;
 
   static const _controlsPlaying = [
     MediaControl.skipToPrevious,
@@ -46,7 +43,7 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   void _init() {
     player.stream.playing.listen((playing) {
       final controls = playing ? _controlsPlaying : _controlsPaused;
-      var state = playbackState.value!.copyWith(
+      final state = playbackState.value.copyWith(
         playing: playing,
         controls: controls,
         systemActions: const {
@@ -62,9 +59,11 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
     });
 
     player.stream.position.listen((position) {
-      playbackState.add(playbackState.value!.copyWith(
-        updatePosition: position,
-      ));
+      playbackState.add(
+        playbackState.value.copyWith(
+          updatePosition: position,
+        ),
+      );
     });
 
     player.stream.duration.listen((duration) {
@@ -76,9 +75,11 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
 
     player.stream.completed.listen((completed) {
       if (completed) {
-        playbackState.add(playbackState.value!.copyWith(
-          processingState: AudioProcessingState.completed,
-        ));
+        playbackState.add(
+          playbackState.value.copyWith(
+            processingState: AudioProcessingState.completed,
+          ),
+        );
       }
     });
   }
@@ -173,7 +174,10 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
     if (name == 'toggleFavorite') {
       onToggleFavorite?.call();
       return null;

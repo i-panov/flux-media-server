@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"flux/internal/models"
 	"flux/internal/services"
 )
 
@@ -19,7 +20,7 @@ type MockScanner struct {
 	scanCalled chan bool
 }
 
-func (m *MockScanner) ScanPath(ctx context.Context, path, mediaType string) error {
+func (m *MockScanner) ScanPath(ctx context.Context, path string, mediaType models.MediaType) error {
 	args := m.Called(ctx, path, mediaType)
 	return args.Error(0)
 }

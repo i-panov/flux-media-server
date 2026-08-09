@@ -14,5 +14,6 @@ class WatchProgress with _$WatchProgress {
     required int position,
   }) = _WatchProgress;
 
-  factory WatchProgress.fromJson(Map<String, dynamic> json) => _$WatchProgressFromJson(json);
+  factory WatchProgress.fromJson(Map<String, dynamic> json) =>
+      _$WatchProgressFromJson(json);
 }

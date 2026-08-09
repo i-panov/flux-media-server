@@ -1,4 +1,3 @@
-import 'package:chopper/chopper.dart';
 import 'package:flux_media_server/core/network/api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/user.dart';
@@ -14,18 +13,18 @@ class AuthRemoteDataSource {
   /// Requests a verification code to be sent to [email].
   /// Returns the debug code if server is in debug mode, null otherwise.
   Future<String?> requestCode(String email) async {
-    final Response<Map<String, dynamic>> response =
-        await apiClient.requestCode({'email': email});
+    final response = await apiClient.requestCode({'email': email});
     checkResponse(response, 'Failed to send code');
     return response.body?['code'] as String?;
   }
 
-  /// Verifies the code sent to [email] and returns the auth token, refresh token, and user.
+  /// Verifies the code sent to [email] and returns the auth token,
+  /// refresh token, and user.
   Future<({String token, String refreshToken, User user})> verifyCode(
     String email,
     String code,
   ) async {
-    final Response<Map<String, dynamic>> response = await apiClient.verifyCode({
+    final response = await apiClient.verifyCode({
       'email': email,
       'code': code,
     });
@@ -42,7 +41,7 @@ class AuthRemoteDataSource {
   Future<({String token, String refreshToken})> refreshTokens(
     String refreshToken,
   ) async {
-    final Response<Map<String, dynamic>> response = await apiClient.refreshToken({
+    final response = await apiClient.refreshToken({
       'refresh_token': refreshToken,
     });
     checkResponse(response, 'Failed to refresh token');
@@ -55,7 +54,7 @@ class AuthRemoteDataSource {
 
   /// Gets the currently authenticated user.
   Future<User> getCurrentUser() async {
-    final Response<Map<String, dynamic>> response = await apiClient.getMe();
+    final response = await apiClient.getMe();
     checkResponse(response, 'Failed to get user');
     return User.fromJson(response.body!);
   }

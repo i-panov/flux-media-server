@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart' show immutable;
+
 /// Base class for all failures in the application.
+@immutable
 abstract class Failure {
   const Failure({required this.message});
 
@@ -7,28 +10,26 @@ abstract class Failure {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Failure && runtimeType == other.runtimeType && message == other.message;
+      other is Failure &&
+          runtimeType == other.runtimeType &&
+          message == other.message;
 
   @override
   int get hashCode => message.hashCode;
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure({String message = 'Server error occurred'})
-      : super(message: message);
+  const ServerFailure({super.message = 'Server error occurred'});
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure({String message = 'Network error occurred'})
-      : super(message: message);
+  const NetworkFailure({super.message = 'Network error occurred'});
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure({String message = 'Cache error occurred'})
-      : super(message: message);
+  const CacheFailure({super.message = 'Cache error occurred'});
 }
 
 class AuthFailure extends Failure {
-  const AuthFailure({String message = 'Authentication error occurred'})
-      : super(message: message);
+  const AuthFailure({super.message = 'Authentication error occurred'});
 }

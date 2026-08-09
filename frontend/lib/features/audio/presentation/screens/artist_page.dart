@@ -17,7 +17,11 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class ArtistPage extends ConsumerStatefulWidget {
-  const ArtistPage({super.key, required this.artistId, required this.artistName});
+  const ArtistPage({
+    required this.artistId,
+    required this.artistName,
+    super.key,
+  });
 
   final int artistId;
   final String artistName;
@@ -53,7 +57,11 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     if (mediaList == null) return;
 
     final tracks = mediaList.items
-        .where((m) => m.type == 'audio' && m.artists.any((a) => a.id == widget.artistId))
+        .where(
+          (m) =>
+              m.type == MediaType.audio &&
+              m.artists.any((a) => a.id == widget.artistId),
+        )
         .toList();
     if (tracks.isEmpty) return;
 
@@ -64,9 +72,12 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     });
 
     for (final track in tracks) {
-      final cached = await ref.read(offlineCacheServiceProvider).isCached(track.id);
+      final cached =
+          await ref.read(offlineCacheServiceProvider).isCached(track.id);
       if (!cached) {
-        await ref.read(downloadNotifierProvider(track.id).notifier).download(track);
+        await ref
+            .read(downloadNotifierProvider(track.id).notifier)
+            .download(track);
       }
       if (!mounted) break;
       setState(() => _downloadedCount++);
@@ -76,7 +87,11 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
       setState(() => _downloadingAll = false);
       final l = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.downloadedOfTotalTracks(_downloadedCount, _downloadTotal))),
+        SnackBar(
+          content: Text(
+            l.downloadedOfTotalTracks(_downloadedCount, _downloadTotal),
+          ),
+        ),
       );
     }
   }
@@ -91,9 +106,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         final media = mediaList.items.firstWhere(
           (m) => m.id == mediaId,
           orElse: () => Media(
-            id: mediaId, title: '', year: null, type: 'audio',
-            filePath: '', fileSize: 0, description: null, duration: null,
-            thumbnailUrl: null, album: null, genre: null, metadata: null,
+            id: mediaId,
+            title: '',
+            type: MediaType.audio,
+            fileSize: 0,
           ),
         );
         ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
@@ -163,8 +179,9 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.invalidate(mediaListProvider(_mediaType));
-                ref.invalidate(favoritesProvider);
+                ref
+                  ..invalidate(mediaListProvider(_mediaType))
+                  ..invalidate(favoritesProvider);
               },
               child: Text(l.retry),
             ),
@@ -173,7 +190,8 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
       );
     }
 
-    final mediaList = mediaListState.valueOrNull ?? MediaListResult(items: <Media>[].toIList(), total: 0);
+    final mediaList = mediaListState.valueOrNull ??
+        MediaListResult(items: <Media>[].toIList(), total: 0);
     final favorites = favoritesState.valueOrNull ?? [];
 
     final favoriteMediaIds = favorites
@@ -182,7 +200,11 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         .toSet();
 
     final allTracks = mediaList.items
-        .where((Media m) => m.type == 'audio' && m.artists.any((a) => a.id == widget.artistId))
+        .where(
+          (Media m) =>
+              m.type == MediaType.audio &&
+              m.artists.any((a) => a.id == widget.artistId),
+        )
         .toList();
 
     if (allTracks.isEmpty) {
@@ -195,7 +217,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
             const SizedBox(height: 16),
             Text(
               l.noTracksFoundForArtist(widget.artistName),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
           ],
@@ -203,12 +228,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
       );
     }
 
-    final likedTracks = allTracks
-        .where((Media t) => favoriteMediaIds.contains(t.id))
-        .toList();
-    final otherTracks = allTracks
-        .where((Media t) => !favoriteMediaIds.contains(t.id))
-        .toList();
+    final likedTracks =
+        allTracks.where((Media t) => favoriteMediaIds.contains(t.id)).toList();
+    final otherTracks =
+        allTracks.where((Media t) => !favoriteMediaIds.contains(t.id)).toList();
 
     return ListView(
       children: [
@@ -239,7 +262,6 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
             final index = entry.key;
             return AudioTrackRow(
               media: track,
-              isFavorite: false,
               onPlay: () => _playTrack(otherTracks, index),
               onFavorite: () => _toggleFavorite(track.id),
               onDownload: () => _toggleDownload(track.id),

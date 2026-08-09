@@ -9,8 +9,8 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 @RoutePage()
 class CodeScreen extends ConsumerStatefulWidget {
   const CodeScreen({
-    super.key,
     required this.email,
+    super.key,
     this.debugCode,
   });
 
@@ -42,9 +42,9 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
   void _verifyCode() {
     if (_formKey.currentState!.validate()) {
       ref.read(authProvider.notifier).verifyCode(
-        widget.email,
-        _codeController.text.trim(),
-      );
+            widget.email,
+            _codeController.text.trim(),
+          );
     }
   }
 
@@ -58,7 +58,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           try {
-            context.router.replaceAll([MainRoute()]);
+            context.router.replaceAll([const MainRoute()]);
           } catch (_) {}
         });
       }
@@ -163,9 +163,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
-                    ref
-                        .read(authProvider.notifier)
-                        .requestCode(widget.email);
+                    ref.read(authProvider.notifier).requestCode(widget.email);
                   },
                   child: Text(l.resendCode),
                 ),
