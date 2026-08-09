@@ -24,15 +24,11 @@ final videoControllerProvider = Provider.autoDispose<VideoController>((ref) {
   );
 });
 
-/// Custom theme for MaterialVideoControls — makes the seek bar thicker
-/// and adds bottom padding so it doesn't get cut off at the screen edge
-/// on Android (especially in immersive mode where safe-area insets are 0).
-const _videoControlsTheme = MaterialVideoControlsThemeData(
+/// Seek bar theme shared by mobile and fullscreen.
+const _seekBarTheme = MaterialVideoControlsThemeData(
   seekBarHeight: 5,
   seekBarThumbSize: 16,
   seekBarMargin: EdgeInsets.only(left: 12, right: 12),
-  // Override safe-area padding with explicit value so the controls
-  // stay fully visible even in immersiveSticky mode.
   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 24),
   seekBarPositionColor: Colors.deepPurple,
   seekBarThumbColor: Colors.deepPurple,
@@ -51,32 +47,14 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
-  bool _resumeDialogShown = false;
   late final PlaybackCoordinator _coordinator;
 
-  /// Visibility of custom overlay controls (back button, seek ±10s, speed).
-  bool _overlayVisible = true;
-  Timer? _hideTimer;
+  /// Shows a semi-transparent "resume" button when a saved position exists.
+  bool _showResumeButton = false;
+  Timer? _resumeTimer;
 
-  /// Auto-hide delay — matches MaterialVideoControls default (3s).
-  static const _hideDelay = Duration(seconds: 3);
-
-  void _showOverlay() {
-    _hideTimer?.cancel();
-    setState(() => _overlayVisible = true);
-    _hideTimer = Timer(_hideDelay, () {
-      if (mounted) setState(() => _overlayVisible = false);
-    });
-  }
-
-  void _toggleOverlay() {
-    if (_overlayVisible) {
-      _hideTimer?.cancel();
-      setState(() => _overlayVisible = false);
-    } else {
-      _showOverlay();
-    }
-  }
+  /// Auto-hide delay for the resume button.
+  static const _resumeHideDelay = Duration(seconds: 5);
 
   @override
   void initState() {
@@ -94,41 +72,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // Use setQueue so the queue is in sync with what's playing.
       // Without this, _onCompleted would jump to a stale queue item.
       ref.read(playQueueProvider.notifier).setQueue([widget.media]);
-      _showOverlay();
     });
   }
 
-  void _showResumeDialog(Duration savedPosition) {
-    final l = AppLocalizations.of(context)!;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.continueWatching),
-        content: Text(l.continueFrom(savedPosition.formatted)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _coordinator.startFromBeginning();
-            },
-            child: Text(l.startFromBeginning),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _coordinator.seekToSavedPosition();
-            },
-            child: Text(l.play),
-          ),
-        ],
-      ),
-    );
+  void _showResumeOverlay(Duration savedPosition) {
+    _resumeTimer?.cancel();
+    setState(() => _showResumeButton = true);
+    _resumeTimer = Timer(_resumeHideDelay, () {
+      if (mounted) setState(() => _showResumeButton = false);
+    });
+  }
+
+  void _onResumeTap() {
+    _resumeTimer?.cancel();
+    setState(() => _showResumeButton = false);
+    _coordinator.seekToSavedPosition();
   }
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
+    _resumeTimer?.cancel();
     // Stop playback (also persists watch progress) when leaving the screen,
     // e.g. via system back button which bypasses the in-app back button.
     _coordinator.stop();
@@ -148,15 +111,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final state = ref.watch(playbackCoordinatorProvider);
     final videoController = ref.watch(videoControllerProvider);
 
-    // Show resume dialog once when savedPosition is set.
+    // Show resume button once when savedPosition is set.
     if (state is PlaybackPlaying &&
         state.type == MediaType.video.value &&
         state.savedPosition != null &&
-        !_resumeDialogShown) {
-      _resumeDialogShown = true;
+        !_showResumeButton &&
+        _resumeTimer == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _showResumeDialog(state.savedPosition!);
+          _showResumeOverlay(state.savedPosition!);
         }
       });
     }
@@ -174,97 +137,187 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               child: CircularProgressIndicator(color: Colors.white),
             );
           }
+
+          // Build controls theme with custom buttons (back, ±10s, speed)
+          // integrated into media_kit's button bars. This avoids a
+          // full-screen GestureDetector that would intercept taps meant
+          // for the built-in play/pause button.
+          final isMobile = Platform.isAndroid || Platform.isIOS;
+
+          final player = ref.read(videoPlayerDatasourceProvider).player;
+
+          final backBtn = IconButton(
+            color: Colors.white,
+            icon: const Icon(Icons.arrow_back),
+            tooltip: l.mediaDetail,
+            onPressed: () async {
+              await player.pause();
+              if (context.mounted) await context.maybePop();
+            },
+          );
+
+          final seekBackBtn = IconButton(
+            color: Colors.white,
+            icon: const Icon(Icons.replay_10),
+            iconSize: 24,
+            tooltip: '-10s',
+            onPressed: () {
+              // Read the position directly from the player: the value in
+              // PlaybackState is updated via a stream and can lag behind,
+              // making consecutive taps seek from a stale position.
+              _coordinator.seek(
+                player.state.position - const Duration(seconds: 10),
+              );
+            },
+          );
+
+          final seekFwdBtn = IconButton(
+            color: Colors.white,
+            icon: const Icon(Icons.forward_10),
+            iconSize: 24,
+            tooltip: '+10s',
+            onPressed: () {
+              _coordinator.seek(
+                player.state.position + const Duration(seconds: 10),
+              );
+            },
+          );
+
+          // Speed button uses StreamBuilder on player.stream.rate so the
+          // label updates immediately when the rate changes — media_kit
+          // controls don't rebuild when the theme data changes, so a
+          // plain Text('${speed}x') would stay stale.
+          Widget buildSpeedBtn() => StreamBuilder<double>(
+                stream: player.stream.rate,
+                initialData: player.state.rate,
+                builder: (context, snapshot) {
+                  final rate = snapshot.data ?? 1.0;
+                  return IconButton(
+                    color: Colors.white,
+                    icon: Text(
+                      '${rate}x',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                    tooltip: l.speed,
+                    onPressed: () {
+                      final next = rate >= 2.0 ? 0.5 : rate + 0.5;
+                      _coordinator.setSpeed(next);
+                    },
+                  );
+                },
+              );
+
+          final mobileTheme = _seekBarTheme.copyWith(
+            // Back button stays in the top bar.
+            topButtonBar: [backBtn],
+            // ±10s + speed in the bottom bar, centered via Spacers so they
+            // don't stick to the left edge and cover the seek bar.
+            bottomButtonBar: [
+              const Spacer(),
+              seekBackBtn,
+              seekFwdBtn,
+              buildSpeedBtn(),
+              const SizedBox(width: 16),
+              const Spacer(),
+              const MaterialPositionIndicator(),
+              const MaterialFullscreenButton(),
+            ],
+          );
+
+          // Desktop: use copyWith to preserve the default bottom button bar
+          // (skip, play/pause, volume, fullscreen) and insert ±10s + speed
+          // right after the volume button — to the right of play/pause.
+          final desktopTheme =
+              const MaterialDesktopVideoControlsThemeData().copyWith(
+            topButtonBar: [backBtn],
+            bottomButtonBar: [
+              const MaterialDesktopSkipPreviousButton(),
+              const MaterialDesktopPlayOrPauseButton(),
+              const MaterialDesktopSkipNextButton(),
+              const MaterialDesktopVolumeButton(),
+              seekBackBtn,
+              seekFwdBtn,
+              buildSpeedBtn(),
+              const SizedBox(width: 16),
+              const MaterialDesktopPositionIndicator(),
+              const Spacer(),
+              const MaterialDesktopFullscreenButton(),
+            ],
+          );
+
           return Stack(
             children: [
               Positioned.fill(
                 child: MaterialVideoControlsTheme(
-                  normal: _videoControlsTheme,
-                  fullscreen: _videoControlsTheme,
-                  child: Video(
-                    controller: videoController,
-                    controls: Platform.isAndroid || Platform.isIOS
-                        ? MaterialVideoControls
-                        : MaterialDesktopVideoControls,
+                  normal: mobileTheme,
+                  fullscreen: mobileTheme,
+                  child: MaterialDesktopVideoControlsTheme(
+                    normal: desktopTheme,
+                    fullscreen: desktopTheme,
+                    child: Video(
+                      controller: videoController,
+                      controls: isMobile
+                          ? MaterialVideoControls
+                          : MaterialDesktopVideoControls,
+                    ),
                   ),
                 ),
               ),
-              // Transparent tap catcher — toggles overlay visibility.
-              // translucent allows MaterialVideoControls underneath to also
-              // receive the tap so its own controls stay in sync.
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _toggleOverlay,
-                ),
-              ),
-              AnimatedOpacity(
-                opacity: _overlayVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: IgnorePointer(
-                  ignoring: !_overlayVisible,
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: IconButton(
-                          color: Colors.white,
-                          icon: const Icon(Icons.arrow_back),
-                          tooltip: l.mediaDetail,
-                          onPressed: () async {
-                            await ref
-                                .read(videoPlayerDatasourceProvider)
-                                .player
-                                .pause();
-                            if (context.mounted) await context.maybePop();
-                          },
+              // Semi-transparent resume button — appears above the controls
+              // bar for a few seconds, then auto-hides.
+              if (_showResumeButton && savedPosition != null)
+                Positioned(
+                  bottom: 100,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: AnimatedOpacity(
+                      opacity: _showResumeButton ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 300),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: _onResumeTap,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: Colors.white24,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.history,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  l.continueFrom(savedPosition.formatted),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      Positioned(
-                        bottom: 80,
-                        left: 0,
-                        right: 0,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _ControlButton(
-                              icon: Icons.replay_10,
-                              tooltip: '-10s',
-                              onPressed: () {
-                                final newPos =
-                                    position - const Duration(seconds: 10);
-                                _coordinator.seek(newPos);
-                                _showOverlay();
-                              },
-                            ),
-                            const SizedBox(width: 16),
-                            _ControlButton(
-                              icon: Icons.forward_10,
-                              tooltip: '+10s',
-                              onPressed: () {
-                                final newPos =
-                                    position + const Duration(seconds: 10);
-                                _coordinator.seek(newPos);
-                                _showOverlay();
-                              },
-                            ),
-                            const SizedBox(width: 24),
-                            _ControlButton(
-                              label: '${speed}x',
-                              tooltip: l.speed,
-                              onPressed: () {
-                                final next = speed >= 2.0 ? 0.5 : speed + 0.5;
-                                _coordinator.setSpeed(next);
-                                _showOverlay();
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
             ],
           );
         },
@@ -319,46 +372,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ControlButton extends StatelessWidget {
-  const _ControlButton({
-    required this.onPressed,
-    this.icon,
-    this.label,
-    this.tooltip,
-  });
-
-  final IconData? icon;
-  final String? label;
-  final String? tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: Material(
-        color: Colors.black54,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            child: icon != null
-                ? Icon(icon, color: Colors.white, size: 28)
-                : Text(
-                    label ?? '',
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-          ),
         ),
       ),
     );

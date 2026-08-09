@@ -92,3 +92,51 @@ func TestMediaStore_PreloadArtistsWithJoinOrder(t *testing.T) {
 	require.Len(t, got.Artists, 2)
 	assert.Equal(t, "Artist B", got.Artists[0].Name)
 }
+
+// Regression test: an artist linked to multiple media must NOT be
+// duplicated when preloading. The old GORM many2many Preload with a
+// manual JOIN media_artists caused a cartesian product — each artist
+// appeared once per media_artists row across ALL media, not just the
+// current one.
+func TestMediaStore_ArtistsNotDuplicatedAcrossMedia(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	shared, err := NewArtistRepository(db).FindOrCreateByName(ctx, "Shared Artist")
+	require.NoError(t, err)
+	other, err := NewArtistRepository(db).FindOrCreateByName(ctx, "Other Artist")
+	require.NoError(t, err)
+
+	m1 := &models.Media{Title: "Track1", Type: models.MediaTypeAudio, FilePath: "/a/1.mp3"}
+	require.NoError(t, store.Create(ctx, m1))
+	m2 := &models.Media{Title: "Track2", Type: models.MediaTypeAudio, FilePath: "/a/2.mp3"}
+	require.NoError(t, store.Create(ctx, m2))
+
+	// m1: Shared (pos 0) + Other (pos 1); m2: Shared (pos 0).
+	require.NoError(t, db.Exec(
+		"INSERT INTO media_artists (media_id, artist_id, position) VALUES (?,?,0),(?,?,1),(?,?,0)",
+		m1.ID, shared.ID, m1.ID, other.ID, m2.ID, shared.ID,
+	).Error)
+
+	list, _, err := store.FindAll(ctx, nil, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, list, 2)
+
+	// m1 must have exactly 2 artists (not 3).
+	require.Len(t, list[0].Artists, 2, "m1 should have 2 artists, not duplicated")
+	assert.Equal(t, "Shared Artist", list[0].Artists[0].Name)
+	assert.Equal(t, "Other Artist", list[0].Artists[1].Name)
+
+	// m2 must have exactly 1 artist (not 2).
+	require.Len(t, list[1].Artists, 1, "m2 should have 1 artist, not duplicated")
+	assert.Equal(t, "Shared Artist", list[1].Artists[0].Name)
+
+	// FindByID must also be correct.
+	got, err := store.FindByID(ctx, m1.ID)
+	require.NoError(t, err)
+	require.Len(t, got.Artists, 2)
+}

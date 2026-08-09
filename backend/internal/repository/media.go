@@ -22,10 +22,7 @@ func (r *MediaStore) FindAll(ctx context.Context, filters map[string]interface{}
 	var media []models.Media
 	var total int64
 	query := r.db.WithContext(ctx).
-		Preload("Metadata").
-		Preload("Artists", func(db *gorm.DB) *gorm.DB {
-			return db.Joins("JOIN media_artists ON media_artists.artist_id = artists.id").Order("media_artists.position ASC")
-		})
+		Preload("Metadata")
 
 	if mediaType, ok := filters["type"]; ok {
 		query = query.Where("type = ?", mediaType)
@@ -62,6 +59,16 @@ func (r *MediaStore) FindAll(ctx context.Context, filters map[string]interface{}
 	query = query.Order("media.id ASC")
 
 	err := query.Find(&media).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Load artists separately to avoid the GORM many2many preload cartesian
+	// product bug (see LoadArtistsForMedia).
+	if loadErr := LoadArtistsForMedia(r.db.WithContext(ctx), media); loadErr != nil {
+		return nil, 0, loadErr
+	}
+
 	return media, total, err
 }
 
@@ -69,21 +76,30 @@ func (r *MediaStore) FindByID(ctx context.Context, id uint) (*models.Media, erro
 	var media models.Media
 	err := r.db.WithContext(ctx).
 		Preload("Metadata").
-		Preload("Artists", func(db *gorm.DB) *gorm.DB {
-			return db.Joins("JOIN media_artists ON media_artists.artist_id = artists.id").Order("media_artists.position ASC")
-		}).
 		First(&media, id).Error
-	return &media, err
+	if err != nil {
+		return &media, err
+	}
+
+	mediaSlice := []models.Media{media}
+	_ = LoadArtistsForMedia(r.db.WithContext(ctx), mediaSlice)
+	media.Artists = mediaSlice[0].Artists
+	return &media, nil
 }
 
 func (r *MediaStore) FindByPath(ctx context.Context, path string) (*models.Media, error) {
 	var media models.Media
 	err := r.db.WithContext(ctx).
-		Preload("Artists", func(db *gorm.DB) *gorm.DB {
-			return db.Joins("JOIN media_artists ON media_artists.artist_id = artists.id").Order("media_artists.position ASC")
-		}).
+		Preload("Metadata").
 		Where("file_path = ?", path).First(&media).Error
-	return &media, err
+	if err != nil {
+		return &media, err
+	}
+
+	mediaSlice := []models.Media{media}
+	_ = LoadArtistsForMedia(r.db.WithContext(ctx), mediaSlice)
+	media.Artists = mediaSlice[0].Artists
+	return &media, nil
 }
 
 func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media, error) {

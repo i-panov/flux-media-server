@@ -58,3 +58,56 @@ func (r *ArtistStore) FindOrCreateByName(ctx context.Context, name string) (*mod
 	}
 	return &artist, nil
 }
+
+// LoadArtistsForMedia attaches artists to each media record in a single
+// query, ordered by the join-table position column.
+//
+// This replaces GORM's many2many Preload for the Artists relation because:
+//  1. GORM's many2many preload cannot ORDER BY a join-table column
+//     (media_artists.position) — the artists query doesn't include the
+//     join table.
+//  2. Adding a manual JOIN media_artists inside the preload function
+//     causes DUPLICATE artists: the JOIN is not scoped to the current
+//     media, so an artist linked to N media produces N rows, all of which
+//     GORM appends to every media that references that artist (cartesian
+//     product).
+//
+// The manual query here is media-scoped (WHERE media_artists.media_id IN
+// (...)) so each artist appears exactly once per media it belongs to.
+func LoadArtistsForMedia(db *gorm.DB, media []models.Media) error {
+	if len(media) == 0 {
+		return nil
+	}
+
+	ids := make([]uint, 0, len(media))
+	for _, m := range media {
+		ids = append(ids, m.ID)
+	}
+
+	var links []models.ArtistLink
+	err := db.Table("media_artists").
+		Select("media_artists.media_id, media_artists.artist_id, artists.name, media_artists.position").
+		Joins("JOIN artists ON artists.id = media_artists.artist_id").
+		Where("media_artists.media_id IN ?", ids).
+		Order("media_artists.media_id ASC, media_artists.position ASC").
+		Scan(&links).Error
+	if err != nil {
+		return err
+	}
+
+	byMedia := make(map[uint][]models.Artist, len(media))
+	for _, l := range links {
+		byMedia[l.MediaID] = append(byMedia[l.MediaID], models.Artist{
+			ID:   l.ArtistID,
+			Name: l.Name,
+		})
+	}
+	for i := range media {
+		if arts, ok := byMedia[media[i].ID]; ok {
+			media[i].Artists = arts
+		} else {
+			media[i].Artists = []models.Artist{}
+		}
+	}
+	return nil
+}

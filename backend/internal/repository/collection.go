@@ -70,11 +70,16 @@ func (r *CollectionItemStore) FindMediaByCollection(ctx context.Context, collect
 		Where("collection_items.collection_id = ?", collectionID).
 		Order("collection_items.position ASC, collection_items.id ASC").
 		Preload("Metadata").
-		Preload("Artists", func(db *gorm.DB) *gorm.DB {
-			return db.Joins("JOIN media_artists ON media_artists.artist_id = artists.id").Order("media_artists.position ASC")
-		}).
 		Find(&media).Error
-	return media, err
+	if err != nil {
+		return nil, err
+	}
+
+	if loadErr := LoadArtistsForMedia(r.db.WithContext(ctx), media); loadErr != nil {
+		return nil, loadErr
+	}
+
+	return media, nil
 }
 
 func (r *CollectionItemStore) Add(ctx context.Context, item *models.CollectionItem) error {

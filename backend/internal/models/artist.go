@@ -17,3 +17,15 @@ type MediaArtist struct {
 	ArtistID uint `gorm:"primaryKey;uniqueIndex:idx_media_artist_pair" json:"artist_id"`
 	Position int  `gorm:"default:0" json:"position"`
 }
+
+// ArtistLink is a row from media_artists JOIN artists, used by the
+// repository to attach artists to media in the correct position order
+// without GORM's many2many preload (which cannot ORDER BY a join-table
+// column and would require a manual JOIN that causes duplicate artists
+// via a cartesian product across all media_artists rows of each artist).
+type ArtistLink struct {
+	MediaID  uint `gorm:"column:media_id"`
+	ArtistID uint `gorm:"column:artist_id"`
+	Name     string `gorm:"column:name"`
+	Position int  `gorm:"column:position"`
+}

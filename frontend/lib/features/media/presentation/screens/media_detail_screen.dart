@@ -213,6 +213,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     final isDownloading = downloadState is DownloadDownloading;
 
     return Scaffold(
+      backgroundColor: Colors.black87,
       extendBodyBehindAppBar: true,
       appBar: state.maybeWhen(
         loaded: (media) => AppBar(
@@ -285,15 +286,22 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
               right: 0,
               bottom: 0,
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black87,
-                    ],
-                    stops: [0.5, 1.0],
+                    colors: _hasCover()
+                        ? [
+                            Colors.transparent,
+                            Colors.black87,
+                          ]
+                        : [
+                            Colors.black54,
+                            Colors.black87,
+                          ],
+                    stops: _hasCover()
+                        ? [0.5, 1.0]
+                        : [0.0, 1.0],
                   ),
                 ),
               ),
