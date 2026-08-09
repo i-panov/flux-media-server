@@ -19,9 +19,11 @@ class TokenRefreshedException implements Exception {
 /// instead of silently failing.
 // ignore: must_be_immutable
 class TokenRefreshInterceptor implements ResponseInterceptor {
-  TokenRefreshInterceptor(this._ref);
+  TokenRefreshInterceptor(this._ref, {http.Client? httpClient})
+      : _httpClient = httpClient ?? http.Client();
 
   final Ref _ref;
+  final http.Client _httpClient;
   Future<bool>? _refreshFuture;
 
   Future<bool> _doRefresh() async {
@@ -30,11 +32,13 @@ class TokenRefreshInterceptor implements ResponseInterceptor {
 
     final baseUrl = _ref.read(baseUrlProvider);
     final uri = Uri.parse('$baseUrl/auth/refresh');
-    final httpResponse = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refresh_token': refreshToken}),
-    ).timeout(const Duration(seconds: 10));
+    final httpResponse = await _httpClient
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'refresh_token': refreshToken}),
+        )
+        .timeout(const Duration(seconds: 10));
 
     if (httpResponse.statusCode == 200) {
       final data = jsonDecode(httpResponse.body) as Map<String, dynamic>;

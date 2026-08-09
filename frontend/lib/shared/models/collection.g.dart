@@ -29,9 +29,12 @@ Map<String, dynamic> _$$CollectionImplToJson(_$CollectionImpl instance) =>
 _$CollectionItemImpl _$$CollectionItemImplFromJson(Map<String, dynamic> json) =>
     _$CollectionItemImpl(
       id: (json['id'] as num).toInt(),
-      collectionId: (json['collection_id'] as num).toInt(),
-      mediaId: (json['media_id'] as num).toInt(),
-      addedAt: DateTime.parse(json['added_at'] as String),
+      collectionId: (json['collection_id'] as num?)?.toInt(),
+      mediaId: (json['media_id'] as num?)?.toInt(),
+      addedAt: json['added_at'] == null
+          ? null
+          : DateTime.parse(json['added_at'] as String),
+      position: (json['position'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$CollectionItemImplToJson(
@@ -40,5 +43,6 @@ Map<String, dynamic> _$$CollectionItemImplToJson(
       'id': instance.id,
       'collection_id': instance.collectionId,
       'media_id': instance.mediaId,
-      'added_at': instance.addedAt.toIso8601String(),
+      'added_at': instance.addedAt?.toIso8601String(),
+      'position': instance.position,
     };

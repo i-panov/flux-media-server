@@ -25,9 +25,10 @@ class Collection with _$Collection {
 class CollectionItem with _$CollectionItem {
   const factory CollectionItem({
     required int id,
-    @JsonKey(name: 'collection_id') required int collectionId,
-    @JsonKey(name: 'media_id') required int mediaId,
-    @JsonKey(name: 'added_at') required DateTime addedAt,
+    @JsonKey(name: 'collection_id') int? collectionId,
+    @JsonKey(name: 'media_id') int? mediaId,
+    @JsonKey(name: 'added_at') DateTime? addedAt,
+    @JsonKey(name: 'position') int? position,
   }) = _CollectionItem;
 
   factory CollectionItem.fromJson(Map<String, dynamic> json) =>

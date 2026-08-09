@@ -2,17 +2,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
+/// Minimal interface for playback control, used by [PlayQueueNotifier].
+/// This abstraction allows testing the queue logic without instantiating
+/// a full [PlaybackCoordinator] (which requires media_kit Player instances).
+abstract class PlaybackController {
+  Future<void> play(Media media);
+  Future<void> stop();
+}
+
 /// Manages a play queue: ordered list of media items with current index.
 /// Supports next/previous, add, remove, and reorder.
 class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
   PlayQueueNotifier(this._coordinator) : super(const PlayQueueState());
 
-  final PlaybackCoordinator _coordinator;
+  final PlaybackController _coordinator;
 
   /// Sets the queue to [items], starting playback from [startIndex].
   Future<void> setQueue(List<Media> items, {int startIndex = 0}) async {
+    if (items.isEmpty) {
+      state = const PlayQueueState();
+      return;
+    }
     state = PlayQueueState(items: items, currentIndex: startIndex);
-    if (items.isNotEmpty && startIndex < items.length) {
+    if (startIndex < items.length) {
       await _coordinator.play(items[startIndex]);
     }
   }

@@ -35,6 +35,10 @@ class OfflineCacheService {
   /// Guard against parallel token refresh calls.
   bool _isRefreshing = false;
 
+  /// Track active downloads by mediaId to prevent parallel downloads
+  /// of the same file (which would corrupt the .part file).
+  final Set<int> _activeDownloads = {};
+
   SharedPreferences get _prefs => _ref.read(sharedPreferencesProvider);
 
   /// Returns the local file path for a cached media item, or null if
@@ -56,6 +60,24 @@ class OfflineCacheService {
   /// [onProgress] receives (bytesReceived, totalBytes).
   /// Returns the local file path on success.
   Future<String> download(
+    Media media, {
+    void Function(int received, int? total)? onProgress,
+  }) async {
+    // Prevent parallel downloads of the same mediaId — two sinks writing
+    // to the same .part file would corrupt it.
+    if (_activeDownloads.contains(media.id)) {
+      throw Exception('Download already in progress for media ${media.id}');
+    }
+    _activeDownloads.add(media.id);
+
+    try {
+      return await _downloadInternal(media, onProgress: onProgress);
+    } finally {
+      _activeDownloads.remove(media.id);
+    }
+  }
+
+  Future<String> _downloadInternal(
     Media media, {
     void Function(int received, int? total)? onProgress,
   }) async {

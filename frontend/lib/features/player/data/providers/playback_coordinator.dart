@@ -34,7 +34,8 @@ class PlaybackState with _$PlaybackState {
 
 /// Manages unified playback across audio and video.
 /// Handles mutual exclusion: starting video stops audio and vice versa.
-class PlaybackCoordinator extends StateNotifier<PlaybackState> {
+class PlaybackCoordinator extends StateNotifier<PlaybackState>
+    implements PlaybackController {
   PlaybackCoordinator(
     this._audioPlayer,
     this._baseUrl,
@@ -166,6 +167,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
         }
       });
       _subscribeToStream(_audioPlayer.completedStream, _onCompleted);
+      _subscribeToStream(_audioPlayer.errorStream, _onPlayerError);
+      _subscribeToStream(_audioPlayer.bufferingStream, _onBuffering);
     } else {
       // Mutual exclusion: stop audio playback before starting video.
       await _audioPlayer.stop();
@@ -207,6 +210,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
         }
       });
       _subscribeToStream(_videoPlayer.completedStream, _onCompleted);
+      _subscribeToStream(_videoPlayer.errorStream, _onPlayerError);
+      _subscribeToStream(_videoPlayer.bufferingStream, _onBuffering);
     }
 
     _startProgressTimer();
@@ -237,6 +242,20 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
     } else {
       state = const PlaybackState.completed();
     }
+  }
+
+  /// Handles player errors (e.g. 401, unreachable stream).
+  void _onPlayerError(String error) {
+    if (state is PlaybackPlaying || state is PlaybackLoading) {
+      state = PlaybackState.error(message: error);
+    }
+  }
+
+  /// Handles buffering state changes.
+  void _onBuffering(bool buffering) {
+    // media_kit emits buffering events frequently; we don't want to
+    // change state on every tick. The UI can subscribe to the stream
+    // directly if it needs a buffering indicator.
   }
 
   void _subscribeToStream<T>(Stream<T> stream, void Function(T) onNext) {
@@ -412,8 +431,11 @@ final audioPlayerDatasourceProvider = Provider<AudioPlayerDatasource>((ref) {
 });
 
 /// Provider for video player datasource.
-final videoPlayerDatasourceProvider =
-    Provider.autoDispose<VideoPlayerDatasource>((ref) {
+/// NOT autoDispose: the PlaybackCoordinator holds it via ref.read across
+/// multiple await points. If it were autoDispose, the player could be
+/// disposed and recreated between open() and play(), causing operations
+/// on different player instances.
+final videoPlayerDatasourceProvider = Provider<VideoPlayerDatasource>((ref) {
   final ds = VideoPlayerDatasource();
   ref.onDispose(ds.dispose);
   return ds;

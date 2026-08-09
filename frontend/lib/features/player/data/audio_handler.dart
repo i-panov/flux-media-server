@@ -194,6 +194,8 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   Stream<Duration> get durationStream => player.stream.duration;
   Stream<bool> get playingStream => player.stream.playing;
   Stream<bool> get completedStream => player.stream.completed;
+  Stream<String> get errorStream => player.stream.error;
+  Stream<bool> get bufferingStream => player.stream.buffering;
 
   Future<void> dispose() async {
     await player.dispose();

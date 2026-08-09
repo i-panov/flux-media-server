@@ -26,6 +26,8 @@ class AudioPlayerDatasource {
   Stream<bool> get playingStream => _handler.playingStream;
   Stream<double> get volumeStream => _handler.volumeStream;
   Stream<bool> get completedStream => _handler.completedStream;
+  Stream<String> get errorStream => _handler.errorStream;
+  Stream<bool> get bufferingStream => _handler.bufferingStream;
   Future<void> dispose() async => _handler.dispose();
 
   /// Loads a media source with metadata for the system notification.

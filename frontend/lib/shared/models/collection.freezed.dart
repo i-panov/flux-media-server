@@ -278,11 +278,13 @@ CollectionItem _$CollectionItemFromJson(Map<String, dynamic> json) {
 mixin _$CollectionItem {
   int get id => throw _privateConstructorUsedError;
   @JsonKey(name: 'collection_id')
-  int get collectionId => throw _privateConstructorUsedError;
+  int? get collectionId => throw _privateConstructorUsedError;
   @JsonKey(name: 'media_id')
-  int get mediaId => throw _privateConstructorUsedError;
+  int? get mediaId => throw _privateConstructorUsedError;
   @JsonKey(name: 'added_at')
-  DateTime get addedAt => throw _privateConstructorUsedError;
+  DateTime? get addedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'position')
+  int? get position => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -298,9 +300,10 @@ abstract class $CollectionItemCopyWith<$Res> {
   @useResult
   $Res call(
       {int id,
-      @JsonKey(name: 'collection_id') int collectionId,
-      @JsonKey(name: 'media_id') int mediaId,
-      @JsonKey(name: 'added_at') DateTime addedAt});
+      @JsonKey(name: 'collection_id') int? collectionId,
+      @JsonKey(name: 'media_id') int? mediaId,
+      @JsonKey(name: 'added_at') DateTime? addedAt,
+      @JsonKey(name: 'position') int? position});
 }
 
 /// @nodoc
@@ -317,27 +320,32 @@ class _$CollectionItemCopyWithImpl<$Res, $Val extends CollectionItem>
   @override
   $Res call({
     Object? id = null,
-    Object? collectionId = null,
-    Object? mediaId = null,
-    Object? addedAt = null,
+    Object? collectionId = freezed,
+    Object? mediaId = freezed,
+    Object? addedAt = freezed,
+    Object? position = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as int,
-      collectionId: null == collectionId
+      collectionId: freezed == collectionId
           ? _value.collectionId
           : collectionId // ignore: cast_nullable_to_non_nullable
-              as int,
-      mediaId: null == mediaId
+              as int?,
+      mediaId: freezed == mediaId
           ? _value.mediaId
           : mediaId // ignore: cast_nullable_to_non_nullable
-              as int,
-      addedAt: null == addedAt
+              as int?,
+      addedAt: freezed == addedAt
           ? _value.addedAt
           : addedAt // ignore: cast_nullable_to_non_nullable
-              as DateTime,
+              as DateTime?,
+      position: freezed == position
+          ? _value.position
+          : position // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -352,9 +360,10 @@ abstract class _$$CollectionItemImplCopyWith<$Res>
   @useResult
   $Res call(
       {int id,
-      @JsonKey(name: 'collection_id') int collectionId,
-      @JsonKey(name: 'media_id') int mediaId,
-      @JsonKey(name: 'added_at') DateTime addedAt});
+      @JsonKey(name: 'collection_id') int? collectionId,
+      @JsonKey(name: 'media_id') int? mediaId,
+      @JsonKey(name: 'added_at') DateTime? addedAt,
+      @JsonKey(name: 'position') int? position});
 }
 
 /// @nodoc
@@ -369,27 +378,32 @@ class __$$CollectionItemImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? id = null,
-    Object? collectionId = null,
-    Object? mediaId = null,
-    Object? addedAt = null,
+    Object? collectionId = freezed,
+    Object? mediaId = freezed,
+    Object? addedAt = freezed,
+    Object? position = freezed,
   }) {
     return _then(_$CollectionItemImpl(
       id: null == id
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as int,
-      collectionId: null == collectionId
+      collectionId: freezed == collectionId
           ? _value.collectionId
           : collectionId // ignore: cast_nullable_to_non_nullable
-              as int,
-      mediaId: null == mediaId
+              as int?,
+      mediaId: freezed == mediaId
           ? _value.mediaId
           : mediaId // ignore: cast_nullable_to_non_nullable
-              as int,
-      addedAt: null == addedAt
+              as int?,
+      addedAt: freezed == addedAt
           ? _value.addedAt
           : addedAt // ignore: cast_nullable_to_non_nullable
-              as DateTime,
+              as DateTime?,
+      position: freezed == position
+          ? _value.position
+          : position // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -399,9 +413,10 @@ class __$$CollectionItemImplCopyWithImpl<$Res>
 class _$CollectionItemImpl implements _CollectionItem {
   const _$CollectionItemImpl(
       {required this.id,
-      @JsonKey(name: 'collection_id') required this.collectionId,
-      @JsonKey(name: 'media_id') required this.mediaId,
-      @JsonKey(name: 'added_at') required this.addedAt});
+      @JsonKey(name: 'collection_id') this.collectionId,
+      @JsonKey(name: 'media_id') this.mediaId,
+      @JsonKey(name: 'added_at') this.addedAt,
+      @JsonKey(name: 'position') this.position});
 
   factory _$CollectionItemImpl.fromJson(Map<String, dynamic> json) =>
       _$$CollectionItemImplFromJson(json);
@@ -410,17 +425,20 @@ class _$CollectionItemImpl implements _CollectionItem {
   final int id;
   @override
   @JsonKey(name: 'collection_id')
-  final int collectionId;
+  final int? collectionId;
   @override
   @JsonKey(name: 'media_id')
-  final int mediaId;
+  final int? mediaId;
   @override
   @JsonKey(name: 'added_at')
-  final DateTime addedAt;
+  final DateTime? addedAt;
+  @override
+  @JsonKey(name: 'position')
+  final int? position;
 
   @override
   String toString() {
-    return 'CollectionItem(id: $id, collectionId: $collectionId, mediaId: $mediaId, addedAt: $addedAt)';
+    return 'CollectionItem(id: $id, collectionId: $collectionId, mediaId: $mediaId, addedAt: $addedAt, position: $position)';
   }
 
   @override
@@ -432,13 +450,15 @@ class _$CollectionItemImpl implements _CollectionItem {
             (identical(other.collectionId, collectionId) ||
                 other.collectionId == collectionId) &&
             (identical(other.mediaId, mediaId) || other.mediaId == mediaId) &&
-            (identical(other.addedAt, addedAt) || other.addedAt == addedAt));
+            (identical(other.addedAt, addedAt) || other.addedAt == addedAt) &&
+            (identical(other.position, position) ||
+                other.position == position));
   }
 
   @JsonKey(ignore: true)
   @override
   int get hashCode =>
-      Object.hash(runtimeType, id, collectionId, mediaId, addedAt);
+      Object.hash(runtimeType, id, collectionId, mediaId, addedAt, position);
 
   @JsonKey(ignore: true)
   @override
@@ -457,11 +477,11 @@ class _$CollectionItemImpl implements _CollectionItem {
 
 abstract class _CollectionItem implements CollectionItem {
   const factory _CollectionItem(
-          {required final int id,
-          @JsonKey(name: 'collection_id') required final int collectionId,
-          @JsonKey(name: 'media_id') required final int mediaId,
-          @JsonKey(name: 'added_at') required final DateTime addedAt}) =
-      _$CollectionItemImpl;
+      {required final int id,
+      @JsonKey(name: 'collection_id') final int? collectionId,
+      @JsonKey(name: 'media_id') final int? mediaId,
+      @JsonKey(name: 'added_at') final DateTime? addedAt,
+      @JsonKey(name: 'position') final int? position}) = _$CollectionItemImpl;
 
   factory _CollectionItem.fromJson(Map<String, dynamic> json) =
       _$CollectionItemImpl.fromJson;
@@ -470,13 +490,16 @@ abstract class _CollectionItem implements CollectionItem {
   int get id;
   @override
   @JsonKey(name: 'collection_id')
-  int get collectionId;
+  int? get collectionId;
   @override
   @JsonKey(name: 'media_id')
-  int get mediaId;
+  int? get mediaId;
   @override
   @JsonKey(name: 'added_at')
-  DateTime get addedAt;
+  DateTime? get addedAt;
+  @override
+  @JsonKey(name: 'position')
+  int? get position;
   @override
   @JsonKey(ignore: true)
   _$$CollectionItemImplCopyWith<_$CollectionItemImpl> get copyWith =>

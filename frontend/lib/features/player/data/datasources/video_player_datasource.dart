@@ -39,6 +39,12 @@ class VideoPlayerDatasource {
   /// Stream that emits when playback completes.
   Stream<bool> get completedStream => player.stream.completed;
 
+  /// Stream of playback errors (e.g. 401, unreachable stream).
+  Stream<String> get errorStream => player.stream.error;
+
+  /// Stream of buffering state.
+  Stream<bool> get bufferingStream => player.stream.buffering;
+
   /// Disposes the player and frees resources.
   Future<void> dispose() async => player.dispose();
 }

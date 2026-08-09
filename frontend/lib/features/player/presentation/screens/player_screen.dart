@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -74,7 +75,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       DeviceOrientation.landscapeRight,
     ]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _coordinator.play(widget.media);
+      // Use setQueue so the queue is in sync with what's playing.
+      // Without this, _onCompleted would jump to a stale queue item.
+      ref.read(playQueueProvider.notifier).setQueue([widget.media]);
       _showOverlay();
     });
   }
@@ -277,9 +280,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () {
-                      _coordinator
-                        ..reset()
-                        ..play(widget.media);
+                      ref
+                          .read(playQueueProvider.notifier)
+                          .setQueue([widget.media]);
                     },
                     child: Text(l.replay),
                   ),

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 
 /// Notifier that toggles favorite status for a media item.
@@ -39,6 +40,13 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
     _isToggling = true;
 
     try {
+      // Check if we're offline — don't send network requests.
+      final isOffline = _ref.read(isOfflineProvider);
+      if (isOffline) {
+        state = const AsyncValue.data(false);
+        return;
+      }
+
       // Read the real state directly – do not trust the cached bool.
       final currentState = await _isFavorited();
       if (!mounted) return;
@@ -94,6 +102,15 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
   /// [favoriteMediaIdsProvider].
   Future<bool> _isFavorited() async {
     try {
+      final isOffline = _ref.read(isOfflineProvider);
+      if (isOffline) {
+        // In offline mode, use cached data only.
+        final ids = _ref.read(favoriteMediaIdsProvider);
+        return ids.maybeWhen(
+          data: (ids) => ids.contains(_mediaId),
+          orElse: () => false,
+        );
+      }
       final ids = await _ref.read(favoriteMediaIdsProvider.future);
       return ids.contains(_mediaId);
     } catch (_) {

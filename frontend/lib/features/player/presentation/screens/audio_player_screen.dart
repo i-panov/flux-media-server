@@ -33,7 +33,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       final alreadyPlaying =
           playback is PlaybackPlaying && playback.media.id == widget.media.id;
       if (!alreadyPlaying) {
-        ref.read(playbackCoordinatorProvider.notifier).play(widget.media);
+        // Use setQueue so the queue is in sync with what's playing.
+        // Without this, _onCompleted would jump to a stale queue item.
+        ref.read(playQueueProvider.notifier).setQueue([widget.media]);
       }
     });
   }
