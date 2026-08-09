@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
-import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -23,6 +23,22 @@ final videoControllerProvider = Provider.autoDispose<VideoController>((ref) {
     ),
   );
 });
+
+/// Custom theme for MaterialVideoControls — makes the seek bar thicker
+/// and adds bottom padding so it doesn't get cut off at the screen edge
+/// on Android (especially in immersive mode where safe-area insets are 0).
+const _videoControlsTheme = MaterialVideoControlsThemeData(
+  seekBarHeight: 5,
+  seekBarThumbSize: 16,
+  seekBarMargin: EdgeInsets.only(left: 12, right: 12),
+  // Override safe-area padding with explicit value so the controls
+  // stay fully visible even in immersiveSticky mode.
+  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+  seekBarPositionColor: Colors.deepPurple,
+  seekBarThumbColor: Colors.deepPurple,
+  seekBarBufferColor: Color(0x66FFFFFF),
+  seekBarColor: Color(0x33FFFFFF),
+);
 
 @RoutePage()
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -161,11 +177,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           return Stack(
             children: [
               Positioned.fill(
-                child: Video(
-                  controller: videoController,
-                  controls: Platform.isAndroid || Platform.isIOS
-                      ? MaterialVideoControls
-                      : MaterialDesktopVideoControls,
+                child: MaterialVideoControlsTheme(
+                  normal: _videoControlsTheme,
+                  fullscreen: _videoControlsTheme,
+                  child: Video(
+                    controller: videoController,
+                    controls: Platform.isAndroid || Platform.isIOS
+                        ? MaterialVideoControls
+                        : MaterialDesktopVideoControls,
+                  ),
                 ),
               ),
               // Transparent tap catcher — toggles overlay visibility.
