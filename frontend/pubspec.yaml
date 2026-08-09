@@ -15,7 +15,7 @@ dependencies:
   chopper: ^7.1.2
   connectivity_plus: ^6.0.0
   crypto: ^3.0.3
-  fast_immutable_collections: ^10.2.0
+  fast_immutable_collections: ^11.2.0
   file_picker: ^10.0.0
   flutter:
     sdk: flutter
