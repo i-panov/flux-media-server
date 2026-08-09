@@ -62,8 +62,11 @@ func main() {
 
 	select {
 	case err := <-serverErr:
-		// log.Fatalf in a goroutine would bypass deferred cleanup; handle here.
-		log.Fatalf("Server error: %v", err)
+		// Perform graceful shutdown before exiting so background goroutines
+		// (watcher, OTP purge, etc.) are cleaned up.
+		log.Printf("Server error: %v", err)
+		application.Shutdown()
+		os.Exit(1)
 	case <-quit:
 		log.Println("Shutting down server...")
 	}

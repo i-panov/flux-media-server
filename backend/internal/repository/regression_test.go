@@ -18,6 +18,10 @@ func TestFavoriteStore_MultipleMediaFavorites(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	// Create media records so FK constraints are satisfied.
+	require.NoError(t, db.Create(&models.Media{ID: 10, Title: "Test1"}).Error)
+	require.NoError(t, db.Create(&models.Media{ID: 11, Title: "Test2"}).Error)
+
 	store := NewFavoriteRepository(db)
 	ctx := context.Background()
 
@@ -48,6 +52,9 @@ func TestProgressStore_UpsertNoDuplicates(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	// Create media so FK constraint is satisfied.
+	require.NoError(t, db.Create(&models.Media{ID: 10, Title: "Test"}).Error)
+
 	// Direct duplicate insert must fail on the unique index.
 	p1 := &models.WatchProgress{UserID: 1, MediaID: 10, Position: 5}
 	require.NoError(t, db.Create(p1).Error)
@@ -63,6 +70,10 @@ func TestCollectionItemStore_NoDuplicates(t *testing.T) {
 	db, err := InitDB(":memory:")
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
+
+	// Create referenced records for FK constraints.
+	require.NoError(t, db.Create(&models.Collection{ID: 1}).Error)
+	require.NoError(t, db.Create(&models.Media{ID: 10, Title: "Test"}).Error)
 
 	store := NewCollectionItemRepository(db)
 	ctx := context.Background()

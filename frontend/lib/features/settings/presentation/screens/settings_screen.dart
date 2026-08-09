@@ -1,6 +1,10 @@
+import 'dart:async' show unawaited;
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -80,17 +84,90 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 child: Text(l.cancel),
                               ),
                               FilledButton(
-                                onPressed: () {
+                                onPressed: () async {
                                   final url = _serverUrlController.text.trim();
                                   if (url.isNotEmpty) {
-                                    ref
-                                        .read(settingsProvider.notifier)
-                                        .setServerUrl(url);
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(this.context)
-                                        .showSnackBar(
-                                      SnackBar(content: Text(l.serverUrlSaved)),
-                                    );
+                                    // Validate URL format.
+                                    try {
+                                      final uri = Uri.parse(url);
+                                      if (uri.scheme.isEmpty ||
+                                          !uri.scheme.startsWith('http')) {
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Please enter a valid URL '
+                                                  'starting with http:// or '
+                                                  'https://'),
+                                            ),
+                                          );
+                                        }
+                                        return;
+                                      }
+                                    } on FormatException {
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Invalid URL format'),
+                                          ),
+                                        );
+                                      }
+                                      return;
+                                    }
+
+                                    // Changing the server URL means a
+                                    // different backend — clear the session
+                                    // (tokens, cache) so stale data from the
+                                    // old server is not sent to the new one.
+                                    try {
+                                      await ref
+                                          .read(settingsProvider.notifier)
+                                          .setServerUrl(url);
+                                      await ref
+                                          .read(settingsProvider.notifier)
+                                          .logout();
+                                    } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                             SnackBar(
+                                               content: Text(
+                                                   'Failed to save '
+                                                   'settings: $e',
+                                               ),
+                                             ),
+                                          );
+                                          return;
+                                        }
+                                    }
+
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            SnackBar(
+                                              content: Text(l.serverUrlSaved),
+                                            ),
+                                          );
+                                      // Rebuild with fresh apiClient for
+                                      // the new base URL.
+                                      if (context.mounted) {
+                                        ref.invalidate(apiClientProvider);
+                                        // Navigate to login if
+                                        // authenticated.
+                                        if (context.mounted) {
+                                          unawaited(
+                                            context.router.replace(
+                                              const LoginRoute(),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    }
                                   }
                                 },
                                 child: Text(l.save),

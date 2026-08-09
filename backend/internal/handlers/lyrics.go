@@ -48,6 +48,9 @@ type UpsertLyricsRequest struct {
 }
 
 // UpsertLyrics creates or updates lyrics for a media item.
+// When updating, only non-empty fields in the request are applied — this
+// prevents the client from accidentally erasing translation/sync_data when
+// it only wants to update the lyrics text.
 func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
 	mediaID, err := c.ParamsInt("id")
 	if err != nil {
@@ -67,6 +70,27 @@ func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
 		Translation: req.Translation,
 		SyncData:    req.SyncData,
 		Source:      req.Source,
+	}
+
+	// If a record already exists, preserve fields that the client did not
+	// send (empty string in the request). This prevents PUT from erasing
+	// translation/sync_data when only lyrics_text is being saved.
+	existing, findErr := h.lyricsRepo.FindByMediaID(ctx, uint(mediaID))
+	if findErr == nil && existing != nil {
+		if req.LyricsText == "" {
+			lyrics.LyricsText = existing.LyricsText
+		}
+		if req.Translation == "" {
+			lyrics.Translation = existing.Translation
+		}
+		if req.SyncData == "" {
+			lyrics.SyncData = existing.SyncData
+		}
+		if req.Source == "" {
+			lyrics.Source = existing.Source
+		}
+		// Preserve the ID so OnConflict updates the existing row.
+		lyrics.ID = existing.ID
 	}
 
 	if err := h.lyricsRepo.Upsert(ctx, lyrics); err != nil {

@@ -2,12 +2,14 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // ThumbnailService generates and serves thumbnails for media files.
@@ -68,7 +70,10 @@ func (s *ThumbnailService) generateVideoThumbnail(mediaID uint, filePath string)
 	}
 
 	// Extract frame at 10% of the video or 10 seconds, whichever is smaller.
-	cmd := exec.Command("ffmpeg",
+	// Use a timeout so one broken/corrupt file cannot hang the whole scan.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-ss", "10",
 		"-i", filePath,
 		"-vframes", "1",
@@ -98,7 +103,10 @@ func (s *ThumbnailService) extractEmbeddedArt(mediaID uint, filePath string) str
 		return ""
 	}
 
-	cmd := exec.Command("ffmpeg",
+	// Use a timeout so a hung ffmpeg cannot block the worker indefinitely.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-i", filePath,
 		"-an", "-vcodec", "copy",
 		"-y", outPath,

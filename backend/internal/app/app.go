@@ -6,13 +6,14 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 
 	"flux/internal/config"
 	"flux/internal/email"
@@ -33,6 +34,7 @@ type App struct {
 	Watcher     *services.WatcherService
 	Version     string
 	cleanupStop chan struct{}
+	cleanupOnce sync.Once
 }
 
 // New creates a new App with all dependencies wired up.
@@ -103,8 +105,12 @@ func New(cfg *config.Config, version string) (*App, error) {
 	})
 
 	// Ensure media directories exist.
-	os.MkdirAll(cfg.Media.VideoPath, 0755)
-	os.MkdirAll(cfg.Media.AudioPath, 0755)
+	if err := os.MkdirAll(cfg.Media.VideoPath, 0755); err != nil {
+		return nil, fmt.Errorf("create video dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Media.AudioPath, 0755); err != nil {
+		return nil, fmt.Errorf("create audio dir: %w", err)
+	}
 
 	progressHandler := handlers.NewProgressHandler(progressRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
@@ -141,7 +147,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 			})
 		},
 	})
-	fiberApp.Use(recover.New())
+	fiberApp.Use(fiberrecover.New())
 	fiberApp.Use(logger.New())
 
 	// fasthttp buffers the whole request body in memory. The global BodyLimit
@@ -215,7 +221,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Post("/upload", requireAdmin, uploadHandler.Upload)
 	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Put("/:id", requireAdmin, mediaHandler.Update)
-	media.Delete("/:id", mediaHandler.Delete)
+	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)
 	media.Get("/:id/thumb", thumbHandler.Get)
 	media.Get("/:id/cover", thumbHandler.GetCover)
@@ -272,7 +278,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	// Periodically purge expired refresh tokens so the table does not grow
 	// unboundedly.
 	cleanupStop := make(chan struct{})
-	go func() {
+	goSafe(func() {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 		for {
@@ -285,7 +291,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 				return
 			}
 		}
-	}()
+	})
 
 	return &App{
 		Fiber:       fiberApp,
@@ -308,16 +314,26 @@ func (a *App) Listen() error {
 	return a.Fiber.Listen(fmt.Sprintf("%s:%d", host, port))
 }
 
-// getClientIP extracts the real client IP from proxy headers, falling back
-// to the direct connection address.
+// getClientIP returns the client IP for rate limiting. We deliberately do
+// NOT trust X-Forwarded-For / X-Real-IP headers because an attacker can
+// trivially spoof them, obtaining a unique key per request and bypassing
+// the rate limiter. If the server runs behind a reverse proxy, configure
+// Fiber's TrustedProxies instead.
 func getClientIP(c *fiber.Ctx) string {
-	if ip := c.Get("X-Forwarded-For"); ip != "" {
-		return ip
-	}
-	if ip := c.Get("X-Real-IP"); ip != "" {
-		return ip
-	}
 	return c.IP()
+}
+
+// goSafe runs fn in a goroutine, recovering from panics so a bug in a
+// background task cannot crash the whole process.
+func goSafe(fn func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("panic in background goroutine: %v", r)
+			}
+		}()
+		fn()
+	}()
 }
 
 // Shutdown gracefully stops the application.
@@ -326,7 +342,7 @@ func (a *App) Shutdown() {
 		a.Watcher.Stop()
 	}
 	a.OTPStore.Stop()
-	if a.cleanupStop != nil {
+	a.cleanupOnce.Do(func() {
 		close(a.cleanupStop)
-	}
+	})
 }

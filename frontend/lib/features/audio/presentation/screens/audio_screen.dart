@@ -240,11 +240,12 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                 leading: const Icon(Icons.search),
                 onChanged: (value) {
                   if (value.isEmpty) {
-                    ref.read(searchQueryProvider.notifier).state = '';
+                    ref.read(searchQueryProvider('audio').notifier).state = '';
                   }
                 },
-                onSubmitted: (value) =>
-                    ref.read(searchQueryProvider.notifier).state = value,
+                onSubmitted: (value) {
+                  ref.read(searchQueryProvider('audio').notifier).state = value;
+                },
               ),
             ),
           ),

@@ -9,10 +9,11 @@ import 'package:flux_media_server/features/favorites/presentation/providers/favo
 /// survives the toggle and correctly retains its state.
 class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
   FavoriteToggleNotifier(this._ref, this._mediaId)
-      : super(const AsyncValue.data(false));
+      : super(const AsyncValue.loading());
 
   final Ref _ref;
   final int _mediaId;
+  bool _isToggling = false;
 
   /// Returns the actual favorite state from the cached
   /// [favoriteMediaIdsProvider].
@@ -27,50 +28,58 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
 
   /// Toggles favorite status.
   Future<void> toggle(int mediaId) async {
-    if (!mounted) return;
-
-    // Read the real state directly – do not trust the cached bool.
-    final currentState = await _isFavorited();
-    if (!mounted) return;
-
-    // Optimistic update
-    state = AsyncValue.data(!currentState);
+    if (!mounted || _isToggling) return;
+    _isToggling = true;
 
     try {
-      if (currentState) {
-        final removeFavorite = _ref.read(removeFavoriteProvider);
-        final result = await removeFavorite(mediaId);
-        if (!mounted) return;
-        result.fold(
-          (failure) {
-            if (!mounted) return;
-            state = AsyncValue.error(failure.message, StackTrace.current);
-          },
-          (_) {
-            _ref
-              ..invalidate(favoritesProvider)
-              ..invalidate(favoriteMediaIdsProvider);
-          },
-        );
-      } else {
-        final addFavorite = _ref.read(addFavoriteProvider);
-        final result = await addFavorite(mediaId);
-        if (!mounted) return;
-        result.fold(
-          (failure) {
-            if (!mounted) return;
-            state = AsyncValue.error(failure.message, StackTrace.current);
-          },
-          (_) {
-            _ref
-              ..invalidate(favoritesProvider)
-              ..invalidate(favoriteMediaIdsProvider);
-          },
-        );
-      }
-    } catch (e, st) {
+      // Read the real state directly – do not trust the cached bool.
+      final currentState = await _isFavorited();
       if (!mounted) return;
-      state = AsyncValue.error(e.toString(), st);
+
+      // Optimistic update
+      state = AsyncValue.data(!currentState);
+
+      try {
+        if (currentState) {
+          final removeFavorite = _ref.read(removeFavoriteProvider);
+          final result = await removeFavorite(mediaId);
+          if (!mounted) return;
+          result.fold(
+            (failure) {
+              if (!mounted) return;
+              // Revert to previous state on error.
+              state = AsyncValue.data(currentState);
+            },
+            (_) {
+              _ref
+                ..invalidate(favoritesProvider)
+                ..invalidate(favoriteMediaIdsProvider);
+            },
+          );
+        } else {
+          final addFavorite = _ref.read(addFavoriteProvider);
+          final result = await addFavorite(mediaId);
+          if (!mounted) return;
+          result.fold(
+            (failure) {
+              if (!mounted) return;
+              // Revert to previous state on error.
+              state = AsyncValue.data(currentState);
+            },
+            (_) {
+              _ref
+                ..invalidate(favoritesProvider)
+                ..invalidate(favoriteMediaIdsProvider);
+            },
+          );
+        }
+    } catch (e) {
+      if (!mounted) return;
+      // Revert to previous state on error.
+      state = AsyncValue.data(currentState);
+    }
+    } finally {
+      _isToggling = false;
     }
   }
 }

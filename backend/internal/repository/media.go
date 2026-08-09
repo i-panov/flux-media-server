@@ -57,6 +57,10 @@ func (r *MediaStore) FindAll(ctx context.Context, filters map[string]interface{}
 		query = query.Offset(offset)
 	}
 
+	// ORDER BY is required for stable pagination: without it SQLite does not
+	// guarantee row order, causing duplicates/missing items between pages.
+	query = query.Order("media.id ASC")
+
 	err := query.Find(&media).Error
 	return media, total, err
 }
@@ -117,19 +121,36 @@ func (r *MediaStore) Update(ctx context.Context, media *models.Media) error {
 		}
 	}
 
-	if err := r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: true}).Save(media).Error; err != nil {
-		return err
-	}
-
-	// Replace many-to-many associations so removed artists are unlinked.
-	if media.Artists != nil {
-		if err := r.db.WithContext(ctx).Model(media).Association("Artists").Replace(&media.Artists); err != nil {
+	// Save media record and replace artist associations in a single
+	// transaction. FullSaveAssociations is NOT used because it would
+	// duplicate the artist-saving work and reset join-table positions.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Omit("Artists").Save(media).Error; err != nil {
 			return err
 		}
-	}
-	return nil
+		if media.Artists != nil {
+			return tx.Model(media).Association("Artists").Replace(&media.Artists)
+		}
+		return nil
+	})
 }
 
 func (r *MediaStore) Delete(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&models.Media{}, id).Error
+	// Delete the media record and its dependent rows (favorites, progress,
+	// lyrics, collection items) atomically to avoid orphaned data.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("media_id = ?", id).Delete(&models.Favorite{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("media_id = ?", id).Delete(&models.WatchProgress{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("media_id = ?", id).Delete(&models.Lyrics{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("media_id = ?", id).Delete(&models.CollectionItem{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.Media{}, id).Error
+	})
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"gopkg.in/vansante/go-ffprobe.v2"
+	"gorm.io/gorm"
 
 	"flux/internal/config"
 	"flux/internal/metadata"
@@ -159,8 +160,14 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 			return nil
 		}
 
-		// Skip empty files.
+		// Skip empty files — but still record them in `seen` so sweep does
+		// not delete an existing record for a file that temporarily has
+		// size 0 (e.g. still being written by another process).
 		if info.Size() == 0 {
+			existing, ferr := s.mediaRepo.FindByPath(ctx, path)
+			if ferr == nil && existing != nil {
+				seen[path] = struct{}{}
+			}
 			return nil
 		}
 
@@ -174,6 +181,12 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 
 		// Check if file already exists in database by path
 		existing, err := s.mediaRepo.FindByPath(ctx, path)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			// A database error is NOT "file is new" — treat it as a scan
+			// failure rather than creating a duplicate/malformed record.
+			log.Printf("FindByPath error for %s: %v", path, err)
+			return nil
+		}
 		if err == nil && existing != nil {
 			// File exists — check if it changed using quick hash
 			qh, err := quickHashFile(path)
@@ -258,8 +271,9 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 		// Parse filename for metadata
 		title, year := metadata.ParseFilename(filepath.Base(path))
 
-		// Probe once for both media type and video metadata
-		probeCtx, probeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		// Probe once for both media type and video metadata. Inherit from the
+		// scan context so a cancelled scan also cancels the ffprobe call.
+		probeCtx, probeCancel := context.WithTimeout(ctx, 10*time.Second)
 		probeData, probeErr := ffprobe.ProbeURL(probeCtx, path)
 		probeCancel()
 
@@ -383,21 +397,31 @@ func quickHashFile(path string) (string, error) {
 	}
 	h.Write(sizeBuf)
 
-	// Hash first chunk
+	// Hash first chunk.
 	head := make([]byte, quickHashChunk)
-	n, _ := io.ReadFull(f, head)
+	n, err := io.ReadFull(f, head)
 	if n > 0 {
 		h.Write(head[:n])
 	}
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return "", err
+	}
 
-	// Hash last chunk (if file is larger than 2x chunk)
+	// Hash last chunk. For files between 1MB and 2MB the head already covers
+	// the whole file, so a separate tail read is unnecessary. Files larger
+	// than 2MB get both head and tail.
 	fileSize := stat.Size()
 	if fileSize > int64(quickHashChunk*2) {
-		f.Seek(-int64(quickHashChunk), io.SeekEnd)
+		if _, err := f.Seek(-int64(quickHashChunk), io.SeekEnd); err != nil {
+			return "", err
+		}
 		tail := make([]byte, quickHashChunk)
-		n, _ := io.ReadFull(f, tail)
+		n, err := io.ReadFull(f, tail)
 		if n > 0 {
 			h.Write(tail[:n])
+		}
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return "", err
 		}
 	}
 

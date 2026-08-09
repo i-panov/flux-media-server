@@ -49,14 +49,30 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
 
   /// Removes item at [index] from the queue.
   void removeAt(int index) {
+    if (index < 0 || index >= state.items.length) return;
     final items = List<Media>.from(state.items)..removeAt(index);
-    final newIndex = index <= state.currentIndex
-        ? (state.currentIndex - 1).clamp(0, items.length - 1)
-        : state.currentIndex;
+
+    int newIndex;
+    if (items.isEmpty) {
+      newIndex = -1;
+    } else if (index <= state.currentIndex) {
+      newIndex = (state.currentIndex - 1).clamp(0, items.length - 1);
+    } else {
+      newIndex = state.currentIndex;
+    }
+
     state = PlayQueueState(
       items: items,
-      currentIndex: items.isEmpty ? -1 : newIndex,
+      currentIndex: newIndex,
     );
+
+    // If we removed the currently playing item, stop playback.
+    if (index == state.currentIndex && items.isNotEmpty) {
+      // currentIndex was already adjusted above
+    } else if (items.isEmpty) {
+      // Queue is empty — coordinator should stop playback.
+      _coordinator.stop();
+    }
   }
 
   /// Clears the queue.

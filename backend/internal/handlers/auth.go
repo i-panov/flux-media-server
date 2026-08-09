@@ -197,7 +197,7 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 
 	ctx := c.UserContext()
 	if req.RefreshTokenID != nil {
-		if err := h.refreshTokenDB.DeleteByID(ctx, *req.RefreshTokenID); err != nil {
+		if err := h.refreshTokenDB.DeleteByID(ctx, *req.RefreshTokenID, userID); err != nil {
 			log.Printf("Logout: delete refresh token %d: %v", *req.RefreshTokenID, err)
 			return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
 		}
@@ -234,7 +234,7 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 
 	user, err := h.userRepo.FindByID(ctx, claims.UserID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "User not found")
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired refresh token")
 	}
 
 	tokens, err := h.jwtService.GenerateTokenPair(user.ID, user.Email)
@@ -247,6 +247,11 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	// otherwise multiple valid refresh tokens accumulate silently.
 	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
 	if _, err := h.refreshTokenDB.RotateToken(ctx, req.RefreshToken, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
+		// A missing row means the token was already rotated (replay) or
+		// revoked — treat it as an auth failure, not a server error.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired refresh token")
+		}
 		log.Printf("Failed to rotate refresh token: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to rotate session")
 	}

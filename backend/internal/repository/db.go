@@ -20,7 +20,9 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 		logMode = logger.Info
 	}
 
-	db, err := gorm.Open(sqlite.Open(path+"?_journal=WAL&_busy_timeout=5000"), &gorm.Config{
+	// DSN parameters ensure PRAGMAs are applied to EVERY connection in the
+	// pool, not just the first one (db.Exec only affects one connection).
+	db, err := gorm.Open(sqlite.Open(path+"?_journal=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL&_cache_size=-8000&_temp_store=MEMORY&_mmap_size=268435456"), &gorm.Config{
 		Logger: logger.Default.LogMode(logMode),
 	})
 	if err != nil {

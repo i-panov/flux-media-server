@@ -38,12 +38,13 @@ type ProgressRepository interface {
 // ArtistRepository defines data access methods for Artist entities.
 type ArtistRepository interface {
 	FindAll(ctx context.Context) ([]models.Artist, error)
+	FindByID(ctx context.Context, id uint) (*models.Artist, error)
 	FindOrCreateByName(ctx context.Context, name string) (*models.Artist, error)
 }
 
 // FavoriteRepository defines data access methods for Favorite entities.
 type FavoriteRepository interface {
-	FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.Favorite, int64, error)
+	FindByUser(ctx context.Context, userID uint, mediaType string, limit, offset int) ([]models.Favorite, int64, error)
 	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error)
 	FindByUserAndArtist(ctx context.Context, userID, artistID uint) (*models.Favorite, error)
 	IsFavorited(ctx context.Context, userID, mediaID uint) (bool, error)

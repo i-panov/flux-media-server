@@ -25,6 +25,13 @@ func (r *ArtistStore) FindAll(ctx context.Context) ([]models.Artist, error) {
 	return artists, err
 }
 
+// FindByID returns an artist by ID.
+func (r *ArtistStore) FindByID(ctx context.Context, id uint) (*models.Artist, error) {
+	var artist models.Artist
+	err := r.db.WithContext(ctx).First(&artist, id).Error
+	return &artist, err
+}
+
 // FindOrCreateByName finds an artist by name or creates a new one.
 // Name is trimmed; empty names are rejected.
 func (r *ArtistStore) FindOrCreateByName(ctx context.Context, name string) (*models.Artist, error) {

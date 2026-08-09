@@ -60,34 +60,43 @@ func (r *CollectionItemStore) FindByCollection(ctx context.Context, collectionID
 	return items, err
 }
 
-// FindMediaByCollection returns the media items of a collection in insertion
-// order, in a single query (avoids N+1 on the client).
+// FindMediaByCollection returns the full media objects of a collection in
+// insertion order, preloading Metadata and Artists (no N+1 on the client).
 func (r *CollectionItemStore) FindMediaByCollection(ctx context.Context, collectionID uint) ([]models.Media, error) {
 	var media []models.Media
 	err := r.db.WithContext(ctx).
-		Table("media").
-		Select("media.*").
+		Model(&models.Media{}).
 		Joins("JOIN collection_items ON collection_items.media_id = media.id").
 		Where("collection_items.collection_id = ?", collectionID).
 		Order("collection_items.position ASC, collection_items.id ASC").
-		Scan(&media).Error
+		Preload("Metadata").
+		Preload("Artists", func(db *gorm.DB) *gorm.DB {
+			return db.Joins("JOIN media_artists ON media_artists.artist_id = artists.id").Order("media_artists.position ASC")
+		}).
+		Find(&media).Error
 	return media, err
 }
 
 func (r *CollectionItemStore) Add(ctx context.Context, item *models.CollectionItem) error {
-	// Auto-assign next position if not explicitly set (0 = default).
-	if item.Position == 0 {
-		var maxPos *int
-		r.db.WithContext(ctx).
-			Model(&models.CollectionItem{}).
-			Where("collection_id = ?", item.CollectionID).
-			Select("MAX(position)").
-			Scan(&maxPos)
-		if maxPos != nil {
-			item.Position = *maxPos + 1
+	// Auto-assign next position inside a transaction: MAX(position)+1 must
+	// be computed atomically, otherwise two parallel AddItem calls can
+	// produce the same position and violate the unique index.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if item.Position == 0 {
+			var maxPos *int
+			if err := tx.
+				Model(&models.CollectionItem{}).
+				Where("collection_id = ?", item.CollectionID).
+				Select("MAX(position)").
+				Scan(&maxPos).Error; err != nil {
+				return err
+			}
+			if maxPos != nil {
+				item.Position = *maxPos + 1
+			}
 		}
-	}
-	return r.db.WithContext(ctx).Create(item).Error
+		return tx.Create(item).Error
+	})
 }
 
 func (r *CollectionItemStore) Remove(ctx context.Context, collectionID, mediaID uint) error {

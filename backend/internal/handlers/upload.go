@@ -81,7 +81,7 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 
 	// Check file size.
 	if h.config.MaxFileSize > 0 && fileHeader.Size > h.config.MaxFileSize {
-		return response.Error(c, fiber.StatusBadRequest, "File too large")
+		return response.Error(c, fiber.StatusRequestEntityTooLarge, "File too large")
 	}
 
 	// Sanitize the filename to prevent path traversal attacks.

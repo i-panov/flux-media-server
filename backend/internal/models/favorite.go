@@ -12,5 +12,6 @@ type Favorite struct {
 	UserID    uint      `gorm:"uniqueIndex:idx_user_media;uniqueIndex:idx_user_artist" json:"user_id"`
 	MediaID   *uint     `gorm:"uniqueIndex:idx_user_media" json:"media_id,omitempty"`
 	ArtistID  *uint     `gorm:"uniqueIndex:idx_user_artist" json:"artist_id,omitempty"`
+	Media     *Media    `json:"media,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }

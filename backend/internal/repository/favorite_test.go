@@ -15,17 +15,20 @@ func TestFavoriteStore_CreateAndFindByUser(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	// Create media first so FK constraint is satisfied.
+	mediaID := uint(10)
+	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
+
 	store := NewFavoriteRepository(db)
 	ctx := context.Background()
 
-	mediaID := uint(10)
 	fav := &models.Favorite{
 		UserID:  1,
 		MediaID: &mediaID,
 	}
 	require.NoError(t, store.Create(ctx, fav))
 
-	favs, total, err := store.FindByUser(ctx, 1, 50, 0)
+	favs, total, err := store.FindByUser(ctx, 1, "", 50, 0)
 	assert.NoError(t, err)
 	assert.Len(t, favs, 1)
 	assert.Equal(t, int64(1), total)
@@ -36,10 +39,12 @@ func TestFavoriteStore_FindByUserAndMedia(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	mediaID := uint(10)
+	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
+
 	store := NewFavoriteRepository(db)
 	ctx := context.Background()
 
-	mediaID := uint(10)
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:  1,
 		MediaID: &mediaID,
@@ -56,10 +61,12 @@ func TestFavoriteStore_IsFavorited(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	mediaID := uint(10)
+	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
+
 	store := NewFavoriteRepository(db)
 	ctx := context.Background()
 
-	mediaID := uint(10)
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:  1,
 		MediaID: &mediaID,
@@ -79,10 +86,12 @@ func TestFavoriteStore_Delete(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	mediaID := uint(10)
+	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
+
 	store := NewFavoriteRepository(db)
 	ctx := context.Background()
 
-	mediaID := uint(10)
 	require.NoError(t, store.Create(ctx, &models.Favorite{
 		UserID:  1,
 		MediaID: &mediaID,

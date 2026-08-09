@@ -1,7 +1,11 @@
 package middleware
 
 import (
+	"errors"
+	"log"
+
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -18,7 +22,13 @@ func RequireAdmin(userRepo repository.UserRepository) fiber.Handler {
 
 		user, err := userRepo.FindByID(c.UserContext(), userID)
 		if err != nil {
-			return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+			}
+			// Database failure — log and return 500 so it is not masked
+			// as a simple 401.
+			log.Printf("RequireAdmin: FindByID %d: %v", userID, err)
+			return response.Error(c, fiber.StatusInternalServerError, "Internal server error")
 		}
 
 		if !user.IsAdmin {

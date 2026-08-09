@@ -6,6 +6,7 @@ import (
 	"flux/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ProgressStore struct {
@@ -29,6 +30,8 @@ func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, limit, offs
 	if offset > 0 {
 		query = query.Offset(offset)
 	}
+	// Stable pagination order — most recently watched first.
+	query = query.Order("updated_at DESC")
 	err := query.Find(&progress).Error
 	return progress, total, err
 }
@@ -39,8 +42,14 @@ func (r *ProgressStore) FindByUserAndMedia(ctx context.Context, userID, mediaID 
 	return &progress, err
 }
 
+// Upsert creates or updates watch progress using a true upsert (ON CONFLICT).
+// This avoids the UNIQUE violation that Save would cause on a race between
+// two concurrent creations for the same (user_id, media_id).
 func (r *ProgressStore) Upsert(ctx context.Context, progress *models.WatchProgress) error {
-	return r.db.WithContext(ctx).Save(progress).Error
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "media_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"position", "updated_at"}),
+	}).Create(progress).Error
 }
 
 func (r *ProgressStore) Delete(ctx context.Context, userID, mediaID uint) error {

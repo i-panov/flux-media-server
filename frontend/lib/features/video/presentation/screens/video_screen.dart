@@ -245,11 +245,12 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
                 leading: const Icon(Icons.search),
                 onChanged: (value) {
                   if (value.isEmpty) {
-                    ref.read(searchQueryProvider.notifier).state = '';
+                    ref.read(searchQueryProvider('video').notifier).state = '';
                   }
                 },
-                onSubmitted: (value) =>
-                    ref.read(searchQueryProvider.notifier).state = value,
+                onSubmitted: (value) {
+                  ref.read(searchQueryProvider('video').notifier).state = value;
+                },
               ),
             ),
           ),

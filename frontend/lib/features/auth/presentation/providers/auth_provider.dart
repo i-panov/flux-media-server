@@ -115,8 +115,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       ..invalidate(mediaListProvider('audio'))
       ..invalidate(favoritesProvider)
       ..invalidate(collectionsProvider)
-      ..invalidate(watchProgressProvider)
-      ..invalidate(settingsProvider);
+      ..invalidate(watchProgressProvider);
+    // Do NOT invalidate settingsProvider — it holds the serverUrl which is
+    // needed for the login screen to know where to send credentials.
     state = const AuthState.initial();
   }
 }

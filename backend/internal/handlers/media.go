@@ -196,7 +196,16 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Media not found")
 	}
 
-	// Delete file from disk.
+	// Delete the database record FIRST. If this fails the files remain on
+	// disk (safe — they can be cleaned up later). If we deleted files first
+	// and the DB delete failed, we'd be left with a "broken" record pointing
+	// to non-existent files.
+	if err := h.mediaRepo.Delete(ctx, uint(id)); err != nil {
+		log.Printf("Delete: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete media")
+	}
+
+	// Now safe to delete files from disk — the record is gone.
 	if media.FilePath != "" {
 		if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Delete: remove file %s: %v", media.FilePath, err)
@@ -215,12 +224,6 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 		if err := os.Remove(media.CoverURL); err != nil && !os.IsNotExist(err) {
 			log.Printf("Delete: remove cover %s: %v", media.CoverURL, err)
 		}
-	}
-
-	// Delete record from database.
-	if err := h.mediaRepo.Delete(ctx, uint(id)); err != nil {
-		log.Printf("Delete: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete media")
 	}
 
 	return c.JSON(fiber.Map{"message": "Media deleted successfully"})

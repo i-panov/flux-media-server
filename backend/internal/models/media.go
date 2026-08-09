@@ -17,7 +17,11 @@ type Media struct {
 	Album        string         `gorm:"index" json:"album"`
 	Genre        string         `json:"genre"`
 	Duration     int            `json:"duration"` // seconds
-	FilePath     string         `gorm:"uniqueIndex" json:"-"`
+	// FilePath is indexed (not unique): a unique index conflicts with soft
+	// delete — a file re-appearing after its record was soft-deleted would
+	// fail with a UNIQUE error and the media would be lost. Duplicate
+	// detection is done in the scanner via FindByPath/FindByHash.
+	FilePath string `gorm:"index" json:"-"`
 	FileSize     int64          `json:"file_size"`
 	FileHash     string         `gorm:"index" json:"file_hash"`
 	QuickHash    string         `gorm:"index" json:"quick_hash"`

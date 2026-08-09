@@ -39,16 +39,28 @@ func (r *RefreshTokenRepository) Create(ctx context.Context, userID uint, rawTok
 
 // RotateToken atomically finds a token by oldRawToken, deletes it, and
 // creates a new one — prevents TOCTOU races during refresh rotation.
+//
+// Replay protection: the Delete result's RowsAffected is checked. If two
+// parallel requests try to rotate the same token, only one can delete the
+// row (RowsAffected == 1) and create the new token. The loser either finds
+// no row (ErrRecordNotFound) or deletes 0 rows and the transaction fails —
+// in both cases no second valid token is created.
 func (r *RefreshTokenRepository) RotateToken(ctx context.Context, oldRawToken string, userID uint, newRawToken string, expiresAt time.Time) (*models.RefreshToken, error) {
 	var rt models.RefreshToken
 	oldHash := HashRefreshToken(oldRawToken)
 	newHash := HashRefreshToken(newRawToken)
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("token = ?", oldHash).First(&rt).Error; err != nil {
+		if err := tx.Where("token = ? AND user_id = ?", oldHash, userID).First(&rt).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("token = ?", oldHash).Delete(&models.RefreshToken{}).Error; err != nil {
-			return err
+		result := tx.Where("token = ?", oldHash).Delete(&models.RefreshToken{})
+		if result.Error != nil {
+			return result.Error
+		}
+		// RowsAffected == 0 means the token was already consumed by a
+		// parallel request — reject the replay.
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
 		}
 		return tx.Create(&models.RefreshToken{
 			UserID:    userID,
@@ -72,8 +84,10 @@ func (r *RefreshTokenRepository) DeleteByToken(ctx context.Context, rawToken str
 	return r.db.WithContext(ctx).Where("token = ?", HashRefreshToken(rawToken)).Delete(&models.RefreshToken{}).Error
 }
 
-func (r *RefreshTokenRepository) DeleteByID(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&models.RefreshToken{}, id).Error
+// DeleteByID deletes a refresh token by ID, scoped to the given userID to
+// prevent IDOR (revoking another user's token).
+func (r *RefreshTokenRepository) DeleteByID(ctx context.Context, id, userID uint) error {
+	return r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&models.RefreshToken{}).Error
 }
 
 func (r *RefreshTokenRepository) DeleteByUserID(ctx context.Context, userID uint) error {

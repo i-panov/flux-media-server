@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"flux/internal/models"
 
@@ -17,10 +16,15 @@ func NewFavoriteRepository(db *gorm.DB) *FavoriteStore {
 	return &FavoriteStore{db: db}
 }
 
-func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.Favorite, int64, error) {
+func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, mediaType string, limit, offset int) ([]models.Favorite, int64, error) {
 	var favs []models.Favorite
 	var total int64
 	query := r.db.WithContext(ctx).Model(&models.Favorite{}).Where("user_id = ?", userID)
+	if mediaType != "" {
+		// Filter media favorites by the media's type (video/audio).
+		query = query.Joins("JOIN media ON media.id = favorites.media_id").
+			Where("media.type = ? AND favorites.media_id IS NOT NULL", mediaType)
+	}
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -30,7 +34,11 @@ func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, limit, offs
 	if offset > 0 {
 		query = query.Offset(offset)
 	}
-	err := query.Find(&favs).Error
+	// Stable pagination order.
+	query = query.Order("favorites.id ASC")
+	// Preload the media object so the client does not need an N+1 request
+	// per favorite row.
+	err := query.Preload("Media").Find(&favs).Error
 	return favs, total, err
 }
 
@@ -75,7 +83,7 @@ func (r *FavoriteStore) Delete(ctx context.Context, userID, mediaID uint) error 
 		Where("user_id = ? AND media_id = ?", userID, mediaID).
 		Delete(&models.Favorite{})
 	if result.RowsAffected == 0 {
-		return errors.New("favorite not found")
+		return gorm.ErrRecordNotFound
 	}
 	return result.Error
 }
@@ -85,7 +93,7 @@ func (r *FavoriteStore) DeleteArtist(ctx context.Context, userID, artistID uint)
 		Where("user_id = ? AND artist_id = ?", userID, artistID).
 		Delete(&models.Favorite{})
 	if result.RowsAffected == 0 {
-		return errors.New("artist favorite not found")
+		return gorm.ErrRecordNotFound
 	}
 	return result.Error
 }

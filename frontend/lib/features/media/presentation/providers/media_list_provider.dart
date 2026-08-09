@@ -46,8 +46,10 @@ final deleteMediaProvider = Provider<DeleteMedia>((ref) {
   return DeleteMedia(ref.watch(mediaRepositoryProvider));
 });
 
-/// Current search query. Empty string means no search.
-final searchQueryProvider = StateProvider<String>((ref) => '');
+/// Current search query scoped to a media type ('video' or 'audio').
+/// Using a family avoids state leakage between audio/video tabs.
+final searchQueryProvider =
+    StateProvider.family<String, String>((ref, type) => '');
 
 /// Media list scoped to a media type ('video' or 'audio').
 /// Using a family avoids state leakage between audio/video tabs that
@@ -60,10 +62,12 @@ final mediaListProvider =
 class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
   static const _pageSize = 20;
 
+  bool _isLoadingMore = false;
+
   @override
   Future<MediaListResult> build(String type) async {
     final getMediaList = ref.watch(getMediaListProvider);
-    final q = ref.watch(searchQueryProvider);
+    final q = ref.watch(searchQueryProvider(type));
     final result = await getMediaList(
       GetMediaListParams(
         limit: _pageSize,
@@ -81,22 +85,44 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
     );
   }
 
+  /// Loads the next page of results.
+  ///
+  /// Guards against concurrent calls and stale query results:
+  /// - [_isLoadingMore] prevents duplicate requests with the same offset.
+  /// - Captures the query at call time and compares against the latest
+  ///   value after the async request completes; if the query changed, the
+  ///   result is discarded to avoid appending items from a previous search.
   Future<void> loadMore() async {
     final current = state.value;
     if (current == null || current.items.length >= current.total) return;
+    if (_isLoadingMore) return;
+
+    // Capture the query at call time.
+    final qAtCall = ref.read(searchQueryProvider(arg));
+    _isLoadingMore = true;
+
     final getMediaList = ref.read(getMediaListProvider);
-    final q = ref.read(searchQueryProvider);
     final result = await getMediaList(
       GetMediaListParams(
         limit: _pageSize,
         offset: current.items.length,
-        q: q.isEmpty ? null : q,
+        q: qAtCall.isEmpty ? null : qAtCall,
         type: arg,
       ),
     );
+
+    _isLoadingMore = false;
+
+    // If the query changed during the async request, discard the result.
+    final qNow = ref.read(searchQueryProvider(arg));
+    if (qNow != qAtCall) return;
+
     result.fold(
-      (failure) =>
-          state = AsyncError(Exception(failure.message), StackTrace.current),
+      (failure) {
+        // Don't replace the whole state on loadMore failure — keep the
+        // existing data and show an error overlay instead.
+        state = state.copyWithPrevious(state);
+      },
       (data) => state = AsyncValue.data(
         MediaListResult(
           items: current.items.addAll(data.items),

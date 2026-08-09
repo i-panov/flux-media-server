@@ -108,13 +108,22 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
   Future<void> _save() async {
     setState(() => _isSaving = true);
     final upsert = ref.read(upsertLyricsProvider);
+
+    // Preserve existing translation and sync_data — the user may only be
+    // editing the lyrics text and we don't want to overwrite those fields.
+    final lyricsState = ref.read(lyricsProvider(widget.media.id));
+    final existingLyrics = lyricsState.valueOrNull;
+
     final result = await upsert(
       UpsertLyricsParams(
         mediaId: widget.media.id,
         lyricsText: _controller.text,
+        translation: existingLyrics?.translation,
+        syncData: existingLyrics?.syncData,
         source: 'user',
       ),
     );
+    if (!mounted) return;
     setState(() => _isSaving = false);
     result.fold(
       (failure) {
@@ -373,6 +382,7 @@ class _TranslationTabState extends ConsumerState<_TranslationTab> {
         source: existing?.source ?? 'user',
       ),
     );
+    if (!mounted) return;
     setState(() => _isSaving = false);
     result.fold(
       (failure) {

@@ -87,6 +87,11 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
+	mediaType := c.Query("type")
+	if mediaType != "" && !isValidMediaType(mediaType) {
+		return response.Error(c, fiber.StatusBadRequest, "invalid type")
+	}
+
 	limit := c.QueryInt("limit", 50)
 	offset := c.QueryInt("offset", 0)
 	if limit <= 0 {
@@ -100,7 +105,7 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 	}
 
 	ctx := c.UserContext()
-	favs, total, err := h.favRepo.FindByUser(ctx, userID, limit, offset)
+	favs, total, err := h.favRepo.FindByUser(ctx, userID, mediaType, limit, offset)
 	if err != nil {
 		log.Printf("FindByUser favorites: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch favorites")
@@ -133,6 +138,15 @@ func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 
 	ctx := c.UserContext()
 
+	// Verify the artist exists before creating the favorite.
+	if _, err := h.artistRepo.FindByID(ctx, req.ArtistID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.Error(c, fiber.StatusNotFound, "Artist not found")
+		}
+		log.Printf("FindByID artist: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to add artist favorite")
+	}
+
 	artistID := req.ArtistID
 	fav := &models.Favorite{
 		UserID:   userID,
@@ -162,6 +176,9 @@ func (h *FavoriteHandler) RemoveArtistFavorite(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	if err := h.favRepo.DeleteArtist(ctx, userID, uint(artistID)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.Error(c, fiber.StatusNotFound, "Artist favorite not found")
+		}
 		log.Printf("DeleteArtist favorite: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to remove artist favorite")
 	}

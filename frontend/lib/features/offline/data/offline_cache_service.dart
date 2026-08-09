@@ -181,12 +181,18 @@ class OfflineCacheService {
   }
 
   /// Removes a downloaded media file, its metadata and lyrics.
+  /// Also cleans up any incomplete `.part` files.
   Future<void> remove(int mediaId) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/${_fileName(mediaId)}');
       if (file.existsSync()) {
         file.deleteSync();
+      }
+      // Clean up partial download file.
+      final partFile = File('${dir.path}/${_fileName(mediaId)}.part');
+      if (partFile.existsSync()) {
+        partFile.deleteSync();
       }
       await _prefs.remove(_metaKey(mediaId));
       await _prefs.remove(_lyricsKey(mediaId));
@@ -205,7 +211,7 @@ class OfflineCacheService {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final files = dir.listSync();
-      final pattern = RegExp(r'flux_media_(\d+)');
+      final pattern = RegExp(r'flux_media_(\d+)\.mp4$');
       final ids = <int>[];
       for (final f in files) {
         final match = pattern.firstMatch(f.path);

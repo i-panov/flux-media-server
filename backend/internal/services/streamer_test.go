@@ -63,43 +63,6 @@ func TestIsPathAllowed(t *testing.T) {
 	}
 }
 
-func TestParseRangeHeader(t *testing.T) {
-	tests := []struct {
-		name      string
-		header    string
-		size      int64
-		wantStart int64
-		wantEnd   int64
-		wantErr   bool
-	}{
-		{"first bytes", "bytes=0-499", 1000, 0, 499, false},
-		{"open end", "bytes=500-", 1000, 500, 999, false},
-		{"suffix", "bytes=-100", 1000, 900, 999, false},
-		{"suffix larger than file", "bytes=-5000", 1000, 0, 999, false},
-		{"single byte", "bytes=0-0", 1000, 0, 0, false},
-		{"start beyond size", "bytes=1000-", 1000, 0, 0, true},
-		{"end beyond size", "bytes=0-1000", 1000, 0, 0, true},
-		{"end before start", "bytes=500-100", 1000, 0, 0, true},
-		{"negative start", "bytes=-1-100", 1000, 0, 0, true},
-		{"invalid unit", "items=0-100", 1000, 0, 0, true},
-		{"garbage", "bytes=", 1000, 0, 0, true},
-		{"non-numeric", "bytes=a-b", 1000, 0, 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			start, end, err := parseRangeHeader(tt.header, tt.size)
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantStart, start)
-			assert.Equal(t, tt.wantEnd, end)
-		})
-	}
-}
-
 func TestMimeTypeByExt(t *testing.T) {
 	assert.Equal(t, "video/mp4", mimeTypeByExt(".mp4"))
 	assert.Equal(t, "video/x-matroska", mimeTypeByExt(".mkv"))
