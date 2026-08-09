@@ -119,23 +119,31 @@ func (s *ScannerService) ScanPath(ctx context.Context, path string, mediaType mo
 
 // sweepDeleted removes media records under the given path whose files were
 // not seen during the scan (i.e. deleted from disk).
+// Uses pagination to avoid loading the entire table at once.
 func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen map[string]struct{}) error {
-	all, _, err := s.mediaRepo.FindAll(ctx, map[string]interface{}{}, 0, 0)
-	if err != nil {
-		return err
-	}
+	const pageSize = 200
+	offset := 0
 
-	for _, m := range all {
-		if !IsSubPath(scanPath, m.FilePath) {
-			continue
+	for {
+		mediaList, total, err := s.mediaRepo.FindByPathPrefix(ctx, scanPath, pageSize, offset)
+		if err != nil {
+			return err
 		}
-		if _, ok := seen[m.FilePath]; !ok {
-			if err := s.mediaRepo.Delete(ctx, m.ID); err != nil {
-				log.Printf("Sweep: delete media %d (%s): %v", m.ID, m.FilePath, err)
-			} else {
-				log.Printf("Sweep: removed missing file: %s", m.FilePath)
+
+		for _, m := range mediaList {
+			if _, ok := seen[m.FilePath]; !ok {
+				if err := s.mediaRepo.Delete(ctx, m.ID); err != nil {
+					log.Printf("Sweep: delete media %d (%s): %v", m.ID, m.FilePath, err)
+				} else {
+					log.Printf("Sweep: removed missing file: %s", m.FilePath)
+				}
 			}
 		}
+
+		if int64(offset+pageSize) >= total {
+			break
+		}
+		offset += pageSize
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/audio/presentation/screens/artist_page.dart';
 import 'package:flux_media_server/features/audio/presentation/screens/audio_screen.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/code_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/login_screen.dart';
 import 'package:flux_media_server/features/collections/presentation/screens/collection_detail_screen.dart';
@@ -158,7 +159,7 @@ class _WideLayout extends StatelessWidget {
               Expanded(
                 child: Column(
                   children: [
-                    if (isOffline) _offlineBanner(context),
+                    if (isOffline) const _OfflineBanner(),
                     Expanded(child: child),
                     const AudioMiniPlayer(),
                   ],
@@ -172,26 +173,35 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
-Widget _offlineBanner(BuildContext context) {
-  final l = AppLocalizations.of(context)!;
-  return MaterialBanner(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    leading: const Icon(Icons.cloud_off, color: Colors.white),
-    backgroundColor: Colors.orange.shade800,
-    content: Text(
-      l.offlineMode,
-      style: const TextStyle(color: Colors.white),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () {},
-        child: Text(
-          l.retry,
-          style: const TextStyle(color: Colors.white),
-        ),
+/// Offline mode banner that shows when the server is unreachable.
+class _OfflineBanner extends ConsumerWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
+    return MaterialBanner(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: const Icon(Icons.cloud_off, color: Colors.white),
+      backgroundColor: Colors.orange.shade800,
+      content: Text(
+        l.offlineMode,
+        style: const TextStyle(color: Colors.white),
       ),
-    ],
-  );
+      actions: [
+        TextButton(
+          onPressed: () {
+            // Retry: re-check auth status to see if server is back.
+            ref.invalidate(authProvider);
+          },
+          child: Text(
+            l.retry,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Mobile layout with bottom NavigationBar.
@@ -214,7 +224,7 @@ class _NarrowLayout extends StatelessWidget {
         return Scaffold(
           body: Column(
             children: [
-              if (isOffline) _offlineBanner(context),
+              if (isOffline) const _OfflineBanner(),
               Expanded(child: child),
             ],
           ),

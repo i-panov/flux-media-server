@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:chopper/chopper.dart';
 import 'package:flux_media_server/core/network/interceptors/auth_interceptor.dart';
@@ -12,10 +11,6 @@ import 'package:http/io_client.dart' show IOClient;
 
 part 'api_client.chopper.dart';
 
-http.Client _createHttpClient() {
-  return _TimeoutHttpClient();
-}
-
 class _TimeoutHttpClient extends http.BaseClient {
   _TimeoutHttpClient()
       : _inner = IOClient(
@@ -25,11 +20,23 @@ class _TimeoutHttpClient extends http.BaseClient {
   final http.Client _inner;
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    if (request is http.MultipartRequest) {
-      return _inner.send(request);
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    try {
+      if (request is http.MultipartRequest) {
+        // Multipart uploads can be large — use longer timeout.
+        return _inner.send(request).timeout(const Duration(seconds: 120));
+      }
+      return _inner.send(request).timeout(const Duration(seconds: 30));
+    } finally {
+      // The inner HttpClient is created once per _TimeoutHttpClient instance
+      // and reused across requests. It should NOT be closed per-request.
     }
-    return _inner.send(request).timeout(const Duration(seconds: 30));
+  }
+
+  /// Close the inner HttpClient to release sockets.
+  @override
+  void close() {
+    _inner.close();
   }
 }
 
@@ -43,7 +50,7 @@ abstract class ApiClient extends ChopperService {
     final client = ChopperClient(
       baseUrl: Uri.parse(baseUrl ?? 'http://localhost:8080/api'),
       services: [_$ApiClient()],
-      client: _createHttpClient(),
+      client: _TimeoutHttpClient(),
       converter: const JsonConverter(),
       interceptors: [
         if (authInterceptor != null) authInterceptor,
@@ -100,9 +107,6 @@ abstract class ApiClient extends ChopperService {
     @Part('media_type') String mediaType,
     @PartFile('file') MultipartFile file,
   );
-
-  @Get(path: '/media/{id}/thumb')
-  Future<Response<Uint8List>> getThumbnail(@Path('id') int id);
 
   @Put(path: '/media/{id}/cover')
   @multipart

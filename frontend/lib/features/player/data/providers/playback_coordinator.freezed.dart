@@ -29,6 +29,8 @@ mixin _$PlaybackState {
             Duration? savedPosition)
         playing,
     required TResult Function() completed,
+    required TResult Function() loading,
+    required TResult Function(String message) error,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -44,6 +46,8 @@ mixin _$PlaybackState {
             Duration? savedPosition)?
         playing,
     TResult? Function()? completed,
+    TResult? Function()? loading,
+    TResult? Function(String message)? error,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -53,6 +57,8 @@ mixin _$PlaybackState {
             Duration? duration, double speed, Duration? savedPosition)?
         playing,
     TResult Function()? completed,
+    TResult Function()? loading,
+    TResult Function(String message)? error,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -61,6 +67,8 @@ mixin _$PlaybackState {
     required TResult Function(PlaybackInitial value) initial,
     required TResult Function(PlaybackPlaying value) playing,
     required TResult Function(PlaybackCompleted value) completed,
+    required TResult Function(PlaybackLoading value) loading,
+    required TResult Function(PlaybackError value) error,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -68,6 +76,8 @@ mixin _$PlaybackState {
     TResult? Function(PlaybackInitial value)? initial,
     TResult? Function(PlaybackPlaying value)? playing,
     TResult? Function(PlaybackCompleted value)? completed,
+    TResult? Function(PlaybackLoading value)? loading,
+    TResult? Function(PlaybackError value)? error,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -75,6 +85,8 @@ mixin _$PlaybackState {
     TResult Function(PlaybackInitial value)? initial,
     TResult Function(PlaybackPlaying value)? playing,
     TResult Function(PlaybackCompleted value)? completed,
+    TResult Function(PlaybackLoading value)? loading,
+    TResult Function(PlaybackError value)? error,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -147,6 +159,8 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
             Duration? savedPosition)
         playing,
     required TResult Function() completed,
+    required TResult Function() loading,
+    required TResult Function(String message) error,
   }) {
     return initial();
   }
@@ -165,6 +179,8 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
             Duration? savedPosition)?
         playing,
     TResult? Function()? completed,
+    TResult? Function()? loading,
+    TResult? Function(String message)? error,
   }) {
     return initial?.call();
   }
@@ -177,6 +193,8 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
             Duration? duration, double speed, Duration? savedPosition)?
         playing,
     TResult Function()? completed,
+    TResult Function()? loading,
+    TResult Function(String message)? error,
     required TResult orElse(),
   }) {
     if (initial != null) {
@@ -191,6 +209,8 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
     required TResult Function(PlaybackInitial value) initial,
     required TResult Function(PlaybackPlaying value) playing,
     required TResult Function(PlaybackCompleted value) completed,
+    required TResult Function(PlaybackLoading value) loading,
+    required TResult Function(PlaybackError value) error,
   }) {
     return initial(this);
   }
@@ -201,6 +221,8 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
     TResult? Function(PlaybackInitial value)? initial,
     TResult? Function(PlaybackPlaying value)? playing,
     TResult? Function(PlaybackCompleted value)? completed,
+    TResult? Function(PlaybackLoading value)? loading,
+    TResult? Function(PlaybackError value)? error,
   }) {
     return initial?.call(this);
   }
@@ -211,6 +233,8 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
     TResult Function(PlaybackInitial value)? initial,
     TResult Function(PlaybackPlaying value)? playing,
     TResult Function(PlaybackCompleted value)? completed,
+    TResult Function(PlaybackLoading value)? loading,
+    TResult Function(PlaybackError value)? error,
     required TResult orElse(),
   }) {
     if (initial != null) {
@@ -381,6 +405,8 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
             Duration? savedPosition)
         playing,
     required TResult Function() completed,
+    required TResult Function() loading,
+    required TResult Function(String message) error,
   }) {
     return playing(
         media, type, isPaused, position, duration, speed, savedPosition);
@@ -400,6 +426,8 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
             Duration? savedPosition)?
         playing,
     TResult? Function()? completed,
+    TResult? Function()? loading,
+    TResult? Function(String message)? error,
   }) {
     return playing?.call(
         media, type, isPaused, position, duration, speed, savedPosition);
@@ -413,6 +441,8 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
             Duration? duration, double speed, Duration? savedPosition)?
         playing,
     TResult Function()? completed,
+    TResult Function()? loading,
+    TResult Function(String message)? error,
     required TResult orElse(),
   }) {
     if (playing != null) {
@@ -428,6 +458,8 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
     required TResult Function(PlaybackInitial value) initial,
     required TResult Function(PlaybackPlaying value) playing,
     required TResult Function(PlaybackCompleted value) completed,
+    required TResult Function(PlaybackLoading value) loading,
+    required TResult Function(PlaybackError value) error,
   }) {
     return playing(this);
   }
@@ -438,6 +470,8 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
     TResult? Function(PlaybackInitial value)? initial,
     TResult? Function(PlaybackPlaying value)? playing,
     TResult? Function(PlaybackCompleted value)? completed,
+    TResult? Function(PlaybackLoading value)? loading,
+    TResult? Function(PlaybackError value)? error,
   }) {
     return playing?.call(this);
   }
@@ -448,6 +482,8 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
     TResult Function(PlaybackInitial value)? initial,
     TResult Function(PlaybackPlaying value)? playing,
     TResult Function(PlaybackCompleted value)? completed,
+    TResult Function(PlaybackLoading value)? loading,
+    TResult Function(PlaybackError value)? error,
     required TResult orElse(),
   }) {
     if (playing != null) {
@@ -528,6 +564,8 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
             Duration? savedPosition)
         playing,
     required TResult Function() completed,
+    required TResult Function() loading,
+    required TResult Function(String message) error,
   }) {
     return completed();
   }
@@ -546,6 +584,8 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
             Duration? savedPosition)?
         playing,
     TResult? Function()? completed,
+    TResult? Function()? loading,
+    TResult? Function(String message)? error,
   }) {
     return completed?.call();
   }
@@ -558,6 +598,8 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
             Duration? duration, double speed, Duration? savedPosition)?
         playing,
     TResult Function()? completed,
+    TResult Function()? loading,
+    TResult Function(String message)? error,
     required TResult orElse(),
   }) {
     if (completed != null) {
@@ -572,6 +614,8 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
     required TResult Function(PlaybackInitial value) initial,
     required TResult Function(PlaybackPlaying value) playing,
     required TResult Function(PlaybackCompleted value) completed,
+    required TResult Function(PlaybackLoading value) loading,
+    required TResult Function(PlaybackError value) error,
   }) {
     return completed(this);
   }
@@ -582,6 +626,8 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
     TResult? Function(PlaybackInitial value)? initial,
     TResult? Function(PlaybackPlaying value)? playing,
     TResult? Function(PlaybackCompleted value)? completed,
+    TResult? Function(PlaybackLoading value)? loading,
+    TResult? Function(PlaybackError value)? error,
   }) {
     return completed?.call(this);
   }
@@ -592,6 +638,8 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
     TResult Function(PlaybackInitial value)? initial,
     TResult Function(PlaybackPlaying value)? playing,
     TResult Function(PlaybackCompleted value)? completed,
+    TResult Function(PlaybackLoading value)? loading,
+    TResult Function(PlaybackError value)? error,
     required TResult orElse(),
   }) {
     if (completed != null) {
@@ -603,4 +651,312 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
 
 abstract class PlaybackCompleted implements PlaybackState {
   const factory PlaybackCompleted() = _$PlaybackCompletedImpl;
+}
+
+/// @nodoc
+abstract class _$$PlaybackLoadingImplCopyWith<$Res> {
+  factory _$$PlaybackLoadingImplCopyWith(_$PlaybackLoadingImpl value,
+          $Res Function(_$PlaybackLoadingImpl) then) =
+      __$$PlaybackLoadingImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$PlaybackLoadingImplCopyWithImpl<$Res>
+    extends _$PlaybackStateCopyWithImpl<$Res, _$PlaybackLoadingImpl>
+    implements _$$PlaybackLoadingImplCopyWith<$Res> {
+  __$$PlaybackLoadingImplCopyWithImpl(
+      _$PlaybackLoadingImpl _value, $Res Function(_$PlaybackLoadingImpl) _then)
+      : super(_value, _then);
+}
+
+/// @nodoc
+
+class _$PlaybackLoadingImpl implements PlaybackLoading {
+  const _$PlaybackLoadingImpl();
+
+  @override
+  String toString() {
+    return 'PlaybackState.loading()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType && other is _$PlaybackLoadingImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() initial,
+    required TResult Function(
+            Media media,
+            String type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)
+        playing,
+    required TResult Function() completed,
+    required TResult Function() loading,
+    required TResult Function(String message) error,
+  }) {
+    return loading();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? initial,
+    TResult? Function(
+            Media media,
+            String type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
+        playing,
+    TResult? Function()? completed,
+    TResult? Function()? loading,
+    TResult? Function(String message)? error,
+  }) {
+    return loading?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? initial,
+    TResult Function(Media media, String type, bool isPaused, Duration position,
+            Duration? duration, double speed, Duration? savedPosition)?
+        playing,
+    TResult Function()? completed,
+    TResult Function()? loading,
+    TResult Function(String message)? error,
+    required TResult orElse(),
+  }) {
+    if (loading != null) {
+      return loading();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PlaybackInitial value) initial,
+    required TResult Function(PlaybackPlaying value) playing,
+    required TResult Function(PlaybackCompleted value) completed,
+    required TResult Function(PlaybackLoading value) loading,
+    required TResult Function(PlaybackError value) error,
+  }) {
+    return loading(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PlaybackInitial value)? initial,
+    TResult? Function(PlaybackPlaying value)? playing,
+    TResult? Function(PlaybackCompleted value)? completed,
+    TResult? Function(PlaybackLoading value)? loading,
+    TResult? Function(PlaybackError value)? error,
+  }) {
+    return loading?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PlaybackInitial value)? initial,
+    TResult Function(PlaybackPlaying value)? playing,
+    TResult Function(PlaybackCompleted value)? completed,
+    TResult Function(PlaybackLoading value)? loading,
+    TResult Function(PlaybackError value)? error,
+    required TResult orElse(),
+  }) {
+    if (loading != null) {
+      return loading(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class PlaybackLoading implements PlaybackState {
+  const factory PlaybackLoading() = _$PlaybackLoadingImpl;
+}
+
+/// @nodoc
+abstract class _$$PlaybackErrorImplCopyWith<$Res> {
+  factory _$$PlaybackErrorImplCopyWith(
+          _$PlaybackErrorImpl value, $Res Function(_$PlaybackErrorImpl) then) =
+      __$$PlaybackErrorImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String message});
+}
+
+/// @nodoc
+class __$$PlaybackErrorImplCopyWithImpl<$Res>
+    extends _$PlaybackStateCopyWithImpl<$Res, _$PlaybackErrorImpl>
+    implements _$$PlaybackErrorImplCopyWith<$Res> {
+  __$$PlaybackErrorImplCopyWithImpl(
+      _$PlaybackErrorImpl _value, $Res Function(_$PlaybackErrorImpl) _then)
+      : super(_value, _then);
+
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? message = null,
+  }) {
+    return _then(_$PlaybackErrorImpl(
+      message: null == message
+          ? _value.message
+          : message // ignore: cast_nullable_to_non_nullable
+              as String,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$PlaybackErrorImpl implements PlaybackError {
+  const _$PlaybackErrorImpl({required this.message});
+
+  @override
+  final String message;
+
+  @override
+  String toString() {
+    return 'PlaybackState.error(message: $message)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PlaybackErrorImpl &&
+            (identical(other.message, message) || other.message == message));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, message);
+
+  @JsonKey(ignore: true)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PlaybackErrorImplCopyWith<_$PlaybackErrorImpl> get copyWith =>
+      __$$PlaybackErrorImplCopyWithImpl<_$PlaybackErrorImpl>(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() initial,
+    required TResult Function(
+            Media media,
+            String type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)
+        playing,
+    required TResult Function() completed,
+    required TResult Function() loading,
+    required TResult Function(String message) error,
+  }) {
+    return error(message);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? initial,
+    TResult? Function(
+            Media media,
+            String type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
+        playing,
+    TResult? Function()? completed,
+    TResult? Function()? loading,
+    TResult? Function(String message)? error,
+  }) {
+    return error?.call(message);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? initial,
+    TResult Function(Media media, String type, bool isPaused, Duration position,
+            Duration? duration, double speed, Duration? savedPosition)?
+        playing,
+    TResult Function()? completed,
+    TResult Function()? loading,
+    TResult Function(String message)? error,
+    required TResult orElse(),
+  }) {
+    if (error != null) {
+      return error(message);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(PlaybackInitial value) initial,
+    required TResult Function(PlaybackPlaying value) playing,
+    required TResult Function(PlaybackCompleted value) completed,
+    required TResult Function(PlaybackLoading value) loading,
+    required TResult Function(PlaybackError value) error,
+  }) {
+    return error(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(PlaybackInitial value)? initial,
+    TResult? Function(PlaybackPlaying value)? playing,
+    TResult? Function(PlaybackCompleted value)? completed,
+    TResult? Function(PlaybackLoading value)? loading,
+    TResult? Function(PlaybackError value)? error,
+  }) {
+    return error?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(PlaybackInitial value)? initial,
+    TResult Function(PlaybackPlaying value)? playing,
+    TResult Function(PlaybackCompleted value)? completed,
+    TResult Function(PlaybackLoading value)? loading,
+    TResult Function(PlaybackError value)? error,
+    required TResult orElse(),
+  }) {
+    if (error != null) {
+      return error(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class PlaybackError implements PlaybackState {
+  const factory PlaybackError({required final String message}) =
+      _$PlaybackErrorImpl;
+
+  String get message;
+  @JsonKey(ignore: true)
+  _$$PlaybackErrorImplCopyWith<_$PlaybackErrorImpl> get copyWith =>
+      throw _privateConstructorUsedError;
 }

@@ -22,6 +22,7 @@ type MediaRepository interface {
 	FindByID(ctx context.Context, id uint) (*models.Media, error)
 	FindByPath(ctx context.Context, path string) (*models.Media, error)
 	FindByHash(ctx context.Context, hash string) (*models.Media, error)
+	FindByPathPrefix(ctx context.Context, prefix string, limit, offset int) ([]models.Media, int64, error)
 	Create(ctx context.Context, media *models.Media) error
 	Update(ctx context.Context, media *models.Media) error
 	Delete(ctx context.Context, id uint) error

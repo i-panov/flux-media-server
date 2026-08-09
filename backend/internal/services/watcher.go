@@ -37,12 +37,15 @@ func (w *WatcherService) StartWithPaths(paths []string) error {
 	if err != nil {
 		return err
 	}
+
+	w.mu.Lock()
 	w.watcher = watcher
+	w.mu.Unlock()
 
 	go w.loop()
 
 	for _, p := range paths {
-		w.addPath(p)
+		w.AddPath(p)
 	}
 
 	log.Printf("watcher: started, watching %d paths", len(paths))
@@ -51,40 +54,39 @@ func (w *WatcherService) StartWithPaths(paths []string) error {
 
 // AddPath adds a directory to watch.
 func (w *WatcherService) AddPath(path string) {
-	w.addPath(path)
-}
-
-// RemovePath removes a directory from watch.
-func (w *WatcherService) RemovePath(path string) {
-	if w.watcher != nil {
-		w.watcher.Remove(path)
-	}
-	log.Printf("watcher: stopped watching %s", path)
-}
-
-// Stop stops the watcher.
-func (w *WatcherService) Stop() {
-	w.cancel()
-	if w.watcher != nil {
-		w.watcher.Close()
-	}
 	w.mu.Lock()
-	if w.debounce != nil {
-		w.debounce.Stop()
-		w.debounce = nil
-	}
+	watcher := w.watcher
 	w.mu.Unlock()
-	log.Println("watcher: stopped")
-}
-
-func (w *WatcherService) addPath(path string) {
-	if w.watcher != nil {
-		if err := w.watcher.Add(path); err != nil {
+	if watcher != nil {
+		if err := watcher.Add(path); err != nil {
 			log.Printf("watcher: add path %s: %v", path, err)
 		} else {
 			log.Printf("watcher: watching %s", path)
 		}
 	}
+}
+
+// RemovePath removes a directory from watch.
+func (w *WatcherService) RemovePath(path string) {
+	w.mu.Lock()
+	watcher := w.watcher
+	w.mu.Unlock()
+	if watcher != nil {
+		watcher.Remove(path)
+	}
+	log.Printf("watcher: stopped watching %s", path)
+}
+
+// Stop stops the watcher and releases resources.
+func (w *WatcherService) Stop() {
+	w.cancel()
+	w.mu.Lock()
+	watcher := w.watcher
+	w.mu.Unlock()
+	if watcher != nil {
+		watcher.Close()
+	}
+	log.Println("watcher: stopped")
 }
 
 func (w *WatcherService) loop() {

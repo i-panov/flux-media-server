@@ -156,17 +156,6 @@ final class _$ApiClient extends ApiClient {
   }
 
   @override
-  Future<Response<Uint8List>> getThumbnail(int id) {
-    final Uri $url = Uri.parse('/media/${id}/thumb');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
-    return client.send<Uint8List, Uint8List>($request);
-  }
-
-  @override
   Future<Response<Map<String, dynamic>>> uploadCover(
     int id,
     MultipartFile cover,

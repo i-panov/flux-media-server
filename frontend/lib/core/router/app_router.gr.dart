@@ -20,9 +20,9 @@ abstract class _$AppRouter extends RootStackRouter {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
         child: ArtistPage(
-          key: args.key,
           artistId: args.artistId,
           artistName: args.artistName,
+          key: args.key,
         ),
       );
     },
@@ -31,8 +31,8 @@ abstract class _$AppRouter extends RootStackRouter {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
         child: AudioPlayerScreen(
-          key: args.key,
           media: args.media,
+          key: args.key,
         ),
       );
     },
@@ -47,8 +47,8 @@ abstract class _$AppRouter extends RootStackRouter {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
         child: CodeScreen(
-          key: args.key,
           email: args.email,
+          key: args.key,
           debugCode: args.debugCode,
         ),
       );
@@ -58,8 +58,8 @@ abstract class _$AppRouter extends RootStackRouter {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
         child: CollectionDetailScreen(
-          key: args.key,
           collection: args.collection,
+          key: args.key,
         ),
       );
     },
@@ -80,8 +80,8 @@ abstract class _$AppRouter extends RootStackRouter {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
         child: MediaDetailScreen(
-          key: args.key,
           mediaId: args.mediaId,
+          key: args.key,
         ),
       );
     },
@@ -90,8 +90,8 @@ abstract class _$AppRouter extends RootStackRouter {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
         child: PlayerScreen(
-          key: args.key,
           media: args.media,
+          key: args.key,
         ),
       );
     },
@@ -112,8 +112,8 @@ abstract class _$AppRouter extends RootStackRouter {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
         child: UploadScreen(
-          key: args.key,
           mediaType: args.mediaType,
+          key: args.key,
         ),
       );
     },
@@ -130,16 +130,16 @@ abstract class _$AppRouter extends RootStackRouter {
 /// [ArtistPage]
 class ArtistRoute extends PageRouteInfo<ArtistRouteArgs> {
   ArtistRoute({
-    Key? key,
     required int artistId,
     required String artistName,
+    Key? key,
     List<PageRouteInfo>? children,
   }) : super(
           ArtistRoute.name,
           args: ArtistRouteArgs(
-            key: key,
             artistId: artistId,
             artistName: artistName,
+            key: key,
           ),
           initialChildren: children,
         );
@@ -151,20 +151,20 @@ class ArtistRoute extends PageRouteInfo<ArtistRouteArgs> {
 
 class ArtistRouteArgs {
   const ArtistRouteArgs({
-    this.key,
     required this.artistId,
     required this.artistName,
+    this.key,
   });
-
-  final Key? key;
 
   final int artistId;
 
   final String artistName;
 
+  final Key? key;
+
   @override
   String toString() {
-    return 'ArtistRouteArgs{key: $key, artistId: $artistId, artistName: $artistName}';
+    return 'ArtistRouteArgs{artistId: $artistId, artistName: $artistName, key: $key}';
   }
 }
 
@@ -172,14 +172,14 @@ class ArtistRouteArgs {
 /// [AudioPlayerScreen]
 class AudioPlayerRoute extends PageRouteInfo<AudioPlayerRouteArgs> {
   AudioPlayerRoute({
-    Key? key,
     required Media media,
+    Key? key,
     List<PageRouteInfo>? children,
   }) : super(
           AudioPlayerRoute.name,
           args: AudioPlayerRouteArgs(
-            key: key,
             media: media,
+            key: key,
           ),
           initialChildren: children,
         );
@@ -192,17 +192,17 @@ class AudioPlayerRoute extends PageRouteInfo<AudioPlayerRouteArgs> {
 
 class AudioPlayerRouteArgs {
   const AudioPlayerRouteArgs({
-    this.key,
     required this.media,
+    this.key,
   });
-
-  final Key? key;
 
   final Media media;
 
+  final Key? key;
+
   @override
   String toString() {
-    return 'AudioPlayerRouteArgs{key: $key, media: $media}';
+    return 'AudioPlayerRouteArgs{media: $media, key: $key}';
   }
 }
 
@@ -224,15 +224,15 @@ class AudioRoute extends PageRouteInfo<void> {
 /// [CodeScreen]
 class CodeRoute extends PageRouteInfo<CodeRouteArgs> {
   CodeRoute({
-    Key? key,
     required String email,
+    Key? key,
     String? debugCode,
     List<PageRouteInfo>? children,
   }) : super(
           CodeRoute.name,
           args: CodeRouteArgs(
-            key: key,
             email: email,
+            key: key,
             debugCode: debugCode,
           ),
           initialChildren: children,
@@ -245,20 +245,20 @@ class CodeRoute extends PageRouteInfo<CodeRouteArgs> {
 
 class CodeRouteArgs {
   const CodeRouteArgs({
-    this.key,
     required this.email,
+    this.key,
     this.debugCode,
   });
 
-  final Key? key;
-
   final String email;
+
+  final Key? key;
 
   final String? debugCode;
 
   @override
   String toString() {
-    return 'CodeRouteArgs{key: $key, email: $email, debugCode: $debugCode}';
+    return 'CodeRouteArgs{email: $email, key: $key, debugCode: $debugCode}';
   }
 }
 
@@ -266,14 +266,14 @@ class CodeRouteArgs {
 /// [CollectionDetailScreen]
 class CollectionDetailRoute extends PageRouteInfo<CollectionDetailRouteArgs> {
   CollectionDetailRoute({
-    Key? key,
     required Collection collection,
+    Key? key,
     List<PageRouteInfo>? children,
   }) : super(
           CollectionDetailRoute.name,
           args: CollectionDetailRouteArgs(
-            key: key,
             collection: collection,
+            key: key,
           ),
           initialChildren: children,
         );
@@ -286,17 +286,17 @@ class CollectionDetailRoute extends PageRouteInfo<CollectionDetailRouteArgs> {
 
 class CollectionDetailRouteArgs {
   const CollectionDetailRouteArgs({
-    this.key,
     required this.collection,
+    this.key,
   });
-
-  final Key? key;
 
   final Collection collection;
 
+  final Key? key;
+
   @override
   String toString() {
-    return 'CollectionDetailRouteArgs{key: $key, collection: $collection}';
+    return 'CollectionDetailRouteArgs{collection: $collection, key: $key}';
   }
 }
 
@@ -332,14 +332,14 @@ class MainRoute extends PageRouteInfo<void> {
 /// [MediaDetailScreen]
 class MediaDetailRoute extends PageRouteInfo<MediaDetailRouteArgs> {
   MediaDetailRoute({
-    Key? key,
     required int mediaId,
+    Key? key,
     List<PageRouteInfo>? children,
   }) : super(
           MediaDetailRoute.name,
           args: MediaDetailRouteArgs(
-            key: key,
             mediaId: mediaId,
+            key: key,
           ),
           initialChildren: children,
         );
@@ -352,17 +352,17 @@ class MediaDetailRoute extends PageRouteInfo<MediaDetailRouteArgs> {
 
 class MediaDetailRouteArgs {
   const MediaDetailRouteArgs({
-    this.key,
     required this.mediaId,
+    this.key,
   });
-
-  final Key? key;
 
   final int mediaId;
 
+  final Key? key;
+
   @override
   String toString() {
-    return 'MediaDetailRouteArgs{key: $key, mediaId: $mediaId}';
+    return 'MediaDetailRouteArgs{mediaId: $mediaId, key: $key}';
   }
 }
 
@@ -370,14 +370,14 @@ class MediaDetailRouteArgs {
 /// [PlayerScreen]
 class PlayerRoute extends PageRouteInfo<PlayerRouteArgs> {
   PlayerRoute({
-    Key? key,
     required Media media,
+    Key? key,
     List<PageRouteInfo>? children,
   }) : super(
           PlayerRoute.name,
           args: PlayerRouteArgs(
-            key: key,
             media: media,
+            key: key,
           ),
           initialChildren: children,
         );
@@ -389,17 +389,17 @@ class PlayerRoute extends PageRouteInfo<PlayerRouteArgs> {
 
 class PlayerRouteArgs {
   const PlayerRouteArgs({
-    this.key,
     required this.media,
+    this.key,
   });
-
-  final Key? key;
 
   final Media media;
 
+  final Key? key;
+
   @override
   String toString() {
-    return 'PlayerRouteArgs{key: $key, media: $media}';
+    return 'PlayerRouteArgs{media: $media, key: $key}';
   }
 }
 
@@ -435,14 +435,14 @@ class SettingsRoute extends PageRouteInfo<void> {
 /// [UploadScreen]
 class UploadRoute extends PageRouteInfo<UploadRouteArgs> {
   UploadRoute({
-    Key? key,
     required String mediaType,
+    Key? key,
     List<PageRouteInfo>? children,
   }) : super(
           UploadRoute.name,
           args: UploadRouteArgs(
-            key: key,
             mediaType: mediaType,
+            key: key,
           ),
           initialChildren: children,
         );
@@ -454,17 +454,17 @@ class UploadRoute extends PageRouteInfo<UploadRouteArgs> {
 
 class UploadRouteArgs {
   const UploadRouteArgs({
-    this.key,
     required this.mediaType,
+    this.key,
   });
-
-  final Key? key;
 
   final String mediaType;
 
+  final Key? key;
+
   @override
   String toString() {
-    return 'UploadRouteArgs{key: $key, mediaType: $mediaType}';
+    return 'UploadRouteArgs{mediaType: $mediaType, key: $key}';
   }
 }
 

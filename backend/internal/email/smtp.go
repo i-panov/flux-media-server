@@ -52,16 +52,35 @@ func GenerateCode(length int) (string, error) {
 	return sb.String(), nil
 }
 
+// extractAddress strips display-name from "Name <email>" → "email".
+// The SMTP MAIL FROM command must contain only the address.
+func extractAddress(addr string) string {
+	if i := strings.LastIndex(addr, "<"); i != -1 {
+		if j := strings.Index(addr[i:], ">"); j != -1 {
+			return addr[i+1 : i+j]
+		}
+	}
+	return addr
+}
+
 func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
 	subject := "Flux Media Server - Login Code"
 	body := fmt.Sprintf("Your login code is: %s\n\nThis code will expire in %d minutes.", code, expiryMinutes)
-	msg := fmt.Sprintf("From: %s\nTo: %s\nSubject: %s\n\n%s", c.config.From, to, subject, body)
+	// Sanitize 'to' to prevent header injection.
+	sanitizedTo := strings.ReplaceAll(to, "\n", "")
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
+		c.config.From, sanitizedTo, subject, body)
 
 	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
-	auth := smtp.PlainAuth("", c.config.Username, c.config.Password, c.config.Host)
 
-	// Use From address as envelope sender (not Username)
-	fromAddr := c.config.From
+	// Only use authentication if both username and password are set.
+	var auth smtp.Auth
+	if c.config.Username != "" && c.config.Password != "" {
+		auth = smtp.PlainAuth("", c.config.Username, c.config.Password, c.config.Host)
+	}
+
+	// MAIL FROM envelope must be a bare address.
+	fromAddr := extractAddress(c.config.From)
 	if fromAddr == "" {
 		fromAddr = c.config.Username
 	}
@@ -78,17 +97,16 @@ func sendMailWithTimeout(cfg SMTPConfig, addr string, auth smtp.Auth, from strin
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	host := hostOf(addr)
 
 	if cfg.ImplicitTLS {
 		tlsConn := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 		if err := tlsConn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
-			conn.Close()
 			return err
 		}
 		if err := tlsConn.Handshake(); err != nil {
-			conn.Close()
 			return err
 		}
 		conn = tlsConn
@@ -96,10 +114,8 @@ func sendMailWithTimeout(cfg SMTPConfig, addr string, auth smtp.Auth, from strin
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
-		conn.Close()
 		return err
 	}
-	defer client.Close()
 
 	if err := conn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
 		return err

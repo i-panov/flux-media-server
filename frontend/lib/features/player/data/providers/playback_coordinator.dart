@@ -28,6 +28,8 @@ class PlaybackState with _$PlaybackState {
     Duration? savedPosition,
   }) = PlaybackPlaying;
   const factory PlaybackState.completed() = PlaybackCompleted;
+  const factory PlaybackState.loading() = PlaybackLoading;
+  const factory PlaybackState.error({required String message}) = PlaybackError;
 }
 
 /// Manages unified playback across audio and video.
@@ -47,6 +49,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   final Ref _ref;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _progressTimer;
+  bool _isPlaying = false;
 
   /// Lazily reads the video player datasource. Using ref.read instead of
   /// ref.watch prevents this long-lived provider from keeping the
@@ -74,7 +77,25 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
   }
 
   /// Starts playback of [media]. Stops any current playback first.
+  /// Serializes concurrent play() calls to prevent race conditions.
   Future<void> play(Media media) async {
+    // Serialize: reject concurrent play() calls to prevent interleaving
+    // of async load/play/seek operations on different player instances.
+    if (_isPlaying) return;
+    _isPlaying = true;
+
+    state = const PlaybackState.loading();
+
+    try {
+      await _playInternal(media);
+    } catch (e) {
+      state = PlaybackState.error(message: e.toString());
+    } finally {
+      _isPlaying = false;
+    }
+  }
+
+  Future<void> _playInternal(Media media) async {
     // Save progress of the current playback before switching.
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
@@ -205,6 +226,9 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState> {
       );
     }
     _cancelProgressTimer();
+
+    // Don't auto-advance if we're in loading state (user switched tracks).
+    if (state is PlaybackLoading) return;
 
     // Auto-advance to next track in queue if available.
     final queue = _ref.read(playQueueProvider);

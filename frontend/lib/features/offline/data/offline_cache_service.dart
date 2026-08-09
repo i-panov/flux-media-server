@@ -32,6 +32,9 @@ class OfflineCacheService {
 
   String? get _authToken => _ref.read(settingsProvider).settings.authToken;
 
+  /// Guard against parallel token refresh calls.
+  bool _isRefreshing = false;
+
   SharedPreferences get _prefs => _ref.read(sharedPreferencesProvider);
 
   /// Returns the local file path for a cached media item, or null if
@@ -72,7 +75,10 @@ class OfflineCacheService {
       final partFile = File('${localFile.path}.part');
 
       try {
-        final response = await client.send(request);
+        final response = await client.send(request).timeout(
+          const Duration(minutes: 10),
+          onTimeout: () => throw Exception('Download timed out'),
+        );
         AppLogger.info('Download response: ${response.statusCode}');
 
         if (response.statusCode == 401 && attempt == 0) {
@@ -125,17 +131,22 @@ class OfflineCacheService {
   }
 
   Future<String?> _refreshToken() async {
-    final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
-    if (refreshToken == null) return null;
-
+    // Guard against parallel refresh calls — two concurrent 401s would
+    // each POST /auth/refresh, both succeed, and invalidate each other's
+    // tokens (only the last one survives).
+    if (_isRefreshing) return null;
+    _isRefreshing = true;
     try {
+      final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
+      if (refreshToken == null) return null;
+
       final baseUrl = _ref.read(baseUrlProvider);
       final uri = Uri.parse('$baseUrl/auth/refresh');
       final httpResponse = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refresh_token': refreshToken}),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (httpResponse.statusCode == 200) {
         final data = jsonDecode(httpResponse.body) as Map<String, dynamic>;
@@ -146,7 +157,11 @@ class OfflineCacheService {
             .setTokens(newAccessToken, newRefreshToken);
         return newAccessToken;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: if refresh fails, return null so the download fails.
+    } finally {
+      _isRefreshing = false;
+    }
     return null;
   }
 

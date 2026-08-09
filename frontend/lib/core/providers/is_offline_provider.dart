@@ -5,5 +5,8 @@ import 'package:flux_media_server/features/auth/presentation/providers/auth_prov
 /// (offline mode — show only downloaded content).
 final isOfflineProvider = Provider<bool>((ref) {
   final authState = ref.watch(authProvider);
-  return authState is AuthError;
+  if (authState is AuthError) {
+    return authState.isOffline;
+  }
+  return false;
 });

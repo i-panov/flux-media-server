@@ -23,17 +23,17 @@ mixin _$Lyrics {
   int get id => throw _privateConstructorUsedError;
   @JsonKey(name: 'media_id')
   int get mediaId => throw _privateConstructorUsedError;
+  String get source => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
+  DateTime get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
+  DateTime get updatedAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'lyrics_text')
   String get lyricsText => throw _privateConstructorUsedError;
   @JsonKey(name: 'translation')
   String get translation => throw _privateConstructorUsedError;
   @JsonKey(name: 'sync_data')
   String get syncData => throw _privateConstructorUsedError;
-  String get source => throw _privateConstructorUsedError;
-  @JsonKey(name: 'created_at')
-  DateTime get createdAt => throw _privateConstructorUsedError;
-  @JsonKey(name: 'updated_at')
-  DateTime get updatedAt => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -48,12 +48,12 @@ abstract class $LyricsCopyWith<$Res> {
   $Res call(
       {int id,
       @JsonKey(name: 'media_id') int mediaId,
-      @JsonKey(name: 'lyrics_text') String lyricsText,
-      @JsonKey(name: 'translation') String translation,
-      @JsonKey(name: 'sync_data') String syncData,
       String source,
       @JsonKey(name: 'created_at') DateTime createdAt,
-      @JsonKey(name: 'updated_at') DateTime updatedAt});
+      @JsonKey(name: 'updated_at') DateTime updatedAt,
+      @JsonKey(name: 'lyrics_text') String lyricsText,
+      @JsonKey(name: 'translation') String translation,
+      @JsonKey(name: 'sync_data') String syncData});
 }
 
 /// @nodoc
@@ -71,12 +71,12 @@ class _$LyricsCopyWithImpl<$Res, $Val extends Lyrics>
   $Res call({
     Object? id = null,
     Object? mediaId = null,
-    Object? lyricsText = null,
-    Object? translation = null,
-    Object? syncData = null,
     Object? source = null,
     Object? createdAt = null,
     Object? updatedAt = null,
+    Object? lyricsText = null,
+    Object? translation = null,
+    Object? syncData = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -87,18 +87,6 @@ class _$LyricsCopyWithImpl<$Res, $Val extends Lyrics>
           ? _value.mediaId
           : mediaId // ignore: cast_nullable_to_non_nullable
               as int,
-      lyricsText: null == lyricsText
-          ? _value.lyricsText
-          : lyricsText // ignore: cast_nullable_to_non_nullable
-              as String,
-      translation: null == translation
-          ? _value.translation
-          : translation // ignore: cast_nullable_to_non_nullable
-              as String,
-      syncData: null == syncData
-          ? _value.syncData
-          : syncData // ignore: cast_nullable_to_non_nullable
-              as String,
       source: null == source
           ? _value.source
           : source // ignore: cast_nullable_to_non_nullable
@@ -111,6 +99,18 @@ class _$LyricsCopyWithImpl<$Res, $Val extends Lyrics>
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      lyricsText: null == lyricsText
+          ? _value.lyricsText
+          : lyricsText // ignore: cast_nullable_to_non_nullable
+              as String,
+      translation: null == translation
+          ? _value.translation
+          : translation // ignore: cast_nullable_to_non_nullable
+              as String,
+      syncData: null == syncData
+          ? _value.syncData
+          : syncData // ignore: cast_nullable_to_non_nullable
+              as String,
     ) as $Val);
   }
 }
@@ -125,12 +125,12 @@ abstract class _$$LyricsImplCopyWith<$Res> implements $LyricsCopyWith<$Res> {
   $Res call(
       {int id,
       @JsonKey(name: 'media_id') int mediaId,
-      @JsonKey(name: 'lyrics_text') String lyricsText,
-      @JsonKey(name: 'translation') String translation,
-      @JsonKey(name: 'sync_data') String syncData,
       String source,
       @JsonKey(name: 'created_at') DateTime createdAt,
-      @JsonKey(name: 'updated_at') DateTime updatedAt});
+      @JsonKey(name: 'updated_at') DateTime updatedAt,
+      @JsonKey(name: 'lyrics_text') String lyricsText,
+      @JsonKey(name: 'translation') String translation,
+      @JsonKey(name: 'sync_data') String syncData});
 }
 
 /// @nodoc
@@ -146,12 +146,12 @@ class __$$LyricsImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? mediaId = null,
-    Object? lyricsText = null,
-    Object? translation = null,
-    Object? syncData = null,
     Object? source = null,
     Object? createdAt = null,
     Object? updatedAt = null,
+    Object? lyricsText = null,
+    Object? translation = null,
+    Object? syncData = null,
   }) {
     return _then(_$LyricsImpl(
       id: null == id
@@ -162,18 +162,6 @@ class __$$LyricsImplCopyWithImpl<$Res>
           ? _value.mediaId
           : mediaId // ignore: cast_nullable_to_non_nullable
               as int,
-      lyricsText: null == lyricsText
-          ? _value.lyricsText
-          : lyricsText // ignore: cast_nullable_to_non_nullable
-              as String,
-      translation: null == translation
-          ? _value.translation
-          : translation // ignore: cast_nullable_to_non_nullable
-              as String,
-      syncData: null == syncData
-          ? _value.syncData
-          : syncData // ignore: cast_nullable_to_non_nullable
-              as String,
       source: null == source
           ? _value.source
           : source // ignore: cast_nullable_to_non_nullable
@@ -186,6 +174,18 @@ class __$$LyricsImplCopyWithImpl<$Res>
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      lyricsText: null == lyricsText
+          ? _value.lyricsText
+          : lyricsText // ignore: cast_nullable_to_non_nullable
+              as String,
+      translation: null == translation
+          ? _value.translation
+          : translation // ignore: cast_nullable_to_non_nullable
+              as String,
+      syncData: null == syncData
+          ? _value.syncData
+          : syncData // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -196,12 +196,12 @@ class _$LyricsImpl implements _Lyrics {
   const _$LyricsImpl(
       {required this.id,
       @JsonKey(name: 'media_id') required this.mediaId,
-      @JsonKey(name: 'lyrics_text') this.lyricsText = '',
-      @JsonKey(name: 'translation') this.translation = '',
-      @JsonKey(name: 'sync_data') this.syncData = '',
       required this.source,
       @JsonKey(name: 'created_at') required this.createdAt,
-      @JsonKey(name: 'updated_at') required this.updatedAt});
+      @JsonKey(name: 'updated_at') required this.updatedAt,
+      @JsonKey(name: 'lyrics_text') this.lyricsText = '',
+      @JsonKey(name: 'translation') this.translation = '',
+      @JsonKey(name: 'sync_data') this.syncData = ''});
 
   factory _$LyricsImpl.fromJson(Map<String, dynamic> json) =>
       _$$LyricsImplFromJson(json);
@@ -212,6 +212,14 @@ class _$LyricsImpl implements _Lyrics {
   @JsonKey(name: 'media_id')
   final int mediaId;
   @override
+  final String source;
+  @override
+  @JsonKey(name: 'created_at')
+  final DateTime createdAt;
+  @override
+  @JsonKey(name: 'updated_at')
+  final DateTime updatedAt;
+  @override
   @JsonKey(name: 'lyrics_text')
   final String lyricsText;
   @override
@@ -220,18 +228,10 @@ class _$LyricsImpl implements _Lyrics {
   @override
   @JsonKey(name: 'sync_data')
   final String syncData;
-  @override
-  final String source;
-  @override
-  @JsonKey(name: 'created_at')
-  final DateTime createdAt;
-  @override
-  @JsonKey(name: 'updated_at')
-  final DateTime updatedAt;
 
   @override
   String toString() {
-    return 'Lyrics(id: $id, mediaId: $mediaId, lyricsText: $lyricsText, translation: $translation, syncData: $syncData, source: $source, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Lyrics(id: $id, mediaId: $mediaId, source: $source, createdAt: $createdAt, updatedAt: $updatedAt, lyricsText: $lyricsText, translation: $translation, syncData: $syncData)';
   }
 
   @override
@@ -241,23 +241,23 @@ class _$LyricsImpl implements _Lyrics {
             other is _$LyricsImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.mediaId, mediaId) || other.mediaId == mediaId) &&
+            (identical(other.source, source) || other.source == source) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt) &&
             (identical(other.lyricsText, lyricsText) ||
                 other.lyricsText == lyricsText) &&
             (identical(other.translation, translation) ||
                 other.translation == translation) &&
             (identical(other.syncData, syncData) ||
-                other.syncData == syncData) &&
-            (identical(other.source, source) || other.source == source) &&
-            (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt) &&
-            (identical(other.updatedAt, updatedAt) ||
-                other.updatedAt == updatedAt));
+                other.syncData == syncData));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, mediaId, lyricsText,
-      translation, syncData, source, createdAt, updatedAt);
+  int get hashCode => Object.hash(runtimeType, id, mediaId, source, createdAt,
+      updatedAt, lyricsText, translation, syncData);
 
   @JsonKey(ignore: true)
   @override
@@ -275,15 +275,14 @@ class _$LyricsImpl implements _Lyrics {
 
 abstract class _Lyrics implements Lyrics {
   const factory _Lyrics(
-          {required final int id,
-          @JsonKey(name: 'media_id') required final int mediaId,
-          @JsonKey(name: 'lyrics_text') final String lyricsText,
-          @JsonKey(name: 'translation') final String translation,
-          @JsonKey(name: 'sync_data') final String syncData,
-          required final String source,
-          @JsonKey(name: 'created_at') required final DateTime createdAt,
-          @JsonKey(name: 'updated_at') required final DateTime updatedAt}) =
-      _$LyricsImpl;
+      {required final int id,
+      @JsonKey(name: 'media_id') required final int mediaId,
+      required final String source,
+      @JsonKey(name: 'created_at') required final DateTime createdAt,
+      @JsonKey(name: 'updated_at') required final DateTime updatedAt,
+      @JsonKey(name: 'lyrics_text') final String lyricsText,
+      @JsonKey(name: 'translation') final String translation,
+      @JsonKey(name: 'sync_data') final String syncData}) = _$LyricsImpl;
 
   factory _Lyrics.fromJson(Map<String, dynamic> json) = _$LyricsImpl.fromJson;
 
@@ -293,6 +292,14 @@ abstract class _Lyrics implements Lyrics {
   @JsonKey(name: 'media_id')
   int get mediaId;
   @override
+  String get source;
+  @override
+  @JsonKey(name: 'created_at')
+  DateTime get createdAt;
+  @override
+  @JsonKey(name: 'updated_at')
+  DateTime get updatedAt;
+  @override
   @JsonKey(name: 'lyrics_text')
   String get lyricsText;
   @override
@@ -301,14 +308,6 @@ abstract class _Lyrics implements Lyrics {
   @override
   @JsonKey(name: 'sync_data')
   String get syncData;
-  @override
-  String get source;
-  @override
-  @JsonKey(name: 'created_at')
-  DateTime get createdAt;
-  @override
-  @JsonKey(name: 'updated_at')
-  DateTime get updatedAt;
   @override
   @JsonKey(ignore: true)
   _$$LyricsImplCopyWith<_$LyricsImpl> get copyWith =>

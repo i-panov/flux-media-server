@@ -22,7 +22,7 @@ mixin _$AuthState {
     required TResult Function() loading,
     required TResult Function(String email, String? debugCode) codeSent,
     required TResult Function(User user) authenticated,
-    required TResult Function(String message) error,
+    required TResult Function(String message, bool isOffline) error,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -31,7 +31,7 @@ mixin _$AuthState {
     TResult? Function()? loading,
     TResult? Function(String email, String? debugCode)? codeSent,
     TResult? Function(User user)? authenticated,
-    TResult? Function(String message)? error,
+    TResult? Function(String message, bool isOffline)? error,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -40,7 +40,7 @@ mixin _$AuthState {
     TResult Function()? loading,
     TResult Function(String email, String? debugCode)? codeSent,
     TResult Function(User user)? authenticated,
-    TResult Function(String message)? error,
+    TResult Function(String message, bool isOffline)? error,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -139,7 +139,7 @@ class _$AuthInitialImpl with DiagnosticableTreeMixin implements AuthInitial {
     required TResult Function() loading,
     required TResult Function(String email, String? debugCode) codeSent,
     required TResult Function(User user) authenticated,
-    required TResult Function(String message) error,
+    required TResult Function(String message, bool isOffline) error,
   }) {
     return initial();
   }
@@ -151,7 +151,7 @@ class _$AuthInitialImpl with DiagnosticableTreeMixin implements AuthInitial {
     TResult? Function()? loading,
     TResult? Function(String email, String? debugCode)? codeSent,
     TResult? Function(User user)? authenticated,
-    TResult? Function(String message)? error,
+    TResult? Function(String message, bool isOffline)? error,
   }) {
     return initial?.call();
   }
@@ -163,7 +163,7 @@ class _$AuthInitialImpl with DiagnosticableTreeMixin implements AuthInitial {
     TResult Function()? loading,
     TResult Function(String email, String? debugCode)? codeSent,
     TResult Function(User user)? authenticated,
-    TResult Function(String message)? error,
+    TResult Function(String message, bool isOffline)? error,
     required TResult orElse(),
   }) {
     if (initial != null) {
@@ -265,7 +265,7 @@ class _$AuthLoadingImpl with DiagnosticableTreeMixin implements AuthLoading {
     required TResult Function() loading,
     required TResult Function(String email, String? debugCode) codeSent,
     required TResult Function(User user) authenticated,
-    required TResult Function(String message) error,
+    required TResult Function(String message, bool isOffline) error,
   }) {
     return loading();
   }
@@ -277,7 +277,7 @@ class _$AuthLoadingImpl with DiagnosticableTreeMixin implements AuthLoading {
     TResult? Function()? loading,
     TResult? Function(String email, String? debugCode)? codeSent,
     TResult? Function(User user)? authenticated,
-    TResult? Function(String message)? error,
+    TResult? Function(String message, bool isOffline)? error,
   }) {
     return loading?.call();
   }
@@ -289,7 +289,7 @@ class _$AuthLoadingImpl with DiagnosticableTreeMixin implements AuthLoading {
     TResult Function()? loading,
     TResult Function(String email, String? debugCode)? codeSent,
     TResult Function(User user)? authenticated,
-    TResult Function(String message)? error,
+    TResult Function(String message, bool isOffline)? error,
     required TResult orElse(),
   }) {
     if (loading != null) {
@@ -429,7 +429,7 @@ class _$AuthCodeSentImpl with DiagnosticableTreeMixin implements AuthCodeSent {
     required TResult Function() loading,
     required TResult Function(String email, String? debugCode) codeSent,
     required TResult Function(User user) authenticated,
-    required TResult Function(String message) error,
+    required TResult Function(String message, bool isOffline) error,
   }) {
     return codeSent(email, debugCode);
   }
@@ -441,7 +441,7 @@ class _$AuthCodeSentImpl with DiagnosticableTreeMixin implements AuthCodeSent {
     TResult? Function()? loading,
     TResult? Function(String email, String? debugCode)? codeSent,
     TResult? Function(User user)? authenticated,
-    TResult? Function(String message)? error,
+    TResult? Function(String message, bool isOffline)? error,
   }) {
     return codeSent?.call(email, debugCode);
   }
@@ -453,7 +453,7 @@ class _$AuthCodeSentImpl with DiagnosticableTreeMixin implements AuthCodeSent {
     TResult Function()? loading,
     TResult Function(String email, String? debugCode)? codeSent,
     TResult Function(User user)? authenticated,
-    TResult Function(String message)? error,
+    TResult Function(String message, bool isOffline)? error,
     required TResult orElse(),
   }) {
     if (codeSent != null) {
@@ -604,7 +604,7 @@ class _$AuthAuthenticatedImpl
     required TResult Function() loading,
     required TResult Function(String email, String? debugCode) codeSent,
     required TResult Function(User user) authenticated,
-    required TResult Function(String message) error,
+    required TResult Function(String message, bool isOffline) error,
   }) {
     return authenticated(user);
   }
@@ -616,7 +616,7 @@ class _$AuthAuthenticatedImpl
     TResult? Function()? loading,
     TResult? Function(String email, String? debugCode)? codeSent,
     TResult? Function(User user)? authenticated,
-    TResult? Function(String message)? error,
+    TResult? Function(String message, bool isOffline)? error,
   }) {
     return authenticated?.call(user);
   }
@@ -628,7 +628,7 @@ class _$AuthAuthenticatedImpl
     TResult Function()? loading,
     TResult Function(String email, String? debugCode)? codeSent,
     TResult Function(User user)? authenticated,
-    TResult Function(String message)? error,
+    TResult Function(String message, bool isOffline)? error,
     required TResult orElse(),
   }) {
     if (authenticated != null) {
@@ -694,7 +694,7 @@ abstract class _$$AuthErrorImplCopyWith<$Res> {
           _$AuthErrorImpl value, $Res Function(_$AuthErrorImpl) then) =
       __$$AuthErrorImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({String message});
+  $Res call({String message, bool isOffline});
 }
 
 /// @nodoc
@@ -709,12 +709,17 @@ class __$$AuthErrorImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? message = null,
+    Object? isOffline = null,
   }) {
     return _then(_$AuthErrorImpl(
       message: null == message
           ? _value.message
           : message // ignore: cast_nullable_to_non_nullable
               as String,
+      isOffline: null == isOffline
+          ? _value.isOffline
+          : isOffline // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -722,14 +727,17 @@ class __$$AuthErrorImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
-  const _$AuthErrorImpl({required this.message});
+  const _$AuthErrorImpl({required this.message, this.isOffline = false});
 
   @override
   final String message;
+  @override
+  @JsonKey()
+  final bool isOffline;
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'AuthState.error(message: $message)';
+    return 'AuthState.error(message: $message, isOffline: $isOffline)';
   }
 
   @override
@@ -737,7 +745,8 @@ class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
     super.debugFillProperties(properties);
     properties
       ..add(DiagnosticsProperty('type', 'AuthState.error'))
-      ..add(DiagnosticsProperty('message', message));
+      ..add(DiagnosticsProperty('message', message))
+      ..add(DiagnosticsProperty('isOffline', isOffline));
   }
 
   @override
@@ -745,11 +754,13 @@ class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$AuthErrorImpl &&
-            (identical(other.message, message) || other.message == message));
+            (identical(other.message, message) || other.message == message) &&
+            (identical(other.isOffline, isOffline) ||
+                other.isOffline == isOffline));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, message);
+  int get hashCode => Object.hash(runtimeType, message, isOffline);
 
   @JsonKey(ignore: true)
   @override
@@ -764,9 +775,9 @@ class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
     required TResult Function() loading,
     required TResult Function(String email, String? debugCode) codeSent,
     required TResult Function(User user) authenticated,
-    required TResult Function(String message) error,
+    required TResult Function(String message, bool isOffline) error,
   }) {
-    return error(message);
+    return error(message, isOffline);
   }
 
   @override
@@ -776,9 +787,9 @@ class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
     TResult? Function()? loading,
     TResult? Function(String email, String? debugCode)? codeSent,
     TResult? Function(User user)? authenticated,
-    TResult? Function(String message)? error,
+    TResult? Function(String message, bool isOffline)? error,
   }) {
-    return error?.call(message);
+    return error?.call(message, isOffline);
   }
 
   @override
@@ -788,11 +799,11 @@ class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
     TResult Function()? loading,
     TResult Function(String email, String? debugCode)? codeSent,
     TResult Function(User user)? authenticated,
-    TResult Function(String message)? error,
+    TResult Function(String message, bool isOffline)? error,
     required TResult orElse(),
   }) {
     if (error != null) {
-      return error(message);
+      return error(message, isOffline);
     }
     return orElse();
   }
@@ -839,9 +850,11 @@ class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
 }
 
 abstract class AuthError implements AuthState {
-  const factory AuthError({required final String message}) = _$AuthErrorImpl;
+  const factory AuthError(
+      {required final String message, final bool isOffline}) = _$AuthErrorImpl;
 
   String get message;
+  bool get isOffline;
   @JsonKey(ignore: true)
   _$$AuthErrorImplCopyWith<_$AuthErrorImpl> get copyWith =>
       throw _privateConstructorUsedError;

@@ -28,7 +28,10 @@ class AuthState with _$AuthState {
   }) = AuthCodeSent;
   const factory AuthState.authenticated({required User user}) =
       AuthAuthenticated;
-  const factory AuthState.error({required String message}) = AuthError;
+  const factory AuthState.error({
+    required String message,
+    @Default(false) bool isOffline,
+  }) = AuthError;
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
@@ -54,7 +57,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _requestCode(email);
     result.fold(
       (failure) {
-        state = AuthState.error(message: failure.message);
+        final isOffline = failure is NetworkFailure;
+        state = AuthState.error(message: failure.message, isOffline: isOffline);
       },
       (debugCode) {
         state = AuthState.codeSent(
@@ -70,7 +74,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result =
         await _verifyCode(VerifyCodeParams(email: email, code: code));
     await result.fold<Future<void>>(
-      (failure) async => state = AuthState.error(message: failure.message),
+      (failure) async {
+        final isOffline = failure is NetworkFailure;
+        state = AuthState.error(message: failure.message, isOffline: isOffline);
+      },
       (data) async {
         await _ref
             .read(settingsProvider.notifier)
@@ -101,7 +108,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         } else {
           // Network/server error — keep the stored session so the user
           // isn't logged out just because the server is unreachable.
-          state = AuthState.error(message: failure.message);
+          final isOffline = failure is NetworkFailure;
+          state = AuthState.error(
+            message: failure.message,
+            isOffline: isOffline,
+          );
         }
       },
       (user) async => state = AuthState.authenticated(user: user),

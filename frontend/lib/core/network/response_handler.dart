@@ -56,8 +56,6 @@ Future<T> safeApiCall<T>(Future<T> Function() call) async {
     throw const NetworkException(message: 'Network error');
   } on Exception catch (e) {
     throw ServerException(message: e.toString());
-  } catch (e) {
-    throw ServerException(message: e.toString());
   }
 }
 

@@ -92,6 +92,27 @@ func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media
 	return &media, err
 }
 
+func (r *MediaStore) FindByPathPrefix(ctx context.Context, prefix string, limit, offset int) ([]models.Media, int64, error) {
+	var media []models.Media
+	var total int64
+	query := r.db.WithContext(ctx).Where("file_path LIKE ?", prefix+"%").Model(&models.Media{})
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	query = query.Order("media.id ASC")
+	err := query.Find(&media).Error
+	return media, total, err
+}
+
 func (r *MediaStore) Create(ctx context.Context, media *models.Media) error {
 	return r.db.WithContext(ctx).Create(media).Error
 }
