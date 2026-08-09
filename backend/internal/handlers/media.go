@@ -108,6 +108,9 @@ func (h *MediaHandler) Create(c *fiber.Ctx) error {
 	if req.FilePath == "" {
 		return response.Error(c, fiber.StatusBadRequest, "FilePath is required")
 	}
+	if req.Type == "" || !models.ParseMediaType(string(req.Type)).Valid() {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid type")
+	}
 
 	ctx := c.UserContext()
 	allowed, err := h.streamer.IsPathAllowed(ctx, req.FilePath)
@@ -157,6 +160,9 @@ func (h *MediaHandler) Update(c *fiber.Ctx) error {
 	}
 	if req.FilePath == "" {
 		return response.Error(c, fiber.StatusBadRequest, "FilePath is required")
+	}
+	if req.Type != "" && !models.ParseMediaType(string(req.Type)).Valid() {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid type")
 	}
 
 	allowed, err := h.streamer.IsPathAllowed(ctx, req.FilePath)

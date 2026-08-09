@@ -284,7 +284,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
                     onDownload: () => _toggleDownload(track.id),
                     onAddToQueue: () => _addToQueue(track),
                     onAddToCollection: () =>
-                        showAddToCollectionDialog(context, ref, track.id),
+                        showAddToCollectionDialog(context, ref, track.id, mediaType: 'audio'),
                     onEditMetadata: () =>
                         showEditMetadataDialog(context, ref, track),
                     onDetails: () => context.router.push(
@@ -309,7 +309,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
                     onDownload: () => _toggleDownload(track.id),
                     onAddToQueue: () => _addToQueue(track),
                     onAddToCollection: () =>
-                        showAddToCollectionDialog(context, ref, track.id),
+                        showAddToCollectionDialog(context, ref, track.id, mediaType: 'audio'),
                     onEditMetadata: () =>
                         showEditMetadataDialog(context, ref, track),
                     onDetails: () => context.router.push(

@@ -73,7 +73,17 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   }
 
   Future<void> _addToCollection() async {
-    await showAddToCollectionDialog(context, ref, widget.mediaId);
+    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
+          loaded: (m) => m,
+          orElse: () => null,
+        );
+    final type = media?.type.value ?? 'video';
+    await showAddToCollectionDialog(
+      context,
+      ref,
+      widget.mediaId,
+      mediaType: type,
+    );
   }
 
   Future<void> _changeCover() async {

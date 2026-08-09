@@ -64,6 +64,8 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     if (index < 0 || index >= state.items.length) return;
     final items = List<Media>.from(state.items)..removeAt(index);
 
+    final wasPlaying = index == state.currentIndex;
+
     int newIndex;
     if (items.isEmpty) {
       newIndex = -1;
@@ -79,11 +81,14 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     );
 
     // If we removed the currently playing item, stop playback.
-    if (index == state.currentIndex && items.isNotEmpty) {
-      // currentIndex was already adjusted above
-    } else if (items.isEmpty) {
-      // Queue is empty — coordinator should stop playback.
+    // The queue is now empty — coordinator should stop playback.
+    if (items.isEmpty) {
       _coordinator.stop();
+    }
+    // If we removed the currently playing track and there are more items,
+    // auto-advance to the new currentIndex (which is the next track).
+    else if (wasPlaying && newIndex >= 0 && newIndex < items.length) {
+      _coordinator.play(items[newIndex]);
     }
   }
 

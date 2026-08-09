@@ -11,18 +11,26 @@ import 'package:flux_media_server/shared/models/collection.dart';
 Future<bool?> showAddToCollectionDialog(
   BuildContext context,
   WidgetRef ref,
-  int mediaId,
-) async {
+  int mediaId, {
+  String mediaType = 'video',
+}) async {
   return showDialog<bool>(
     context: context,
-    builder: (ctx) => _AddToCollectionDialog(mediaId: mediaId),
+    builder: (ctx) => _AddToCollectionDialog(
+      mediaId: mediaId,
+      mediaType: mediaType,
+    ),
   );
 }
 
 class _AddToCollectionDialog extends ConsumerStatefulWidget {
-  const _AddToCollectionDialog({required this.mediaId});
+  const _AddToCollectionDialog({
+    required this.mediaId,
+    required this.mediaType,
+  });
 
   final int mediaId;
+  final String mediaType;
 
   @override
   ConsumerState<_AddToCollectionDialog> createState() =>
@@ -145,7 +153,7 @@ class _AddToCollectionDialogState
       try {
         final createCollection = ref.read(createCollectionProvider);
         final collection = await createCollection(
-          CreateCollectionParams(name: nameController.text, type: 'video'),
+          CreateCollectionParams(name: nameController.text, type: widget.mediaType),
         );
         collection.fold(
           (failure) {

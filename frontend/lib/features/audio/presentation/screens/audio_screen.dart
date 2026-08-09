@@ -265,11 +265,12 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                   onFavorite: () => _toggleFavorite(likedTracks[index].id),
                   onDownload: () => _toggleDownload(likedTracks[index].id),
                   onAddToQueue: () => _addToQueue(likedTracks[index]),
-                  onAddToCollection: () => showAddToCollectionDialog(
-                    context,
-                    ref,
-                    likedTracks[index].id,
-                  ),
+                   onAddToCollection: () => showAddToCollectionDialog(
+                     context,
+                     ref,
+                     likedTracks[index].id,
+                     mediaType: 'audio',
+                   ),
                   onEditMetadata: () =>
                       showEditMetadataDialog(context, ref, likedTracks[index]),
                   onDetails: () => context.router
@@ -327,11 +328,12 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                   onFavorite: () => _toggleFavorite(downloadedAudio[index].id),
                   onDownload: () => _toggleDownload(downloadedAudio[index].id),
                   onAddToQueue: () => _addToQueue(downloadedAudio[index]),
-                  onAddToCollection: () => showAddToCollectionDialog(
-                    context,
-                    ref,
-                    downloadedAudio[index].id,
-                  ),
+                   onAddToCollection: () => showAddToCollectionDialog(
+                     context,
+                     ref,
+                     downloadedAudio[index].id,
+                     mediaType: 'audio',
+                   ),
                   onEditMetadata: () => showEditMetadataDialog(
                     context,
                     ref,
@@ -384,11 +386,12 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                   onFavorite: () => _toggleFavorite(allTracks[index].id),
                   onDownload: () => _toggleDownload(allTracks[index].id),
                   onAddToQueue: () => _addToQueue(allTracks[index]),
-                  onAddToCollection: () => showAddToCollectionDialog(
-                    context,
-                    ref,
-                    allTracks[index].id,
-                  ),
+                   onAddToCollection: () => showAddToCollectionDialog(
+                     context,
+                     ref,
+                     allTracks[index].id,
+                     mediaType: 'audio',
+                   ),
                   onEditMetadata: () =>
                       showEditMetadataDialog(context, ref, allTracks[index]),
                   onDetails: () => context.router

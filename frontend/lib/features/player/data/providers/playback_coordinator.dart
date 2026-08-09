@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:collection';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
@@ -50,7 +51,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   final Ref _ref;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _progressTimer;
-  bool _isPlaying = false;
 
   /// Lazily reads the video player datasource. Using ref.read instead of
   /// ref.watch prevents this long-lived provider from keeping the
@@ -77,23 +77,36 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     super.dispose();
   }
 
+  /// Serializes concurrent play() calls using a Future queue to prevent
+  /// interleaving of async load/play/seek operations on different player
+  /// instances. Each call waits for the previous one to finish, ensuring
+  /// only the latest media actually starts playing.
+  final Queue<Future<void> Function()> _playQueue = Queue();
+  Future<void> _playQueueDone = Future.value();
+
   /// Starts playback of [media]. Stops any current playback first.
   /// Serializes concurrent play() calls to prevent race conditions.
   Future<void> play(Media media) async {
-    // Serialize: reject concurrent play() calls to prevent interleaving
-    // of async load/play/seek operations on different player instances.
-    if (_isPlaying) return;
-    _isPlaying = true;
+    // Enqueue this play request. The queue ensures sequential execution:
+    // each call waits for the previous one to finish, so rapid track
+    // switches only play the last requested media.
+    final completer = Completer<void>();
+    final previous = _playQueueDone;
 
-    state = const PlaybackState.loading();
+    _playQueue.add(() async {
+      await previous;
+      try {
+        state = const PlaybackState.loading();
+        await _playInternal(media);
+        if (!completer.isCompleted) completer.complete();
+      } catch (e) {
+        state = PlaybackState.error(message: e.toString());
+        if (!completer.isCompleted) completer.completeError(e);
+      }
+    });
 
-    try {
-      await _playInternal(media);
-    } catch (e) {
-      state = PlaybackState.error(message: e.toString());
-    } finally {
-      _isPlaying = false;
-    }
+    _playQueueDone = completer.future;
+    await completer.future;
   }
 
   Future<void> _playInternal(Media media) async {
