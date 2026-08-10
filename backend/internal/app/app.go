@@ -122,7 +122,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	// Fiber app
 	fiberApp := fiber.New(fiber.Config{
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 120 * time.Second,
+		WriteTimeout: 10 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 		BodyLimit:    int(cfg.Server.MaxUploadSize),
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
@@ -185,16 +185,13 @@ func New(cfg *config.Config, version string) (*App, error) {
 		AllowCredentials: allowOrigins != "*",
 	}))
 
-	// Health check
-	fiberApp.Get("/api/health", handlers.HealthCheck)
-	fiberApp.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok", "version": version})
-	})
+	// Health check — single canonical endpoint.
+	fiberApp.Get("/health", handlers.HealthCheck)
 
-	// Auth rate limiter
+	// Auth rate limiter — parameters from config.
 	authRateLimiter := limiter.New(limiter.Config{
-		Max:        10,
-		Expiration: time.Minute,
+		Max:        cfg.RateLimiter.Max,
+		Expiration: time.Duration(cfg.RateLimiter.Expiration) * time.Second,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return getClientIP(c)
 		},

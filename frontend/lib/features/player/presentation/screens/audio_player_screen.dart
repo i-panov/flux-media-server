@@ -42,7 +42,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -358,12 +357,6 @@ class _TranslationTabState extends ConsumerState<_TranslationTab> {
   bool _isEditing = false;
   final _controller = TextEditingController();
   bool _isSaving = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   void _startEditing(String currentText) {
     _controller.text = currentText;

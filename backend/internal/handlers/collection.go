@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -195,6 +196,7 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 		CollectionID: uint(collectionID),
 		MediaID:      req.MediaID,
 		Position:     nextPos,
+		AddedAt:      time.Now().UTC(),
 	}
 
 	if err := h.itemRepo.Add(ctx, item); err != nil {

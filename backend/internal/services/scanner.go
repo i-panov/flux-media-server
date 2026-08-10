@@ -327,11 +327,9 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 			if media.Genre == "" && fileMeta.Genre != "" {
 				media.Genre = fileMeta.Genre
 			}
-			// Use file-extracted title if filename parsing gave a generic result.
 			if media.Title == filepath.Base(path) && fileMeta.Title != "" {
 				media.Title = fileMeta.Title
 			}
-			// Build description from artist/album for audio.
 			if mediaType.IsAudio() && len(media.Artists) > 0 {
 				desc := media.Artists[0].Name
 				if media.Album != "" {
@@ -349,14 +347,6 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 			media.ThumbnailURL = thumbPath
 			if err := s.mediaRepo.Update(ctx, media); err != nil {
 				log.Printf("Error updating media thumbnail for %s: %v", path, err)
-			}
-		}
-
-		// Extract embedded cover art (if file has one).
-		if coverPath := s.thumbService.ExtractCover(media.ID, path); coverPath != "" {
-			media.CoverURL = coverPath
-			if err := s.mediaRepo.Update(ctx, media); err != nil {
-				log.Printf("Error updating media cover for %s: %v", path, err)
 			}
 		}
 

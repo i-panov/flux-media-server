@@ -40,18 +40,15 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
     _isToggling = true;
 
     try {
-      // Check if we're offline — don't send network requests.
       final isOffline = _ref.read(isOfflineProvider);
       if (isOffline) {
         state = const AsyncValue.data(false);
         return;
       }
 
-      // Read the real state directly – do not trust the cached bool.
       final currentState = await _isFavorited();
       if (!mounted) return;
 
-      // Optimistic update
       state = AsyncValue.data(!currentState);
 
       try {
@@ -62,7 +59,6 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
           result.fold(
             (failure) {
               if (!mounted) return;
-              // Revert to previous state on error.
               state = AsyncValue.data(currentState);
             },
             (_) {
@@ -78,7 +74,6 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
           result.fold(
             (failure) {
               if (!mounted) return;
-              // Revert to previous state on error.
               state = AsyncValue.data(currentState);
             },
             (_) {
@@ -90,7 +85,6 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
         }
       } catch (e) {
         if (!mounted) return;
-        // Revert to previous state on error.
         state = AsyncValue.data(currentState);
       }
     } finally {

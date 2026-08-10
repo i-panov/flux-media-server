@@ -1,5 +1,4 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/is_offline_provider.dart';
@@ -92,7 +91,15 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     final l = AppLocalizations.of(context)!;
     final isNarrow = MediaQuery.of(context).size.width < 900;
 
-    final mediaListState = ref.watch(mediaListProvider(_mediaType));
+    // Use select to avoid rebuilding on unrelated state changes.
+    final mediaListState = ref.watch(
+      mediaListProvider(_mediaType).select(
+        (state) => switch (state) {
+          AsyncData(:final value) => value,
+          _ => null,
+        },
+      ),
+    );
     final favoritesState = ref.watch(favoritesProvider);
 
     return Scaffold(
@@ -126,18 +133,19 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
   Widget _buildBody({
     required BuildContext context,
     required AppLocalizations l,
-    required AsyncValue<MediaListResult> mediaListState,
+    required MediaListResult? mediaListState,
     required AsyncValue<List<Favorite>> favoritesState,
   }) {
-    if (mediaListState.isLoading) {
-      return _buildSkeletonList(context);
+    if (mediaListState == null) {
+      return const Center(child: CircularProgressIndicator());
     }
     if (favoritesState.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     final isOffline = ref.watch(isOfflineProvider);
-    if (!isOffline && (mediaListState.hasError || favoritesState.hasError)) {
+    final hasError = !isOffline && favoritesState.hasError;
+    if (hasError) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -145,18 +153,14 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
             const Icon(Icons.error_outline, size: 64, color: Colors.red),
             const SizedBox(height: 16),
             Text(
-              mediaListState.error?.toString() ??
-                  favoritesState.error?.toString() ??
-                  'Unknown error',
+              favoritesState.error?.toString() ?? 'Unknown error',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref
-                  ..invalidate(mediaListProvider(_mediaType))
-                  ..invalidate(favoritesProvider);
+                ref.invalidate(favoritesProvider);
               },
               child: Text(l.retry),
             ),
@@ -165,8 +169,6 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
       );
     }
 
-    final mediaList = mediaListState.valueOrNull ??
-        MediaListResult(items: <Media>[].toIList(), total: 0);
     final favorites = favoritesState.valueOrNull ?? [];
 
     // Downloaded tracks — shown as main list when offline,
@@ -175,6 +177,9 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     final downloadedMedia = downloadsState.valueOrNull ?? [];
     final downloadedAudio =
         downloadedMedia.where((m) => m.type == MediaType.audio).toList();
+
+    // Use the already-selected media list.
+    final mediaList = mediaListState;
 
     // Offline + no server media → show downloaded only.
     if (mediaList.items.isEmpty && downloadedAudio.isEmpty) {

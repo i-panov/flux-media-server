@@ -39,6 +39,9 @@ class OfflineCacheService {
   /// of the same file (which would corrupt the .part file).
   final Set<int> _activeDownloads = {};
 
+  /// Maximum total cache size: 5 GB.
+  static const int _maxCacheBytes = 5 * 1024 * 1024 * 1024;
+
   SharedPreferences get _prefs => _ref.read(sharedPreferencesProvider);
 
   /// Returns the local file path for a cached media item, or null if
@@ -233,6 +236,8 @@ class OfflineCacheService {
       }
       await _prefs.remove(_metaKey(mediaId));
       await _prefs.remove(_lyricsKey(mediaId));
+      // Enforce cache size limit after removal.
+      await _enforceCacheLimit();
     } catch (e) {
       AppLogger.error('Error removing cached file', e);
     }
@@ -248,7 +253,7 @@ class OfflineCacheService {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final files = dir.listSync();
-      final pattern = RegExp(r'flux_media_(\d+)\.mp4$');
+      final pattern = RegExp(r'${_prefix}flux_media_(\d+)\.mp4$');
       final ids = <int>[];
       for (final f in files) {
         final match = pattern.firstMatch(f.path);
@@ -260,6 +265,42 @@ class OfflineCacheService {
     } catch (e) {
       AppLogger.error('Error listing cached files', e);
       return [];
+    }
+  }
+
+  /// Enforces the maximum cache size by removing the oldest downloads.
+  Future<void> _enforceCacheLimit() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final files = dir.listSync();
+      final pattern = RegExp(r'${_prefix}flux_media_(\d+)\.mp4$');
+      final fileStats = <(int, int)>[]; // (mediaId, fileSize)
+
+      for (final f in files) {
+        final match = pattern.firstMatch(f.path);
+        if (match != null) {
+          final id = int.parse(match.group(1)!);
+          try {
+            final stat = await f.stat();
+            fileStats.add((id, stat.size));
+          } on Exception {
+            // Best-effort: skip files we can't stat.
+          }
+        }
+      }
+
+      var totalSize = fileStats.fold<int>(
+        0, (prev, curr) => prev + curr.$2);
+
+      // Remove oldest downloads (sorted by mediaId as a proxy for age).
+      fileStats.sort((a, b) => a.$1.compareTo(b.$1));
+      for (final (id, size) in fileStats) {
+        if (totalSize <= _maxCacheBytes) break;
+        totalSize -= size;
+        await remove(id);
+      }
+    } catch (e) {
+      AppLogger.error('Error enforcing cache limit', e);
     }
   }
 

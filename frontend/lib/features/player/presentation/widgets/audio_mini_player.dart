@@ -259,8 +259,16 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   IconButton(
                     icon: const Icon(Icons.skip_next),
                     tooltip: l.next,
-                    onPressed: () {
-                      ref.read(playQueueProvider.notifier).next();
+                    onPressed: () async {
+                      final success = await ref
+                          .read(playQueueProvider.notifier)
+                          .next();
+                      // If there's no next track, stop playback.
+                      if (!success && context.mounted) {
+                        ref
+                            .read(playbackCoordinatorProvider.notifier)
+                            .stop();
+                      }
                     },
                     iconSize: 24,
                     padding: EdgeInsets.zero,

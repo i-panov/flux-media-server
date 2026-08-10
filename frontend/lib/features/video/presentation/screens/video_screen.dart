@@ -105,8 +105,13 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     required AsyncValue<List<Collection>> collectionsState,
     required String baseUrl,
   }) {
-    // Show loading skeleton
-    if (mediaListState.isLoading) {
+    // Show loading skeleton only on initial load, not during refresh.
+    final isInitialLoad = mediaListState.isLoading &&
+        mediaListState.value == null &&
+        watchProgressState.value == null &&
+        favoritesState.value == null &&
+        collectionsState.value == null;
+    if (isInitialLoad) {
       return _buildSkeletonGrid(context);
     }
     if (watchProgressState.isLoading ||
@@ -303,11 +308,13 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
               ),
             ),
 
-          // Collections section
+          // Collections section — only show video collections.
           if (collections.isNotEmpty)
             SliverToBoxAdapter(
               child: _CollectionsRow(
-                collections: collections,
+                collections: collections
+                    .where((c) => c.type == MediaType.video)
+                    .toList(),
                 onItemTapped: (id) {
                   final collection = collections.firstWhere((c) => c.id == id);
                   context.router

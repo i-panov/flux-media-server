@@ -11,11 +11,12 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Auth     AuthConfig     `yaml:"auth"`
-	Scanner  ScannerConfig  `yaml:"scanner"`
-	Media    MediaConfig    `yaml:"media"`
+	Server      ServerConfig      `yaml:"server"`
+	Database    DatabaseConfig    `yaml:"database"`
+	Auth        AuthConfig        `yaml:"auth"`
+	Scanner     ScannerConfig     `yaml:"scanner"`
+	RateLimiter RateLimiterConfig `yaml:"rate_limiter"`
+	Media       MediaConfig       `yaml:"media"`
 }
 
 type ServerConfig struct {
@@ -56,6 +57,11 @@ type ScannerConfig struct {
 	Enabled      bool `yaml:"enabled"`
 	Interval     int  `yaml:"interval"`
 	WatchEnabled bool `yaml:"watch_enabled"`
+}
+
+type RateLimiterConfig struct {
+	Max        int   `yaml:"max"`
+	Expiration int64 `yaml:"expiration"` // in seconds
 }
 
 type MediaConfig struct {
@@ -110,6 +116,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Auth.MaxOTPEntries == 0 {
 		cfg.Auth.MaxOTPEntries = 10000
+	}
+	if cfg.RateLimiter.Max == 0 {
+		cfg.RateLimiter.Max = 10
+	}
+	if cfg.RateLimiter.Expiration == 0 {
+		cfg.RateLimiter.Expiration = 60
 	}
 
 	// Validate code length

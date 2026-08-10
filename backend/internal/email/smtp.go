@@ -63,12 +63,26 @@ func extractAddress(addr string) string {
 	return addr
 }
 
+// Sanitize 'to' to prevent header injection — strip newlines and
+// limit length to prevent buffer overflow attacks.
+func sanitizeEmail(addr string) string {
+	s := strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' {
+			return -1
+		}
+		return r
+	}, addr)
+	if len(s) > 254 {
+		s = s[:254]
+	}
+	return strings.TrimSpace(s)
+}
+
 func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
 	subject := "Flux Media Server - Login Code"
 	body := fmt.Sprintf("Your login code is: %s\n\nThis code will expire in %d minutes.", code, expiryMinutes)
-	// Sanitize 'to' to prevent header injection.
-	sanitizedTo := strings.ReplaceAll(to, "\n", "")
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
+	sanitizedTo := sanitizeEmail(to)
+	msg := fmt.Sprintf("From: <%s>\r\nTo: <%s>\r\nSubject: %s\r\n\r\n%s",
 		c.config.From, sanitizedTo, subject, body)
 
 	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
@@ -133,6 +147,11 @@ func sendMailWithTimeout(cfg SMTPConfig, addr string, auth smtp.Auth, from strin
 	}
 
 	if auth != nil {
+		// Timeout the AUTH exchange separately so a slow EHLO+AUTH
+		// doesn't block indefinitely.
+		if err := conn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
+			return err
+		}
 		if ok, _ := client.Extension("AUTH"); ok {
 			if err := client.Auth(auth); err != nil {
 				return err

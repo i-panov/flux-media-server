@@ -10,7 +10,7 @@ type Media struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
 	Title        string         `gorm:"index" json:"title"`
 	Filename     string         `gorm:"index" json:"filename"`
-	Year         int            `json:"year"`
+	Year      int       `gorm:"index" json:"year"`
 	Description  string         `gorm:"index" json:"description"`
 	Type         MediaType      `gorm:"index;type:text" json:"type"` // video, audio
 	Artists      []Artist       `gorm:"many2many:media_artists;" json:"artists"`
@@ -42,7 +42,7 @@ type Metadata struct {
 	ExternalID  string    `gorm:"index" json:"external_id"`
 	Source      string    `json:"source"` // tmdb, tvdb
 	Title       string    `json:"title"`
-	Year        int       `json:"year"`
+	Year      int       `gorm:"index" json:"year"`
 	Description string    `json:"description"`
 	PosterURL   string    `json:"poster_url"`
 	BackdropURL string    `json:"backdrop_url"`

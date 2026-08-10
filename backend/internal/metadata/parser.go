@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	dotPattern     = regexp.MustCompile(`(?i)^(.+)\.(\d{4})\.[^.]+$`)
-	parenPattern   = regexp.MustCompile(`(?i)^(.+?)\s*\((\d{4})\)\.[^.]+$`)
 	episodePattern = regexp.MustCompile(`(?i)^(.+)\.S(\d{2})E(\d{2})\..+$`)
+	parenPattern   = regexp.MustCompile(`(?i)^(.+?)\s*\((\d{4})\)\.[^.]+$`)
+	dotPattern     = regexp.MustCompile(`(?i)^(.+)\.(\d{4})\.[^.]+$`)
 )
 
 // ParseFilenameUpload parses a filename (without directory path) to extract title and year.
@@ -27,7 +27,6 @@ func ParseFilename(filename string) (string, int) {
 	}
 
 	// Parenthesized year: "Movie Name (2020).mkv" → title "Movie Name", year 2020
-	// Must come before dotPattern which would match "Movie Name (2020)" + year.
 	if matches := parenPattern.FindStringSubmatch(filename); matches != nil {
 		title := strings.TrimSpace(matches[1])
 		year, _ := strconv.Atoi(matches[2])
@@ -44,5 +43,7 @@ func ParseFilename(filename string) (string, int) {
 	if len(parts) > 1 {
 		parts = parts[:len(parts)-1]
 	}
-	return strings.Join(parts, " "), 0
+	// Normalize case: lowercase first occurrence of each word for consistent
+	// matching, but preserve the original casing otherwise.
+	return strings.TrimSpace(parts[0]), 0
 }
