@@ -17,45 +17,15 @@ void checkResponse(Response<dynamic> response, String defaultMessage) {
     throw const AuthException(message: 'Session expired');
   }
   if (response.statusCode != 200 && response.statusCode != 201) {
-    throw ServerException(
-      message: response.body is Map<String, dynamic>
-          ? (response.body as Map<String, dynamic>)['error'] as String? ??
-              defaultMessage
-          : defaultMessage,
-    );
-  }
-}
-
-/// Wraps an async operation, converting low-level exceptions into
-/// domain-level [AuthException], [NetworkException], or [ServerException].
-/// Retries once on [TokenRefreshedException] (token was just refreshed).
-Future<T> safeApiCall<T>(Future<T> Function() call) async {
-  try {
-    return await call();
-  } on TokenRefreshedException {
-    // Token was refreshed — retry with the new token
-    return call();
-  } on AuthException {
-    rethrow;
-  } on ServerException {
-    rethrow;
-  } on NetworkException {
-    rethrow;
-  } on SocketException catch (e) {
-    if (e.message.contains('Broken pipe') || e.message.contains('errno = 32')) {
-      throw const ServerException(
-        message: 'File too large for server to accept',
-      );
+    final body = response.body;
+    String? errorMessage;
+    if (body is Map<String, dynamic>) {
+      final error = body['error'];
+      errorMessage = error is String ? error : null;
     }
-    throw const NetworkException(message: 'No internet connection');
-  } on HttpException {
-    throw const NetworkException(message: 'Network error');
-  } on TimeoutException {
-    throw const NetworkException(message: 'Request timed out');
-  } on IOException {
-    throw const NetworkException(message: 'Network error');
-  } on Exception catch (e) {
-    throw ServerException(message: e.toString());
+    throw ServerException(
+      message: errorMessage ?? defaultMessage,
+    );
   }
 }
 
@@ -86,6 +56,9 @@ Future<Either<Failure, T>> safeRepositoryCall<T>(
   } on NetworkException catch (e) {
     return Left(NetworkFailure(message: e.message));
   } catch (e) {
+    if (e is Exception) {
+      return Left(ServerFailure(message: e.toString()));
+    }
     return Left(ServerFailure(message: e.toString()));
   }
 }

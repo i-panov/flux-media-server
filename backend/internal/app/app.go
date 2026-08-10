@@ -153,11 +153,18 @@ func New(cfg *config.Config, version string) (*App, error) {
 	// fasthttp buffers the whole request body in memory. The global BodyLimit
 	// equals the max upload size (potentially gigabytes), so cap the body size
 	// for all non-upload routes to prevent memory exhaustion.
+	// ContentLength == -1 means chunked/streamed — fasthttp will buffer the
+	// whole body anyway, so we reject those outright for non-upload routes.
 	fiberApp.Use(func(c *fiber.Ctx) error {
 		p := c.Path()
 		// Allow multipart uploads for media upload and cover upload.
 		if p == "/api/media/upload" || (c.Method() == "PUT" && strings.HasSuffix(p, "/cover")) {
 			return c.Next()
+		}
+		if c.Request().Header.ContentLength() == -1 {
+			return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{
+				"error": "Chunked/streamed request body not allowed",
+			})
 		}
 		if int64(c.Request().Header.ContentLength()) > maxAPIBodySize {
 			return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{

@@ -45,6 +45,9 @@ func (h *CollectionHandler) Create(c *fiber.Ctx) error {
 	if req.Type == "" {
 		req.Type = models.MediaTypeVideo
 	}
+	if !models.ParseMediaType(string(req.Type)).Valid() {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid type")
+	}
 
 	ctx := c.UserContext()
 	col := &models.Collection{
@@ -174,12 +177,19 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 	}
 
 	// Determine the next position in the collection.
-	items, err := h.itemRepo.FindByCollection(ctx, uint(collectionID))
+	// Use MAX(position)+1 from DB to handle gaps after deletions.
+	nextPos, err := h.itemRepo.MaxPosition(ctx, uint(collectionID))
 	if err != nil {
-		log.Printf("FindByCollection: %v", err)
+		log.Printf("MaxPosition: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to add item")
 	}
-	nextPos := len(items)
+	nextPos++
+
+	// Check for duplicate
+	existing, err := h.itemRepo.FindByCollectionAndMedia(ctx, uint(collectionID), req.MediaID)
+	if err == nil && existing != nil {
+		return response.Error(c, fiber.StatusConflict, "Media already in collection")
+	}
 
 	item := &models.CollectionItem{
 		CollectionID: uint(collectionID),

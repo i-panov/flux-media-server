@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -18,6 +20,7 @@ type WatcherService struct {
 	mu          sync.Mutex
 	ctx         context.Context
 	cancel      context.CancelFunc
+	isRunning   bool
 }
 
 // NewWatcherService creates a new WatcherService.
@@ -32,7 +35,18 @@ func NewWatcherService(scanner ScannerInterface) *WatcherService {
 }
 
 // StartWithPaths begins watching the given directory paths.
+// It is idempotent: if already running, it stops the old watcher and starts fresh.
 func (w *WatcherService) StartWithPaths(paths []string) error {
+	// Stop any existing watcher first (idempotent).
+	w.mu.Lock()
+	if w.isRunning {
+		w.cancel()
+		if w.watcher != nil {
+			w.watcher.Close()
+		}
+	}
+	w.mu.Unlock()
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -40,6 +54,7 @@ func (w *WatcherService) StartWithPaths(paths []string) error {
 
 	w.mu.Lock()
 	w.watcher = watcher
+	w.isRunning = true
 	w.mu.Unlock()
 
 	go w.loop()
@@ -52,17 +67,28 @@ func (w *WatcherService) StartWithPaths(paths []string) error {
 	return nil
 }
 
-// AddPath adds a directory to watch.
-func (w *WatcherService) AddPath(path string) {
+// AddPath adds a directory to watch, including all subdirectories recursively.
+func (w *WatcherService) AddPath(root string) {
 	w.mu.Lock()
 	watcher := w.watcher
 	w.mu.Unlock()
-	if watcher != nil {
-		if err := watcher.Add(path); err != nil {
-			log.Printf("watcher: add path %s: %v", path, err)
-		} else {
+	if watcher == nil {
+		return
+	}
+
+	// Walk the directory tree and add each directory to fsnotify.
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			_ = watcher.Add(path) // ignore errors for already-watched dirs
 			log.Printf("watcher: watching %s", path)
 		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("watcher: walk path %s: %v", root, err)
 	}
 }
 
@@ -79,8 +105,13 @@ func (w *WatcherService) RemovePath(path string) {
 
 // Stop stops the watcher and releases resources.
 func (w *WatcherService) Stop() {
-	w.cancel()
 	w.mu.Lock()
+	if !w.isRunning {
+		w.mu.Unlock()
+		return
+	}
+	w.isRunning = false
+	w.cancel()
 	watcher := w.watcher
 	w.mu.Unlock()
 	if watcher != nil {

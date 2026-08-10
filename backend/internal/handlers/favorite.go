@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"log"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -49,6 +50,12 @@ func (h *FavoriteHandler) AddFavorite(c *fiber.Ctx) error {
 
 	if err := h.favRepo.Create(ctx, fav); err != nil {
 		log.Printf("Create favorite: %v", err)
+		// UNIQUE violation on (user_id, media_id) means already favorited.
+		if isUniqueViolation(err) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"message": "Already in favorites",
+			})
+		}
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to add favorite")
 	}
 
@@ -155,10 +162,25 @@ func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 
 	if err := h.favRepo.Create(ctx, fav); err != nil {
 		log.Printf("Create artist favorite: %v", err)
+		if isUniqueViolation(err) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"message": "Already in favorites",
+			})
+		}
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to add artist favorite")
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fav)
+}
+
+// isUniqueViolation checks if the error is a SQLite UNIQUE constraint violation.
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "UNIQUE constraint failed") ||
+		strings.Contains(msg, "UNIQUE")
 }
 
 // RemoveArtistFavorite removes an artist from the user's favorites.

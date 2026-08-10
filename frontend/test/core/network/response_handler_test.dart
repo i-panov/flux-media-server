@@ -1,6 +1,3 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
@@ -9,70 +6,6 @@ import 'package:fpdart/fpdart.dart';
 
 void main() {
   group('Response Handler', () {
-    group('safeApiCall', () {
-      test('should return data for successful call', () async {
-        final result = await safeApiCall(() async => 'success');
-
-        expect(result, 'success');
-      });
-
-      test('should rethrow AuthException', () async {
-        expect(
-          () => safeApiCall(
-            () async => throw const AuthException(message: 'Auth failed'),
-          ),
-          throwsA(const TypeMatcher<AuthException>()),
-        );
-      });
-
-      test('should rethrow ServerException', () async {
-        expect(
-          () => safeApiCall(
-            () async => throw const ServerException(message: 'Server error'),
-          ),
-          throwsA(const TypeMatcher<ServerException>()),
-        );
-      });
-
-      test('should convert SocketException to NetworkException', () async {
-        expect(
-          () => safeApiCall(
-            () async => throw const SocketException('Connection failed'),
-          ),
-          throwsA(const TypeMatcher<NetworkException>()),
-        );
-      });
-
-      test('should convert HttpException to NetworkException', () async {
-        expect(
-          () =>
-              safeApiCall(() async => throw const HttpException('HTTP error')),
-          throwsA(const TypeMatcher<NetworkException>()),
-        );
-      });
-
-      test('should convert TimeoutException to NetworkException', () async {
-        expect(
-          () => safeApiCall(
-            () async => throw TimeoutException(
-              'Request timed out',
-              const Duration(seconds: 30),
-            ),
-          ),
-          throwsA(const TypeMatcher<NetworkException>()),
-        );
-      });
-
-      test('should convert IOException to NetworkException', () async {
-        expect(
-          () => safeApiCall(
-            () async => throw const FileSystemException('IO error'),
-          ),
-          throwsA(const TypeMatcher<NetworkException>()),
-        );
-      });
-    });
-
     group('safeRepositoryCall', () {
       test('should return Right(data) for successful call', () async {
         final result = await safeRepositoryCall(() async => 'success');

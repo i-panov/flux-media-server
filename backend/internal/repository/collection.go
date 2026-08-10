@@ -109,3 +109,25 @@ func (r *CollectionItemStore) Remove(ctx context.Context, collectionID, mediaID 
 		Where("collection_id = ? AND media_id = ?", collectionID, mediaID).
 		Delete(&models.CollectionItem{}).Error
 }
+
+func (r *CollectionItemStore) FindByCollectionAndMedia(ctx context.Context, collectionID, mediaID uint) (*models.CollectionItem, error) {
+	var item models.CollectionItem
+	err := r.db.WithContext(ctx).Where("collection_id = ? AND media_id = ?", collectionID, mediaID).First(&item).Error
+	return &item, err
+}
+
+func (r *CollectionItemStore) MaxPosition(ctx context.Context, collectionID uint) (int, error) {
+	var maxPos *int
+	err := r.db.WithContext(ctx).
+		Model(&models.CollectionItem{}).
+		Where("collection_id = ?", collectionID).
+		Select("MAX(position)").
+		Scan(&maxPos).Error
+	if err != nil {
+		return 0, err
+	}
+	if maxPos == nil {
+		return 0, nil
+	}
+	return *maxPos, nil
+}

@@ -285,19 +285,22 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 		probeData, probeErr := ffprobe.ProbeURL(probeCtx, path)
 		probeCancel()
 
-		mediaType := models.MediaTypeVideo
+		// Use a local `detectedType` to avoid shadowing the `mediaType`
+		// parameter — the parameter is the user-provided hint, while this
+		// variable holds the actual detected type from probing.
+		detectedType := models.MediaTypeVideo
 		if probeErr == nil {
-			mediaType = DetermineMediaTypeFromProbe(probeData)
+			detectedType = DetermineMediaTypeFromProbe(probeData)
 		} else {
 			log.Printf("Probe failed for %s: %v, using extension fallback", path, probeErr)
-			mediaType = determineMediaTypeByExt(path)
+			detectedType = determineMediaTypeByExt(path)
 		}
 
 		media := &models.Media{
 			Title:     title,
 			Filename:  filepath.Base(path),
 			Year:      year,
-			Type:      mediaType,
+			Type:      detectedType,
 			FilePath:  path,
 			FileSize:  info.Size(),
 			FileHash:  hash,

@@ -67,9 +67,11 @@ type CollectionRepository interface {
 // CollectionItemRepository defines data access methods for CollectionItem entities.
 type CollectionItemRepository interface {
 	FindByCollection(ctx context.Context, collectionID uint) ([]models.CollectionItem, error)
+	FindByCollectionAndMedia(ctx context.Context, collectionID, mediaID uint) (*models.CollectionItem, error)
 	FindMediaByCollection(ctx context.Context, collectionID uint) ([]models.Media, error)
 	Add(ctx context.Context, item *models.CollectionItem) error
 	Remove(ctx context.Context, collectionID, mediaID uint) error
+	MaxPosition(ctx context.Context, collectionID uint) (int, error)
 }
 
 // LyricsRepository defines data access methods for Lyrics entities.
