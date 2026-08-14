@@ -147,11 +147,6 @@ class _$AppSettingsImpl implements _AppSettings {
   final String locale;
 
   @override
-  String toString() {
-    return 'AppSettings(serverUrl: $serverUrl, authToken: $authToken, refreshToken: $refreshToken, locale: $locale)';
-  }
-
-  @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&

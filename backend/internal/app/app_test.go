@@ -89,7 +89,7 @@ func authReq(method, uri, token string) *http.Request {
 func TestHealthEndpoint(t *testing.T) {
 	application := newTestApp(t)
 
-	resp, err := application.Fiber.Test(httptest.NewRequest("GET", "/health", nil))
+	resp, err := application.Fiber.Test(httptest.NewRequest("GET", "/api/health", nil))
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 
@@ -98,6 +98,14 @@ func TestHealthEndpoint(t *testing.T) {
 	assert.Equal(t, "ok", body["status"])
 	// Version is only set when built with -ldflags; in tests it may be empty.
 	assert.Contains(t, map[string]string{"": "ok", "test": "ok"}, body["version"])
+}
+
+func TestLegacyHealthEndpointGone(t *testing.T) {
+	application := newTestApp(t)
+
+	resp, err := application.Fiber.Test(httptest.NewRequest("GET", "/health", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 }
 
 // --- Auth flow ---
@@ -252,4 +260,42 @@ func TestOTPStoreFull(t *testing.T) {
 
 	_, err = application.OTPStore.Generate("c@test.com")
 	assert.ErrorIs(t, err, services.ErrOTPStoreFull)
+}
+
+// --- Rate limiter ---
+
+func TestAuthRateLimiter(t *testing.T) {
+	cfg := &config.Config{
+		Server:   config.ServerConfig{Port: 0, Debug: true},
+		Database: config.DatabaseConfig{Path: ":memory:"},
+		Auth: config.AuthConfig{
+			JWTSecret:         "test-secret-that-is-at-least-32-characters-long",
+			CodeLength:        6,
+			CodeExpiry:        300,
+			MaxOTPEntries:     1000,
+			AllowUnknownEmail: true,
+		},
+		RateLimiter: config.RateLimiterConfig{Max: 3, Expiration: 60},
+		Media:       config.MediaConfig{VideoPath: t.TempDir() + "/video", AudioPath: t.TempDir() + "/audio"},
+	}
+	application, err := New(cfg, "test")
+	require.NoError(t, err)
+	t.Cleanup(application.Shutdown)
+
+	// Первые Max запросов проходят...
+	for i := 0; i < 3; i++ {
+		b, _ := json.Marshal(map[string]string{"email": "ratelimit@example.com"})
+		req := testReq("POST", "/api/auth/request-code", bytes.NewReader(b))
+		resp, err := application.Fiber.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode, "request %d should pass", i+1)
+		resp.Body.Close()
+	}
+
+	// ...а следующий получает 429.
+	b, _ := json.Marshal(map[string]string{"email": "ratelimit@example.com"})
+	req := testReq("POST", "/api/auth/request-code", bytes.NewReader(b))
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusTooManyRequests, resp.StatusCode)
 }

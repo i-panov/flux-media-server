@@ -48,6 +48,34 @@ func (s *ThumbnailService) GetCoverPath(mediaID uint) string {
 	return filepath.Join(s.thumbnailsDir, fmt.Sprintf("%d_cover.jpg", mediaID))
 }
 
+// CoverPathForExt возвращает путь к обложке с заданным расширением.
+// Используется UploadCover для сохранения файла с фактическим форматом.
+func (s *ThumbnailService) CoverPathForExt(mediaID uint, ext string) string {
+	return filepath.Join(s.thumbnailsDir, fmt.Sprintf("%d_cover%s", mediaID, ext))
+}
+
+// FindCoverPath возвращает путь к существующей обложке (jpg/png/webp)
+// или пустую строку, если обложки нет.
+func (s *ThumbnailService) FindCoverPath(mediaID uint) string {
+	for _, ext := range []string{".jpg", ".png", ".webp"} {
+		p := s.CoverPathForExt(mediaID, ext)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// RemoveCovers удаляет все файлы обложек для mediaID (все известные форматы).
+func (s *ThumbnailService) RemoveCovers(mediaID uint) {
+	for _, ext := range []string{".jpg", ".png", ".webp"} {
+		p := s.CoverPathForExt(mediaID, ext)
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			log.Printf("thumb: remove cover %s: %v", p, err)
+		}
+	}
+}
+
 // GetPath returns the thumbnail path for a media ID.
 func (s *ThumbnailService) GetPath(mediaID uint) string {
 	return filepath.Join(s.thumbnailsDir, fmt.Sprintf("%d.jpg", mediaID))

@@ -1,6 +1,6 @@
-import 'package:flux_media_server/features/settings/data/datasources/settings_local_datasource.dart';
-import 'package:flux_media_server/features/settings/domain/entities/app_settings.dart';
-import 'package:flux_media_server/features/settings/domain/repositories/settings_repository.dart';
+import 'package:flux_media_server/core/session/app_settings.dart';
+import 'package:flux_media_server/core/session/settings_local_datasource.dart';
+import 'package:flux_media_server/core/session/settings_repository.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
   SettingsRepositoryImpl(this._localDataSource);

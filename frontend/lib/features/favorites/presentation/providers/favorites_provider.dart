@@ -10,7 +10,7 @@ import 'package:flux_media_server/shared/models/favorite.dart';
 
 final favoritesRemoteDataSourceProvider =
     Provider<FavoritesRemoteDataSource>((ref) {
-  return FavoritesRemoteDataSource(ref.watch(apiClientProvider));
+  return FavoritesRemoteDataSource(ref.watch(libraryApiClientProvider));
 });
 
 final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
@@ -31,16 +31,49 @@ final removeFavoriteProvider = Provider<RemoveFavorite>((ref) {
   return RemoveFavorite(ref.watch(favoritesRepositoryProvider));
 });
 
+/// Избранное текущего пользователя.
+///
+/// Notifier-обёртка нужна для локальных мутаций кеша при toggle: после
+/// успешного add/remove мы обновляем список напрямую (без лишнего GET).
+class FavoritesNotifier extends AutoDisposeAsyncNotifier<List<Favorite>> {
+  @override
+  Future<List<Favorite>> build() async {
+    final getFavorites = ref.watch(getFavoritesProvider);
+    final result = await getFavorites(const GetFavoritesParams());
+    return result.fold(
+      (failure) => throw Exception(failure.message),
+      (favorites) => favorites,
+    );
+  }
+
+  /// Добавляет [favorite] в кеш без сетевого запроса.
+  void addLocal(Favorite favorite) {
+    final current = state.valueOrNull;
+    if (current == null) {
+      // Данные ещё не загружены — перечитываем с сервера.
+      ref.invalidateSelf();
+      return;
+    }
+    if (current.any((f) => f.mediaId == favorite.mediaId)) return;
+    state = AsyncValue.data([...current, favorite]);
+  }
+
+  /// Удаляет избранное [mediaId] из кеша без сетевого запроса.
+  void removeLocal(int mediaId) {
+    final current = state.valueOrNull;
+    if (current == null) {
+      ref.invalidateSelf();
+      return;
+    }
+    state = AsyncValue.data(
+      current.where((f) => f.mediaId != mediaId).toList(),
+    );
+  }
+}
+
 /// Fetches all favorites for the current user.
-final favoritesProvider =
-    FutureProvider.autoDispose<List<Favorite>>((ref) async {
-  final getFavorites = ref.watch(getFavoritesProvider);
-  final result = await getFavorites(const GetFavoritesParams());
-  return result.fold(
-    (failure) => throw Exception(failure.message),
-    (favorites) => favorites,
-  );
-});
+final favoritesProvider = AsyncNotifierProvider.autoDispose<FavoritesNotifier,
+    List<Favorite>>(FavoritesNotifier.new);
 
 /// Tracks favorite media IDs for quick lookup.
 final favoriteMediaIdsProvider =

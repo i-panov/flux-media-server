@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
+import 'package:flux_media_server/core/session/settings_provider.dart';
 
 /// Adds Bearer token to outgoing requests by reading it from Riverpod state.
 class AuthInterceptor implements RequestInterceptor {

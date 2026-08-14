@@ -9,6 +9,7 @@ import 'package:flux_media_server/features/player/data/providers/play_queue_prov
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/player/presentation/widgets/audio_mini_player.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
@@ -38,11 +39,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
         ref.read(playQueueProvider.notifier).setQueue([widget.media]);
       }
     });
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   @override
@@ -95,6 +91,11 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
   final _controller = TextEditingController();
   bool _isSaving = false;
 
+  /// Кеш разбора LRC-синхронизации: парсим один раз на загрузку текста,
+  /// а не на каждый тик позиции.
+  String? _parsedSyncKey;
+  List<({Duration time, String text})> _parsedSync = [];
+
   @override
   void dispose() {
     _controller.dispose();
@@ -112,15 +113,22 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
 
     // Preserve existing translation and sync_data — the user may only be
     // editing the lyrics text and we don't want to overwrite those fields.
-    final lyricsState = ref.read(lyricsProvider(widget.media.id));
-    final existingLyrics = lyricsState.valueOrNull;
+    // Ждём загрузки lyricsProvider, чтобы не затереть поля пустыми
+    // значениями (ref.read(...).valueOrNull — гонка).
+    Lyrics? existing;
+    try {
+      final loaded = await ref.read(lyricsProvider(widget.media.id).future);
+      existing = loaded.lyrics;
+    } catch (_) {
+      existing = null;
+    }
 
     final result = await upsert(
       UpsertLyricsParams(
         mediaId: widget.media.id,
         lyricsText: _controller.text,
-        translation: existingLyrics?.translation,
-        syncData: existingLyrics?.syncData,
+        translation: existing?.translation,
+        syncData: existing?.syncData,
         source: 'user',
       ),
     );
@@ -197,65 +205,98 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
       );
     }
 
-    return lyricsState.maybeWhen(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text(l.errorLoadingLyrics)),
-      data: (lyrics) {
-        final text = lyrics?.lyricsText ?? '';
-        final syncData = lyrics?.syncData ?? '';
-
-        if (text.isEmpty && syncData.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(l.noLyricsAvailable),
-                const SizedBox(height: 16),
-                FilledButton.tonal(
-                  onPressed: () => _startEditing(''),
-                  child: Text(l.editLyrics),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final syncLines = _parseLyricsSync(syncData);
-
-        return Stack(
+    // Сетевая ошибка — различимое состояние, не «нет лирики».
+    if (lyricsState.hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (syncLines.isEmpty)
-              SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  text,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              _SyncedLyricsView(
-                syncLines: syncLines,
-                playbackState:
-                    playbackState is PlaybackPlaying ? playbackState : null,
-              ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: l.editLyrics,
-                onPressed: () => _startEditing(text),
-              ),
+            Text(l.errorLoadingLyrics),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(lyricsProvider(widget.media.id)),
+              child: Text(l.retry),
             ),
           ],
-        );
-      },
-      orElse: () => const SizedBox.shrink(),
+        ),
+      );
+    }
+
+    final result = lyricsState.valueOrNull;
+    if (result == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final lyrics = result.lyrics;
+    final text = lyrics?.lyricsText ?? '';
+    final syncData = lyrics?.syncData ?? '';
+
+    if (text.isEmpty && syncData.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(l.noLyricsAvailable),
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: () => _startEditing(''),
+              child: Text(l.editLyrics),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final syncLines = _parseLyricsSync(syncData);
+
+    return Stack(
+      children: [
+        if (syncLines.isEmpty)
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          _SyncedLyricsView(
+            syncLines: syncLines,
+            playbackState:
+                playbackState is PlaybackPlaying ? playbackState : null,
+          ),
+        if (result.fromCache)
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Chip(
+              label: Text(
+                l.offlineCopy,
+                style: const TextStyle(fontSize: 12),
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: l.editLyrics,
+            onPressed: () => _startEditing(text),
+          ),
+        ),
+      ],
     );
   }
 
   List<({Duration time, String text})> _parseLyricsSync(String syncData) {
+    if (syncData == _parsedSyncKey) return _parsedSync;
+    _parsedSyncKey = syncData;
+    return _parsedSync = _doParseLyricsSync(syncData);
+  }
+
+  List<({Duration time, String text})> _doParseLyricsSync(String syncData) {
     if (syncData.isEmpty) return [];
     final lines = syncData.split('\n');
     final result = <({Duration time, String text})>[];
@@ -365,8 +406,14 @@ class _TranslationTabState extends ConsumerState<_TranslationTab> {
 
   Future<void> _save() async {
     setState(() => _isSaving = true);
-    final lyricsState = ref.read(lyricsProvider(widget.media.id));
-    final existing = lyricsState.valueOrNull;
+    // Ждём загрузки lyricsProvider: не затираем поля пустыми значениями.
+    Lyrics? existing;
+    try {
+      final loaded = await ref.read(lyricsProvider(widget.media.id).future);
+      existing = loaded.lyrics;
+    } catch (_) {
+      existing = null;
+    }
     final upsert = ref.read(upsertLyricsProvider);
     final result = await upsert(
       UpsertLyricsParams(
@@ -449,50 +496,77 @@ class _TranslationTabState extends ConsumerState<_TranslationTab> {
       );
     }
 
-    return lyricsState.maybeWhen(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text(l.errorLoadingTranslation)),
-      data: (lyrics) {
-        final text = lyrics?.translation ?? '';
-
-        if (text.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(l.noTranslationAvailable),
-                const SizedBox(height: 16),
-                FilledButton.tonal(
-                  onPressed: () => _startEditing(''),
-                  child: Text(l.editTranslation),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Stack(
+    // Сетевая ошибка — различимое состояние, не «нет перевода».
+    if (lyricsState.hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                text,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: l.editTranslation,
-                onPressed: () => _startEditing(text),
-              ),
+            Text(l.errorLoadingTranslation),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.invalidate(lyricsProvider(widget.media.id)),
+              child: Text(l.retry),
             ),
           ],
-        );
-      },
-      orElse: () => const SizedBox.shrink(),
+        ),
+      );
+    }
+
+    final result = lyricsState.valueOrNull;
+    if (result == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final lyrics = result.lyrics;
+    final text = lyrics?.translation ?? '';
+
+    if (text.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(l.noTranslationAvailable),
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: () => _startEditing(''),
+              child: Text(l.editTranslation),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ),
+        if (result.fromCache)
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Chip(
+              label: Text(
+                l.offlineCopy,
+                style: const TextStyle(fontSize: 12),
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: l.editTranslation,
+            onPressed: () => _startEditing(text),
+          ),
+        ),
+      ],
     );
   }
 }

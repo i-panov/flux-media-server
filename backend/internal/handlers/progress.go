@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 
+	"flux/internal/middleware"
 	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -14,20 +15,24 @@ import (
 
 type ProgressHandler struct {
 	progressRepo repository.ProgressRepository
+	mediaRepo    repository.MediaRepository
 }
 
-func NewProgressHandler(progressRepo repository.ProgressRepository) *ProgressHandler {
+func NewProgressHandler(progressRepo repository.ProgressRepository, mediaRepo repository.MediaRepository) *ProgressHandler {
 	return &ProgressHandler{
 		progressRepo: progressRepo,
+		mediaRepo:    mediaRepo,
 	}
 }
 
 type UpdateProgressRequest struct {
-	Position int `json:"position"`
+	Position  int  `json:"position"`
+	Duration  int  `json:"duration"`  // общая длительность в секундах
+	Completed bool `json:"completed"` // просмотрено до конца
 }
 
 func (h *ProgressHandler) List(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -60,7 +65,7 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *ProgressHandler) Update(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -77,8 +82,17 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 	if req.Position < 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Position must be non-negative")
 	}
+	if req.Duration < 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Duration must be non-negative")
+	}
 
 	ctx := c.UserContext()
+
+	// Проверяем существование медиа до создания/обновления прогресса.
+	if _, err := h.mediaRepo.FindByID(ctx, uint(mediaID)); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Media not found")
+	}
+
 	progress, err := h.progressRepo.FindByUserAndMedia(ctx, userID, uint(mediaID))
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -92,6 +106,8 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 	}
 
 	progress.Position = req.Position
+	progress.Duration = req.Duration
+	progress.Completed = req.Completed
 
 	if err := h.progressRepo.Upsert(ctx, progress); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to update progress")
@@ -101,7 +117,7 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 }
 
 func (h *ProgressHandler) Delete(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}

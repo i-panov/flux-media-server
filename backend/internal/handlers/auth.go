@@ -12,6 +12,7 @@ import (
 
 	"flux/internal/config"
 	"flux/internal/email"
+	"flux/internal/middleware"
 	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -20,7 +21,7 @@ import (
 
 type AuthHandler struct {
 	userRepo       repository.UserRepository
-	refreshTokenDB *repository.RefreshTokenRepository
+	refreshTokenDB repository.RefreshTokenRepository
 	otpStore       services.OTPStoreInterface
 	jwtService     services.JWTService
 	smtpClient     *email.SMTPClient
@@ -29,7 +30,7 @@ type AuthHandler struct {
 
 func NewAuthHandler(
 	userRepo repository.UserRepository,
-	refreshTokenRepo *repository.RefreshTokenRepository,
+	refreshTokenRepo repository.RefreshTokenRepository,
 	otpStore services.OTPStoreInterface,
 	jwtService services.JWTService,
 	smtpClient *email.SMTPClient,
@@ -105,6 +106,9 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 			expiryMinutes = 1
 		}
 		if err := h.smtpClient.SendCode(req.Email, code, expiryMinutes); err != nil {
+			// Письмо не ушло — удаляем сгенерированный код из стора, чтобы
+			// не оставлять рабочий OTP без уведомления пользователя.
+			h.otpStore.Remove(req.Email)
 			return response.Error(c, fiber.StatusInternalServerError, "Failed to send code")
 		}
 	}
@@ -163,7 +167,7 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) Me(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -185,7 +189,7 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 // specific token is revoked; otherwise all tokens of the current user are
 // deleted (full logout).
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -193,7 +197,9 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	var req struct {
 		RefreshTokenID *uint `json:"refresh_token_id"`
 	}
-	c.BodyParser(&req)
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
 
 	ctx := c.UserContext()
 	if req.RefreshTokenID != nil {

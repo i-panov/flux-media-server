@@ -10,6 +10,8 @@ import 'package:flux_media_server/features/favorites/presentation/providers/favo
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
+import 'package:flux_media_server/features/offline/presentation/widgets/download_toggle.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
@@ -83,22 +85,36 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     });
 
     var downloaded = 0;
-    for (final track in tracks) {
-      if (!mounted) break;
-      final cached =
-          await ref.read(offlineCacheServiceProvider).isCached(track.id);
-      if (!cached) {
+    final pending = List<Media>.from(tracks);
+
+    // Параллельные загрузки с лимитом 4: не грузим все сразу.
+    const concurrency = 4;
+    Future<void> worker() async {
+      while (pending.isNotEmpty) {
+        if (!mounted) return;
+        final track = pending.removeAt(0);
+
+        // Уже скачанные пропускаем (и не считаем).
+        final cached =
+            await ref.read(offlineCacheServiceProvider).isCached(track.id);
+        if (cached) continue;
+
         await ref
             .read(downloadNotifierProvider(track.id).notifier)
             .download(track);
+        final state = ref.read(downloadNotifierProvider(track.id));
+        if (state is DownloadDownloaded) downloaded++;
       }
-      if (!mounted) break;
-      downloaded++;
-      setState(() => _downloadedCount = downloaded);
     }
 
+    await Future.wait(List.generate(concurrency, (_) => worker()));
+
     if (mounted) {
-      setState(() => _downloadingAll = false);
+      // Один setState по завершении — не на каждый трек.
+      setState(() {
+        _downloadingAll = false;
+        _downloadedCount = downloaded;
+      });
       final l = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -111,24 +127,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
   }
 
   void _toggleDownload(int mediaId) {
-    final downloadState = ref.read(downloadNotifierProvider(mediaId));
-    if (downloadState is DownloadDownloaded) {
-      ref.read(downloadNotifierProvider(mediaId).notifier).remove(mediaId);
-    } else if (downloadState is! DownloadDownloading) {
-      final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
-      if (mediaList != null) {
-        final media = mediaList.items.firstWhere(
-          (m) => m.id == mediaId,
-          orElse: () => Media(
-            id: mediaId,
-            title: '',
-            type: MediaType.audio,
-            fileSize: 0,
-          ),
-        );
-        ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
-      }
-    }
+    toggleDownload(ref, mediaId: mediaId, mediaType: _mediaType);
   }
 
   @override
@@ -168,7 +167,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
 
   VoidCallback? _buildDownloadAll(AsyncValue<MediaListResult> mediaListState) {
     if (mediaListState.valueOrNull == null) return null;
-    final mediaList = mediaListState.value!;
+    final mediaList = mediaListState.valueOrNull!;
     final tracks = mediaList.items
         .where(
           (m) =>
@@ -265,7 +264,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         ref
           ..invalidate(mediaListProvider(_mediaType))
           ..invalidate(favoritesProvider);
-        await ref.watch(mediaListProvider(_mediaType).future);
+        // Ошибка уже отражена в состоянии провайдера.
+        try {
+          await ref.watch(mediaListProvider(_mediaType).future);
+        } catch (_) {}
       },
       child: CustomScrollView(
         controller: _scrollController,
@@ -283,8 +285,12 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
                     onFavorite: () => _toggleFavorite(track.id),
                     onDownload: () => _toggleDownload(track.id),
                     onAddToQueue: () => _addToQueue(track),
-                    onAddToCollection: () =>
-                        showAddToCollectionDialog(context, ref, track.id, mediaType: 'audio'),
+                    onAddToCollection: () => showAddToCollectionDialog(
+                      context,
+                      ref,
+                      track.id,
+                      mediaType: 'audio',
+                    ),
                     onEditMetadata: () =>
                         showEditMetadataDialog(context, ref, track),
                     onDetails: () => context.router.push(
@@ -308,8 +314,12 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
                     onFavorite: () => _toggleFavorite(track.id),
                     onDownload: () => _toggleDownload(track.id),
                     onAddToQueue: () => _addToQueue(track),
-                    onAddToCollection: () =>
-                        showAddToCollectionDialog(context, ref, track.id, mediaType: 'audio'),
+                    onAddToCollection: () => showAddToCollectionDialog(
+                      context,
+                      ref,
+                      track.id,
+                      mediaType: 'audio',
+                    ),
                     onEditMetadata: () =>
                         showEditMetadataDialog(context, ref, track),
                     onDetails: () => context.router.push(

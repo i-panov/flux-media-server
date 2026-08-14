@@ -1,18 +1,17 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
-import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/artist_card.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
-import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
+import 'package:flux_media_server/features/offline/presentation/widgets/download_toggle.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
@@ -44,13 +43,21 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
 
   void _onScroll() {
     final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent * 0.8) {
+    if (position.maxScrollExtent > 0 &&
+        position.pixels >= position.maxScrollExtent * 0.8) {
       ref.read(mediaListProvider(_mediaType).notifier).loadMore();
     }
   }
 
-  void _playTrack(List<Media> queue, int index) {
-    ref.read(playQueueProvider.notifier).setQueue(queue, startIndex: index);
+  /// Очередь воспроизведения строится из ВСЕХ загруженных элементов
+  /// списка (текущее состояние провайдера), а не из секции.
+  void _playTrack(Media media, List<Media> fallbackQueue) {
+    final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
+    final queue = mediaList?.items.toList() ?? fallbackQueue;
+    final index = queue.indexWhere((m) => m.id == media.id);
+    ref
+        .read(playQueueProvider.notifier)
+        .setQueue(queue, startIndex: index < 0 ? 0 : index);
   }
 
   void _addToQueue(Media media) {
@@ -66,24 +73,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
   }
 
   void _toggleDownload(int mediaId) {
-    final downloadState = ref.read(downloadNotifierProvider(mediaId));
-    if (downloadState is DownloadDownloaded) {
-      ref.read(downloadNotifierProvider(mediaId).notifier).remove(mediaId);
-    } else if (downloadState is! DownloadDownloading) {
-      final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
-      if (mediaList != null) {
-        final media = mediaList.items.firstWhere(
-          (m) => m.id == mediaId,
-          orElse: () => Media(
-            id: mediaId,
-            title: '',
-            type: MediaType.audio,
-            fileSize: 0,
-          ),
-        );
-        ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
-      }
-    }
+    toggleDownload(ref, mediaId: mediaId, mediaType: _mediaType);
   }
 
   @override
@@ -136,6 +126,63 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     required MediaListResult? mediaListState,
     required AsyncValue<List<Favorite>> favoritesState,
   }) {
+    final isOffline = ref.watch(isOfflineProvider);
+
+    // Офлайн: сразу показываем скачанные треки из кеша, не ждём
+    // провала API (иначе здесь был бы вечный спиннер).
+    if (isOffline) {
+      final downloadsState = ref.watch(downloadsProvider);
+      if (downloadsState.isLoading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final downloadedMedia = downloadsState.valueOrNull ?? [];
+      final downloadedAudio =
+          downloadedMedia.where((m) => m.type == MediaType.audio).toList();
+      if (downloadedAudio.isEmpty) {
+        return Center(
+          child: Text(
+            l.noMediaFound,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: Colors.grey),
+          ),
+        );
+      }
+      return RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(downloadsProvider.notifier).refresh();
+        },
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: _SectionHeader(
+                icon: Icons.download,
+                title: l.downloads,
+              ),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => AudioTrackRow(
+                  media: downloadedAudio[index],
+                  onPlay: () =>
+                      _playTrack(downloadedAudio[index], downloadedAudio),
+                  onDownload: () =>
+                      _toggleDownload(downloadedAudio[index].id),
+                  onAddToQueue: () => _addToQueue(downloadedAudio[index]),
+                  onDetails: () => context.router.push(
+                    MediaDetailRoute(mediaId: downloadedAudio[index].id),
+                  ),
+                ),
+                childCount: downloadedAudio.length,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (mediaListState == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -143,8 +190,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final isOffline = ref.watch(isOfflineProvider);
-    final hasError = !isOffline && favoritesState.hasError;
+    final hasError = favoritesState.hasError;
     if (hasError) {
       return Center(
         child: Column(
@@ -171,8 +217,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
 
     final favorites = favoritesState.valueOrNull ?? [];
 
-    // Downloaded tracks — shown as main list when offline,
-    // as a section when online.
+    // Downloaded tracks — shown as a section when online.
     final downloadsState = ref.watch(downloadsProvider);
     final downloadedMedia = downloadsState.valueOrNull ?? [];
     final downloadedAudio =
@@ -232,7 +277,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
         ref
           ..invalidate(mediaListProvider(_mediaType))
           ..invalidate(favoritesProvider);
-        await ref.watch(mediaListProvider(_mediaType).future);
+        // Ошибка уже отражена в состоянии провайдера.
+        try {
+          await ref.watch(mediaListProvider(_mediaType).future);
+        } catch (_) {}
       },
       child: CustomScrollView(
         controller: _scrollController,
@@ -266,16 +314,16 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                 (context, index) => AudioTrackRow(
                   media: likedTracks[index],
                   isFavorite: true,
-                  onPlay: () => _playTrack(likedTracks, index),
+                  onPlay: () => _playTrack(likedTracks[index], allTracks),
                   onFavorite: () => _toggleFavorite(likedTracks[index].id),
                   onDownload: () => _toggleDownload(likedTracks[index].id),
                   onAddToQueue: () => _addToQueue(likedTracks[index]),
-                   onAddToCollection: () => showAddToCollectionDialog(
-                     context,
-                     ref,
-                     likedTracks[index].id,
-                     mediaType: 'audio',
-                   ),
+                  onAddToCollection: () => showAddToCollectionDialog(
+                    context,
+                    ref,
+                    likedTracks[index].id,
+                    mediaType: 'audio',
+                  ),
                   onEditMetadata: () =>
                       showEditMetadataDialog(context, ref, likedTracks[index]),
                   onDetails: () => context.router
@@ -316,7 +364,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
               ),
             ),
           ],
-          if (downloadedAudio.isNotEmpty && !isOffline) ...[
+          if (downloadedAudio.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: _SectionHeader(
                 icon: Icons.download,
@@ -329,16 +377,18 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                   media: downloadedAudio[index],
                   isFavorite:
                       favoriteMediaIds.contains(downloadedAudio[index].id),
-                  onPlay: () => _playTrack(downloadedAudio, index),
-                  onFavorite: () => _toggleFavorite(downloadedAudio[index].id),
-                  onDownload: () => _toggleDownload(downloadedAudio[index].id),
+                  onPlay: () => _playTrack(downloadedAudio[index], allTracks),
+                  onFavorite: () =>
+                      _toggleFavorite(downloadedAudio[index].id),
+                  onDownload: () =>
+                      _toggleDownload(downloadedAudio[index].id),
                   onAddToQueue: () => _addToQueue(downloadedAudio[index]),
-                   onAddToCollection: () => showAddToCollectionDialog(
-                     context,
-                     ref,
-                     downloadedAudio[index].id,
-                     mediaType: 'audio',
-                   ),
+                  onAddToCollection: () => showAddToCollectionDialog(
+                    context,
+                    ref,
+                    downloadedAudio[index].id,
+                    mediaType: 'audio',
+                  ),
                   onEditMetadata: () => showEditMetadataDialog(
                     context,
                     ref,
@@ -352,87 +402,36 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
               ),
             ),
           ],
-          // Offline mode: show downloaded as the only list.
-          if (isOffline && downloadedAudio.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: _SectionHeader(
-                icon: Icons.download,
-                title: l.downloads,
-              ),
+          SliverToBoxAdapter(
+            child: _SectionHeader(
+              icon: Icons.music_note,
+              title: l.allTracks,
             ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => AudioTrackRow(
-                  media: downloadedAudio[index],
-                  onPlay: () => _playTrack(downloadedAudio, index),
-                  onDownload: () => _toggleDownload(downloadedAudio[index].id),
-                  onAddToQueue: () => _addToQueue(downloadedAudio[index]),
-                  onDetails: () => context.router.push(
-                    MediaDetailRoute(mediaId: downloadedAudio[index].id),
-                  ),
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => AudioTrackRow(
+                media: allTracks[index],
+                isFavorite: favoriteMediaIds.contains(allTracks[index].id),
+                onPlay: () => _playTrack(allTracks[index], allTracks),
+                onFavorite: () => _toggleFavorite(allTracks[index].id),
+                onDownload: () => _toggleDownload(allTracks[index].id),
+                onAddToQueue: () => _addToQueue(allTracks[index]),
+                onAddToCollection: () => showAddToCollectionDialog(
+                  context,
+                  ref,
+                  allTracks[index].id,
+                  mediaType: 'audio',
                 ),
-                childCount: downloadedAudio.length,
+                onEditMetadata: () =>
+                    showEditMetadataDialog(context, ref, allTracks[index]),
+                onDetails: () => context.router
+                    .push(MediaDetailRoute(mediaId: allTracks[index].id)),
               ),
+              childCount: allTracks.length,
             ),
-          ],
-          if (!isOffline) ...[
-            SliverToBoxAdapter(
-              child: _SectionHeader(
-                icon: Icons.music_note,
-                title: l.allTracks,
-              ),
-            ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => AudioTrackRow(
-                  media: allTracks[index],
-                  isFavorite: favoriteMediaIds.contains(allTracks[index].id),
-                  onPlay: () => _playTrack(allTracks, index),
-                  onFavorite: () => _toggleFavorite(allTracks[index].id),
-                  onDownload: () => _toggleDownload(allTracks[index].id),
-                  onAddToQueue: () => _addToQueue(allTracks[index]),
-                   onAddToCollection: () => showAddToCollectionDialog(
-                     context,
-                     ref,
-                     allTracks[index].id,
-                     mediaType: 'audio',
-                   ),
-                  onEditMetadata: () =>
-                      showEditMetadataDialog(context, ref, allTracks[index]),
-                  onDetails: () => context.router
-                      .push(MediaDetailRoute(mediaId: allTracks[index].id)),
-                ),
-                childCount: allTracks.length,
-              ),
-            ),
-          ],
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSkeletonList(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 6,
-      itemBuilder: (context, index) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            SkeletonWidget(width: 48, height: 48, borderRadius: 8),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SkeletonWidget(height: 14, width: double.infinity),
-                  SizedBox(height: 6),
-                  SkeletonWidget(height: 10, width: 120),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

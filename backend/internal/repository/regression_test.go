@@ -18,7 +18,9 @@ func TestFavoriteStore_MultipleMediaFavorites(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
-	// Create media records so FK constraints are satisfied.
+	// Create user and media records so FK constraints are satisfied.
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
+	require.NoError(t, db.Create(&models.User{ID: 2, Email: "u2@test.com"}).Error)
 	require.NoError(t, db.Create(&models.Media{ID: 10, Title: "Test1"}).Error)
 	require.NoError(t, db.Create(&models.Media{ID: 11, Title: "Test2"}).Error)
 
@@ -52,7 +54,8 @@ func TestProgressStore_UpsertNoDuplicates(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
-	// Create media so FK constraint is satisfied.
+	// Create user and media so FK constraints are satisfied.
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
 	require.NoError(t, db.Create(&models.Media{ID: 10, Title: "Test"}).Error)
 
 	// Direct duplicate insert must fail on the unique index.

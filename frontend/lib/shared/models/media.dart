@@ -25,13 +25,15 @@ MediaType _mediaTypeFromValue(String value) {
     case 'audio':
       return MediaType.audio;
     default:
-      return MediaType.video;
+      // Не маскируем нераспознанные значения под video.
+      return MediaType.unknown;
   }
 }
 
 enum MediaType {
   video('video'),
-  audio('audio');
+  audio('audio'),
+  unknown('');
 
   const MediaType(this.value);
   final String value;
@@ -46,7 +48,6 @@ class Media with _$Media {
     @JsonKey(name: 'file_size') required int fileSize,
     @JsonKey(name: 'filename') @Default('') String filename,
     int? year,
-    @JsonKey(name: 'file_path') @Default('') String filePath,
     String? description,
     int? duration,
     @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,

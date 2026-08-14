@@ -1,4 +1,4 @@
-import 'package:flux_media_server/core/network/api_client.dart';
+import 'package:flux_media_server/core/network/library_api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -6,7 +6,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 class CollectionsRemoteDataSource {
   CollectionsRemoteDataSource(this.apiClient);
 
-  final ApiClient apiClient;
+  final LibraryApiClient apiClient;
 
   Future<List<Collection>> getCollections() async {
     final response = await apiClient.getCollections();

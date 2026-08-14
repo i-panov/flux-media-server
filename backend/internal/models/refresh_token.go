@@ -9,4 +9,6 @@ type RefreshToken struct {
 	Token     string    `json:"-" gorm:"uniqueIndex;size:512"`
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
+	// FK-ассоциация с каскадным удалением (для новых инсталляций).
+	User *User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
 }

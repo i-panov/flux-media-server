@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -238,14 +239,15 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 				}
 			}
 
-			// Regenerate thumbnail for changed file.
+			// Regenerate thumbnail for changed file. В БД сохраняем
+			// относительный URL — фронтенд строит полный адрес сам.
 			if thumbPath := s.thumbService.Generate(existing.ID, path); thumbPath != "" {
-				existing.ThumbnailURL = thumbPath
+				existing.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", existing.ID)
 			}
 
 			// Extract embedded cover art (if file has one).
 			if coverPath := s.thumbService.ExtractCover(existing.ID, path); coverPath != "" {
-				existing.CoverURL = coverPath
+				existing.CoverURL = fmt.Sprintf("/api/media/%d/cover", existing.ID)
 			}
 
 			if err := s.mediaRepo.Update(ctx, existing); err != nil {
@@ -342,9 +344,10 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 			}
 		}
 
-		// Generate thumbnail.
+		// Generate thumbnail. В БД сохраняем относительный URL — фронтенд
+		// строит полный адрес сам.
 		if thumbPath := s.thumbService.Generate(media.ID, path); thumbPath != "" {
-			media.ThumbnailURL = thumbPath
+			media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
 			if err := s.mediaRepo.Update(ctx, media); err != nil {
 				log.Printf("Error updating media thumbnail for %s: %v", path, err)
 			}

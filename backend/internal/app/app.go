@@ -98,7 +98,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, otpStore, jwtService, smtpClient, cfg)
-	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer, thumbSvc)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
 	uploadHandler := handlers.NewUploadHandler(mediaRepo, scanner, thumbSvc, cfg.Media, handlers.UploadConfig{
 		MaxFileSize: cfg.Server.MaxUploadSize,
@@ -112,11 +112,11 @@ func New(cfg *config.Config, version string) (*App, error) {
 		return nil, fmt.Errorf("create audio dir: %w", err)
 	}
 
-	progressHandler := handlers.NewProgressHandler(progressRepo)
+	progressHandler := handlers.NewProgressHandler(progressRepo, mediaRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
 	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
-	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo)
+	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
 	artistHandler := handlers.NewArtistHandler(artistRepo)
 
 	// Fiber app
@@ -155,10 +155,15 @@ func New(cfg *config.Config, version string) (*App, error) {
 	// for all non-upload routes to prevent memory exhaustion.
 	// ContentLength == -1 means chunked/streamed — fasthttp will buffer the
 	// whole body anyway, so we reject those outright for non-upload routes.
+	// Исключения задаются по конкретным зарегистрированным путям:
+	// POST /api/media/upload и PUT /api/media/:id/cover (multipart).
 	fiberApp.Use(func(c *fiber.Ctx) error {
 		p := c.Path()
-		// Allow multipart uploads for media upload and cover upload.
-		if p == "/api/media/upload" || (c.Method() == "PUT" && strings.HasSuffix(p, "/cover")) {
+		if p == "/api/media/upload" {
+			return c.Next()
+		}
+		if c.Method() == fiber.MethodPut &&
+			strings.HasPrefix(p, "/api/media/") && strings.HasSuffix(p, "/cover") {
 			return c.Next()
 		}
 		if c.Request().Header.ContentLength() == -1 {
@@ -185,8 +190,9 @@ func New(cfg *config.Config, version string) (*App, error) {
 		AllowCredentials: allowOrigins != "*",
 	}))
 
-	// Health check — single canonical endpoint.
-	fiberApp.Get("/health", handlers.HealthCheck)
+	// Health check — единственный канонический эндпоинт /api/health
+	// (его используют фронтенд и Dockerfile HEALTHCHECK).
+	fiberApp.Get("/api/health", handlers.HealthCheck)
 
 	// Auth rate limiter — parameters from config.
 	authRateLimiter := limiter.New(limiter.Config{

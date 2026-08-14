@@ -10,13 +10,8 @@ import (
 
 // --- OTPStore security tests ---
 
-func newTestOTPStore() *OTPStore {
-	return NewOTPStore(5*time.Minute, 6, 100)
-}
-
 func TestOTPVerifyInvalidatesAfterMaxAttempts(t *testing.T) {
-	s := newTestOTPStore()
-	defer s.Stop()
+	s := newTestOTPStore(t, 5*time.Minute, 6, 100)
 
 	code, err := s.Generate("a@b.c")
 	require.NoError(t, err)
@@ -31,8 +26,7 @@ func TestOTPVerifyInvalidatesAfterMaxAttempts(t *testing.T) {
 }
 
 func TestOTPVerifySuccessOnFirstTry(t *testing.T) {
-	s := newTestOTPStore()
-	defer s.Stop()
+	s := newTestOTPStore(t, 5*time.Minute, 6, 100)
 
 	code, err := s.Generate("a@b.c")
 	require.NoError(t, err)
@@ -43,13 +37,13 @@ func TestOTPVerifySuccessOnFirstTry(t *testing.T) {
 }
 
 func TestOTPVerifyExpired(t *testing.T) {
-	s := NewOTPStore(10*time.Millisecond, 6, 100)
-	defer s.Stop()
+	// Отрицательный TTL — код истёк сразу после генерации; детерминированно
+	// и без time.Sleep.
+	s := newTestOTPStore(t, -time.Minute, 6, 100)
 
 	code, err := s.Generate("a@b.c")
 	require.NoError(t, err)
 
-	time.Sleep(20 * time.Millisecond)
 	assert.False(t, s.Verify("a@b.c", code))
 }
 

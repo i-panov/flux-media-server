@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -25,7 +27,11 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     }
     state = PlayQueueState(items: items, currentIndex: startIndex);
     if (startIndex < items.length) {
-      await _coordinator.play(items[startIndex]);
+      // Ошибка воспроизведения уже отражена в PlaybackState.error —
+      // не пробрасываем её в UI-вызовы (часто fire-and-forget).
+      try {
+        await _coordinator.play(items[startIndex]);
+      } catch (_) {}
     }
   }
 
@@ -45,7 +51,9 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     if (state.currentIndex + 1 >= state.items.length) return false;
     final newIndex = state.currentIndex + 1;
     state = state.copyWith(currentIndex: newIndex);
-    await _coordinator.play(state.items[newIndex]);
+    try {
+      await _coordinator.play(state.items[newIndex]);
+    } catch (_) {}
     return true;
   }
 
@@ -55,7 +63,9 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     if (state.currentIndex <= 0) return false;
     final newIndex = state.currentIndex - 1;
     state = state.copyWith(currentIndex: newIndex);
-    await _coordinator.play(state.items[newIndex]);
+    try {
+      await _coordinator.play(state.items[newIndex]);
+    } catch (_) {}
     return true;
   }
 
@@ -69,10 +79,12 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     int newIndex;
     if (items.isEmpty) {
       newIndex = -1;
-    } else if (index <= state.currentIndex) {
-      newIndex = (state.currentIndex - 1).clamp(0, items.length - 1);
+    } else if (index < state.currentIndex) {
+      newIndex = state.currentIndex - 1;
     } else {
-      newIndex = state.currentIndex;
+      // index == currentIndex: следующий трек занимает тот же индекс.
+      // index > currentIndex: текущий индекс не меняется.
+      newIndex = state.currentIndex.clamp(0, items.length - 1);
     }
 
     state = PlayQueueState(
@@ -88,7 +100,9 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     // If we removed the currently playing track and there are more items,
     // auto-advance to the new currentIndex (which is the next track).
     else if (wasPlaying && newIndex >= 0 && newIndex < items.length) {
-      _coordinator.play(items[newIndex]);
+      unawaited(
+        _coordinator.play(items[newIndex]).catchError((_) {}),
+      );
     }
   }
 

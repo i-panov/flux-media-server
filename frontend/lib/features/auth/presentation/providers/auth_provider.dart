@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/usecases/usecase.dart';
 import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flux_media_server/features/auth/data/repositories/auth_repository_impl.dart';
@@ -12,7 +13,7 @@ import 'package:flux_media_server/features/collections/presentation/providers/co
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
-import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
+import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/user.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -51,22 +52,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final VerifyCode _verifyCode;
   final GetCurrentUser _getCurrentUser;
 
+  /// Guard от гонок: игнорируем повторный requestCode, пока идёт запрос.
+  bool _requestInFlight = false;
+
   Future<void> requestCode(String email) async {
-    // Don't set AuthLoading here — FluxApp's showSplash catches it
-    // and removes LoginScreen from the widget tree, breaking navigation.
-    final result = await _requestCode(email);
-    result.fold(
-      (failure) {
-        final isOffline = failure is NetworkFailure;
-        state = AuthState.error(message: failure.message, isOffline: isOffline);
-      },
-      (debugCode) {
-        state = AuthState.codeSent(
-          email: email,
-          debugCode: debugCode,
-        );
-      },
-    );
+    if (_requestInFlight) return;
+    _requestInFlight = true;
+    try {
+      // Don't set AuthLoading here — FluxApp's showSplash catches it
+      // and removes LoginScreen from the widget tree, breaking navigation.
+      final result = await _requestCode(email);
+      result.fold(
+        (failure) {
+          final isOffline = failure is NetworkFailure;
+          state =
+              AuthState.error(message: failure.message, isOffline: isOffline);
+        },
+        (_) {
+          state = AuthState.codeSent(
+            email: email,
+            debugCode: _requestCode.lastDebugCode,
+          );
+        },
+      );
+    } finally {
+      _requestInFlight = false;
+    }
   }
 
   Future<void> verifyCode(String email, String code) async {
@@ -82,15 +93,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _ref
             .read(settingsProvider.notifier)
             .setTokens(data.token, data.refreshToken);
-        // Invalidate all cached data providers so they refetch with the
-        // new token. Without this, stale providers from a previous session
-        // may still hold invalid tokens and fail with "session expired".
-        _ref
-          ..invalidate(mediaListProvider('video'))
-          ..invalidate(mediaListProvider('audio'))
-          ..invalidate(favoritesProvider)
-          ..invalidate(collectionsProvider)
-          ..invalidate(watchProgressProvider);
+        _invalidateSessionProviders();
         state = AuthState.authenticated(user: data.user);
       },
     );
@@ -120,21 +123,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Очищаем офлайн-кеш пользователя (файлы + метаданные) до сброса
+    // сессии, чтобы id пользователя ещё был доступен из состояния auth.
+    await _ref.read(offlineCacheServiceProvider).clearUserCache();
     await _ref.read(settingsProvider.notifier).logout();
+    _invalidateSessionProviders();
+    // Do NOT invalidate settingsProvider — it holds the serverUrl which is
+    // needed for the login screen to know where to send credentials.
+    state = const AuthState.initial();
+  }
+
+  /// Инвалидирует кэшированные провайдеры сессии, чтобы они
+  /// перечитали данные с новым токеном (или после logout).
+  void _invalidateSessionProviders() {
     _ref
       ..invalidate(mediaListProvider('video'))
       ..invalidate(mediaListProvider('audio'))
       ..invalidate(favoritesProvider)
       ..invalidate(collectionsProvider)
       ..invalidate(watchProgressProvider);
-    // Do NOT invalidate settingsProvider — it holds the serverUrl which is
-    // needed for the login screen to know where to send credentials.
-    state = const AuthState.initial();
   }
 }
 
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
-  return AuthRemoteDataSource(ref.watch(apiClientProvider));
+  return AuthRemoteDataSource(
+    ref.watch(authApiClientProvider),
+    refresher: ref.watch(authTokenRefresherProvider),
+  );
 });
 
 final authRepositoryProvider = Provider<AuthRepositoryImpl>((ref) {

@@ -45,9 +45,6 @@ scanner:
 
 media:
   thumbnail_path: "./thumbnails"
-  allowed_extensions:
-    - .mp4
-    - .mkv
 `
 	err := os.WriteFile(configPath, []byte(yamlContent), 0644)
 	require.NoError(t, err)

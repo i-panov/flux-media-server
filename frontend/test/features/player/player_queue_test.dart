@@ -7,7 +7,6 @@ Media _fakeMedia([int id = 1]) => Media(
       title: 'Test Media $id',
       year: 2024,
       type: MediaType.video,
-      filePath: '/test$id.mp4',
       fileSize: 1024,
     );
 
@@ -88,16 +87,18 @@ void main() {
   group('PlayQueueNotifier.enqueue', () {
     test('enqueue adds item to end', () {
       final items = [_fakeMedia()];
-      notifier.setQueue(items);
-      notifier.enqueue(_fakeMedia(2));
+      notifier
+        ..setQueue(items)
+        ..enqueue(_fakeMedia(2));
 
       expect(notifier.state.items, hasLength(2));
       expect(notifier.state.items[1].id, 2);
     });
 
     test('enqueueAll adds multiple items', () {
-      notifier.setQueue([_fakeMedia()]);
-      notifier.enqueueAll([_fakeMedia(2), _fakeMedia(3)]);
+      notifier
+        ..setQueue([_fakeMedia()])
+        ..enqueueAll([_fakeMedia(2), _fakeMedia(3)]);
 
       expect(notifier.state.items, hasLength(3));
     });
@@ -106,7 +107,7 @@ void main() {
   group('PlayQueueNotifier.next', () {
     test('next advances to next track and calls play', () async {
       final items = [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)];
-      await notifier.setQueue(items, startIndex: 0);
+      await notifier.setQueue(items);
 
       fakeController.playCalls.clear();
       final result = await notifier.next();
@@ -118,12 +119,14 @@ void main() {
     });
 
     test('next returns false at end of queue', () async {
-      await notifier.setQueue([_fakeMedia()], startIndex: 0);
+      await notifier.setQueue([_fakeMedia()]);
 
+      fakeController.playCalls.clear();
       final result = await notifier.next();
 
       expect(result, isFalse);
       expect(notifier.state.currentIndex, 0);
+      expect(fakeController.playCalls, isEmpty);
     });
   });
 
@@ -142,26 +145,102 @@ void main() {
     });
 
     test('previous returns false at start of queue', () async {
-      await notifier.setQueue([_fakeMedia(), _fakeMedia(2)], startIndex: 0);
+      await notifier.setQueue([_fakeMedia(), _fakeMedia(2)]);
 
+      fakeController.playCalls.clear();
       final result = await notifier.previous();
 
       expect(result, isFalse);
+      expect(fakeController.playCalls, isEmpty);
+    });
+  });
+
+  group('PlayQueueNotifier.removeAt auto-advance', () {
+    test('removing the playing track calls play with the next item',
+        () async {
+      await notifier.setQueue(
+        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
+      );
+      fakeController.playCalls.clear();
+
+      notifier.removeAt(0);
+
+      expect(notifier.state.items, hasLength(2));
+      expect(notifier.state.currentIndex, 0);
+      expect(fakeController.playCalls, hasLength(1));
+      expect(fakeController.playCalls.first.id, 2);
+    });
+
+    test('removing the playing track in the middle plays the following item',
+        () async {
+      await notifier.setQueue(
+        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
+        startIndex: 1,
+      );
+      fakeController.playCalls.clear();
+
+      notifier.removeAt(1);
+
+      expect(notifier.state.items, hasLength(2));
+      expect(notifier.state.currentIndex, 1);
+      expect(fakeController.playCalls, hasLength(1));
+      expect(fakeController.playCalls.first.id, 3);
+    });
+
+    test('removing the playing last track plays the previous item', () async {
+      await notifier.setQueue(
+        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
+        startIndex: 2,
+      );
+      fakeController.playCalls.clear();
+
+      notifier.removeAt(2);
+
+      expect(notifier.state.items, hasLength(2));
+      expect(notifier.state.currentIndex, 1);
+      expect(fakeController.playCalls, hasLength(1));
+      expect(fakeController.playCalls.first.id, 2);
+    });
+
+    test('removing a non-current track does not call play', () async {
+      await notifier.setQueue(
+        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
+      );
+      fakeController.playCalls.clear();
+
+      notifier.removeAt(2);
+
+      expect(notifier.state.items, hasLength(2));
+      expect(fakeController.playCalls, isEmpty);
+    });
+
+    test('removing the only track stops playback without calling play',
+        () async {
+      await notifier.setQueue([_fakeMedia()]);
+      fakeController.playCalls.clear();
+
+      notifier.removeAt(0);
+
+      expect(notifier.state.items, isEmpty);
+      expect(fakeController.playCalls, isEmpty);
+      expect(fakeController.stopCalls, 1);
     });
   });
 
   group('PlayQueueNotifier.removeAt', () {
     test('remove non-current item keeps currentIndex', () {
-      notifier.setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)]);
-      notifier.removeAt(2); // Remove last (not current)
+      notifier
+        ..setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)])
+        ..removeAt(2); // Remove last (not current)
 
       expect(notifier.state.items, hasLength(2));
       expect(notifier.state.currentIndex, 0);
     });
 
     test('remove item before current shifts currentIndex', () {
-      notifier.setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)]);
-      notifier.removeAt(0); // Remove first, current is at 0
+      notifier
+        ..setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)])
+        ..removeAt(0); // Remove first, current is at 0
 
       expect(notifier.state.items, hasLength(2));
       expect(notifier.state.currentIndex, 0);
@@ -169,8 +248,9 @@ void main() {
     });
 
     test('remove only item stops playback', () {
-      notifier.setQueue([_fakeMedia()]);
-      notifier.removeAt(0);
+      notifier
+        ..setQueue([_fakeMedia()])
+        ..removeAt(0);
 
       expect(notifier.state.items, isEmpty);
       expect(notifier.state.currentIndex, -1);
@@ -178,8 +258,9 @@ void main() {
     });
 
     test('remove at invalid index is no-op', () {
-      notifier.setQueue([_fakeMedia()]);
-      notifier.removeAt(5);
+      notifier
+        ..setQueue([_fakeMedia()])
+        ..removeAt(5);
 
       expect(notifier.state.items, hasLength(1));
     });
@@ -187,8 +268,9 @@ void main() {
 
   group('PlayQueueNotifier.clear', () {
     test('clear empties the queue', () {
-      notifier.setQueue([_fakeMedia(), _fakeMedia(2)]);
-      notifier.clear();
+      notifier
+        ..setQueue([_fakeMedia(), _fakeMedia(2)])
+        ..clear();
 
       expect(notifier.state.items, isEmpty);
       expect(notifier.state.currentIndex, -1);
@@ -211,7 +293,6 @@ void main() {
     test('returns items after current', () async {
       await notifier.setQueue(
         [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
-        startIndex: 0,
       );
 
       expect(notifier.upcoming, hasLength(2));
@@ -220,7 +301,7 @@ void main() {
     });
 
     test('returns empty at end of queue', () async {
-      await notifier.setQueue([_fakeMedia()], startIndex: 0);
+      await notifier.setQueue([_fakeMedia()]);
 
       expect(notifier.upcoming, isEmpty);
     });

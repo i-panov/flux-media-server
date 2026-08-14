@@ -357,7 +357,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToQueue => 'Add to Queue';
 
   @override
-  String continueFrom(Object formatted) {
+  String continueFrom(String formatted) {
     return 'Continue from $formatted';
   }
 
@@ -448,4 +448,28 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get offlineMode =>
       'No server connection. Showing downloaded content only.';
+
+  @override
+  String get invalidYear => 'Invalid year';
+
+  @override
+  String get uploadCancelled => 'Upload cancelled';
+
+  @override
+  String get hashingFile => 'Hashing file...';
+
+  @override
+  String get checkingDuplicates => 'Checking for duplicates...';
+
+  @override
+  String get offlineCopy => 'Offline copy';
+
+  @override
+  String get audioPlayingInBackground => 'Playing audio track';
+
+  @override
+  String get removeFromCollection => 'Remove from collection';
+
+  @override
+  String get addMedia => 'Add media';
 }

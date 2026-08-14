@@ -124,14 +124,9 @@ func RunMigrations(db *gorm.DB) error {
 		return fmt.Errorf("drop media.library_id: %w", err)
 	}
 
-	// watch_progresses: drop duration (duplicates media.duration) and completed
-	// (can be derived from position vs duration).
-	if err := dropColumnIfExists(db, "watch_progresses", "duration"); err != nil {
-		return fmt.Errorf("drop watch_progresses.duration: %w", err)
-	}
-	if err := dropColumnIfExists(db, "watch_progresses", "completed"); err != nil {
-		return fmt.Errorf("drop watch_progresses.completed: %w", err)
-	}
+	// Примечание: watch_progresses.duration и completed больше НЕ удаляются —
+	// эти поля теперь часть модели WatchProgress (клиент присылает их в
+	// UpdateProgress) и пересоздаются AutoMigrate.
 
 	// favorites: drop type (redundant — media type is in the media table;
 	// artist favorites are identified by artist_name IS NOT NULL).

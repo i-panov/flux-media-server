@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -14,6 +15,10 @@ import (
 // smtpTimeout bounds all SMTP network operations so a hanging server does
 // not block a request worker indefinitely.
 const smtpTimeout = 15 * time.Second
+
+// randomDigit — источник случайных цифр для GenerateCode. Инициализируется
+// один раз вне цикла, чтобы не создавать big.Int на каждую итерацию.
+var randomDigit = big.NewInt(10)
 
 type SMTPConfig struct {
 	Host        string
@@ -43,7 +48,7 @@ func GenerateCode(length int) (string, error) {
 	var sb strings.Builder
 	sb.Grow(length)
 	for i := 0; i < length; i++ {
-		n, err := rand.Int(rand.Reader, big.NewInt(10))
+		n, err := rand.Int(rand.Reader, randomDigit)
 		if err != nil {
 			panic(fmt.Sprintf("crypto/rand unavailable, cannot generate secure code: %v", err))
 		}
@@ -52,38 +57,50 @@ func GenerateCode(length int) (string, error) {
 	return sb.String(), nil
 }
 
-// extractAddress strips display-name from "Name <email>" → "email".
-// The SMTP MAIL FROM command must contain only the address.
-func extractAddress(addr string) string {
-	if i := strings.LastIndex(addr, "<"); i != -1 {
-		if j := strings.Index(addr[i:], ">"); j != -1 {
-			return addr[i+1 : i+j]
-		}
+// validateHeaderValue проверяет значение заголовка письма на CR/LF-инъекции:
+// ни одна строка заголовка не должна содержать переводов строки, иначе
+// атакующий мог бы вставить дополнительные заголовки в DATA.
+func validateHeaderValue(name, value string) error {
+	if strings.ContainsAny(value, "\r\n") {
+		return fmt.Errorf("smtp: invalid %s header: contains CR/LF", name)
 	}
-	return addr
-}
-
-// Sanitize 'to' to prevent header injection — strip newlines and
-// limit length to prevent buffer overflow attacks.
-func sanitizeEmail(addr string) string {
-	s := strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\r' {
-			return -1
-		}
-		return r
-	}, addr)
-	if len(s) > 254 {
-		s = s[:254]
-	}
-	return strings.TrimSpace(s)
+	return nil
 }
 
 func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
 	subject := "Flux Media Server - Login Code"
 	body := fmt.Sprintf("Your login code is: %s\n\nThis code will expire in %d minutes.", code, expiryMinutes)
-	sanitizedTo := sanitizeEmail(to)
-	msg := fmt.Sprintf("From: <%s>\r\nTo: <%s>\r\nSubject: %s\r\n\r\n%s",
-		c.config.From, sanitizedTo, subject, body)
+
+	// From разбираем через net/mail.ParseAddress: в envelope MAIL FROM
+	// подставляется только голый адрес, display-name остаётся в заголовке.
+	fromAddr, err := mail.ParseAddress(c.config.From)
+	if err != nil {
+		return fmt.Errorf("smtp: invalid From address %q: %w", c.config.From, err)
+	}
+
+	// To разбираем так же — в envelope RCPT TO идёт голый адрес.
+	toAddr, err := mail.ParseAddress(to)
+	if err != nil {
+		return fmt.Errorf("smtp: invalid To address %q: %w", to, err)
+	}
+
+	// Защита от CR/LF-инъекций: значения заголовков проверяются до вставки
+	// в DATA. Display-name и адрес могут содержать управляющие символы,
+	// поэтому проверяем итоговую строку заголовка.
+	fromHeader := fromAddr.String()
+	toHeader := toAddr.String()
+	if err := validateHeaderValue("From", fromHeader); err != nil {
+		return err
+	}
+	if err := validateHeaderValue("To", toHeader); err != nil {
+		return err
+	}
+	if err := validateHeaderValue("Subject", subject); err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
+		fromHeader, toHeader, subject, body)
 
 	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
 
@@ -94,12 +111,12 @@ func (c *SMTPClient) SendCode(to string, code string, expiryMinutes int) error {
 	}
 
 	// MAIL FROM envelope must be a bare address.
-	fromAddr := extractAddress(c.config.From)
-	if fromAddr == "" {
-		fromAddr = c.config.Username
+	fromEnvelope := fromAddr.Address
+	if fromEnvelope == "" {
+		fromEnvelope = c.config.Username
 	}
 
-	return sendMailWithTimeout(c.config, addr, auth, fromAddr, []string{to}, []byte(msg))
+	return sendMailWithTimeout(c.config, addr, auth, fromEnvelope, []string{toAddr.Address}, []byte(msg))
 }
 
 // sendMailWithTimeout is smtp.SendMail with a connection-level deadline.
@@ -113,10 +130,18 @@ func sendMailWithTimeout(cfg SMTPConfig, addr string, auth smtp.Auth, from strin
 	}
 	defer conn.Close()
 
+	// Deadline ставим сразу после установки соединения, ДО smtp.NewClient —
+	// он должен покрывать и чтение приветствия, и EHLO.
+	if err := conn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
+		return err
+	}
+
 	host := hostOf(addr)
 
 	if cfg.ImplicitTLS {
 		tlsConn := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+		// Для ImplicitTLS deadline ставится сразу после установки соединения,
+		// чтобы покрыть TLS-рукопожатие.
 		if err := tlsConn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
 			return err
 		}
@@ -128,10 +153,6 @@ func sendMailWithTimeout(cfg SMTPConfig, addr string, auth smtp.Auth, from strin
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
-		return err
-	}
-
-	if err := conn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
 		return err
 	}
 
@@ -179,7 +200,13 @@ func sendMailWithTimeout(cfg SMTPConfig, addr string, auth smtp.Auth, from strin
 		return err
 	}
 
-	return client.Quit()
+	if err := client.Quit(); err != nil {
+		// QUIT не удался — явно закрываем соединение, чтобы не оставлять
+		// ресурсы на сервере и клиенте.
+		client.Close()
+		return err
+	}
+	return nil
 }
 
 func hostOf(addr string) string {

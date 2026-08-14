@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"flux/internal/models"
 )
@@ -79,4 +80,15 @@ type LyricsRepository interface {
 	FindByMediaID(ctx context.Context, mediaID uint) (*models.Lyrics, error)
 	Upsert(ctx context.Context, lyrics *models.Lyrics) error
 	Delete(ctx context.Context, mediaID uint) error
+}
+
+// RefreshTokenRepository defines data access methods for RefreshToken entities.
+type RefreshTokenRepository interface {
+	Create(ctx context.Context, userID uint, rawToken string, expiresAt time.Time) error
+	RotateToken(ctx context.Context, oldRawToken string, userID uint, newRawToken string, expiresAt time.Time) (*models.RefreshToken, error)
+	FindByToken(ctx context.Context, rawToken string) (*models.RefreshToken, error)
+	DeleteByToken(ctx context.Context, rawToken string) error
+	DeleteByID(ctx context.Context, id, userID uint) error
+	DeleteByUserID(ctx context.Context, userID uint) error
+	DeleteExpired(ctx context.Context) error
 }

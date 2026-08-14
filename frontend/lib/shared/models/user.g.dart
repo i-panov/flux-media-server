@@ -9,10 +9,12 @@ part of 'user.dart';
 _$UserImpl _$$UserImplFromJson(Map<String, dynamic> json) => _$UserImpl(
       id: (json['id'] as num).toInt(),
       email: json['email'] as String,
+      isAdmin: json['is_admin'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$UserImplToJson(_$UserImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'email': instance.email,
+      'is_admin': instance.isAdmin,
     };

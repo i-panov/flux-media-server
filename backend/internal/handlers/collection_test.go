@@ -131,6 +131,92 @@ func TestCollectionHandler_Delete(t *testing.T) {
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 }
 
+func TestCollectionHandler_UpdateType(t *testing.T) {
+	app := setupCollectionTestApp(t)
+
+	// Create
+	body, _ := json.Marshal(map[string]string{"name": "Old Name", "type": string(models.MediaTypeVideo)})
+	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	var col models.Collection
+	buf := bytes.Buffer{}
+	buf.ReadFrom(resp.Body)
+	json.Unmarshal(buf.Bytes(), &col)
+
+	// Update type → audio применяется.
+	body, _ = json.Marshal(map[string]string{"type": string(models.MediaTypeAudio)})
+	req = httptest.NewRequest("PUT", "/api/collections/"+strconv.Itoa(int(col.ID)), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	buf.Reset()
+	buf.ReadFrom(resp.Body)
+	var updated models.Collection
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &updated))
+	assert.Equal(t, models.MediaTypeAudio, updated.Type)
+}
+
+func TestCollectionHandler_UpdateInvalidType(t *testing.T) {
+	app := setupCollectionTestApp(t)
+
+	// Create
+	body, _ := json.Marshal(map[string]string{"name": "Old Name", "type": string(models.MediaTypeVideo)})
+	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	var col models.Collection
+	buf := bytes.Buffer{}
+	buf.ReadFrom(resp.Body)
+	json.Unmarshal(buf.Bytes(), &col)
+
+	// Невалидный type → 400.
+	body, _ = json.Marshal(map[string]string{"type": "garbage"})
+	req = httptest.NewRequest("PUT", "/api/collections/"+strconv.Itoa(int(col.ID)), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}
+
+func TestCollectionHandler_AddItemDuplicate(t *testing.T) {
+	app := setupCollectionTestApp(t)
+
+	// Create collection
+	body, _ := json.Marshal(map[string]string{"name": "My List", "type": string(models.MediaTypeVideo)})
+	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	var col models.Collection
+	buf := bytes.Buffer{}
+	buf.ReadFrom(resp.Body)
+	json.Unmarshal(buf.Bytes(), &col)
+
+	// Add item — первый раз 201.
+	body, _ = json.Marshal(map[string]uint{"media_id": 1})
+	req = httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(col.ID))+"/items", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+
+	// Дубликат — 409.
+	body, _ = json.Marshal(map[string]uint{"media_id": 1})
+	req = httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(col.ID))+"/items", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+}
+
 func TestCollectionHandler_AddAndRemoveItem(t *testing.T) {
 	app := setupCollectionTestApp(t)
 

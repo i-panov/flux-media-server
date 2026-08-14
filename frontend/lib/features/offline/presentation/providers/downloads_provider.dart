@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/providers/is_offline_provider.dart';
+import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_invalidator_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+import 'package:fpdart/fpdart.dart';
 
 class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
   DownloadsNotifier(this._ref) : super(const AsyncValue.loading()) {
@@ -40,8 +42,14 @@ class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
       }
 
       final mediaRepository = _ref.read(mediaRepositoryProvider);
-      final futures = ids.map(mediaRepository.getMediaDetail);
-      final results = await Future.wait(futures);
+      // Пачками по 8, чтобы не создавать сотни параллельных запросов.
+      const batchSize = 8;
+      final results = <Either<Failure, Media>>[];
+      for (var i = 0; i < ids.length; i += batchSize) {
+        final end = (i + batchSize < ids.length) ? i + batchSize : ids.length;
+        final batch = ids.sublist(i, end).map(mediaRepository.getMediaDetail);
+        results.addAll(await Future.wait(batch));
+      }
 
       final mediaList = <Media>[];
       var allFailed = true;

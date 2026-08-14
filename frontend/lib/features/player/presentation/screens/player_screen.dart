@@ -46,8 +46,14 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+class _PlayerScreenState extends ConsumerState<PlayerScreen>
+    with WidgetsBindingObserver {
   late final PlaybackCoordinator _coordinator;
+
+  /// Последнее известное состояние воспроизведения. Обновляется в build:
+  /// в dispose() уже нельзя обращаться к ref, а состояние нужно, чтобы
+  /// остановить видео, но не трогать аудио (мини-плеер продолжает играть).
+  PlaybackState _lastPlayback = const PlaybackState.initial();
 
   /// Shows a semi-transparent "resume" button when a saved position exists.
   bool _showResumeButton = false;
@@ -60,6 +66,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void initState() {
     super.initState();
     _coordinator = ref.read(playbackCoordinatorProvider.notifier);
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     // Allow all orientations — video aspect ratio determines the best fit.
     SystemChrome.setPreferredOrientations([
@@ -73,6 +80,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // Without this, _onCompleted would jump to a stale queue item.
       ref.read(playQueueProvider.notifier).setQueue([widget.media]);
     });
+  }
+
+  /// При сворачивании приложения паузим видео.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    final playback = ref.read(playbackCoordinatorProvider);
+    if (playback is PlaybackPlaying &&
+        playback.type == MediaType.video &&
+        !playback.isPaused) {
+      _coordinator.pause();
+    }
   }
 
   void _showResumeOverlay(Duration savedPosition) {
@@ -91,10 +110,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _resumeTimer?.cancel();
-    // Stop playback (also persists watch progress) when leaving the screen,
-    // e.g. via system back button which bypasses the in-app back button.
-    _coordinator.stop();
+    // Останавливаем только видео: если очередь авто-перешла на
+    // аудио-трек, он должен продолжать играть (мини-плеер).
+    // ref использовать уже нельзя (элемент disposed) — берём _lastPlayback.
+    final playback = _lastPlayback;
+    if (playback is PlaybackPlaying && playback.type == MediaType.video) {
+      unawaited(_coordinator.stop());
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -110,10 +134,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final l = AppLocalizations.of(context)!;
     final state = ref.watch(playbackCoordinatorProvider);
     final videoController = ref.watch(videoControllerProvider);
+    _lastPlayback = state;
 
     // Show resume button once when savedPosition is set.
     if (state is PlaybackPlaying &&
-        state.type == MediaType.video.value &&
+        state.type == MediaType.video &&
         state.savedPosition != null &&
         !_showResumeButton &&
         _resumeTimer == null) {
@@ -132,9 +157,43 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ),
         playing:
             (media, type, isPaused, position, duration, speed, savedPosition) {
-          if (type != 'video') {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.white),
+          if (type != MediaType.video) {
+            // Авто-переход на аудио-трек: вместо бесконечного спиннера
+            // показываем осмысленное состояние и кнопку «назад».
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.music_note,
+                    size: 64,
+                    color: Colors.white70,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    media.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l.audioPlayingInBackground,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    onPressed: () => context.maybePop(),
+                    child: Text(l.close),
+                  ),
+                ],
+              ),
             );
           }
 

@@ -32,9 +32,11 @@ mixin _$Metadata {
   @JsonKey(name: 'backdrop_url')
   String? get backdropUrl => throw _privateConstructorUsedError;
   double? get rating => throw _privateConstructorUsedError;
-  @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+  @JsonKey(
+      name: 'genres', fromJson: _stringListFromJson, toJson: _stringListToJson)
   List<String>? get genres => throw _privateConstructorUsedError;
-  @JsonKey(name: 'cast', fromJson: _stringListFromJson)
+  @JsonKey(
+      name: 'cast', fromJson: _stringListFromJson, toJson: _stringListToJson)
   List<String>? get cast => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -58,9 +60,15 @@ abstract class $MetadataCopyWith<$Res> {
       @JsonKey(name: 'poster_url') String? posterUrl,
       @JsonKey(name: 'backdrop_url') String? backdropUrl,
       double? rating,
-      @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'genres',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       List<String>? genres,
-      @JsonKey(name: 'cast', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'cast',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       List<String>? cast});
 }
 
@@ -156,9 +164,15 @@ abstract class _$$MetadataImplCopyWith<$Res>
       @JsonKey(name: 'poster_url') String? posterUrl,
       @JsonKey(name: 'backdrop_url') String? backdropUrl,
       double? rating,
-      @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'genres',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       List<String>? genres,
-      @JsonKey(name: 'cast', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'cast',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       List<String>? cast});
 }
 
@@ -247,9 +261,15 @@ class _$MetadataImpl implements _Metadata {
       @JsonKey(name: 'poster_url') this.posterUrl,
       @JsonKey(name: 'backdrop_url') this.backdropUrl,
       this.rating,
-      @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'genres',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       final List<String>? genres,
-      @JsonKey(name: 'cast', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'cast',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       final List<String>? cast})
       : _genres = genres,
         _cast = cast;
@@ -280,7 +300,8 @@ class _$MetadataImpl implements _Metadata {
   final double? rating;
   final List<String>? _genres;
   @override
-  @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+  @JsonKey(
+      name: 'genres', fromJson: _stringListFromJson, toJson: _stringListToJson)
   List<String>? get genres {
     final value = _genres;
     if (value == null) return null;
@@ -291,7 +312,8 @@ class _$MetadataImpl implements _Metadata {
 
   final List<String>? _cast;
   @override
-  @JsonKey(name: 'cast', fromJson: _stringListFromJson)
+  @JsonKey(
+      name: 'cast', fromJson: _stringListFromJson, toJson: _stringListToJson)
   List<String>? get cast {
     final value = _cast;
     if (value == null) return null;
@@ -368,9 +390,15 @@ abstract class _Metadata implements Metadata {
       @JsonKey(name: 'poster_url') final String? posterUrl,
       @JsonKey(name: 'backdrop_url') final String? backdropUrl,
       final double? rating,
-      @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'genres',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       final List<String>? genres,
-      @JsonKey(name: 'cast', fromJson: _stringListFromJson)
+      @JsonKey(
+          name: 'cast',
+          fromJson: _stringListFromJson,
+          toJson: _stringListToJson)
       final List<String>? cast}) = _$MetadataImpl;
 
   factory _Metadata.fromJson(Map<String, dynamic> json) =
@@ -398,10 +426,12 @@ abstract class _Metadata implements Metadata {
   @override
   double? get rating;
   @override
-  @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+  @JsonKey(
+      name: 'genres', fromJson: _stringListFromJson, toJson: _stringListToJson)
   List<String>? get genres;
   @override
-  @JsonKey(name: 'cast', fromJson: _stringListFromJson)
+  @JsonKey(
+      name: 'cast', fromJson: _stringListFromJson, toJson: _stringListToJson)
   List<String>? get cast;
   @override
   @JsonKey(ignore: true)

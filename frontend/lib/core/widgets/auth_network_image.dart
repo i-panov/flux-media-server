@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
+import 'package:flux_media_server/core/session/settings_provider.dart';
 
 /// A [CachedNetworkImage] that attaches the JWT access token as an
 /// `Authorization` header. Required for protected endpoints

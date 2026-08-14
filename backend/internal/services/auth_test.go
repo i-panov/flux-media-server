@@ -7,15 +7,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// newTestOTPStore создаёт OTPStore с автоматической остановкой фоновой
+// горутины cleanupLoop — тесты не должны утекать горутинами.
+func newTestOTPStore(t *testing.T, ttl time.Duration, codeLength, maxEntries int) *OTPStore {
+	t.Helper()
+	store := NewOTPStore(ttl, codeLength, maxEntries)
+	t.Cleanup(store.Stop)
+	return store
+}
+
 func TestGenerateOTP(t *testing.T) {
-	store := NewOTPStore(5*time.Minute, 6, 10000)
+	store := newTestOTPStore(t, 5*time.Minute, 6, 10000)
 	code, err := store.Generate("test@example.com")
 	assert.NoError(t, err)
 	assert.Len(t, code, 6)
 }
 
 func TestVerifyOTP(t *testing.T) {
-	store := NewOTPStore(5*time.Minute, 6, 10000)
+	store := newTestOTPStore(t, 5*time.Minute, 6, 10000)
 	code, err := store.Generate("test@example.com")
 	assert.NoError(t, err)
 
@@ -28,18 +37,18 @@ func TestVerifyOTP(t *testing.T) {
 }
 
 func TestVerifyOTPExpired(t *testing.T) {
-	store := NewOTPStore(0*time.Millisecond, 6, 10000)
+	// TTL отрицательный — код истекает сразу после генерации.
+	// Детерминированно, без time.Sleep.
+	store := newTestOTPStore(t, -time.Minute, 6, 10000)
 	code, err := store.Generate("test@example.com")
 	assert.NoError(t, err)
-
-	time.Sleep(10 * time.Millisecond)
 
 	valid := store.Verify("test@example.com", code)
 	assert.False(t, valid)
 }
 
 func TestVerifyOTPWrongCode(t *testing.T) {
-	store := NewOTPStore(5*time.Minute, 6, 10000)
+	store := newTestOTPStore(t, 5*time.Minute, 6, 10000)
 	_, err := store.Generate("test@example.com")
 	assert.NoError(t, err)
 
@@ -48,7 +57,7 @@ func TestVerifyOTPWrongCode(t *testing.T) {
 }
 
 func TestVerifyOTPWrongEmail(t *testing.T) {
-	store := NewOTPStore(5*time.Minute, 6, 10000)
+	store := newTestOTPStore(t, 5*time.Minute, 6, 10000)
 	code, err := store.Generate("test@example.com")
 	assert.NoError(t, err)
 
@@ -57,7 +66,7 @@ func TestVerifyOTPWrongEmail(t *testing.T) {
 }
 
 func TestOTPStoreFull(t *testing.T) {
-	store := NewOTPStore(5*time.Minute, 6, 2)
+	store := newTestOTPStore(t, 5*time.Minute, 6, 2)
 
 	_, err := store.Generate("user1@example.com")
 	assert.NoError(t, err)
@@ -70,7 +79,7 @@ func TestOTPStoreFull(t *testing.T) {
 }
 
 func TestOTPStoreOverwriteSameAddress(t *testing.T) {
-	store := NewOTPStore(5*time.Minute, 6, 2)
+	store := newTestOTPStore(t, 5*time.Minute, 6, 2)
 
 	_, err := store.Generate("user1@example.com")
 	assert.NoError(t, err)
@@ -81,4 +90,14 @@ func TestOTPStoreOverwriteSameAddress(t *testing.T) {
 	code, err := store.Generate("user1@example.com")
 	assert.NoError(t, err)
 	assert.Len(t, code, 6)
+}
+
+func TestOTPStoreRemove(t *testing.T) {
+	store := newTestOTPStore(t, 5*time.Minute, 6, 10000)
+	code, err := store.Generate("test@example.com")
+	assert.NoError(t, err)
+
+	// После Remove код должен перестать действовать.
+	store.Remove("test@example.com")
+	assert.False(t, store.Verify("test@example.com", code))
 }

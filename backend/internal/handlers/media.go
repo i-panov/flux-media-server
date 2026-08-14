@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 
 	"flux/internal/models"
 	"flux/internal/repository"
@@ -15,12 +17,14 @@ import (
 type MediaHandler struct {
 	mediaRepo repository.MediaRepository
 	streamer  services.StreamerInterface
+	thumbSvc  *services.ThumbnailService
 }
 
-func NewMediaHandler(mediaRepo repository.MediaRepository, streamer services.StreamerInterface) *MediaHandler {
+func NewMediaHandler(mediaRepo repository.MediaRepository, streamer services.StreamerInterface, thumbSvc *services.ThumbnailService) *MediaHandler {
 	return &MediaHandler{
 		mediaRepo: mediaRepo,
 		streamer:  streamer,
+		thumbSvc:  thumbSvc,
 	}
 }
 
@@ -218,18 +222,16 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 		}
 	}
 
-	// Delete thumbnail.
-	if media.ThumbnailURL != "" {
-		if err := os.Remove(media.ThumbnailURL); err != nil && !os.IsNotExist(err) {
-			log.Printf("Delete: remove thumbnail %s: %v", media.ThumbnailURL, err)
+	// Delete thumbnail — файл ищется по ID, а не по ThumbnailURL
+	// (в БД теперь относительный URL, а не путь ФС).
+	if h.thumbSvc != nil {
+		thumbPath := h.thumbSvc.GetPath(media.ID)
+		if err := os.Remove(thumbPath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Delete: remove thumbnail %s: %v", thumbPath, err)
 		}
-	}
 
-	// Delete cover.
-	if media.CoverURL != "" {
-		if err := os.Remove(media.CoverURL); err != nil && !os.IsNotExist(err) {
-			log.Printf("Delete: remove cover %s: %v", media.CoverURL, err)
-		}
+		// Delete cover (все известные форматы).
+		h.thumbSvc.RemoveCovers(media.ID)
 	}
 
 	return c.JSON(fiber.Map{"message": "Media deleted successfully"})
@@ -248,7 +250,15 @@ func (h *MediaHandler) CheckHash(c *fiber.Ctx) error {
 
 	ctx := c.UserContext()
 	existing, err := h.mediaRepo.FindByHash(ctx, req.Hash)
-	if err == nil && existing != nil {
+	if err != nil {
+		// Ошибка БД — это не "hash не найден": логируем и возвращаем 500,
+		// чтобы клиент не принял сбой за отсутствие дубликата.
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("CheckHash: FindByHash: %v", err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to check hash")
+		}
+	}
+	if existing != nil {
 		return c.JSON(fiber.Map{
 			"exists": true,
 			"media": fiber.Map{

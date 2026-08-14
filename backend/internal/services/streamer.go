@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"os"
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -71,11 +71,18 @@ func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
 	ext := strings.ToLower(filepath.Ext(resolvedPath))
 	c.Set("Content-Type", mimeTypeByExt(ext))
 
-	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
-		return response.Error(c, fiber.StatusNotFound, "File not found")
+	// SendFile сам возвращает 404 (fiber.Error) для отсутствующего файла.
+	// Отдельный os.Stat не нужен — он давал бы лишний системный вызов,
+	// а fasthttp всё равно проверяет файл при отправке.
+	if err := c.SendFile(resolvedPath); err != nil {
+		var fiberErr *fiber.Error
+		if errors.As(err, &fiberErr) && fiberErr.Code == fiber.StatusNotFound {
+			// Не возвращаем текст ошибки SendFile — он содержит путь ФС.
+			return response.Error(c, fiber.StatusNotFound, "File not found")
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to stream file")
 	}
-
-	return c.SendFile(resolvedPath)
+	return nil
 }
 
 // resolveAllowedPath checks filePath against the registered media paths and

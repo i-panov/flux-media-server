@@ -2,7 +2,12 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Префикс ключей хранилища: debug- и release-сборки не делят данные.
+/// Единая константа для SharedPreferences и FlutterSecureStorage.
+const String storageKeyPrefix = kDebugMode ? 'debug_' : 'release_';
 
 /// Local data source for application settings.
 ///
@@ -17,9 +22,6 @@ class SettingsLocalDataSource {
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
 
-  /// Prefix all storage keys so debug and release builds don't share data.
-  static const String _prefix = kDebugMode ? 'debug_' : 'release_';
-
   static const _keyServerUrl = 'server_url';
   static const _keyAuthToken = 'auth_token';
   static const _keyAuthTokenFallback = 'auth_token_insecure';
@@ -27,12 +29,15 @@ class SettingsLocalDataSource {
   static const _keyRefreshTokenFallback = 'refresh_token_insecure';
   static const _keyLocale = 'locale';
 
-  String _p(String key) => '$_prefix$key';
+  String _p(String key) => '$storageKeyPrefix$key';
 
   String? getServerUrl() => _prefs.getString(_p(_keyServerUrl));
 
   Future<void> setServerUrl(String url) async {
-    final success = await _prefs.setString(_p(_keyServerUrl), url);
+    // Нормализуем при сохранении, чтобы в хранилище всегда был
+    // единый формат (полный baseUrl API с сегментом /api).
+    final success =
+        await _prefs.setString(_p(_keyServerUrl), normalizeServerUrl(url));
     if (!success) {
       throw Exception('Failed to save server URL to SharedPreferences');
     }

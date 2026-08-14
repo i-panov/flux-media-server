@@ -106,6 +106,14 @@ func (s *OTPStore) Generate(addr string) (string, error) {
 	return code, nil
 }
 
+// Remove удаляет код для адреса. Используется, когда отправка письма не
+// удалась — несостоявшийся код не должен оставаться в сторе.
+func (s *OTPStore) Remove(addr string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.entries, addr)
+}
+
 func (s *OTPStore) Verify(email, code string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

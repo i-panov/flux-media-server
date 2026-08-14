@@ -24,13 +24,19 @@ class ContinueWatchingRow extends StatelessWidget {
   final ValueChanged<int>? onDownloadToggled;
 
   double _progress((Media, WatchProgress) item) {
-    final duration = item.$1.duration ?? 0;
-    if (duration == 0) return 0;
-    return item.$2.position / duration;
+    final duration = _durationSeconds(item);
+    if (duration <= 0) return 0;
+    return (item.$2.position / duration).clamp(0.0, 1.0);
+  }
+
+  /// Длительность из прогресса (клиент её шлёт), иначе из медиа.
+  int _durationSeconds((Media, WatchProgress) item) {
+    return item.$2.duration > 0 ? item.$2.duration : (item.$1.duration ?? 0);
   }
 
   bool _isCompleted((Media, WatchProgress) item) {
-    final duration = item.$1.duration ?? 0;
+    if (item.$2.completed) return true;
+    final duration = _durationSeconds(item);
     return duration > 0 && item.$2.position >= duration * 0.9;
   }
 
@@ -83,9 +89,10 @@ class ContinueWatchingRow extends StatelessWidget {
               final item = items[index];
               final progress = _progress(item);
               final completed = _isCompleted(item);
-              final remaining = Duration(
-                seconds: (item.$1.duration ?? 0) - item.$2.position,
-              );
+              // Клампим: remaining никогда не уходит в отрицательные.
+              final secondsLeft =
+                  (_durationSeconds(item) - item.$2.position).clamp(0, 359999);
+              final remaining = Duration(seconds: secondsLeft);
 
               return SizedBox(
                 width: 160,

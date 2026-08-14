@@ -6,6 +6,7 @@ import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/interceptors/token_refresh_interceptor.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:http/http.dart' as http;
 
 /// Checks the HTTP response status and throws appropriate exceptions.
 ///
@@ -29,6 +30,23 @@ void checkResponse(Response<dynamic> response, String defaultMessage) {
   }
 }
 
+/// Преобразует исключение в соответствующий [Failure].
+///
+/// Сетевые ошибки ([http.ClientException], [SocketException],
+/// [TimeoutException]) становятся [NetworkFailure], а не
+/// [ServerFailure] с сырым текстом.
+Failure _failureFor(Object e) {
+  if (e is AuthException) return AuthFailure(message: e.message);
+  if (e is ServerException) return ServerFailure(message: e.message);
+  if (e is NetworkException) return NetworkFailure(message: e.message);
+  if (e is http.ClientException) return NetworkFailure(message: e.message);
+  if (e is SocketException) return NetworkFailure(message: e.message);
+  if (e is TimeoutException) {
+    return NetworkFailure(message: e.message ?? 'Request timed out');
+  }
+  return ServerFailure(message: e.toString());
+}
+
 /// Wraps a repository call with token-refresh retry logic.
 /// Retries once on [TokenRefreshedException], converts exceptions to [Failure].
 Future<Either<Failure, T>> safeRepositoryCall<T>(
@@ -40,25 +58,10 @@ Future<Either<Failure, T>> safeRepositoryCall<T>(
     // Token was just refreshed — retry with the new token.
     try {
       return Right(await call());
-    } on AuthException catch (e) {
-      return Left(AuthFailure(message: e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message));
-    } on NetworkException catch (e) {
-      return Left(NetworkFailure(message: e.message));
-    } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+    } on Exception catch (e) {
+      return Left(_failureFor(e));
     }
-  } on AuthException catch (e) {
-    return Left(AuthFailure(message: e.message));
-  } on ServerException catch (e) {
-    return Left(ServerFailure(message: e.message));
-  } on NetworkException catch (e) {
-    return Left(NetworkFailure(message: e.message));
-  } catch (e) {
-    if (e is Exception) {
-      return Left(ServerFailure(message: e.toString()));
-    }
-    return Left(ServerFailure(message: e.toString()));
+  } on Exception catch (e) {
+    return Left(_failureFor(e));
   }
 }

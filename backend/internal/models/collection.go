@@ -19,4 +19,7 @@ type CollectionItem struct {
 	MediaID      uint      `gorm:"index;uniqueIndex:idx_collection_media" json:"media_id"`
 	Position     int       `gorm:"default:0;uniqueIndex:idx_collection_position" json:"position"`
 	AddedAt      time.Time `json:"added_at"`
+	// FK-ассоциации с каскадным удалением (для новых инсталляций).
+	Collection *Collection `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	Media      *Media      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
 }

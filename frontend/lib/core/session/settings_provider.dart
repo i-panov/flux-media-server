@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flux_media_server/features/settings/data/datasources/settings_local_datasource.dart';
-import 'package:flux_media_server/features/settings/data/repositories/settings_repository_impl.dart';
-import 'package:flux_media_server/features/settings/domain/entities/app_settings.dart';
-import 'package:flux_media_server/features/settings/domain/repositories/settings_repository.dart';
+import 'package:flux_media_server/core/session/app_settings.dart';
+import 'package:flux_media_server/core/session/settings_local_datasource.dart';
+import 'package:flux_media_server/core/session/settings_repository.dart';
+import 'package:flux_media_server/core/session/settings_repository_impl.dart';
+import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -50,41 +51,55 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 
   Future<void> setServerUrl(String url) async {
-    await _repository.setServerUrl(url);
-    final settings = await _repository.getSettings();
-    state = SettingsState(settings: settings);
+    // Нормализуем один раз при сохранении — храним полный baseUrl API.
+    final normalized = normalizeServerUrl(url);
+    await _repository.setServerUrl(normalized);
+    state = SettingsState(
+      settings: state.settings.copyWith(serverUrl: normalized),
+    );
   }
 
   Future<void> setAuthToken(String token) async {
     await _repository.setAuthToken(token);
-    final settings = await _repository.getSettings();
-    state = SettingsState(settings: settings);
+    state = SettingsState(
+      settings: state.settings.copyWith(authToken: token),
+    );
   }
 
   Future<void> setRefreshToken(String token) async {
     await _repository.setRefreshToken(token);
-    final settings = await _repository.getSettings();
-    state = SettingsState(settings: settings);
+    state = SettingsState(
+      settings: state.settings.copyWith(refreshToken: token),
+    );
   }
 
   Future<void> setTokens(String accessToken, String refreshToken) async {
     await _repository.setAuthToken(accessToken);
     await _repository.setRefreshToken(refreshToken);
-    final settings = await _repository.getSettings();
-    state = SettingsState(settings: settings);
+    state = SettingsState(
+      settings: state.settings.copyWith(
+        authToken: accessToken,
+        refreshToken: refreshToken,
+      ),
+    );
   }
 
   Future<void> logout() async {
     await _repository.clearAuthToken();
     await _repository.clearRefreshToken();
-    final settings = await _repository.getSettings();
-    state = SettingsState(settings: settings);
+    state = SettingsState(
+      settings: state.settings.copyWith(
+        authToken: null,
+        refreshToken: null,
+      ),
+    );
   }
 
   Future<void> setLocale(String locale) async {
     await _repository.setLocale(locale);
-    final settings = await _repository.getSettings();
-    state = SettingsState(settings: settings);
+    state = SettingsState(
+      settings: state.settings.copyWith(locale: locale),
+    );
   }
 }
 

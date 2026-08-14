@@ -3,10 +3,10 @@ import 'dart:async' show unawaited;
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
-import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
 // Version is read from pubspec.yaml via package_info_plus in production.
@@ -88,31 +88,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   final url = _serverUrlController.text.trim();
                                   if (url.isNotEmpty) {
                                     // Validate URL format.
-                                    try {
-                                      final uri = Uri.parse(url);
-                                      if (uri.scheme.isEmpty ||
-                                          !uri.scheme.startsWith('http')) {
-                                        if (context.mounted) {
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                  'Please enter a valid URL '
-                                                  'starting with http:// or '
-                                                  'https://'),
-                                            ),
-                                          );
-                                        }
-                                        return;
-                                      }
-                                    } on FormatException {
+                                    if (!isValidServerUrl(url)) {
                                       if (context.mounted) {
                                         Navigator.pop(context);
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           const SnackBar(
-                                            content: Text('Invalid URL format'),
+                                            content: Text(
+                                                'Please enter a valid URL '
+                                                'starting with http:// or '
+                                                'https://'),
                                           ),
                                         );
                                       }
@@ -123,6 +108,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     // different backend — clear the session
                                     // (tokens, cache) so stale data from the
                                     // old server is not sent to the new one.
+                                    // Нормализация (включая /api) происходит
+                                    // в settingsProvider.setServerUrl.
                                     try {
                                       await ref
                                           .read(settingsProvider.notifier)
@@ -134,12 +121,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
-                                             SnackBar(
-                                               content: Text(
-                                                   'Failed to save '
-                                                   'settings: $e',
-                                               ),
-                                             ),
+                                              SnackBar(
+                                                content: Text(
+                                                    'Failed to save '
+                                                    'settings: $e',
+                                                ),
+                                              ),
                                           );
                                           return;
                                         }
@@ -153,19 +140,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                               content: Text(l.serverUrlSaved),
                                             ),
                                           );
-                                      // Rebuild with fresh apiClient for
-                                      // the new base URL.
+                                      // Navigate to login if
+                                      // authenticated.
                                       if (context.mounted) {
-                                        ref.invalidate(apiClientProvider);
-                                        // Navigate to login if
-                                        // authenticated.
-                                        if (context.mounted) {
-                                          unawaited(
-                                            context.router.replace(
-                                              const LoginRoute(),
-                                            ),
-                                          );
-                                        }
+                                        unawaited(
+                                          context.router.replace(
+                                            const LoginRoute(),
+                                          ),
+                                        );
                                       }
                                     }
                                   }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -55,10 +56,15 @@ func NewUploadHandler(
 func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	// Resolve destination path by media_type.
-	mediaType := models.ParseMediaType(c.FormValue("media_type"))
-	if mediaType == "" {
-		mediaType = models.MediaTypeVideo
+	// Resolve destination path by media_type. Невалидное непустое значение —
+	// ошибка 400, а не молчаливое падение в video.
+	rawType := c.FormValue("media_type")
+	mediaType := models.MediaTypeVideo
+	if rawType != "" {
+		mediaType = models.ParseMediaType(rawType)
+		if !mediaType.Valid() {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid media_type")
+		}
 	}
 	destPath := h.mediaCfg.VideoPath
 	if mediaType == models.MediaTypeAudio {
@@ -151,7 +157,7 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 	}
 
 	// Parse filename for metadata
-	title, year := metadata.ParseFilenameUpload(filename)
+	title, year := metadata.ParseFilename(filename)
 
 	// Determine media type
 	mediaType := services.DetermineMediaType(filePath)
@@ -198,19 +204,24 @@ func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, fil
 		}
 	}
 
-	// Generate thumbnail.
+	// Generate thumbnail. В JSON кладём относительный URL — фронтенд строит
+	// полный адрес сам ({baseUrl}/media/{id}/thumb), а абсолютные пути ФС
+	// наружу не утекают.
 	if thumbPath := h.thumbSvc.Generate(media.ID, filePath); thumbPath != "" {
-		media.ThumbnailURL = thumbPath
+		media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
 		if err := h.mediaRepo.Update(ctx, media); err != nil {
 			log.Printf("upload: update media thumbnail: %v", err)
 		}
 	}
 
-	// Extract embedded cover art (if file has one).
-	if coverPath := h.thumbSvc.ExtractCover(media.ID, filePath); coverPath != "" {
-		media.CoverURL = coverPath
-		if err := h.mediaRepo.Update(ctx, media); err != nil {
-			log.Printf("upload: update media cover: %v", err)
+	// Extract embedded cover art — только для аудио (для видео обложка
+	// загружается вручную через UploadCover).
+	if mediaType == models.MediaTypeAudio {
+		if coverPath := h.thumbSvc.ExtractCover(media.ID, filePath); coverPath != "" {
+			media.CoverURL = fmt.Sprintf("/api/media/%d/cover", media.ID)
+			if err := h.mediaRepo.Update(ctx, media); err != nil {
+				log.Printf("upload: update media cover: %v", err)
+			}
 		}
 	}
 

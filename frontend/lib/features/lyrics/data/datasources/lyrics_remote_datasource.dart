@@ -1,11 +1,11 @@
-import 'package:flux_media_server/core/network/api_client.dart';
+import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/lyrics.dart';
 
 class LyricsRemoteDataSource {
   LyricsRemoteDataSource(this.apiClient);
 
-  final ApiClient apiClient;
+  final MediaApiClient apiClient;
 
   Future<Lyrics?> getLyrics(int mediaId) async {
     final response = await apiClient.getLyrics(mediaId);

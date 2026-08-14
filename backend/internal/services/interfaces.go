@@ -21,6 +21,7 @@ type JWTService interface {
 type OTPStoreInterface interface {
 	Generate(addr string) (string, error)
 	Verify(email, code string) bool
+	Remove(addr string)
 	Stop()
 }
 

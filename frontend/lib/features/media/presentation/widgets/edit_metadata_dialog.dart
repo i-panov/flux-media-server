@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/filename_parser.dart';
+import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
 import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -13,42 +14,18 @@ Future<void> showEditMetadataDialog(
   WidgetRef ref,
   Media media,
 ) async {
-  final l = AppLocalizations.of(context)!;
-
-  final saved = await showDialog<Map<String, dynamic>?>(
+  // Сохранение происходит внутри диалога: при ошибке сети введённые
+  // значения не теряются (диалог остаётся открытым).
+  await showDialog<void>(
     context: context,
-    builder: (ctx) => _EditMetadataDialog(media: media, l: l),
-  );
-
-  if (saved == null) return;
-
-  final result =
-      await ref.read(mediaRepositoryProvider).updateMetadata(media.id, saved);
-
-  result.fold(
-    (failure) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l.errorLabel}: ${failure.message}')),
-        );
-      }
-    },
-    (updatedMedia) {
-      ref
-          .read(mediaDetailProvider(media.id).notifier)
-          .updateMedia(updatedMedia);
-      ref
-        ..invalidate(mediaListProvider('video'))
-        ..invalidate(mediaListProvider('audio'));
-    },
+    builder: (ctx) => _EditMetadataDialog(media: media),
   );
 }
 
 class _EditMetadataDialog extends ConsumerStatefulWidget {
-  const _EditMetadataDialog({required this.media, required this.l});
+  const _EditMetadataDialog({required this.media});
 
   final Media media;
-  final AppLocalizations l;
 
   @override
   ConsumerState<_EditMetadataDialog> createState() =>
@@ -65,6 +42,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
   final _formKey = GlobalKey<FormState>();
 
   String? _originalFilename;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -77,7 +55,11 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
         : [TextEditingController()];
     _albumController = TextEditingController(text: widget.media.album ?? '');
     _genreController = TextEditingController(text: widget.media.genre ?? '');
-    _yearController = TextEditingController(text: widget.media.year.toString());
+    _yearController = TextEditingController(
+      text: (widget.media.year ?? 0) > 0
+          ? widget.media.year.toString()
+          : '',
+    );
     _descriptionController =
         TextEditingController(text: widget.media.description ?? '');
     _originalFilename =
@@ -124,6 +106,21 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     super.dispose();
   }
 
+  /// Год: либо пусто, либо 4 цифры в диапазоне 1888..текущий+2.
+  String? _validateYear(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
+    final year = int.tryParse(text);
+    if (year == null || text.length != 4) {
+      return AppLocalizations.of(context)!.invalidYear;
+    }
+    final maxYear = DateTime.now().year + 2;
+    if (year < 1888 || year > maxYear) {
+      return AppLocalizations.of(context)!.invalidYear;
+    }
+    return null;
+  }
+
   Map<String, dynamic> _collectData() {
     final data = <String, dynamic>{
       'title': _titleController.text.trim(),
@@ -139,6 +136,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     if (_genreController.text.trim().isNotEmpty) {
       data['genre'] = _genreController.text.trim();
     }
+    // Валидатор гарантирует корректный год (или пусто).
     final yearParsed = int.tryParse(_yearController.text.trim());
     if (yearParsed != null) {
       data['year'] = yearParsed;
@@ -149,9 +147,47 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     return data;
   }
 
+  Future<void> _save() async {
+    final l = AppLocalizations.of(context)!;
+    if (_isSaving || !_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+    final updateMetadata = ref.read(updateMetadataProvider);
+    final result = await updateMetadata(
+      UpdateMetadataParams(
+        mediaId: widget.media.id,
+        data: _collectData(),
+      ),
+    );
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    result.fold(
+      (failure) {
+        // Ошибка сети: остаёмся открытыми, значения не теряются.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l.errorLabel}: ${failure.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (updatedMedia) {
+        ref
+            .read(mediaDetailProvider(widget.media.id).notifier)
+            .updateMedia(updatedMedia);
+        ref
+          ..invalidate(mediaListProvider('video'))
+          ..invalidate(mediaListProvider('audio'));
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l = widget.l;
+    final l = AppLocalizations.of(context)!;
     final artistsAsync = ref.watch(artistsProvider);
 
     return AlertDialog(
@@ -187,6 +223,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
                 controller: _yearController,
                 decoration: InputDecoration(labelText: l.year),
                 keyboardType: TextInputType.number,
+                validator: _validateYear,
               ),
               TextFormField(
                 controller: _descriptionController,
@@ -240,22 +277,19 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
           child: Text(l.cancel),
         ),
         FilledButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Navigator.of(context).pop(_collectData());
-            }
-          },
-          child: Text(l.save),
+          onPressed: _isSaving ? null : _save,
+          child: Text(_isSaving ? l.saving : l.save),
         ),
       ],
     );
   }
 
-  /// Builds the group of artist fields with autocomplete and add/remove buttons.
+  /// Builds the group of artist fields with autocomplete and add/remove
+  /// buttons.
   Widget _buildArtistsGroup(AppLocalizations l, List<Artist> allArtists) {
     return Container(
       padding: const EdgeInsets.all(8),
@@ -301,7 +335,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
 }
 
 /// A single artist text field with autocomplete dropdown.
-class _ArtistField extends StatelessWidget {
+class _ArtistField extends StatefulWidget {
   const _ArtistField({
     required this.controller,
     required this.allArtists,
@@ -313,14 +347,28 @@ class _ArtistField extends StatelessWidget {
   final VoidCallback? onRemove;
 
   @override
+  State<_ArtistField> createState() => _ArtistFieldState();
+}
+
+class _ArtistFieldState extends State<_ArtistField> {
+  /// FocusNode живёт в State: ранее создавался на каждый rebuild.
+  final _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return RawAutocomplete<String>(
-      textEditingController: controller,
-      focusNode: FocusNode(),
+      textEditingController: widget.controller,
+      focusNode: _focusNode,
       optionsBuilder: (textEditingValue) {
         final query = textEditingValue.text.trim().toLowerCase();
         if (query.isEmpty) return const Iterable<String>.empty();
-        return allArtists
+        return widget.allArtists
             .where((a) => a.name.toLowerCase().contains(query))
             .map((a) => a.name)
             .take(10);
@@ -359,10 +407,10 @@ class _ArtistField extends StatelessWidget {
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: const OutlineInputBorder(),
-            suffixIcon: onRemove != null
+            suffixIcon: widget.onRemove != null
                 ? IconButton(
                     icon: const Icon(Icons.close, size: 18),
-                    onPressed: onRemove,
+                    onPressed: widget.onRemove,
                     visualDensity: VisualDensity.compact,
                   )
                 : null,

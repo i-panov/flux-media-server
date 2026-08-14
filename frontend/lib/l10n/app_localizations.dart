@@ -744,7 +744,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Continue from {formatted}'**
-  String continueFrom(Object formatted);
+  String continueFrom(String formatted);
 
   /// No description provided for @startFromBeginning.
   ///
@@ -919,6 +919,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No server connection. Showing downloaded content only.'**
   String get offlineMode;
+
+  /// No description provided for @invalidYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid year'**
+  String get invalidYear;
+
+  /// No description provided for @uploadCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload cancelled'**
+  String get uploadCancelled;
+
+  /// No description provided for @hashingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Hashing file...'**
+  String get hashingFile;
+
+  /// No description provided for @checkingDuplicates.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for duplicates...'**
+  String get checkingDuplicates;
+
+  /// No description provided for @offlineCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline copy'**
+  String get offlineCopy;
+
+  /// No description provided for @audioPlayingInBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Playing audio track'**
+  String get audioPlayingInBackground;
+
+  /// No description provided for @removeFromCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from collection'**
+  String get removeFromCollection;
+
+  /// No description provided for @addMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'Add media'**
+  String get addMedia;
 }
 
 class _AppLocalizationsDelegate

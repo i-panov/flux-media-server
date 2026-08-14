@@ -153,7 +153,10 @@ class _AddToCollectionDialogState
       try {
         final createCollection = ref.read(createCollectionProvider);
         final collection = await createCollection(
-          CreateCollectionParams(name: nameController.text, type: widget.mediaType),
+          CreateCollectionParams(
+            name: nameController.text,
+            type: widget.mediaType,
+          ),
         );
         collection.fold(
           (failure) {

@@ -1,16 +1,15 @@
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:collection';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
-import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -21,7 +20,7 @@ class PlaybackState with _$PlaybackState {
   const factory PlaybackState.initial() = PlaybackInitial;
   const factory PlaybackState.playing({
     required Media media,
-    required String type, // 'audio' or 'video'
+    required MediaType type,
     @Default(false) bool isPaused,
     @Default(Duration.zero) Duration position,
     Duration? duration,
@@ -77,36 +76,31 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     super.dispose();
   }
 
-  /// Serializes concurrent play() calls using a Future queue to prevent
-  /// interleaving of async load/play/seek operations on different player
-  /// instances. Each call waits for the previous one to finish, ensuring
-  /// only the latest media actually starts playing.
-  final Queue<Future<void> Function()> _playQueue = Queue();
-  Future<void> _playQueueDone = Future.value();
+  /// Serializes concurrent play() calls through a Future chain: each call
+  /// waits for the previous one to finish, ensuring only the latest media
+  /// actually starts playing. Errors are swallowed in the chain itself
+  /// (otherwise one failed play would block all subsequent calls), while
+  /// each caller still receives its own result.
+  Future<void> _playChain = Future.value();
 
   /// Starts playback of [media]. Stops any current playback first.
   /// Serializes concurrent play() calls to prevent race conditions.
-  Future<void> play(Media media) async {
-    // Enqueue this play request. The queue ensures sequential execution:
-    // each call waits for the previous one to finish, so rapid track
-    // switches only play the last requested media.
-    final completer = Completer<void>();
-    final previous = _playQueueDone;
+  @override
+  Future<void> play(Media media) {
+    final result = _playChain.then((_) => _guardedPlay(media));
+    _playChain = result.catchError((_) {});
+    return result;
+  }
 
-    _playQueue.add(() async {
-      await previous;
-      try {
-        state = const PlaybackState.loading();
-        await _playInternal(media);
-        if (!completer.isCompleted) completer.complete();
-      } catch (e) {
-        state = PlaybackState.error(message: e.toString());
-        if (!completer.isCompleted) completer.completeError(e);
-      }
-    });
-
-    _playQueueDone = completer.future;
-    await completer.future;
+  /// Runs [_playInternal] and converts failures into [PlaybackState.error].
+  Future<void> _guardedPlay(Media media) async {
+    try {
+      state = const PlaybackState.loading();
+      await _playInternal(media);
+    } catch (e) {
+      state = PlaybackState.error(message: e.toString());
+      rethrow;
+    }
   }
 
   Future<void> _playInternal(Media media) async {
@@ -161,7 +155,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
 
       state = PlaybackState.playing(
         media: media,
-        type: 'audio',
+        type: MediaType.audio,
       );
 
       _subscribeToStream(_audioPlayer.positionStream, (pos) {
@@ -195,7 +189,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
 
       state = PlaybackState.playing(
         media: media,
-        type: 'video',
+        type: MediaType.video,
         savedPosition: resumePosition != null &&
                 resumePosition > const Duration(seconds: 5)
             ? resumePosition
@@ -294,7 +288,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   }
 
   /// Saves watch progress to the backend. Best-effort: errors are logged
-  /// and ignored.
+  /// and ignored. Отправляет duration и completed — бэкенд их принимает
+  /// и сохраняет.
   Future<void> _saveProgress(
     int mediaId,
     Duration position,
@@ -306,6 +301,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
       await _ref.read(mediaRepositoryProvider).updateProgress(
             mediaId,
             position: position.inSeconds,
+            duration: duration.inSeconds,
+            completed: completed ?? false,
           );
     } on Exception catch (e) {
       developer.log('Failed to save progress: $e');
@@ -405,6 +402,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     await _audioPlayer.setVolume(volume);
   }
 
+  @override
   Future<void> stop() async {
     _cancelSubscriptions();
     _cancelProgressTimer();

@@ -1,19 +1,21 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
-import 'package:flux_media_server/core/providers/is_offline_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
-import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
+import 'package:flux_media_server/features/offline/presentation/widgets/download_toggle.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/continue_watching_row.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/horizontal_video_row.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -34,6 +36,10 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
   static const _mediaType = 'video';
   final ScrollController _scrollController = ScrollController();
 
+  /// Debounce live-поиска.
+  Timer? _searchDebounce;
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -42,15 +48,39 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent * 0.8) {
+    final position = _scrollController.position;
+    if (position.maxScrollExtent > 0 &&
+        position.pixels >= position.maxScrollExtent * 0.8) {
       ref.read(mediaListProvider(_mediaType).notifier).loadMore();
     }
+  }
+
+  /// Live-поиск с debounce 300 мс вместо поиска только по Enter.
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    final query = value.trim();
+    if (query.isEmpty) {
+      ref.read(searchQueryProvider('video').notifier).state = '';
+    } else {
+      _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+        ref.read(searchQueryProvider('video').notifier).state = query;
+      });
+    }
+    // Перерисовать кнопку очистки (visible/disabled).
+    setState(() {});
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    ref.read(searchQueryProvider('video').notifier).state = '';
   }
 
   @override
@@ -106,11 +136,13 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     required String baseUrl,
   }) {
     // Show loading skeleton only on initial load, not during refresh.
+    // valueOrNull вместо value: у AsyncLoading с previous=AsyncError
+    // обращение к value бросило бы прошлую ошибку при повторной попытке.
     final isInitialLoad = mediaListState.isLoading &&
-        mediaListState.value == null &&
-        watchProgressState.value == null &&
-        favoritesState.value == null &&
-        collectionsState.value == null;
+        mediaListState.valueOrNull == null &&
+        watchProgressState.valueOrNull == null &&
+        favoritesState.valueOrNull == null &&
+        collectionsState.valueOrNull == null;
     if (isInitialLoad) {
       return _buildSkeletonGrid(context);
     }
@@ -170,6 +202,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     final downloadedMedia = downloadsState.valueOrNull ?? [];
     final downloadedVideo =
         downloadedMedia.where((m) => m.type == MediaType.video).toList();
+    final downloadedIds = downloadedVideo.map((m) => m.id).toSet();
 
     // Get favorite media IDs
     final favoriteMediaIds = favorites
@@ -177,26 +210,39 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
         .map((f) => f.mediaId!)
         .toSet();
 
-    // Continue Watching: incomplete progress for items in the current list.
+    // Continue Watching: незавершённый прогресс для элементов текущего
+    // списка; исключаем завершённые (completed или position >= 0.9),
+    // сортируем по updatedAt — свежие сверху.
     final mediaIds = mediaList.items.map((m) => m.id).toSet();
+    final mediaById = {for (final m in mediaList.items) m.id: m};
     final continueWatchingProgress = watchProgress
         .where((p) => mediaIds.contains(p.mediaId))
-        .take(10)
-        .toList();
+        .where((p) {
+          if (p.completed) return false;
+          final media = mediaById[p.mediaId];
+          final duration = p.duration > 0 ? p.duration : (media?.duration ?? 0);
+          if (duration <= 0) return p.position > 0;
+          return p.position < duration * 0.9;
+        })
+        .toList()
+      ..sort(
+        (a, b) =>
+            (b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0)).compareTo(
+          a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0),
+        ),
+      );
     final continueWatchingIds =
         continueWatchingProgress.map((p) => p.mediaId).toSet();
 
     // Build continue watching items with progress
-    final continueWatchingItems = continueWatchingProgress.map((p) {
-      final media = mediaList.items.firstWhere(
-        (m) => m.id == p.mediaId,
-        orElse: () => Media(
-          id: p.mediaId,
-          title: 'Unknown',
-          type: MediaType.video,
-          fileSize: 0,
-        ),
-      );
+    final continueWatchingItems = continueWatchingProgress.take(10).map((p) {
+      final media = mediaById[p.mediaId] ??
+          Media(
+            id: p.mediaId,
+            title: 'Unknown',
+            type: MediaType.video,
+            fileSize: 0,
+          );
       return (media, p);
     }).toList();
 
@@ -235,8 +281,11 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
           ..invalidate(watchProgressProvider)
           ..invalidate(favoritesProvider)
           ..invalidate(collectionsProvider);
-        // Wait for the next stable state
-        await ref.watch(mediaListProvider(_mediaType).future);
+        // Wait for the next stable state. Ошибка уже отражена в состоянии
+        // провайдера и отрисовывается экраном ошибки — не пробрасываем.
+        try {
+          await ref.watch(mediaListProvider(_mediaType).future);
+        } catch (_) {}
       },
       child: CustomScrollView(
         controller: _scrollController,
@@ -246,16 +295,19 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: SearchBar(
+                controller: _searchController,
                 hintText: l.searchMedia,
                 leading: const Icon(Icons.search),
-                onChanged: (value) {
-                  if (value.isEmpty) {
-                    ref.read(searchQueryProvider('video').notifier).state = '';
-                  }
-                },
-                onSubmitted: (value) {
-                  ref.read(searchQueryProvider('video').notifier).state = value;
-                },
+                trailing: [
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: l.cancel,
+                    onPressed: _searchController.text.isEmpty
+                        ? null
+                        : _clearSearch,
+                  ),
+                ],
+                onChanged: _onSearchChanged,
               ),
             ),
           ),
@@ -270,6 +322,9 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
                   for (final id in favoriteMediaIds) id: true,
                 },
                 onFavoriteToggled: _toggleFavorite,
+                isDownloadedMap: {
+                  for (final id in downloadedIds) id: true,
+                },
                 onDownloadToggled: _toggleDownload,
               ),
             ),
@@ -482,25 +537,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
   }
 
   void _toggleDownload(int mediaId) {
-    final downloadState = ref.read(downloadNotifierProvider(mediaId));
-    if (downloadState is DownloadDownloaded) {
-      ref.read(downloadNotifierProvider(mediaId).notifier).remove(mediaId);
-    } else if (downloadState is! DownloadDownloading) {
-      // Need media object — find from list
-      final mediaList = ref.read(mediaListProvider(_mediaType)).valueOrNull;
-      if (mediaList != null) {
-        final media = mediaList.items.firstWhere(
-          (m) => m.id == mediaId,
-          orElse: () => Media(
-            id: mediaId,
-            title: '',
-            type: MediaType.video,
-            fileSize: 0,
-          ),
-        );
-        ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
-      }
-    }
+    toggleDownload(ref, mediaId: mediaId, mediaType: _mediaType);
   }
 }
 

@@ -32,6 +32,6 @@ Map<String, dynamic> _$$MetadataImplToJson(_$MetadataImpl instance) =>
       'poster_url': instance.posterUrl,
       'backdrop_url': instance.backdropUrl,
       'rating': instance.rating,
-      'genres': instance.genres,
-      'cast': instance.cast,
+      'genres': _stringListToJson(instance.genres),
+      'cast': _stringListToJson(instance.cast),
     };

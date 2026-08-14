@@ -1,11 +1,11 @@
-import 'package:flux_media_server/core/network/api_client.dart';
+import 'package:flux_media_server/core/network/library_api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
 
 class FavoritesRemoteDataSource {
   FavoritesRemoteDataSource(this.apiClient);
 
-  final ApiClient apiClient;
+  final LibraryApiClient apiClient;
 
   Future<List<Favorite>> getFavorites() async {
     final response = await apiClient.getFavorites();

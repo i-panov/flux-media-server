@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 
+	"flux/internal/middleware"
 	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -25,7 +26,7 @@ func NewFavoriteHandler(favRepo repository.FavoriteRepository, mediaRepo reposit
 
 // AddFavorite adds a media item to the user's favorites.
 func (h *FavoriteHandler) AddFavorite(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -64,7 +65,7 @@ func (h *FavoriteHandler) AddFavorite(c *fiber.Ctx) error {
 
 // RemoveFavorite removes a media item from the user's favorites.
 func (h *FavoriteHandler) RemoveFavorite(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -89,7 +90,7 @@ func (h *FavoriteHandler) RemoveFavorite(c *fiber.Ctx) error {
 
 // ListFavorites returns the user's favorites, optionally filtered by type.
 func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -128,7 +129,7 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 
 // AddArtistFavorite adds an artist to the user's favorites.
 func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -185,7 +186,7 @@ func isUniqueViolation(err error) bool {
 
 // RemoveArtistFavorite removes an artist from the user's favorites.
 func (h *FavoriteHandler) RemoveArtistFavorite(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}

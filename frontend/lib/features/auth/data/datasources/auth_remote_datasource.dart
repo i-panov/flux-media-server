@@ -1,14 +1,20 @@
-import 'package:flux_media_server/core/network/api_client.dart';
+import 'package:flux_media_server/core/error/exceptions.dart';
+import 'package:flux_media_server/core/network/auth_api_client.dart';
+import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/user.dart';
 
 /// Remote data source for authentication API calls.
 class AuthRemoteDataSource {
-  /// Creates an [AuthRemoteDataSource] with the given [apiClient].
-  AuthRemoteDataSource(this.apiClient);
+  /// Creates an [AuthRemoteDataSource] with the given [apiClient]
+  /// and [refresher].
+  AuthRemoteDataSource(this.apiClient, {required this.refresher});
 
   /// The API client used for HTTP requests.
-  final ApiClient apiClient;
+  final AuthApiClient apiClient;
+
+  /// Единый refresher токенов (общий с интерцептором и offline-кэшем).
+  final AuthTokenRefresher refresher;
 
   /// Requests a verification code to be sent to [email].
   /// Returns the debug code if server is in debug mode, null otherwise.
@@ -38,18 +44,18 @@ class AuthRemoteDataSource {
   }
 
   /// Refreshes the access token using a refresh token.
+  ///
+  /// Использует единый [AuthTokenRefresher], чтобы параллельные вызовы
+  /// ждали один общий refresh.
   Future<({String token, String refreshToken})> refreshTokens(
     String refreshToken,
   ) async {
-    final response = await apiClient.refreshToken({
-      'refresh_token': refreshToken,
-    });
-    checkResponse(response, 'Failed to refresh token');
-    final body = response.body!;
-    return (
-      token: body['token'] as String,
-      refreshToken: body['refresh_token'] as String,
-    );
+    final refreshed = await refresher.refresh(refreshToken);
+    final tokens = refresher.lastTokens;
+    if (!refreshed || tokens == null) {
+      throw const ServerException(message: 'Failed to refresh token');
+    }
+    return tokens;
   }
 
   /// Gets the currently authenticated user.

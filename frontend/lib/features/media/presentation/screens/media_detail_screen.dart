@@ -13,7 +13,7 @@ import 'package:flux_media_server/features/media/domain/usecases/upload_cover.da
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
-import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -121,10 +121,12 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        // Reload the media detail to refresh the cover.
+        // Точечно обновляем обложку в состоянии — без полного reload
+        // (иначе весь экран мигает спиннером).
+        final baseUrl = ref.read(baseUrlProvider);
         ref
             .read(mediaDetailProvider(widget.mediaId).notifier)
-            .load(widget.mediaId);
+            .setCoverUrl('$baseUrl/media/${widget.mediaId}/cover');
         // Refresh media lists so cards show the new cover.
         ref
           ..invalidate(mediaListProvider('video'))
@@ -146,7 +148,12 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
       await ref
           .read(downloadNotifierProvider(widget.mediaId).notifier)
           .remove(widget.mediaId);
-    } else if (downloadState is! DownloadDownloading) {
+    } else if (downloadState is DownloadDownloading) {
+      // Повторный тап во время загрузки отменяет её.
+      await ref
+          .read(downloadNotifierProvider(widget.mediaId).notifier)
+          .cancel(widget.mediaId);
+    } else {
       await ref
           .read(downloadNotifierProvider(widget.mediaId).notifier)
           .download(media);
@@ -336,7 +343,15 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${media.year} · ${media.type.value}',
+                          () {
+                            // 0 = «нет данных» на бэкенде — не показываем год.
+                            final parts = <String>[
+                              if (media.year != null && media.year! > 0)
+                                '${media.year}',
+                              media.type.value,
+                            ];
+                            return parts.join(' · ');
+                          }(),
                           style: Theme.of(context)
                               .textTheme
                               .bodyLarge
@@ -382,7 +397,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                             style: const TextStyle(color: Colors.white70),
                           ),
                         ],
-                        if (media.duration != null) ...[
+                        if (media.duration != null && media.duration! > 0) ...[
                           const SizedBox(height: 8),
                           Text(
                             '${l.duration}: '
@@ -447,9 +462,11 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Tooltip(
-                                message: l.download,
+                                message: isDownloading
+                                    ? l.cancel
+                                    : l.download,
                                 child: OutlinedButton.icon(
-                                  onPressed: isDownloading ? null : _download,
+                                  onPressed: _download,
                                   icon: isDownloading
                                       ? SizedBox(
                                           width: 18,

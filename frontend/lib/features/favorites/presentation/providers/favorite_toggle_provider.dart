@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/providers/is_offline_provider.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 
 /// Notifier that toggles favorite status for a media item.
@@ -62,9 +62,8 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
               state = AsyncValue.data(currentState);
             },
             (_) {
-              _ref
-                ..invalidate(favoritesProvider)
-                ..invalidate(favoriteMediaIdsProvider);
+              // Обновляем кеш локально — без лишнего GET избранного.
+              _ref.read(favoritesProvider.notifier).removeLocal(_mediaId);
             },
           );
         } else {
@@ -76,10 +75,9 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
               if (!mounted) return;
               state = AsyncValue.data(currentState);
             },
-            (_) {
-              _ref
-                ..invalidate(favoritesProvider)
-                ..invalidate(favoriteMediaIdsProvider);
+            (favorite) {
+              // Обновляем кеш локально — без лишнего GET избранного.
+              _ref.read(favoritesProvider.notifier).addLocal(favorite);
             },
           );
         }

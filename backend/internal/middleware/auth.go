@@ -9,6 +9,25 @@ import (
 	"flux/internal/services"
 )
 
+// Ключи Locals, в которых AuthMiddleware сохраняет данные аутентифицированного
+// пользователя. Типизированные ключи исключают опечатки в магических строках.
+const (
+	LocalsUserID    = "user_id"
+	LocalsUserEmail = "user_email"
+)
+
+// GetUserID возвращает ID аутентифицированного пользователя из Locals.
+func GetUserID(c *fiber.Ctx) (uint, bool) {
+	userID, ok := c.Locals(LocalsUserID).(uint)
+	return userID, ok
+}
+
+// GetUserEmail возвращает email аутентифицированного пользователя из Locals.
+func GetUserEmail(c *fiber.Ctx) (string, bool) {
+	email, ok := c.Locals(LocalsUserEmail).(string)
+	return email, ok
+}
+
 func AuthMiddleware(jwtService services.JWTService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
@@ -26,8 +45,8 @@ func AuthMiddleware(jwtService services.JWTService) fiber.Handler {
 			return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired token")
 		}
 
-		c.Locals("user_id", claims.UserID)
-		c.Locals("user_email", claims.Email)
+		c.Locals(LocalsUserID, claims.UserID)
+		c.Locals(LocalsUserEmail, claims.Email)
 
 		return c.Next()
 	}

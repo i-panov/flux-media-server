@@ -14,10 +14,11 @@ import (
 
 type LyricsHandler struct {
 	lyricsRepo repository.LyricsRepository
+	mediaRepo  repository.MediaRepository
 }
 
-func NewLyricsHandler(lyricsRepo repository.LyricsRepository) *LyricsHandler {
-	return &LyricsHandler{lyricsRepo: lyricsRepo}
+func NewLyricsHandler(lyricsRepo repository.LyricsRepository, mediaRepo repository.MediaRepository) *LyricsHandler {
+	return &LyricsHandler{lyricsRepo: lyricsRepo, mediaRepo: mediaRepo}
 }
 
 // GetLyrics returns lyrics for a media item.
@@ -63,6 +64,11 @@ func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
 	}
 
 	ctx := c.UserContext()
+
+	// Проверяем существование медиа до создания/обновления текста.
+	if _, err := h.mediaRepo.FindByID(ctx, uint(mediaID)); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Media not found")
+	}
 
 	lyrics := &models.Lyrics{
 		MediaID:     uint(mediaID),

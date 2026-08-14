@@ -22,6 +22,8 @@ User _$UserFromJson(Map<String, dynamic> json) {
 mixin _$User {
   int get id => throw _privateConstructorUsedError;
   String get email => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_admin')
+  bool get isAdmin => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -33,7 +35,7 @@ abstract class $UserCopyWith<$Res> {
   factory $UserCopyWith(User value, $Res Function(User) then) =
       _$UserCopyWithImpl<$Res, User>;
   @useResult
-  $Res call({int id, String email});
+  $Res call({int id, String email, @JsonKey(name: 'is_admin') bool isAdmin});
 }
 
 /// @nodoc
@@ -51,6 +53,7 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
   $Res call({
     Object? id = null,
     Object? email = null,
+    Object? isAdmin = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -61,6 +64,10 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
               as String,
+      isAdmin: null == isAdmin
+          ? _value.isAdmin
+          : isAdmin // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -72,7 +79,7 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
       __$$UserImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({int id, String email});
+  $Res call({int id, String email, @JsonKey(name: 'is_admin') bool isAdmin});
 }
 
 /// @nodoc
@@ -87,6 +94,7 @@ class __$$UserImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? email = null,
+    Object? isAdmin = null,
   }) {
     return _then(_$UserImpl(
       id: null == id
@@ -97,6 +105,10 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
               as String,
+      isAdmin: null == isAdmin
+          ? _value.isAdmin
+          : isAdmin // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -104,7 +116,10 @@ class __$$UserImplCopyWithImpl<$Res>
 /// @nodoc
 @JsonSerializable()
 class _$UserImpl implements _User {
-  const _$UserImpl({required this.id, required this.email});
+  const _$UserImpl(
+      {required this.id,
+      required this.email,
+      @JsonKey(name: 'is_admin') this.isAdmin = false});
 
   factory _$UserImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserImplFromJson(json);
@@ -113,10 +128,13 @@ class _$UserImpl implements _User {
   final int id;
   @override
   final String email;
+  @override
+  @JsonKey(name: 'is_admin')
+  final bool isAdmin;
 
   @override
   String toString() {
-    return 'User(id: $id, email: $email)';
+    return 'User(id: $id, email: $email, isAdmin: $isAdmin)';
   }
 
   @override
@@ -125,12 +143,13 @@ class _$UserImpl implements _User {
         (other.runtimeType == runtimeType &&
             other is _$UserImpl &&
             (identical(other.id, id) || other.id == id) &&
-            (identical(other.email, email) || other.email == email));
+            (identical(other.email, email) || other.email == email) &&
+            (identical(other.isAdmin, isAdmin) || other.isAdmin == isAdmin));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, email);
+  int get hashCode => Object.hash(runtimeType, id, email, isAdmin);
 
   @JsonKey(ignore: true)
   @override
@@ -147,8 +166,10 @@ class _$UserImpl implements _User {
 }
 
 abstract class _User implements User {
-  const factory _User({required final int id, required final String email}) =
-      _$UserImpl;
+  const factory _User(
+      {required final int id,
+      required final String email,
+      @JsonKey(name: 'is_admin') final bool isAdmin}) = _$UserImpl;
 
   factory _User.fromJson(Map<String, dynamic> json) = _$UserImpl.fromJson;
 
@@ -156,6 +177,9 @@ abstract class _User implements User {
   int get id;
   @override
   String get email;
+  @override
+  @JsonKey(name: 'is_admin')
+  bool get isAdmin;
   @override
   @JsonKey(ignore: true)
   _$$UserImplCopyWith<_$UserImpl> get copyWith =>

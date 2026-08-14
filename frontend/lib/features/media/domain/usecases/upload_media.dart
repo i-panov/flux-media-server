@@ -9,11 +9,19 @@ class UploadMediaParams {
     required this.filePath,
     required this.mediaType,
     required this.fileName,
+    this.onProgress,
+    this.isCancelled,
   });
 
   final String filePath;
   final String mediaType;
   final String fileName;
+
+  /// Прогресс загрузки: (отправлено байт, всего байт или null).
+  final void Function(int sent, int? total)? onProgress;
+
+  /// Возвращает true, когда загрузку нужно прервать.
+  final bool Function()? isCancelled;
 }
 
 class UploadMedia extends UseCase<Either<Failure, Media>, UploadMediaParams> {
@@ -27,6 +35,8 @@ class UploadMedia extends UseCase<Either<Failure, Media>, UploadMediaParams> {
       filePath: params.filePath,
       mediaType: params.mediaType,
       fileName: params.fileName,
+      onProgress: params.onProgress,
+      isCancelled: params.isCancelled,
     );
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flux_media_server/features/settings/domain/entities/app_settings.dart';
+import 'package:flux_media_server/core/session/app_settings.dart';
 
 /// Repository for application settings and authentication token storage.
 abstract class SettingsRepository {

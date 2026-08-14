@@ -29,8 +29,6 @@ mixin _$Media {
   @JsonKey(name: 'filename')
   String get filename => throw _privateConstructorUsedError;
   int? get year => throw _privateConstructorUsedError;
-  @JsonKey(name: 'file_path')
-  String get filePath => throw _privateConstructorUsedError;
   String? get description => throw _privateConstructorUsedError;
   int? get duration => throw _privateConstructorUsedError;
   @JsonKey(name: 'thumbnail_url')
@@ -63,7 +61,6 @@ abstract class $MediaCopyWith<$Res> {
       @JsonKey(name: 'file_size') int fileSize,
       @JsonKey(name: 'filename') String filename,
       int? year,
-      @JsonKey(name: 'file_path') String filePath,
       String? description,
       int? duration,
       @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
@@ -97,7 +94,6 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
     Object? fileSize = null,
     Object? filename = null,
     Object? year = freezed,
-    Object? filePath = null,
     Object? description = freezed,
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
@@ -134,10 +130,6 @@ class _$MediaCopyWithImpl<$Res, $Val extends Media>
           ? _value.year
           : year // ignore: cast_nullable_to_non_nullable
               as int?,
-      filePath: null == filePath
-          ? _value.filePath
-          : filePath // ignore: cast_nullable_to_non_nullable
-              as String,
       description: freezed == description
           ? _value.description
           : description // ignore: cast_nullable_to_non_nullable
@@ -208,7 +200,6 @@ abstract class _$$MediaImplCopyWith<$Res> implements $MediaCopyWith<$Res> {
       @JsonKey(name: 'file_size') int fileSize,
       @JsonKey(name: 'filename') String filename,
       int? year,
-      @JsonKey(name: 'file_path') String filePath,
       String? description,
       int? duration,
       @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
@@ -241,7 +232,6 @@ class __$$MediaImplCopyWithImpl<$Res>
     Object? fileSize = null,
     Object? filename = null,
     Object? year = freezed,
-    Object? filePath = null,
     Object? description = freezed,
     Object? duration = freezed,
     Object? thumbnailUrl = freezed,
@@ -278,10 +268,6 @@ class __$$MediaImplCopyWithImpl<$Res>
           ? _value.year
           : year // ignore: cast_nullable_to_non_nullable
               as int?,
-      filePath: null == filePath
-          ? _value.filePath
-          : filePath // ignore: cast_nullable_to_non_nullable
-              as String,
       description: freezed == description
           ? _value.description
           : description // ignore: cast_nullable_to_non_nullable
@@ -336,7 +322,6 @@ class _$MediaImpl implements _Media {
       @JsonKey(name: 'file_size') required this.fileSize,
       @JsonKey(name: 'filename') this.filename = '',
       this.year,
-      @JsonKey(name: 'file_path') this.filePath = '',
       this.description,
       this.duration,
       @JsonKey(name: 'thumbnail_url') this.thumbnailUrl,
@@ -367,9 +352,6 @@ class _$MediaImpl implements _Media {
   final String filename;
   @override
   final int? year;
-  @override
-  @JsonKey(name: 'file_path')
-  final String filePath;
   @override
   final String? description;
   @override
@@ -404,7 +386,7 @@ class _$MediaImpl implements _Media {
 
   @override
   String toString() {
-    return 'Media(id: $id, title: $title, type: $type, fileSize: $fileSize, filename: $filename, year: $year, filePath: $filePath, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artists: $artists, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash, updatedAt: $updatedAt)';
+    return 'Media(id: $id, title: $title, type: $type, fileSize: $fileSize, filename: $filename, year: $year, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artists: $artists, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash, updatedAt: $updatedAt)';
   }
 
   @override
@@ -420,8 +402,6 @@ class _$MediaImpl implements _Media {
             (identical(other.filename, filename) ||
                 other.filename == filename) &&
             (identical(other.year, year) || other.year == year) &&
-            (identical(other.filePath, filePath) ||
-                other.filePath == filePath) &&
             (identical(other.description, description) ||
                 other.description == description) &&
             (identical(other.duration, duration) ||
@@ -451,7 +431,6 @@ class _$MediaImpl implements _Media {
       fileSize,
       filename,
       year,
-      filePath,
       description,
       duration,
       thumbnailUrl,
@@ -485,7 +464,6 @@ abstract class _Media implements Media {
       @JsonKey(name: 'file_size') required final int fileSize,
       @JsonKey(name: 'filename') final String filename,
       final int? year,
-      @JsonKey(name: 'file_path') final String filePath,
       final String? description,
       final int? duration,
       @JsonKey(name: 'thumbnail_url') final String? thumbnailUrl,
@@ -514,9 +492,6 @@ abstract class _Media implements Media {
   String get filename;
   @override
   int? get year;
-  @override
-  @JsonKey(name: 'file_path')
-  String get filePath;
   @override
   String? get description;
   @override

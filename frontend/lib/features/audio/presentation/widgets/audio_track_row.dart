@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
-import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -58,9 +58,20 @@ class AudioTrackRow extends ConsumerWidget {
       _ => 0.0,
     };
 
-    final playbackState = ref.watch(playbackCoordinatorProvider);
-    final isCurrentlyPlaying =
-        playbackState is PlaybackPlaying && playbackState.media.id == media.id;
+    // select: тики позиции не должны перестраивать все ряды — нужны
+    // только текущий mediaId и состояние паузы.
+    final playback = ref.watch(
+      playbackCoordinatorProvider.select((state) {
+        return switch (state) {
+          PlaybackPlaying(:final media, :final isPaused) => (
+              mediaId: media.id,
+              isPaused: isPaused,
+            ),
+          _ => null,
+        };
+      }),
+    );
+    final isCurrentlyPlaying = playback?.mediaId == media.id;
 
     return InkWell(
       onTap: onPlay,
@@ -76,10 +87,9 @@ class AudioTrackRow extends ConsumerWidget {
             // Cover — tap toggles play/pause
             GestureDetector(
               onTap: () {
-                final current = ref.read(playbackCoordinatorProvider);
-                if (current is PlaybackPlaying &&
-                    current.media.id == media.id) {
-                  if (current.isPaused) {
+                final p = playback;
+                if (p != null && p.mediaId == media.id) {
+                  if (p.isPaused) {
                     ref.read(playbackCoordinatorProvider.notifier).resume();
                   } else {
                     ref.read(playbackCoordinatorProvider.notifier).pause();
@@ -193,7 +203,7 @@ class AudioTrackRow extends ConsumerWidget {
                         color: isDownloaded ? colorScheme.primary : null,
                         size: 20,
                       ),
-                onPressed: isDownloading ? null : onDownload,
+                onPressed: onDownload,
                 tooltip: isDownloaded
                     ? 'Downloaded'
                     : isDownloading
@@ -216,21 +226,28 @@ class AudioTrackRow extends ConsumerWidget {
                     onDetails?.call();
                 }
               },
+              // Мёртвые пункты меню: показываем только те, для которых
+              // есть обработчики.
               itemBuilder: (context) => [
-                PopupMenuItem(value: 'play', child: Text(l.play)),
-                PopupMenuItem(
-                  value: 'add_to_queue',
-                  child: Text(l.addToQueue),
-                ),
-                PopupMenuItem(
-                  value: 'add_to_collection',
-                  child: Text(l.addToCollection),
-                ),
-                PopupMenuItem(
-                  value: 'edit_metadata',
-                  child: Text(l.editMetadata),
-                ),
-                PopupMenuItem(value: 'details', child: Text(l.details)),
+                if (onPlay != null)
+                  PopupMenuItem(value: 'play', child: Text(l.play)),
+                if (onAddToQueue != null)
+                  PopupMenuItem(
+                    value: 'add_to_queue',
+                    child: Text(l.addToQueue),
+                  ),
+                if (onAddToCollection != null)
+                  PopupMenuItem(
+                    value: 'add_to_collection',
+                    child: Text(l.addToCollection),
+                  ),
+                if (onEditMetadata != null)
+                  PopupMenuItem(
+                    value: 'edit_metadata',
+                    child: Text(l.editMetadata),
+                  ),
+                if (onDetails != null)
+                  PopupMenuItem(value: 'details', child: Text(l.details)),
               ],
             ),
           ],

@@ -12,6 +12,9 @@ class WatchProgress with _$WatchProgress {
     @JsonKey(name: 'user_id') required int userId,
     @JsonKey(name: 'media_id') required int mediaId,
     required int position,
+    @Default(0) int duration,
+    @Default(false) bool completed,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   }) = _WatchProgress;
 
   factory WatchProgress.fromJson(Map<String, dynamic> json) =>

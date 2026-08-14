@@ -15,7 +15,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 final collectionsRemoteDataSourceProvider =
     Provider<CollectionsRemoteDataSource>((ref) {
-  return CollectionsRemoteDataSource(ref.watch(apiClientProvider));
+  return CollectionsRemoteDataSource(ref.watch(libraryApiClientProvider));
 });
 
 final collectionsRepositoryProvider = Provider<CollectionsRepository>((ref) {

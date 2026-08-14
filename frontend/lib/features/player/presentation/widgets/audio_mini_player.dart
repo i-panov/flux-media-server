@@ -37,6 +37,10 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
   double _volume = 100;
   StreamSubscription<double>? _volumeSub;
 
+  /// Локальное значение позиции во время перетаскивания слайдера:
+  /// seek шлём только на onChangeEnd, а не на каждый onChanged.
+  double? _dragValue;
+
   @override
   void initState() {
     super.initState();
@@ -82,12 +86,12 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
     if (info == null) return const SizedBox.shrink();
     final (
       Media media,
-      String type,
+      MediaType type,
       bool isPaused,
       Duration position,
       Duration? duration
     ) = info;
-    if (type != 'audio') return const SizedBox.shrink();
+    if (type != MediaType.audio) return const SizedBox.shrink();
 
     final progress = (duration != null && duration > Duration.zero)
         ? position.inMicroseconds / duration.inMicroseconds
@@ -114,8 +118,15 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     ),
                   ),
                   child: Slider(
-                    value: progress.clamp(0.0, 1.0),
+                    value: (_dragValue ?? progress).clamp(0.0, 1.0),
                     onChanged: (value) {
+                      // Только двигаем ползунок локально — seek на
+                      // onChangeEnd, чтобы не спамить player на каждый
+                      // пиксель перетаскивания.
+                      setState(() => _dragValue = value);
+                    },
+                    onChangeEnd: (value) {
+                      setState(() => _dragValue = null);
                       if (duration != null && duration > Duration.zero) {
                         final newPos = Duration(
                           microseconds:
@@ -265,7 +276,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                           .next();
                       // If there's no next track, stop playback.
                       if (!success && context.mounted) {
-                        ref
+                        await ref
                             .read(playbackCoordinatorProvider.notifier)
                             .stop();
                       }

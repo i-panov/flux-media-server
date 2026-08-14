@@ -120,6 +120,9 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		media.Genre = *req.Genre
 	}
 	if req.Year != nil {
+		if !metadata.IsValidYear(*req.Year) {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid year: must be between 1888 and current year + 2")
+		}
 		media.Year = *req.Year
 	}
 
@@ -130,6 +133,9 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		media.Metadata.PosterURL = *req.PosterURL
 	}
 	if req.Rating != nil {
+		if *req.Rating < 0 || *req.Rating > 10 {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid rating: must be between 0 and 10")
+		}
 		media.Metadata.Rating = *req.Rating
 	}
 	if req.Genres != nil {

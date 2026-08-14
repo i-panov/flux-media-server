@@ -15,7 +15,7 @@ import (
 // has the admin flag. Must be used after AuthMiddleware.
 func RequireAdmin(userRepo repository.UserRepository) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		userID, ok := c.Locals("user_id").(uint)
+		userID, ok := GetUserID(c)
 		if !ok {
 			return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 		}

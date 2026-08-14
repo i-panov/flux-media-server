@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:http/http.dart' as http;
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,7 +15,7 @@ import 'package:path_provider/path_provider.dart';
 /// slider, seek bar) can subscribe to its streams directly.
 class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   FluxAudioHandler() : player = Player() {
-    _init();
+    unawaited(_init());
   }
 
   /// The media_kit player used for actual audio playback.
@@ -28,6 +29,12 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   /// Whether the current track is favorited (for notification icon).
   bool isFavorite = false;
 
+  /// Играл ли трек до прерывания (звонок и т.п.) — для resume.
+  bool _wasPlayingBeforeInterruption = false;
+
+  StreamSubscription<dynamic>? _interruptionSub;
+  StreamSubscription<dynamic>? _noisySub;
+
   static const _controlsPlaying = [
     MediaControl.skipToPrevious,
     MediaControl.pause,
@@ -40,7 +47,31 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
     MediaControl.skipToNext,
   ];
 
-  void _init() {
+  Future<void> _init() async {
+    // Аудиофокус: пауза при звонках/других приложениях, пауза при
+    // отключении наушников (becomingNoisy).
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      _interruptionSub = session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          _wasPlayingBeforeInterruption = player.state.playing;
+          unawaited(player.pause());
+        } else if (event.type == AudioInterruptionType.pause &&
+            _wasPlayingBeforeInterruption) {
+          _wasPlayingBeforeInterruption = false;
+          unawaited(player.play());
+        }
+      });
+      _noisySub =
+          session.becomingNoisyEventStream.listen((_) => player.pause());
+    } catch (e) {
+      // audio_session может быть недоступен на некоторых платформах —
+      // воспроизведение продолжает работать без обработки фокуса.
+      // ignore: avoid_print
+      print('AudioSession init failed: $e');
+    }
+
     player.stream.playing.listen((playing) {
       final controls = playing ? _controlsPlaying : _controlsPaused;
       final state = playbackState.value.copyWith(
@@ -126,7 +157,9 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
     }
 
     try {
-      final response = await http.get(uri, headers: httpHeaders ?? {});
+      final response = await http
+          .get(uri, headers: httpHeaders ?? {})
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return uri;
 
       final dir = await getTemporaryDirectory();
@@ -198,6 +231,8 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   Stream<bool> get bufferingStream => player.stream.buffering;
 
   Future<void> dispose() async {
+    await _interruptionSub?.cancel();
+    await _noisySub?.cancel();
     await player.dispose();
   }
 }

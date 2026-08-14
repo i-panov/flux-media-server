@@ -30,7 +30,7 @@ func setupLyricsTestApp(t *testing.T) *fiber.App {
 		FilePath: "/test.mp3",
 	}))
 
-	handler := NewLyricsHandler(lyricsRepo)
+	handler := NewLyricsHandler(lyricsRepo, mediaRepo)
 	app := fiber.New()
 
 	app.Use(func(c *fiber.Ctx) error {
@@ -48,6 +48,18 @@ func TestLyricsHandler_GetLyrics_NotFound(t *testing.T) {
 	app := setupLyricsTestApp(t)
 
 	req := httptest.NewRequest("GET", "/api/media/1/lyrics", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+}
+
+func TestLyricsHandler_UpsertMediaNotFound(t *testing.T) {
+	app := setupLyricsTestApp(t)
+
+	// Медиа 999 не существует — 404 до создания записи lyrics.
+	body, _ := json.Marshal(map[string]string{"lyrics_text": "La la la"})
+	req := httptest.NewRequest("PUT", "/api/media/999/lyrics", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)

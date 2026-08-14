@@ -90,13 +90,17 @@
   "sentCodeTo": "Мы отправили код на {email}",
   "@sentCodeTo": {
     "placeholders": {
-      "email": { "type": "String" }
+      "email": {
+        "type": "String"
+      }
     }
   },
   "debugCodeLabel": "Отладочный код: {code}",
   "@debugCodeLabel": {
     "placeholders": {
-      "code": { "type": "String" }
+      "code": {
+        "type": "String"
+      }
     }
   },
   "code": "Код",
@@ -122,33 +126,47 @@
   "uploadedOfTotal": "Загружено {success} из {total} файлов",
   "@uploadedOfTotal": {
     "placeholders": {
-      "success": { "type": "int" },
-      "total": { "type": "int" }
+      "success": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "skippedAlreadyExists": "{count} пропущено — уже существует",
   "@skippedAlreadyExists": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "checkingFile": "Проверка {name}...",
   "@checkingFile": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "ofTotal": "{current} из {total}",
   "@ofTotal": {
     "placeholders": {
-      "current": { "type": "int" },
-      "total": { "type": "int" }
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "filesSkippedOnServer": "{count} файл(ов) пропущено (уже на сервере)",
   "@filesSkippedOnServer": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "errorLoadingLyrics": "Ошибка загрузки текста",
@@ -174,7 +192,9 @@
   "deleteCollectionConfirm": "Вы уверены, что хотите удалить \"{name}\"?",
   "@deleteCollectionConfirm": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "thisCollectionIsEmpty": "Эта коллекция пуста",
@@ -184,13 +204,17 @@
   "addedToCollection": "Добавлено в \"{name}\"",
   "@addedToCollection": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "failedToAdd": "Не удалось добавить: {error}",
   "@failedToAdd": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "allTracks": "Все треки",
@@ -198,14 +222,20 @@
   "downloadedOfTotalTracks": "Загружено {done}/{total} треков",
   "@downloadedOfTotalTracks": {
     "placeholders": {
-      "done": { "type": "int" },
-      "total": { "type": "int" }
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "noTracksFoundForArtist": "Треки не найдены для \"{name}\"",
   "@noTracksFoundForArtist": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "done": "Готово",
@@ -216,12 +246,14 @@
   "@downloaded": {},
   "errorLabel": "Ошибка",
   "@errorLabel": {},
-"addToQueue": "В очередь",
+  "addToQueue": "В очередь",
   "@addToQueue": {},
   "continueFrom": "Продолжить с {formatted}",
   "@continueFrom": {
     "placeholders": {
-      "formatted": {}
+      "formatted": {
+        "type": "String"
+      }
     }
   },
   "startFromBeginning": "Начать сначала",
@@ -281,5 +313,21 @@
   "addTranslationHere": "Введите перевод...",
   "@addTranslationHere": {},
   "offlineMode": "Нет подключения к серверу. Показывается только скачанный контент.",
-  "@offlineMode": {}
+  "@offlineMode": {},
+  "invalidYear": "Неверный год",
+  "@invalidYear": {},
+  "uploadCancelled": "Загрузка отменена",
+  "@uploadCancelled": {},
+  "hashingFile": "Вычисление хэша...",
+  "@hashingFile": {},
+  "checkingDuplicates": "Проверка дубликатов...",
+  "@checkingDuplicates": {},
+  "offlineCopy": "Офлайн-копия",
+  "@offlineCopy": {},
+  "audioPlayingInBackground": "Играет аудио-трек",
+  "@audioPlayingInBackground": {},
+  "removeFromCollection": "Удалить из коллекции",
+  "@removeFromCollection": {},
+  "addMedia": "Добавить медиа",
+  "@addMedia": {}
 }

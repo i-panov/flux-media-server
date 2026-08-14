@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
-import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
-import 'package:http/http.dart' as http;
+import 'package:flux_media_server/core/session/settings_provider.dart';
 
 /// Signal that a token refresh succeeded and the request should be retried.
 class TokenRefreshedException implements Exception {
@@ -14,57 +13,24 @@ class TokenRefreshedException implements Exception {
 
 /// Intercepts 401 responses, attempts token refresh, and signals retry.
 ///
-/// Uses a [Future] instead of a binary flag so that parallel 401-requests
-/// wait for the single ongoing refresh and then retry with the new token
-/// instead of silently failing.
-// ignore: must_be_immutable
+/// Использует единый [AuthTokenRefresher]: параллельные 401-запросы
+/// ждут один общий refresh вместо конкурентных запросов.
 class TokenRefreshInterceptor implements ResponseInterceptor {
-  TokenRefreshInterceptor(this._ref, {http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+  TokenRefreshInterceptor(this._ref);
 
   final Ref _ref;
-  final http.Client _httpClient;
-  Future<bool>? _refreshFuture;
-
-  Future<bool> _doRefresh() async {
-    final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
-    if (refreshToken == null) return false;
-
-    final baseUrl = _ref.read(baseUrlProvider);
-    final uri = Uri.parse('$baseUrl/auth/refresh');
-    final httpResponse = await _httpClient
-        .post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'refresh_token': refreshToken}),
-        )
-        .timeout(const Duration(seconds: 10));
-
-    if (httpResponse.statusCode == 200) {
-      final data = jsonDecode(httpResponse.body) as Map<String, dynamic>;
-      final newAccessToken = data['token'] as String;
-      final newRefreshToken = data['refresh_token'] as String;
-      await _ref
-          .read(settingsProvider.notifier)
-          .setTokens(newAccessToken, newRefreshToken);
-      return true;
-    }
-
-    // Refresh failed (401, 403, 500, etc.) — clear all tokens so the
-    // user is forced to log in again. This prevents stale tokens from
-    // causing infinite 401 loops.
-    await _ref.read(settingsProvider.notifier).logout();
-    return false;
-  }
 
   @override
   FutureOr<Response<dynamic>> onResponse(Response<dynamic> response) async {
     if (response.statusCode != 401) return response;
 
-    // Ensure only one refresh runs at a time; other 401 responses
-    // wait for the single ongoing refresh.
-    final refreshSucceeded = await (_refreshFuture ??= _doRefresh()
-        .whenComplete(() => _refreshFuture = null));
+    // Запросы на /auth/refresh не должны рекурсивно вызывать refresh.
+    final path = response.base.request?.url.path ?? '';
+    if (path.contains('/auth/refresh')) return response;
+
+    final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
+    final refresher = _ref.read(authTokenRefresherProvider);
+    final refreshSucceeded = await refresher.refresh(refreshToken);
 
     if (refreshSucceeded) {
       throw const TokenRefreshedException();

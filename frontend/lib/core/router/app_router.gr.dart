@@ -49,7 +49,6 @@ abstract class _$AppRouter extends RootStackRouter {
         child: CodeScreen(
           email: args.email,
           key: args.key,
-          debugCode: args.debugCode,
         ),
       );
     },
@@ -72,7 +71,7 @@ abstract class _$AppRouter extends RootStackRouter {
     MainRoute.name: (routeData) {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
-        child: const MainScreen(),
+        child: const MainRoutePage(),
       );
     },
     MediaDetailRoute.name: (routeData) {
@@ -226,14 +225,12 @@ class CodeRoute extends PageRouteInfo<CodeRouteArgs> {
   CodeRoute({
     required String email,
     Key? key,
-    String? debugCode,
     List<PageRouteInfo>? children,
   }) : super(
           CodeRoute.name,
           args: CodeRouteArgs(
             email: email,
             key: key,
-            debugCode: debugCode,
           ),
           initialChildren: children,
         );
@@ -247,18 +244,15 @@ class CodeRouteArgs {
   const CodeRouteArgs({
     required this.email,
     this.key,
-    this.debugCode,
   });
 
   final String email;
 
   final Key? key;
 
-  final String? debugCode;
-
   @override
   String toString() {
-    return 'CodeRouteArgs{email: $email, key: $key, debugCode: $debugCode}';
+    return 'CodeRouteArgs{email: $email, key: $key}';
   }
 }
 
@@ -315,7 +309,7 @@ class LoginRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
-/// [MainScreen]
+/// [MainRoutePage]
 class MainRoute extends PageRouteInfo<void> {
   const MainRoute({List<PageRouteInfo>? children})
       : super(

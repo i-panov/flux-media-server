@@ -57,6 +57,23 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
   void updateMedia(Media media) {
     state = MediaDetailState.loaded(media: media);
   }
+
+  /// Точечно обновляет обложку без перевода экрана в loading.
+  ///
+  /// [coverUrl] используется как флаг наличия обложки; обновление
+  /// `updatedAt` меняет cache-buster в URL картинки, чтобы обновилась
+  /// картинка.
+  void setCoverUrl(String coverUrl) {
+    state = state.maybeWhen(
+      loaded: (media) => MediaDetailState.loaded(
+        media: media.copyWith(
+          coverUrl: coverUrl,
+          updatedAt: DateTime.now(),
+        ),
+      ),
+      orElse: () => state,
+    );
+  }
 }
 
 final getMediaDetailUseCaseProvider = Provider<GetMediaDetail>((ref) {

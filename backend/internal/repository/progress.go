@@ -48,7 +48,7 @@ func (r *ProgressStore) FindByUserAndMedia(ctx context.Context, userID, mediaID 
 func (r *ProgressStore) Upsert(ctx context.Context, progress *models.WatchProgress) error {
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}, {Name: "media_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"position", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"position", "duration", "completed", "updated_at"}),
 	}).Create(progress).Error
 }
 

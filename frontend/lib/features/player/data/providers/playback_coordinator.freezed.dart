@@ -21,7 +21,7 @@ mixin _$PlaybackState {
     required TResult Function() initial,
     required TResult Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -38,7 +38,7 @@ mixin _$PlaybackState {
     TResult? Function()? initial,
     TResult? Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -53,8 +53,14 @@ mixin _$PlaybackState {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(Media media, String type, bool isPaused, Duration position,
-            Duration? duration, double speed, Duration? savedPosition)?
+    TResult Function(
+            Media media,
+            MediaType type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
         playing,
     TResult Function()? completed,
     TResult Function()? loading,
@@ -151,7 +157,7 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
     required TResult Function() initial,
     required TResult Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -171,7 +177,7 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
     TResult? Function()? initial,
     TResult? Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -189,8 +195,14 @@ class _$PlaybackInitialImpl implements PlaybackInitial {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(Media media, String type, bool isPaused, Duration position,
-            Duration? duration, double speed, Duration? savedPosition)?
+    TResult Function(
+            Media media,
+            MediaType type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
         playing,
     TResult Function()? completed,
     TResult Function()? loading,
@@ -256,7 +268,7 @@ abstract class _$$PlaybackPlayingImplCopyWith<$Res> {
   @useResult
   $Res call(
       {Media media,
-      String type,
+      MediaType type,
       bool isPaused,
       Duration position,
       Duration? duration,
@@ -293,7 +305,7 @@ class __$$PlaybackPlayingImplCopyWithImpl<$Res>
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
-              as String,
+              as MediaType,
       isPaused: null == isPaused
           ? _value.isPaused
           : isPaused // ignore: cast_nullable_to_non_nullable
@@ -341,8 +353,7 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
   @override
   final Media media;
   @override
-  final String type;
-// 'audio' or 'video'
+  final MediaType type;
   @override
   @JsonKey()
   final bool isPaused;
@@ -397,7 +408,7 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
     required TResult Function() initial,
     required TResult Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -418,7 +429,7 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
     TResult? Function()? initial,
     TResult? Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -437,8 +448,14 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(Media media, String type, bool isPaused, Duration position,
-            Duration? duration, double speed, Duration? savedPosition)?
+    TResult Function(
+            Media media,
+            MediaType type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
         playing,
     TResult Function()? completed,
     TResult Function()? loading,
@@ -496,7 +513,7 @@ class _$PlaybackPlayingImpl implements PlaybackPlaying {
 abstract class PlaybackPlaying implements PlaybackState {
   const factory PlaybackPlaying(
       {required final Media media,
-      required final String type,
+      required final MediaType type,
       final bool isPaused,
       final Duration position,
       final Duration? duration,
@@ -504,7 +521,7 @@ abstract class PlaybackPlaying implements PlaybackState {
       final Duration? savedPosition}) = _$PlaybackPlayingImpl;
 
   Media get media;
-  String get type; // 'audio' or 'video'
+  MediaType get type;
   bool get isPaused;
   Duration get position;
   Duration? get duration;
@@ -556,7 +573,7 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
     required TResult Function() initial,
     required TResult Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -576,7 +593,7 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
     TResult? Function()? initial,
     TResult? Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -594,8 +611,14 @@ class _$PlaybackCompletedImpl implements PlaybackCompleted {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(Media media, String type, bool isPaused, Duration position,
-            Duration? duration, double speed, Duration? savedPosition)?
+    TResult Function(
+            Media media,
+            MediaType type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
         playing,
     TResult Function()? completed,
     TResult Function()? loading,
@@ -694,7 +717,7 @@ class _$PlaybackLoadingImpl implements PlaybackLoading {
     required TResult Function() initial,
     required TResult Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -714,7 +737,7 @@ class _$PlaybackLoadingImpl implements PlaybackLoading {
     TResult? Function()? initial,
     TResult? Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -732,8 +755,14 @@ class _$PlaybackLoadingImpl implements PlaybackLoading {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(Media media, String type, bool isPaused, Duration position,
-            Duration? duration, double speed, Duration? savedPosition)?
+    TResult Function(
+            Media media,
+            MediaType type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
         playing,
     TResult Function()? completed,
     TResult Function()? loading,
@@ -858,7 +887,7 @@ class _$PlaybackErrorImpl implements PlaybackError {
     required TResult Function() initial,
     required TResult Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -878,7 +907,7 @@ class _$PlaybackErrorImpl implements PlaybackError {
     TResult? Function()? initial,
     TResult? Function(
             Media media,
-            String type,
+            MediaType type,
             bool isPaused,
             Duration position,
             Duration? duration,
@@ -896,8 +925,14 @@ class _$PlaybackErrorImpl implements PlaybackError {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? initial,
-    TResult Function(Media media, String type, bool isPaused, Duration position,
-            Duration? duration, double speed, Duration? savedPosition)?
+    TResult Function(
+            Media media,
+            MediaType type,
+            bool isPaused,
+            Duration position,
+            Duration? duration,
+            double speed,
+            Duration? savedPosition)?
         playing,
     TResult Function()? completed,
     TResult Function()? loading,

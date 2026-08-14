@@ -90,14 +90,17 @@ class MediaCard extends ConsumerWidget {
                                     ),
                           ),
                         ],
-                        const SizedBox(height: 2),
-                        Text(
-                          '${media.year}',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.grey),
-                        ),
+                        // 0 = «нет данных» на бэкенде — не показываем.
+                        if (media.year != null && media.year! > 0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '${media.year}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Colors.grey),
+                          ),
+                        ],
                       ],
                     ),
                   ),

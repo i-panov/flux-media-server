@@ -1,8 +1,8 @@
-import 'package:chopper/chopper.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_media_server/core/error/failures.dart';
-import 'package:flux_media_server/core/network/api_client.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
+import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/network/auth_api_client.dart';
+import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flux_media_server/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:flux_media_server/shared/models/user.dart';
@@ -13,7 +13,13 @@ import 'package:fpdart/fpdart.dart';
 /// AuthRepositoryImpl + safeRepositoryCall chain.
 class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
   _FakeAuthRemoteDataSource()
-      : super(ApiClient.create(baseUrl: 'http://localhost:8080/api'));
+      : super(
+          AuthApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
+          refresher: AuthTokenRefresher(
+            performRefresh: (_) async => null,
+            onRefreshFailure: () async {},
+          ),
+        );
 
   // Canned responses / exceptions for each method.
   String? Function(String)? onRequestCode;
@@ -34,7 +40,7 @@ class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
     String code,
   ) async {
     if (onVerifyCode == null) {
-      throw ServerException(message: 'not configured');
+      throw const ServerException(message: 'not configured');
     }
     return onVerifyCode!(email, code);
   }
@@ -42,7 +48,7 @@ class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
   @override
   Future<User> getCurrentUser() async {
     if (onGetCurrentUser == null) {
-      throw ServerException(message: 'not configured');
+      throw const ServerException(message: 'not configured');
     }
     return onGetCurrentUser!();
   }
@@ -52,7 +58,7 @@ class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
     String refreshToken,
   ) async {
     if (onRefreshToken == null) {
-      throw ServerException(message: 'not configured');
+      throw const ServerException(message: 'not configured');
     }
     return onRefreshToken!(refreshToken);
   }
@@ -68,31 +74,31 @@ void main() {
   });
 
   group('requestCode', () {
-    test('returns Right(null) when not in debug mode', () async {
+    test('returns Right(unit) when not in debug mode', () async {
       datasource.onRequestCode = (_) => null;
 
       final result = await repository.requestCode('test@example.com');
 
-      expect(result, isA<Right<Failure, String?>>());
-      expect(result.getOrElse((_) => null), isNull);
+      expect(result, isA<Right<Failure, Unit>>());
+      expect(repository.lastDebugCode, isNull);
     });
 
-    test('returns Right(debugCode) when in debug mode', () async {
+    test('stores debug code in lastDebugCode', () async {
       datasource.onRequestCode = (_) => '123456';
 
       final result = await repository.requestCode('test@example.com');
 
-      expect(result, isA<Right<Failure, String?>>());
-      expect(result.getOrElse((_) => null), '123456');
+      expect(result, isA<Right<Failure, Unit>>());
+      expect(repository.lastDebugCode, '123456');
     });
 
     test('returns Left(ServerFailure) on ServerException', () async {
       datasource.onRequestCode =
-          (_) => throw ServerException(message: 'Email not allowed');
+          (_) => throw const ServerException(message: 'Email not allowed');
 
       final result = await repository.requestCode('test@example.com');
 
-      expect(result, isA<Left<Failure, String?>>());
+      expect(result, isA<Left<Failure, Unit>>());
       expect(
         result.fold((l) => l.message, (_) => ''),
         'Email not allowed',
@@ -105,7 +111,7 @@ void main() {
 
       final result = await repository.requestCode('test@example.com');
 
-      expect(result, isA<Left<Failure, String?>>());
+      expect(result, isA<Left<Failure, Unit>>());
       expect(result.fold((l) => l, (_) => null), isA<AuthFailure>());
     });
   });
@@ -139,8 +145,9 @@ void main() {
     });
 
     test('returns Left(ServerFailure) on ServerException', () async {
-      datasource.onVerifyCode =
-          (_, __) => throw ServerException(message: 'Invalid or expired code');
+      datasource.onVerifyCode = (_, __) => throw const ServerException(
+            message: 'Invalid or expired code',
+          );
 
       final result =
           await repository.verifyCode('test@example.com', '000000');
@@ -202,7 +209,7 @@ void main() {
 
     test('returns Left(ServerFailure) on ServerException', () async {
       datasource.onRefreshToken =
-          (_) => throw ServerException(message: 'Invalid refresh token');
+          (_) => throw const ServerException(message: 'Invalid refresh token');
 
       final result = await repository.refreshToken('old-refresh');
 

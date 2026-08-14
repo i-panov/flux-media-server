@@ -87,6 +87,11 @@ func TestCollectionItemStore_AddAndFindByCollection(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	// Создаём коллекцию и медиа, чтобы FK constraints были удовлетворены.
+	require.NoError(t, db.Create(&models.Collection{ID: 1, Name: "Test"}).Error)
+	require.NoError(t, db.Create(&models.Media{ID: 10, Title: "M10"}).Error)
+	require.NoError(t, db.Create(&models.Media{ID: 20, Title: "M20"}).Error)
+
 	itemStore := NewCollectionItemRepository(db)
 	ctx := context.Background()
 
@@ -108,6 +113,10 @@ func TestCollectionItemStore_Remove(t *testing.T) {
 	db, err := InitDB(":memory:")
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
+
+	// Создаём коллекцию и медиа, чтобы FK constraints были удовлетворены.
+	require.NoError(t, db.Create(&models.Collection{ID: 1, Name: "Test"}).Error)
+	require.NoError(t, db.Create(&models.Media{ID: 10, Title: "M10"}).Error)
 
 	itemStore := NewCollectionItemRepository(db)
 	ctx := context.Background()

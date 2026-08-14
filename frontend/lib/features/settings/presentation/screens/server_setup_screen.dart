@@ -4,7 +4,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
-import 'package:flux_media_server/features/settings/presentation/providers/settings_provider.dart';
+import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
@@ -35,40 +36,49 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
   }
 
   Future<void> _save() async {
-    if (_formKey.currentState!.validate()) {
-      final url = _controller.text.trim();
-      final baseUrl =
-          url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    // Заблокируем двойной сабмит: кнопка и onFieldSubmitted.
+    if (_isChecking) return;
+    if (!_formKey.currentState!.validate()) return;
 
-      setState(() => _isChecking = true);
+    final url = _controller.text.trim();
+    // Нормализуем один раз: храним полный baseUrl API (с /api).
+    final normalized = normalizeServerUrl(url);
+
+    setState(() => _isChecking = true);
+    try {
+      // Check if server is reachable. Health-check — на /api/health
+      // (нормализованный адрес уже содержит сегмент /api).
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
       try {
-        // Check if server is reachable
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 5);
-        final request = await client.getUrl(Uri.parse('$baseUrl/api/health'));
+        final request = await client.getUrl(Uri.parse('$normalized/health'));
         final response = await request.close();
-        client.close();
+        // Прочитать тело ответа, чтобы освободить соединение.
+        await response.drain<void>();
 
         if (response.statusCode != HttpStatus.ok) {
           throw Exception('Сервер вернул статус ${response.statusCode}');
         }
-
-        // Server is reachable, save URL and proceed
-        await ref.read(settingsProvider.notifier).setServerUrl(baseUrl);
-        if (!mounted) return;
-        await context.router.replace(const LoginRoute());
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Не удалось подключиться к серверу: $e'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
       } finally {
-        if (mounted) {
-          setState(() => _isChecking = false);
-        }
+        // Закрываем клиент в любом случае, чтобы не было утечки сокетов.
+        client.close(force: true);
+      }
+
+      // Server is reachable, save URL and proceed
+      await ref.read(settingsProvider.notifier).setServerUrl(normalized);
+      if (!mounted) return;
+      await context.router.replace(const LoginRoute());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Не удалось подключиться к серверу: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isChecking = false);
       }
     }
   }
@@ -114,9 +124,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
                     if (value == null || value.isEmpty) {
                       return l.pleaseEnterServerUrl;
                     }
-                    final trimmed = value.trim();
-                    if (!trimmed.startsWith('http://') &&
-                        !trimmed.startsWith('https://')) {
+                    if (!isValidServerUrl(value)) {
                       return l.urlMustStartWithHttp;
                     }
                     return null;

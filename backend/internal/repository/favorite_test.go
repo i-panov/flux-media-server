@@ -15,7 +15,9 @@ func TestFavoriteStore_CreateAndFindByUser(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
-	// Create media first so FK constraint is satisfied.
+	// Create user and media first so FK constraints are satisfied.
+	// Create user and media first so FK constraints are satisfied.
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
 	mediaID := uint(10)
 	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
 
@@ -39,6 +41,7 @@ func TestFavoriteStore_FindByUserAndMedia(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
 	mediaID := uint(10)
 	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
 
@@ -61,6 +64,7 @@ func TestFavoriteStore_IsFavorited(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
 	mediaID := uint(10)
 	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
 
@@ -86,6 +90,7 @@ func TestFavoriteStore_Delete(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
 	mediaID := uint(10)
 	require.NoError(t, db.Create(&models.Media{ID: mediaID, Title: "Test"}).Error)
 
@@ -108,6 +113,8 @@ func TestFavoriteStore_ArtistFavorite(t *testing.T) {
 	db, err := InitDB(":memory:")
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
+
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
 
 	store := NewFavoriteRepository(db)
 	artistStore := NewArtistRepository(db)

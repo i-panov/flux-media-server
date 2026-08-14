@@ -358,7 +358,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addToQueue => 'В очередь';
 
   @override
-  String continueFrom(Object formatted) {
+  String continueFrom(String formatted) {
     return 'Продолжить с $formatted';
   }
 
@@ -449,4 +449,28 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get offlineMode =>
       'Нет подключения к серверу. Показывается только скачанный контент.';
+
+  @override
+  String get invalidYear => 'Неверный год';
+
+  @override
+  String get uploadCancelled => 'Загрузка отменена';
+
+  @override
+  String get hashingFile => 'Вычисление хэша...';
+
+  @override
+  String get checkingDuplicates => 'Проверка дубликатов...';
+
+  @override
+  String get offlineCopy => 'Офлайн-копия';
+
+  @override
+  String get audioPlayingInBackground => 'Играет аудио-трек';
+
+  @override
+  String get removeFromCollection => 'Удалить из коллекции';
+
+  @override
+  String get addMedia => 'Добавить медиа';
 }

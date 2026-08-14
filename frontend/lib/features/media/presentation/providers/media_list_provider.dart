@@ -1,12 +1,15 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/domain/usecases/check_media_hash.dart';
 import 'package:flux_media_server/features/media/domain/usecases/delete_media.dart';
+import 'package:flux_media_server/features/media/domain/usecases/get_artists.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
+import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -19,7 +22,21 @@ class MediaListResult {
 }
 
 final mediaRemoteDataSourceProvider = Provider<MediaRemoteDataSource>((ref) {
-  return MediaRemoteDataSource(ref.watch(apiClientProvider));
+  return MediaRemoteDataSource(
+    ref.watch(mediaApiClientProvider),
+    libraryApiClient: ref.watch(libraryApiClientProvider),
+    uploadBaseUrl: ref.watch(baseUrlProvider),
+    authToken: () => ref.read(settingsProvider).settings.authToken,
+    refreshAuth: () async {
+      final refreshToken = ref.read(settingsProvider).settings.refreshToken;
+      if (refreshToken == null) return null;
+      final refreshed =
+          await ref.read(authTokenRefresherProvider).refresh(refreshToken);
+      return refreshed
+          ? ref.read(settingsProvider).settings.authToken
+          : null;
+    },
+  );
 });
 
 final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
@@ -28,6 +45,10 @@ final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
 
 final getMediaListProvider = Provider<GetMediaList>((ref) {
   return GetMediaList(ref.watch(mediaRepositoryProvider));
+});
+
+final getArtistsProvider = Provider<GetArtists>((ref) {
+  return GetArtists(ref.watch(mediaRepositoryProvider));
 });
 
 final checkMediaHashProvider = Provider<CheckMediaHash>((ref) {
@@ -44,6 +65,10 @@ final uploadCoverProvider = Provider<UploadCover>((ref) {
 
 final deleteMediaProvider = Provider<DeleteMedia>((ref) {
   return DeleteMedia(ref.watch(mediaRepositoryProvider));
+});
+
+final updateMetadataProvider = Provider<UpdateMetadata>((ref) {
+  return UpdateMetadata(ref.watch(mediaRepositoryProvider));
 });
 
 /// Current search query scoped to a media type ('video' or 'audio').

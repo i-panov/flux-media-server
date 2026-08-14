@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"flux/internal/middleware"
 	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -31,7 +32,7 @@ type CreateCollectionRequest struct {
 }
 
 func (h *CollectionHandler) Create(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -66,7 +67,7 @@ func (h *CollectionHandler) Create(c *fiber.Ctx) error {
 }
 
 func (h *CollectionHandler) List(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -82,7 +83,7 @@ func (h *CollectionHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *CollectionHandler) Update(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -109,6 +110,13 @@ func (h *CollectionHandler) Update(c *fiber.Ctx) error {
 	if req.Name != "" {
 		col.Name = req.Name
 	}
+	if req.Type != "" {
+		parsed := models.ParseMediaType(string(req.Type))
+		if !parsed.Valid() {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid type")
+		}
+		col.Type = parsed
+	}
 
 	if err := h.colRepo.Update(ctx, col); err != nil {
 		log.Printf("Update collection: %v", err)
@@ -119,7 +127,7 @@ func (h *CollectionHandler) Update(c *fiber.Ctx) error {
 }
 
 func (h *CollectionHandler) Delete(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
@@ -258,7 +266,7 @@ func (h *CollectionHandler) ListItems(c *fiber.Ctx) error {
 // getOwnedCollection loads the collection and verifies it belongs to the
 // current user. On failure it writes the appropriate error response.
 func (h *CollectionHandler) getOwnedCollection(c *fiber.Ctx, collectionID uint) (*models.Collection, error) {
-	userID, ok := c.Locals("user_id").(uint)
+	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return nil, response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}

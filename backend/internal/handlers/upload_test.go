@@ -116,6 +116,22 @@ func TestUploadMissingFile(t *testing.T) {
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 }
 
+func TestUploadInvalidMediaType(t *testing.T) {
+	app, _, cleanup := setupUploadTest(t)
+	defer cleanup()
+
+	// Невалидный media_type должен вернуть 400, а не молча стать video.
+	fileContent := []byte("test file content")
+	body, contentType := createMultipartForm(t, "test.mp4", fileContent, "garbage")
+
+	req := httptest.NewRequest("POST", "/api/media/upload", body)
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}
+
 func TestUploadFileTooLarge(t *testing.T) {
 	app, _, cleanup := setupUploadTest(t)
 	defer cleanup()

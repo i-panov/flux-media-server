@@ -15,6 +15,9 @@ func TestLyricsStore_UpsertAndFind(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	// Создаём медиа, чтобы FK constraint был удовлетворён.
+	require.NoError(t, db.Create(&models.Media{ID: 1, Title: "Test Song"}).Error)
+
 	store := NewLyricsRepository(db)
 	ctx := context.Background()
 
@@ -39,6 +42,9 @@ func TestLyricsStore_UpsertReplaces(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
 
+	// Создаём медиа, чтобы FK constraint был удовлетворён.
+	require.NoError(t, db.Create(&models.Media{ID: 1, Title: "Test Song"}).Error)
+
 	store := NewLyricsRepository(db)
 	ctx := context.Background()
 
@@ -62,6 +68,9 @@ func TestLyricsStore_Delete(t *testing.T) {
 	db, err := InitDB(":memory:")
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
+
+	// Создаём медиа, чтобы FK constraint был удовлетворён.
+	require.NoError(t, db.Create(&models.Media{ID: 1, Title: "Test Song"}).Error)
 
 	store := NewLyricsRepository(db)
 	ctx := context.Background()

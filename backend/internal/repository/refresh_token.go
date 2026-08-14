@@ -11,14 +11,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// RefreshTokenRepository stores refresh tokens. Only SHA-256 hashes of the
+// RefreshTokenStore stores refresh tokens. Only SHA-256 hashes of the
 // tokens are persisted, so a database leak does not compromise live sessions.
-type RefreshTokenRepository struct {
+type RefreshTokenStore struct {
 	db *gorm.DB
 }
 
-func NewRefreshTokenRepository(db *gorm.DB) *RefreshTokenRepository {
-	return &RefreshTokenRepository{db: db}
+func NewRefreshTokenRepository(db *gorm.DB) *RefreshTokenStore {
+	return &RefreshTokenStore{db: db}
 }
 
 // HashRefreshToken returns the SHA-256 hash of a raw refresh token.
@@ -28,7 +28,7 @@ func HashRefreshToken(rawToken string) string {
 }
 
 // Create stores a new refresh token (as a hash) for the user.
-func (r *RefreshTokenRepository) Create(ctx context.Context, userID uint, rawToken string, expiresAt time.Time) error {
+func (r *RefreshTokenStore) Create(ctx context.Context, userID uint, rawToken string, expiresAt time.Time) error {
 	record := &models.RefreshToken{
 		UserID:    userID,
 		Token:     HashRefreshToken(rawToken),
@@ -45,7 +45,7 @@ func (r *RefreshTokenRepository) Create(ctx context.Context, userID uint, rawTok
 // row (RowsAffected == 1) and create the new token. The loser either finds
 // no row (ErrRecordNotFound) or deletes 0 rows and the transaction fails —
 // in both cases no second valid token is created.
-func (r *RefreshTokenRepository) RotateToken(ctx context.Context, oldRawToken string, userID uint, newRawToken string, expiresAt time.Time) (*models.RefreshToken, error) {
+func (r *RefreshTokenStore) RotateToken(ctx context.Context, oldRawToken string, userID uint, newRawToken string, expiresAt time.Time) (*models.RefreshToken, error) {
 	var rt models.RefreshToken
 	oldHash := HashRefreshToken(oldRawToken)
 	newHash := HashRefreshToken(newRawToken)
@@ -71,7 +71,7 @@ func (r *RefreshTokenRepository) RotateToken(ctx context.Context, oldRawToken st
 	return &rt, err
 }
 
-func (r *RefreshTokenRepository) FindByToken(ctx context.Context, rawToken string) (*models.RefreshToken, error) {
+func (r *RefreshTokenStore) FindByToken(ctx context.Context, rawToken string) (*models.RefreshToken, error) {
 	var rt models.RefreshToken
 	err := r.db.WithContext(ctx).Where("token = ?", HashRefreshToken(rawToken)).First(&rt).Error
 	if err != nil {
@@ -80,22 +80,22 @@ func (r *RefreshTokenRepository) FindByToken(ctx context.Context, rawToken strin
 	return &rt, nil
 }
 
-func (r *RefreshTokenRepository) DeleteByToken(ctx context.Context, rawToken string) error {
+func (r *RefreshTokenStore) DeleteByToken(ctx context.Context, rawToken string) error {
 	return r.db.WithContext(ctx).Where("token = ?", HashRefreshToken(rawToken)).Delete(&models.RefreshToken{}).Error
 }
 
 // DeleteByID deletes a refresh token by ID, scoped to the given userID to
 // prevent IDOR (revoking another user's token).
-func (r *RefreshTokenRepository) DeleteByID(ctx context.Context, id, userID uint) error {
+func (r *RefreshTokenStore) DeleteByID(ctx context.Context, id, userID uint) error {
 	return r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&models.RefreshToken{}).Error
 }
 
-func (r *RefreshTokenRepository) DeleteByUserID(ctx context.Context, userID uint) error {
+func (r *RefreshTokenStore) DeleteByUserID(ctx context.Context, userID uint) error {
 	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&models.RefreshToken{}).Error
 }
 
 // DeleteExpired removes all expired refresh tokens. Should be called
 // periodically to keep the table from growing unboundedly.
-func (r *RefreshTokenRepository) DeleteExpired(ctx context.Context) error {
+func (r *RefreshTokenStore) DeleteExpired(ctx context.Context) error {
 	return r.db.WithContext(ctx).Where("expires_at < ?", time.Now()).Delete(&models.RefreshToken{}).Error
 }

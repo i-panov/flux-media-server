@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
@@ -11,30 +12,38 @@ class CodeScreen extends ConsumerStatefulWidget {
   const CodeScreen({
     required this.email,
     super.key,
-    this.debugCode,
   });
 
   final String email;
-  final String? debugCode;
 
   @override
   ConsumerState<CodeScreen> createState() => _CodeScreenState();
 }
 
 class _CodeScreenState extends ConsumerState<CodeScreen> {
+  /// Задержка перед повторной отправкой кода.
+  static const _resendCooldown = Duration(seconds: 30);
+
   final _codeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  Timer? _cooldownTimer;
+  int _cooldownSeconds = 0;
 
   @override
   void initState() {
     super.initState();
-    if (widget.debugCode != null) {
-      _codeController.text = widget.debugCode!;
+    // Автозаполняем debug-код из актуального состояния провайдера,
+    // а не из параметров конструктора.
+    final state = ref.read(authProvider);
+    if (state is AuthCodeSent && state.debugCode != null) {
+      _codeController.text = state.debugCode!;
     }
   }
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -48,21 +57,38 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
     }
   }
 
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() => _cooldownSeconds = _resendCooldown.inSeconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (_cooldownSeconds > 0) {
+          _cooldownSeconds--;
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  void _resendCode() {
+    // Ресенд недоступен во время верификации и пока идёт cooldown.
+    final state = ref.read(authProvider);
+    if (state is AuthLoading || _cooldownSeconds > 0) return;
+    ref.read(authProvider.notifier).requestCode(widget.email);
+    _startCooldown();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final authState = ref.watch(authProvider);
-
-    ref.listen(authProvider, (previous, next) {
-      if (next is AuthAuthenticated) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          try {
-            context.router.replaceAll([const MainRoute()]);
-          } catch (_) {}
-        });
-      }
-    });
+    final debugCode = authState is AuthCodeSent ? authState.debugCode : null;
+    final isVerifying = authState is AuthLoading;
 
     return Scaffold(
       appBar: AppBar(
@@ -92,7 +118,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
-                if (widget.debugCode != null) ...[
+                if (debugCode != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -107,7 +133,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                         Icon(Icons.bug_report, color: Colors.orange.shade700),
                         const SizedBox(width: 8),
                         Text(
-                          l.debugCodeLabel(widget.debugCode!),
+                          l.debugCodeLabel(debugCode),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.orange.shade900,
@@ -147,8 +173,8 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: authState is AuthLoading ? null : _verifyCode,
-                    child: authState is AuthLoading
+                    onPressed: isVerifying ? null : _verifyCode,
+                    child: isVerifying
                         ? const CircularProgressIndicator()
                         : Text(l.verify),
                   ),
@@ -162,10 +188,13 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                 ],
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () {
-                    ref.read(authProvider.notifier).requestCode(widget.email);
-                  },
-                  child: Text(l.resendCode),
+                  onPressed:
+                      isVerifying || _cooldownSeconds > 0 ? null : _resendCode,
+                  child: Text(
+                    _cooldownSeconds > 0
+                        ? '${l.resendCode} (${_cooldownSeconds}s)'
+                        : l.resendCode,
+                  ),
                 ),
               ],
             ),

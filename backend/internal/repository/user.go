@@ -50,6 +50,29 @@ func (r *UserStore) Update(ctx context.Context, user *models.User) error {
 	return r.db.WithContext(ctx).Save(user).Error
 }
 
+// Delete removes a user and cascades to all dependent rows (refresh tokens,
+// favorites, watch progress, collections with their items). For старых БД,
+// где FK-constraints не были созданы, каскад выполняется вручную в одной
+// транзакции; для новых инсталляций это дополняется FK CASCADE.
 func (r *UserStore) Delete(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&models.User{}, id).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", id).Delete(&models.RefreshToken{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", id).Delete(&models.Favorite{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", id).Delete(&models.WatchProgress{}).Error; err != nil {
+			return err
+		}
+		// Элементы коллекций пользователя (в старых БД FK отсутствует).
+		if err := tx.Where("collection_id IN (SELECT id FROM collections WHERE user_id = ?)", id).
+			Delete(&models.CollectionItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", id).Delete(&models.Collection{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.User{}, id).Error
+	})
 }

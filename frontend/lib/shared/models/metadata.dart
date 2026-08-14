@@ -15,6 +15,9 @@ List<String>? _stringListFromJson(Object? json) {
   return null;
 }
 
+String? _stringListToJson(List<String>? value) =>
+    value == null ? null : jsonEncode(value);
+
 // ignore_for_file: invalid_annotation_target
 
 @freezed
@@ -29,9 +32,18 @@ class Metadata with _$Metadata {
     @JsonKey(name: 'poster_url') String? posterUrl,
     @JsonKey(name: 'backdrop_url') String? backdropUrl,
     double? rating,
-    @JsonKey(name: 'genres', fromJson: _stringListFromJson)
+    @JsonKey(
+      name: 'genres',
+      fromJson: _stringListFromJson,
+      toJson: _stringListToJson,
+    )
     List<String>? genres,
-    @JsonKey(name: 'cast', fromJson: _stringListFromJson) List<String>? cast,
+    @JsonKey(
+      name: 'cast',
+      fromJson: _stringListFromJson,
+      toJson: _stringListToJson,
+    )
+    List<String>? cast,
   }) = _Metadata;
 
   factory Metadata.fromJson(Map<String, dynamic> json) =>

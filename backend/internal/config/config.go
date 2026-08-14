@@ -90,8 +90,12 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
+	// KnownFields(true) отклоняет неизвестные поля конфига — опечатка в
+	// ключе YAML не останется незамеченной (молча игнорируемой).
 	cfg := &Config{}
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	dec := yaml.NewDecoder(strings.NewReader(string(data)))
+	dec.KnownFields(true)
+	if err := dec.Decode(cfg); err != nil {
 		return nil, err
 	}
 

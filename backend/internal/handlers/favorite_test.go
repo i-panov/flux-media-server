@@ -24,7 +24,8 @@ func setupFavoriteTestApp(t *testing.T) *fiber.App {
 	mediaRepo := repository.NewMediaRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
 
-	// Create a test media item
+	// Создаём пользователя и медиа — FK constraints требуют их наличия.
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
 	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
 		Title:    "Test Movie",
 		Type:     models.MediaTypeVideo,
@@ -66,6 +67,21 @@ func TestFavoriteHandler_AddFavorite(t *testing.T) {
 	resp, err := app.Test(req)
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+}
+
+func TestFavoriteHandler_AddFavoriteDuplicate(t *testing.T) {
+	app := setupFavoriteTestApp(t)
+
+	req := httptest.NewRequest("POST", "/api/media/1/favorite", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+
+	// Дубликат — 409.
+	req = httptest.NewRequest("POST", "/api/media/1/favorite", nil)
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
 }
 
 func TestFavoriteHandler_RemoveFavorite(t *testing.T) {
