@@ -104,6 +104,21 @@ class FakeMediaRepository implements MediaRepository {
     bool Function()? isCancelled,
   }) async =>
       const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, Artist>> updateArtistName(
+    int artistId,
+    String name,
+  ) async =>
+      const Left(ServerFailure());
+
+  @override
+  Future<Either<Failure, void>> uploadArtistCover(
+    int artistId,
+    String filePath, {
+    bool Function()? isCancelled,
+  }) async =>
+      const Left(ServerFailure());
 }
 
 /// Фейк датасорса: записывает параметры updateProgress.

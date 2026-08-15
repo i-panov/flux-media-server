@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"flux/internal/models"
 
 	"gorm.io/gorm"
 )
+
+// ErrArtistNameTaken — переименование артиста в уже занятое имя.
+var ErrArtistNameTaken = errors.New("artist name already taken")
 
 type ArtistStore struct {
 	db *gorm.DB
@@ -30,6 +34,48 @@ func (r *ArtistStore) FindByID(ctx context.Context, id uint) (*models.Artist, er
 	var artist models.Artist
 	err := r.db.WithContext(ctx).First(&artist, id).Error
 	return &artist, err
+}
+
+// Update переименовывает артиста. Имя уникально — при конфликте
+// возвращается ErrArtistNameTaken. Привязки media_artists ссылаются по
+// id, поэтому новое имя автоматически применяется ко всем трекам.
+func (r *ArtistStore) Update(ctx context.Context, id uint, name string) (*models.Artist, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("artist name is empty")
+	}
+
+	result := r.db.WithContext(ctx).
+		Model(&models.Artist{}).
+		Where("id = ?", id).
+		Update("name", name)
+	if result.Error != nil {
+		if isUniqueViolation(result.Error) {
+			return nil, ErrArtistNameTaken
+		}
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return r.FindByID(ctx, id)
+}
+
+// Touch обновляет updated_at артиста. Нужно для cache-buster'а обложки:
+// клиент строит URL картинки с ?v=updated_at, поэтому при смене файла
+// обложки отметка времени обязана измениться.
+func (r *ArtistStore) Touch(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).
+		Model(&models.Artist{}).
+		Where("id = ?", id).
+		Update("updated_at", time.Now())
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // FindOrCreateByName finds an artist by name or creates a new one.

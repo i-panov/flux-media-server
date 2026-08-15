@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -263,9 +264,16 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           }
           if (status.isDone) {
             // Готово: медиа уже на сервере — инвалидируем списки,
-            // чтобы карточка появилась, и закрываем экран.
+            // чтобы карточка появилась, и закрываем экран. SnackBar
+            // показываем через глобальный ключ: экран закрывается, и
+            // контекстный SnackBar был бы уничтожен вместе с ним.
             refreshMediaLists(ref);
-            _showSnackBar(l.uploadSuccess, Colors.green);
+            scaffoldMessengerKey.currentState?.showSnackBar(
+              SnackBar(
+                content: Text(l.uploadSuccess),
+                backgroundColor: Colors.green,
+              ),
+            );
             context.router.maybePop();
             return true;
           }

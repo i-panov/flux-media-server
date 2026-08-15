@@ -270,6 +270,43 @@ class MediaRemoteDataSource {
     );
   }
 
+  /// Переименовывает артиста; возвращает обновлённый объект.
+  Future<Map<String, dynamic>> updateArtistName(
+    int artistId,
+    String name,
+  ) async {
+    final body = await _sendJsonRequest(
+      'PUT',
+      '/artists/$artistId',
+      jsonBody: {'name': name},
+    );
+    return body!;
+  }
+
+  /// Загружает обложку артиста (jpg/jpeg/png/webp).
+  Future<void> uploadArtistCover(
+    int artistId,
+    String filePath, {
+    bool Function()? isCancelled,
+  }) async {
+    final file = File(filePath);
+    final length = await file.length();
+    await _postMultipart(
+      '/artists/$artistId/cover',
+      fields: const {},
+      createFiles: () => [
+        _CountingMultipartFile(
+          file,
+          field: 'cover',
+          filename: filePath.split('/').last,
+          length: length,
+          isCancelled: isCancelled,
+        ),
+      ],
+      isCancelled: isCancelled,
+    );
+  }
+
   /// Multipart-POST с тем же контрактом, что у основного пути:
   /// Bearer-токен из настроек, один refresh при 401 (через тот же
   /// AuthTokenRefresher, что и Chopper-перехватчики), повторная
@@ -368,6 +405,7 @@ class MediaRemoteDataSource {
   Future<Map<String, dynamic>?> _sendJsonRequest(
     String method,
     String path, {
+    Map<String, dynamic>? jsonBody,
     bool Function()? isCancelled,
     Set<int> acceptedStatuses = const {200},
   }) async {
@@ -382,6 +420,10 @@ class MediaRemoteDataSource {
       final client = _clientFactory();
       try {
         final request = http.Request(method, Uri.parse('$baseUrl$path'));
+        if (jsonBody != null) {
+          request.headers['Content-Type'] = 'application/json';
+          request.body = jsonEncode(jsonBody);
+        }
         if (token != null) {
           request.headers['Authorization'] = 'Bearer $token';
         }

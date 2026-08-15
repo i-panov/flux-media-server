@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -182,6 +183,51 @@ void main() {
         dataSource.uploadCover(5, _coverFile.path, isCancelled: () => true),
         throwsA(isA<UploadCancelledException>()),
       );
+    });
+  });
+
+  group('MediaRemoteDataSource artist actions', () {
+    test('updateArtistName sends PUT with the new name', () async {
+      late http.Request captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response(
+          '{"id": 3, "name": "New Name", "has_cover": false}',
+          200,
+        );
+      });
+
+      final dataSource = _dataSource(
+        client: client,
+        authToken: () => 'artist-token',
+      );
+      final body = await dataSource.updateArtistName(3, 'New Name');
+
+      expect(captured.method, 'PUT');
+      expect(captured.url.path, '/api/artists/3');
+      expect(captured.headers['Authorization'], 'Bearer artist-token');
+      expect(captured.headers['Content-Type'], contains('application/json'));
+      expect(jsonDecode(captured.body), {'name': 'New Name'});
+      expect(body['name'], 'New Name');
+    });
+
+    test('uploadArtistCover sends multipart to /artists/{id}/cover',
+        () async {
+      late http.Request captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response('{"ok": true}', 200);
+      });
+
+      final dataSource = _dataSource(
+        client: client,
+        authToken: () => 'cover-token',
+      );
+      await dataSource.uploadArtistCover(3, _coverFile.path);
+
+      expect(captured.method, 'POST');
+      expect(captured.url.path, '/api/artists/3/cover');
+      expect(captured.headers['Authorization'], 'Bearer cover-token');
     });
   });
 

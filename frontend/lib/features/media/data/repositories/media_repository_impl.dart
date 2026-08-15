@@ -140,6 +140,30 @@ class MediaRepositoryImpl implements MediaRepository {
         ),
       );
 
+  @override
+  Future<Either<Failure, Artist>> updateArtistName(
+    int artistId,
+    String name,
+  ) =>
+      safeRepositoryCall(() async {
+        final json = await remoteDataSource.updateArtistName(artistId, name);
+        return Artist.fromJson(json);
+      });
+
+  @override
+  Future<Either<Failure, void>> uploadArtistCover(
+    int artistId,
+    String filePath, {
+    bool Function()? isCancelled,
+  }) =>
+      _cancellableCall(
+        () => remoteDataSource.uploadArtistCover(
+          artistId,
+          filePath,
+          isCancelled: isCancelled,
+        ),
+      );
+
   /// Обёртка над [safeRepositoryCall] для операций с отменой: общий маппинг
   /// уже превращает [UploadCancelledException] в [UploadCancelledFailure],
   /// этот catch — дополнительная страховка на случай будущих изменений.

@@ -1123,6 +1123,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Server returned status {code}'**
   String serverStatusError(int code);
+
+  /// No description provided for @editArtistName.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit artist name'**
+  String get editArtistName;
+
+  /// No description provided for @artistName.
+  ///
+  /// In en, this message translates to:
+  /// **'Artist name'**
+  String get artistName;
 }
 
 class _AppLocalizationsDelegate

@@ -567,4 +567,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String serverStatusError(int code) {
     return 'Server returned status $code';
   }
+
+  @override
+  String get editArtistName => 'Edit artist name';
+
+  @override
+  String get artistName => 'Artist name';
 }

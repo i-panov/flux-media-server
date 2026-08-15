@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/audio/presentation/utils/download_batch.dart';
@@ -9,6 +10,9 @@ import 'package:flux_media_server/features/audio/presentation/widgets/section_he
 import 'package:flux_media_server/features/audio/presentation/widgets/track_actions_mixin.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:flux_media_server/features/media/domain/usecases/update_artist_name.dart';
+import 'package:flux_media_server/features/media/domain/usecases/upload_artist_cover.dart';
+import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
@@ -128,6 +132,16 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
       appBar: AppBar(
         title: Text(widget.artistName),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.image),
+            tooltip: l.changeCover,
+            onPressed: _changeArtistCover,
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: l.editArtistName,
+            onPressed: _renameArtist,
+          ),
           if (_downloadingAll)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -152,6 +166,112 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
         favoriteIds: favoriteIds,
       ),
     );
+  }
+
+  /// Диалог переименования артиста: имя обновляется у всех его треков.
+  Future<void> _renameArtist() async {
+    final l = AppLocalizations.of(context)!;
+    final controller = TextEditingController(text: widget.artistName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.editArtistName),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l.artistName),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text(l.save),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null || newName.isEmpty || newName == widget.artistName) {
+      return;
+    }
+
+    final result = await ref.read(updateArtistNameProvider)(
+      UpdateArtistNameParams(
+        artistId: widget.artistId,
+        name: newName,
+      ),
+    );
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l.errorLabel}: ${failure.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (_) {
+        // Имя меняется у всех треков — обновляем списки и страницу.
+        _refreshAfterArtistChange();
+        setState(() {});
+      },
+    );
+  }
+
+  /// Замена обложки артиста.
+  Future<void> _changeArtistCover() async {
+    final l = AppLocalizations.of(context)!;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.path == null) return;
+
+    final uploadResult = await ref.read(uploadArtistCoverProvider)(
+      UploadArtistCoverParams(
+        artistId: widget.artistId,
+        filePath: file.path!,
+      ),
+    );
+    if (!mounted) return;
+
+    uploadResult.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l.errorLabel}: ${failure.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.uploadSuccess),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _refreshAfterArtistChange();
+      },
+    );
+  }
+
+  /// Инвалидирует данные, зависящие от артиста: списки медиа (имена в
+  /// треках), список артистов и скачанные метаданные.
+  void _refreshAfterArtistChange() {
+    ref
+      ..invalidate(mediaListProvider('audio'))
+      ..invalidate(mediaListProvider('video'))
+      ..invalidate(artistsProvider);
   }
 
   VoidCallback? _buildDownloadAll(AsyncValue<MediaListResult> mediaListState) {

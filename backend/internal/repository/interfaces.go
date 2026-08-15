@@ -57,6 +57,11 @@ type ArtistRepository interface {
 	FindAll(ctx context.Context) ([]models.Artist, error)
 	FindByID(ctx context.Context, id uint) (*models.Artist, error)
 	FindOrCreateByName(ctx context.Context, name string) (*models.Artist, error)
+	// Update переименовывает артиста. ErrArtistNameTaken — имя занято,
+	// gorm.ErrRecordNotFound — артист не найден.
+	Update(ctx context.Context, id uint, name string) (*models.Artist, error)
+	// Touch обновляет updated_at (cache-buster обложки).
+	Touch(ctx context.Context, id uint) error
 }
 
 // FavoriteRepository defines data access methods for Favorite entities.

@@ -13,7 +13,9 @@ import 'package:flux_media_server/features/media/domain/usecases/delete_media.da
 import 'package:flux_media_server/features/media/domain/usecases/get_artists.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_upload_status.dart';
+import 'package:flux_media_server/features/media/domain/usecases/update_artist_name.dart';
 import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
+import 'package:flux_media_server/features/media/domain/usecases/upload_artist_cover.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -61,6 +63,14 @@ final getMediaListProvider = Provider<GetMediaList>((ref) {
 
 final getArtistsProvider = Provider<GetArtists>((ref) {
   return GetArtists(ref.watch(mediaRepositoryProvider));
+});
+
+final updateArtistNameProvider = Provider<UpdateArtistName>((ref) {
+  return UpdateArtistName(ref.watch(mediaRepositoryProvider));
+});
+
+final uploadArtistCoverProvider = Provider<UploadArtistCover>((ref) {
+  return UploadArtistCover(ref.watch(mediaRepositoryProvider));
 });
 
 final checkMediaHashProvider = Provider<CheckMediaHash>((ref) {

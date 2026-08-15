@@ -23,6 +23,10 @@ mixin _$Artist {
   int get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
   int get position => throw _privateConstructorUsedError;
+  @JsonKey(name: 'has_cover')
+  bool get hasCover => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -34,7 +38,12 @@ abstract class $ArtistCopyWith<$Res> {
   factory $ArtistCopyWith(Artist value, $Res Function(Artist) then) =
       _$ArtistCopyWithImpl<$Res, Artist>;
   @useResult
-  $Res call({int id, String name, int position});
+  $Res call(
+      {int id,
+      String name,
+      int position,
+      @JsonKey(name: 'has_cover') bool hasCover,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -53,6 +62,8 @@ class _$ArtistCopyWithImpl<$Res, $Val extends Artist>
     Object? id = null,
     Object? name = null,
     Object? position = null,
+    Object? hasCover = null,
+    Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -67,6 +78,14 @@ class _$ArtistCopyWithImpl<$Res, $Val extends Artist>
           ? _value.position
           : position // ignore: cast_nullable_to_non_nullable
               as int,
+      hasCover: null == hasCover
+          ? _value.hasCover
+          : hasCover // ignore: cast_nullable_to_non_nullable
+              as bool,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 }
@@ -78,7 +97,12 @@ abstract class _$$ArtistImplCopyWith<$Res> implements $ArtistCopyWith<$Res> {
       __$$ArtistImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({int id, String name, int position});
+  $Res call(
+      {int id,
+      String name,
+      int position,
+      @JsonKey(name: 'has_cover') bool hasCover,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -95,6 +119,8 @@ class __$$ArtistImplCopyWithImpl<$Res>
     Object? id = null,
     Object? name = null,
     Object? position = null,
+    Object? hasCover = null,
+    Object? updatedAt = freezed,
   }) {
     return _then(_$ArtistImpl(
       id: null == id
@@ -109,6 +135,14 @@ class __$$ArtistImplCopyWithImpl<$Res>
           ? _value.position
           : position // ignore: cast_nullable_to_non_nullable
               as int,
+      hasCover: null == hasCover
+          ? _value.hasCover
+          : hasCover // ignore: cast_nullable_to_non_nullable
+              as bool,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ));
   }
 }
@@ -116,7 +150,12 @@ class __$$ArtistImplCopyWithImpl<$Res>
 /// @nodoc
 @JsonSerializable()
 class _$ArtistImpl implements _Artist {
-  const _$ArtistImpl({required this.id, required this.name, this.position = 0});
+  const _$ArtistImpl(
+      {required this.id,
+      required this.name,
+      this.position = 0,
+      @JsonKey(name: 'has_cover') this.hasCover = false,
+      @JsonKey(name: 'updated_at') this.updatedAt});
 
   factory _$ArtistImpl.fromJson(Map<String, dynamic> json) =>
       _$$ArtistImplFromJson(json);
@@ -128,10 +167,16 @@ class _$ArtistImpl implements _Artist {
   @override
   @JsonKey()
   final int position;
+  @override
+  @JsonKey(name: 'has_cover')
+  final bool hasCover;
+  @override
+  @JsonKey(name: 'updated_at')
+  final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'Artist(id: $id, name: $name, position: $position)';
+    return 'Artist(id: $id, name: $name, position: $position, hasCover: $hasCover, updatedAt: $updatedAt)';
   }
 
   @override
@@ -142,12 +187,17 @@ class _$ArtistImpl implements _Artist {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.name, name) || other.name == name) &&
             (identical(other.position, position) ||
-                other.position == position));
+                other.position == position) &&
+            (identical(other.hasCover, hasCover) ||
+                other.hasCover == hasCover) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, name, position);
+  int get hashCode =>
+      Object.hash(runtimeType, id, name, position, hasCover, updatedAt);
 
   @JsonKey(ignore: true)
   @override
@@ -167,7 +217,9 @@ abstract class _Artist implements Artist {
   const factory _Artist(
       {required final int id,
       required final String name,
-      final int position}) = _$ArtistImpl;
+      final int position,
+      @JsonKey(name: 'has_cover') final bool hasCover,
+      @JsonKey(name: 'updated_at') final DateTime? updatedAt}) = _$ArtistImpl;
 
   factory _Artist.fromJson(Map<String, dynamic> json) = _$ArtistImpl.fromJson;
 
@@ -177,6 +229,12 @@ abstract class _Artist implements Artist {
   String get name;
   @override
   int get position;
+  @override
+  @JsonKey(name: 'has_cover')
+  bool get hasCover;
+  @override
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt;
   @override
   @JsonKey(ignore: true)
   _$$ArtistImplCopyWith<_$ArtistImpl> get copyWith =>

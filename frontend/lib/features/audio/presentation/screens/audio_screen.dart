@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/audio/presentation/utils/play_queue_utils.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/artist_card.dart';
@@ -13,12 +14,15 @@ import 'package:flux_media_server/features/audio/presentation/widgets/track_acti
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
+import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
@@ -159,6 +163,9 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
     required Set<int> favoriteIds,
   }) {
     final isOffline = ref.watch(isOfflineProvider);
+    // has_cover/updated_at приходят только с GET /artists; артисты из
+    // треков (m.artists) содержат лишь id+name.
+    final artistsState = ref.watch(artistsProvider);
 
     // Офлайн: сразу показываем скачанные треки из кеша, не ждём
     // провала API (иначе здесь был бы вечный спиннер).
@@ -274,14 +281,14 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
         _showAllLiked ? likedTracks : likedTracks.take(10).toList();
 
     // Collect unique artists from all media items.
-    final artistMap = <int, String>{};
+    final artistMap = <int, Artist>{};
     for (final m in mediaList.items) {
       for (final a in m.artists) {
-        artistMap.putIfAbsent(a.id, () => a.name);
+        artistMap.putIfAbsent(a.id, () => a);
       }
     }
-    final artists = artistMap.entries.toList()
-      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    final artists = artistMap.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     final allTracks = mediaList.items.toList();
 
@@ -383,12 +390,23 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                   separatorBuilder: (_, __) => const SizedBox(width: 16),
                   itemBuilder: (context, index) {
                     final artist = artists[index];
+                    final serverArtist = artistsState.valueOrNull
+                        ?.where((a) => a.id == artist.id)
+                        .firstOrNull;
                     return ArtistCard(
-                      name: artist.value,
+                      name: artist.name,
+                      coverUrl: (serverArtist?.hasCover ?? false)
+                          ? buildArtistCoverUrl(
+                              baseUrl: ref.watch(baseUrlProvider),
+                              artistId: artist.id,
+                              cacheBust: serverArtist?.updatedAt
+                                  ?.millisecondsSinceEpoch,
+                            )
+                          : null,
                       onTap: () => context.router.push(
                         ArtistRoute(
-                          artistId: artist.key,
-                          artistName: artist.value,
+                          artistId: artist.id,
+                          artistName: artist.name,
                         ),
                       ),
                     );

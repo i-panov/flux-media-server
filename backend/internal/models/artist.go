@@ -4,8 +4,11 @@ import "time"
 
 // Artist represents a music artist or creator.
 type Artist struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"uniqueIndex;size:255" json:"name"`
+	ID   uint   `gorm:"primaryKey" json:"id"`
+	Name string `gorm:"uniqueIndex;size:255" json:"name"`
+	// HasCover — признак наличия файла обложки на диске. Заполняется
+	// хендлером (stat по файлу), в БД не хранится.
+	HasCover  bool      `gorm:"-" json:"has_cover"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

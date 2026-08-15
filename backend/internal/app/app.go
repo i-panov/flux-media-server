@@ -174,7 +174,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
-	artistHandler := handlers.NewArtistHandler(artistRepo)
+	artistHandler := handlers.NewArtistHandler(artistRepo, cfg.Media.ThumbnailPath)
 
 	// Fiber app
 	fiberApp := fiber.New(fiber.Config{
@@ -352,7 +352,11 @@ func New(cfg *config.Config, version string) (*App, error) {
 	api.Delete("/favorites/artist", favoriteHandler.RemoveArtistFavorite)
 
 	// Artists
-	api.Get("/artists", artistHandler.List)
+	artist := api.Group("/artists")
+	artist.Get("", artistHandler.List)
+	artist.Put("/:id", requireAdmin, artistHandler.Update)
+	artist.Post("/:id/cover", requireAdmin, artistHandler.UploadCover)
+	artist.Get("/:id/cover", artistHandler.GetCover)
 
 	// Collections
 	api.Post("/collections", collectionHandler.Create)

@@ -476,5 +476,9 @@
         "type": "int"
       }
     }
-  }
+  },
+  "editArtistName": "Edit artist name",
+  "@editArtistName": {},
+  "artistName": "Artist name",
+  "@artistName": {}
 }

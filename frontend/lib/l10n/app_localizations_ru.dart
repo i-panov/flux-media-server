@@ -569,4 +569,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String serverStatusError(int code) {
     return 'Сервер вернул статус $code';
   }
+
+  @override
+  String get editArtistName => 'Изменить имя артиста';
+
+  @override
+  String get artistName => 'Имя артиста';
 }

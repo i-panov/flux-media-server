@@ -63,4 +63,14 @@ abstract class MediaRepository {
     String filePath, {
     bool Function()? isCancelled,
   });
+
+  /// Переименовывает артиста (имя меняется у всех его треков).
+  Future<Either<Failure, Artist>> updateArtistName(int artistId, String name);
+
+  /// Загружает обложку артиста.
+  Future<Either<Failure, void>> uploadArtistCover(
+    int artistId,
+    String filePath, {
+    bool Function()? isCancelled,
+  });
 }

@@ -294,6 +294,21 @@ class _FakeMediaRepository implements MediaRepository {
       throw UnimplementedError();
 
   @override
+  Future<Either<Failure, Artist>> updateArtistName(
+    int artistId,
+    String name,
+  ) async =>
+      const Left(ServerFailure());
+
+  @override
+  Future<Either<Failure, void>> uploadArtistCover(
+    int artistId,
+    String filePath, {
+    bool Function()? isCancelled,
+  }) async =>
+      const Left(ServerFailure());
+
+  @override
   Future<Either<Failure, UploadResult>> uploadFile({
     required String filePath,
     required String mediaType,

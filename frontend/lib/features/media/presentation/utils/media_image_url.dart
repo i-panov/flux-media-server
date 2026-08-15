@@ -25,3 +25,15 @@ String buildMediaImageUrl({
 
 /// true, если у медиа есть год (0 = «нет данных» на бэкенде).
 bool hasMediaYear(int? year) => year != null && year > 0;
+
+/// Строит URL обложки артиста (`{baseUrl}/artists/{id}/cover`) с
+/// cache-buster'ом по updated_at — после смены обложки картинка
+/// перезагружается, а не берётся из кеша.
+String buildArtistCoverUrl({
+  required String baseUrl,
+  required int artistId,
+  int? cacheBust,
+}) {
+  final buster = cacheBust != null ? '?v=$cacheBust' : '';
+  return '$baseUrl/artists/$artistId/cover$buster';
+}

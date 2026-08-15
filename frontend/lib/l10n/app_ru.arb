@@ -424,5 +424,9 @@
         "type": "int"
       }
     }
-  }
+  },
+  "editArtistName": "Изменить имя артиста",
+  "@editArtistName": {},
+  "artistName": "Имя артиста",
+  "@artistName": {}
 }
