@@ -329,5 +329,84 @@
   "removeFromCollection": "Удалить из коллекции",
   "@removeFromCollection": {},
   "addMedia": "Добавить медиа",
-  "@addMedia": {}
+  "@addMedia": {},
+  "loadMore": "Загрузить ещё",
+  "@loadMore": {},
+  "showAll": "Показать все",
+  "@showAll": {},
+  "changeEmail": "Изменить email",
+  "@changeEmail": {},
+  "failedToRemove": "Не удалось удалить: {error}",
+  "@failedToRemove": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "alreadyAdded": "Уже добавлено",
+  "@alreadyAdded": {},
+  "uploadFileEmpty": "Выбранный файл пуст",
+  "@uploadFileEmpty": {},
+  "uploadFileTooLarge": "Файл превышает лимит загрузки сервера (2 ГБ)",
+  "@uploadFileTooLarge": {},
+  "addToFavorites": "Добавить в избранное",
+  "@addToFavorites": {},
+  "removeFromFavorites": "Убрать из избранного",
+  "@removeFromFavorites": {},
+  "invalidServerUrl": "Введите корректный URL, начинающийся с http:// или https://",
+  "@invalidServerUrl": {},
+  "failedToSaveSettings": "Не удалось сохранить настройки: {error}",
+  "@failedToSaveSettings": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "logoutConfirmTitle": "Выйти?",
+  "@logoutConfirmTitle": {},
+  "logoutConfirmMessage": "У вас {size} офлайн-медиа. Выход удалит офлайн-кэш.",
+  "@logoutConfirmMessage": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "offlineCache": "Офлайн-кэш",
+  "@offlineCache": {},
+  "cacheSizeCalculating": "Расчёт размера кэша...",
+  "@cacheSizeCalculating": {},
+  "cacheSizeLabel": "Офлайн-кэш: {size}",
+  "@cacheSizeLabel": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheCleared": "Офлайн-кэш очищен",
+  "@cacheCleared": {},
+  "@clearCache": {},
+  "trustSelfSignedCertificate": "Доверять самоподписанному сертификату",
+  "@trustSelfSignedCertificate": {},
+  "trustSelfSignedHint": "Только для частных серверов с собственным сертификатом. Включает небезопасный HTTPS.",
+  "@trustSelfSignedHint": {},
+  "connectionFailed": "Не удалось подключиться к серверу: {error}",
+  "@connectionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "serverStatusError": "Сервер вернул статус {code}",
+  "@serverStatusError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  }
 }

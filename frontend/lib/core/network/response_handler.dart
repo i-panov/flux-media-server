@@ -10,24 +10,26 @@ import 'package:http/http.dart' as http;
 
 /// Checks the HTTP response status and throws appropriate exceptions.
 ///
-/// - 401 → [AuthException] (session expired)
+/// - 401 → [AuthException] (session expired; `error` из тела при наличии)
 /// - 200, 201 → success (no-op)
 /// - anything else → [ServerException] with error message from body
 void checkResponse(Response<dynamic> response, String defaultMessage) {
   if (response.statusCode == 401) {
-    throw const AuthException(message: 'Session expired');
-  }
-  if (response.statusCode != 200 && response.statusCode != 201) {
-    final body = response.body;
-    String? errorMessage;
-    if (body is Map<String, dynamic>) {
-      final error = body['error'];
-      errorMessage = error is String ? error : null;
-    }
-    throw ServerException(
-      message: errorMessage ?? defaultMessage,
+    throw AuthException(
+      message: _errorFromBody(response.body) ?? 'Session expired',
     );
   }
+  if (response.statusCode != 200 && response.statusCode != 201) {
+    throw ServerException(
+      message: _errorFromBody(response.body) ?? defaultMessage,
+    );
+  }
+}
+
+String? _errorFromBody(Object? body) {
+  if (body is! Map<String, dynamic>) return null;
+  final error = body['error'];
+  return error is String && error.isNotEmpty ? error : null;
 }
 
 /// Преобразует исключение в соответствующий [Failure].
@@ -39,6 +41,11 @@ Failure _failureFor(Object e) {
   if (e is AuthException) return AuthFailure(message: e.message);
   if (e is ServerException) return ServerFailure(message: e.message);
   if (e is NetworkException) return NetworkFailure(message: e.message);
+  if (e is TokenRefreshedException) {
+    // Второй 401 после ретрая: refresh не помог, сессия мертва.
+    return const AuthFailure(message: 'Session expired');
+  }
+  if (e is UploadCancelledException) return const UploadCancelledFailure();
   if (e is http.ClientException) return NetworkFailure(message: e.message);
   if (e is SocketException) return NetworkFailure(message: e.message);
   if (e is TimeoutException) {

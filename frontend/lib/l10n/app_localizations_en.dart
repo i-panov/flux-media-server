@@ -472,4 +472,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addMedia => 'Add media';
+
+  @override
+  String get loadMore => 'Load more';
+
+  @override
+  String get showAll => 'Show all';
+
+  @override
+  String get changeEmail => 'Change email';
+
+  @override
+  String failedToRemove(String error) {
+    return 'Failed to remove: $error';
+  }
+
+  @override
+  String get alreadyAdded => 'Already added';
+
+  @override
+  String get uploadFileEmpty => 'Selected file is empty';
+
+  @override
+  String get uploadFileTooLarge =>
+      'File exceeds the server upload limit (2 GB)';
+
+  @override
+  String get addToFavorites => 'Add to favorites';
+
+  @override
+  String get removeFromFavorites => 'Remove from favorites';
+
+  @override
+  String get invalidServerUrl =>
+      'Please enter a valid URL starting with http:// or https://';
+
+  @override
+  String failedToSaveSettings(String error) {
+    return 'Failed to save settings: $error';
+  }
+
+  @override
+  String get logoutConfirmTitle => 'Log out?';
+
+  @override
+  String logoutConfirmMessage(String size) {
+    return 'You have $size of offline media. Logging out will delete the offline cache.';
+  }
+
+  @override
+  String get offlineCache => 'Offline cache';
+
+  @override
+  String get cacheSizeCalculating => 'Calculating cache size...';
+
+  @override
+  String cacheSizeLabel(String size) {
+    return 'Offline cache: $size';
+  }
+
+  @override
+  String get cacheCleared => 'Offline cache cleared';
+
+  @override
+  String get trustSelfSignedCertificate => 'Trust self-signed certificate';
+
+  @override
+  String get trustSelfSignedHint =>
+      'Use only for private servers with your own certificate. Enables insecure HTTPS.';
+
+  @override
+  String connectionFailed(String error) {
+    return 'Failed to connect to the server: $error';
+  }
+
+  @override
+  String serverStatusError(int code) {
+    return 'Server returned status $code';
+  }
 }

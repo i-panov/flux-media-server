@@ -68,9 +68,13 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 
 	// Validate the email format. Besides rejecting garbage input, this
 	// prevents SMTP header injection through control characters.
-	if _, err := mail.ParseAddress(req.Email); err != nil {
+	// Парсинг отбрасывает display-name: allowlist сравнивается по голому
+	// адресу, иначе "User <user@example.com>" не совпал бы со списком.
+	addr, err := mail.ParseAddress(req.Email)
+	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid email address")
 	}
+	req.Email = strings.ToLower(addr.Address)
 
 	allowed := false
 	for _, e := range h.config.Auth.AllowedEmails {
@@ -81,7 +85,10 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 	}
 
 	if !allowed && !h.config.Auth.AllowUnknownEmail {
-		return response.Error(c, fiber.StatusForbidden, "Email not allowed")
+		// Не раскрываем существование email в allowlist (user enumeration):
+		// отвечаем как при успешной отправке, не генерируя код и не
+		// отправляя письмо.
+		return c.JSON(fiber.Map{"message": "Code sent successfully"})
 	}
 
 	code, err := h.otpStore.Generate(req.Email)
@@ -105,7 +112,7 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 		if expiryMinutes < 1 {
 			expiryMinutes = 1
 		}
-		if err := h.smtpClient.SendCode(req.Email, code, expiryMinutes); err != nil {
+		if err := h.smtpClient.SendCodeContext(c.UserContext(), req.Email, code, expiryMinutes); err != nil {
 			// Письмо не ушло — удаляем сгенерированный код из стора, чтобы
 			// не оставлять рабочий OTP без уведомления пользователя.
 			h.otpStore.Remove(req.Email)
@@ -187,7 +194,8 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 
 // Logout revokes refresh tokens. If refresh_token_id is provided only that
 // specific token is revoked; otherwise all tokens of the current user are
-// deleted (full logout).
+// deleted (full logout). Тело опционально: невалидный JSON приравнивается
+// к отсутствующему телу — полный logout безопаснее, чем ошибка 400.
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
@@ -198,7 +206,7 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 		RefreshTokenID *uint `json:"refresh_token_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+		log.Printf("Logout: invalid body, falling back to full logout: %v", err)
 	}
 
 	ctx := c.UserContext()
@@ -251,6 +259,8 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	// Rotate atomically: delete old refresh token, store new one in a single
 	// transaction. If rotation fails we must not issue the new pair —
 	// otherwise multiple valid refresh tokens accumulate silently.
+	// RotateToken возвращает сохранённый новый токен; в ответ отдаём
+	// только что сгенерированный из GenerateTokenPair.
 	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
 	if _, err := h.refreshTokenDB.RotateToken(ctx, req.RefreshToken, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
 		// A missing row means the token was already rotated (replay) or

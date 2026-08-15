@@ -42,7 +42,8 @@ String normalizeServerUrl(String input) {
   }
   final normalized = Uri(
     scheme: uri.scheme,
-    userInfo: uri.userInfo,
+    // userInfo намеренно не сохраняется (дефолт null): учётные данные
+    // в адресе сервера не нужны и утекли бы в логи при логировании URL.
     host: uri.host,
     port: uri.hasPort ? uri.port : null,
     pathSegments: segments,

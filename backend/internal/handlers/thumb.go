@@ -17,6 +17,13 @@ import (
 	"flux/internal/services"
 )
 
+const (
+	// maxCoverSize — максимальный размер загружаемой обложки (10 МБ).
+	maxCoverSize = 10 << 20
+	// coverCacheMaxAge — Cache-Control для обложек/превью (1 день).
+	coverCacheMaxAge = 86400
+)
+
 // ThumbHandler serves media thumbnails.
 type ThumbHandler struct {
 	mediaRepo repository.MediaRepository
@@ -30,19 +37,18 @@ func NewThumbHandler(mediaRepo repository.MediaRepository, thumbSvc *services.Th
 
 // Get returns the thumbnail for a media item.
 func (h *ThumbHandler) Get(c *fiber.Ctx) error {
-	mediaID, err := c.ParamsInt("id")
+	mediaID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	_, err = h.mediaRepo.FindByID(ctx, uint(mediaID))
-	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+	if _, err := h.mediaRepo.FindByID(ctx, mediaID); err != nil {
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
-	thumbPath := h.thumbSvc.GetPath(uint(mediaID))
-	if !h.thumbSvc.Exists(uint(mediaID)) {
+	thumbPath := h.thumbSvc.GetPath(mediaID)
+	if !h.thumbSvc.Exists(mediaID) {
 		return response.Error(c, fiber.StatusNotFound, "Thumbnail not available")
 	}
 
@@ -54,22 +60,22 @@ func (h *ThumbHandler) Get(c *fiber.Ctx) error {
 	}
 
 	c.Set("Content-Type", contentType)
-	c.Set("Cache-Control", "public, max-age=86400")
+	c.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", coverCacheMaxAge))
 
 	return c.SendFile(thumbPath)
 }
 
 // GetCover returns the embedded cover art for a media item.
 func (h *ThumbHandler) GetCover(c *fiber.Ctx) error {
-	mediaID, err := c.ParamsInt("id")
+	mediaID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, uint(mediaID))
+	media, err := h.mediaRepo.FindByID(ctx, mediaID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	// Check if cover URL is set (флаг непустоты).
@@ -79,7 +85,7 @@ func (h *ThumbHandler) GetCover(c *fiber.Ctx) error {
 
 	// Файл ищем по известным расширениям, а не по значению CoverURL —
 	// в БД теперь хранится относительный URL, а не путь ФС.
-	coverPath := h.thumbSvc.FindCoverPath(uint(mediaID))
+	coverPath := h.thumbSvc.FindCoverPath(mediaID)
 	if coverPath == "" {
 		return response.Error(c, fiber.StatusNotFound, "Cover not available")
 	}
@@ -92,7 +98,7 @@ func (h *ThumbHandler) GetCover(c *fiber.Ctx) error {
 	}
 
 	c.Set("Content-Type", contentType)
-	c.Set("Cache-Control", "public, max-age=86400")
+	c.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", coverCacheMaxAge))
 
 	return c.SendFile(coverPath)
 }
@@ -104,10 +110,19 @@ var allowedCoverExtensions = map[string]bool{
 	".webp": true,
 }
 
+// minImageBytes — минимальный читаемый заголовок: покрывает полный magic
+// JPEG (FF D8 FF + следующий маркер), PNG (8 байт) и WebP (12 байт RIFF).
+const minImageBytes = 12
+
 // detectImageFormat определяет формат изображения по magic bytes.
 // Возвращает расширение (".jpg", ".png", ".webp") или пустую строку.
 func detectImageFormat(head []byte) string {
-	if len(head) >= 3 && head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF {
+	// Слишком короткий файл не может быть валидным изображением: 3 байта
+	// "FF D8 FF" — это не JPEG, а лишь фрагмент magic.
+	if len(head) < minImageBytes {
+		return ""
+	}
+	if head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF {
 		return ".jpg"
 	}
 	if len(head) >= 8 && bytes.Equal(head[:8], []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}) {
@@ -122,15 +137,15 @@ func detectImageFormat(head []byte) string {
 // UploadCover accepts a cover image upload and replaces the existing cover
 // for a media item. Accepts JPEG, PNG, and WebP images up to 10 MB.
 func (h *ThumbHandler) UploadCover(c *fiber.Ctx) error {
-	mediaID, err := c.ParamsInt("id")
+	mediaID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, uint(mediaID))
+	media, err := h.mediaRepo.FindByID(ctx, mediaID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	// Get uploaded file.
@@ -139,8 +154,8 @@ func (h *ThumbHandler) UploadCover(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Cover image file is required")
 	}
 
-	// Check file size (max 10 MB).
-	if fileHeader.Size > 10<<20 {
+	// Check file size (max 10 MB) — до чтения содержимого в память.
+	if fileHeader.Size > maxCoverSize {
 		return response.Error(c, fiber.StatusRequestEntityTooLarge, "Cover image too large (max 10 MB)")
 	}
 
@@ -155,7 +170,7 @@ func (h *ThumbHandler) UploadCover(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Failed to read cover file")
 	}
-	head := make([]byte, 12)
+	head := make([]byte, minImageBytes)
 	n, readErr := io.ReadFull(uploaded, head)
 	uploaded.Close()
 	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
@@ -168,19 +183,27 @@ func (h *ThumbHandler) UploadCover(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid image content. Allowed: JPEG, PNG, WebP")
 	}
 
-	coverPath := h.thumbSvc.CoverPathForExt(uint(mediaID), actualExt)
+	coverPath := h.thumbSvc.CoverPathForExt(mediaID, actualExt)
 	if err := os.MkdirAll(filepath.Dir(coverPath), 0755); err != nil {
 		log.Printf("UploadCover: mkdir: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
 	}
 
-	// Удаляем старые обложки с другими расширениями ДО сохранения новой,
-	// чтобы не затереть только что записанный файл.
-	h.thumbSvc.RemoveCovers(uint(mediaID))
-
+	// Сначала сохраняем новую обложку — при сбое записи старая остаётся
+	// нетронутой. Файл с тем же расширением перезаписывается, остальные
+	// расширения удаляются только после успешного сохранения.
 	if err := c.SaveFile(fileHeader, coverPath); err != nil {
 		log.Printf("UploadCover: save file: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
+	}
+	for _, oldExt := range []string{".jpg", ".png", ".webp"} {
+		if oldExt == actualExt {
+			continue
+		}
+		oldPath := h.thumbSvc.CoverPathForExt(mediaID, oldExt)
+		if err := os.Remove(oldPath); err != nil && !os.IsNotExist(err) {
+			log.Printf("UploadCover: remove old cover %s: %v", oldPath, err)
+		}
 	}
 
 	// В БД сохраняем относительный URL, а не путь ФС.

@@ -22,6 +22,7 @@ Artist _$ArtistFromJson(Map<String, dynamic> json) {
 mixin _$Artist {
   int get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
+  int get position => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -33,7 +34,7 @@ abstract class $ArtistCopyWith<$Res> {
   factory $ArtistCopyWith(Artist value, $Res Function(Artist) then) =
       _$ArtistCopyWithImpl<$Res, Artist>;
   @useResult
-  $Res call({int id, String name});
+  $Res call({int id, String name, int position});
 }
 
 /// @nodoc
@@ -51,6 +52,7 @@ class _$ArtistCopyWithImpl<$Res, $Val extends Artist>
   $Res call({
     Object? id = null,
     Object? name = null,
+    Object? position = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -61,6 +63,10 @@ class _$ArtistCopyWithImpl<$Res, $Val extends Artist>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
+      position: null == position
+          ? _value.position
+          : position // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -72,7 +78,7 @@ abstract class _$$ArtistImplCopyWith<$Res> implements $ArtistCopyWith<$Res> {
       __$$ArtistImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({int id, String name});
+  $Res call({int id, String name, int position});
 }
 
 /// @nodoc
@@ -88,6 +94,7 @@ class __$$ArtistImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? name = null,
+    Object? position = null,
   }) {
     return _then(_$ArtistImpl(
       id: null == id
@@ -98,6 +105,10 @@ class __$$ArtistImplCopyWithImpl<$Res>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
+      position: null == position
+          ? _value.position
+          : position // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -105,7 +116,7 @@ class __$$ArtistImplCopyWithImpl<$Res>
 /// @nodoc
 @JsonSerializable()
 class _$ArtistImpl implements _Artist {
-  const _$ArtistImpl({required this.id, required this.name});
+  const _$ArtistImpl({required this.id, required this.name, this.position = 0});
 
   factory _$ArtistImpl.fromJson(Map<String, dynamic> json) =>
       _$$ArtistImplFromJson(json);
@@ -114,10 +125,13 @@ class _$ArtistImpl implements _Artist {
   final int id;
   @override
   final String name;
+  @override
+  @JsonKey()
+  final int position;
 
   @override
   String toString() {
-    return 'Artist(id: $id, name: $name)';
+    return 'Artist(id: $id, name: $name, position: $position)';
   }
 
   @override
@@ -126,12 +140,14 @@ class _$ArtistImpl implements _Artist {
         (other.runtimeType == runtimeType &&
             other is _$ArtistImpl &&
             (identical(other.id, id) || other.id == id) &&
-            (identical(other.name, name) || other.name == name));
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.position, position) ||
+                other.position == position));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, name);
+  int get hashCode => Object.hash(runtimeType, id, name, position);
 
   @JsonKey(ignore: true)
   @override
@@ -148,8 +164,10 @@ class _$ArtistImpl implements _Artist {
 }
 
 abstract class _Artist implements Artist {
-  const factory _Artist({required final int id, required final String name}) =
-      _$ArtistImpl;
+  const factory _Artist(
+      {required final int id,
+      required final String name,
+      final int position}) = _$ArtistImpl;
 
   factory _Artist.fromJson(Map<String, dynamic> json) = _$ArtistImpl.fromJson;
 
@@ -157,6 +175,8 @@ abstract class _Artist implements Artist {
   int get id;
   @override
   String get name;
+  @override
+  int get position;
   @override
   @JsonKey(ignore: true)
   _$$ArtistImplCopyWith<_$ArtistImpl> get copyWith =>

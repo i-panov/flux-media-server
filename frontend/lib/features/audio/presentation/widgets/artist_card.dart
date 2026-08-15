@@ -13,35 +13,41 @@ class ArtistCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).colorScheme.primaryContainer,
+    final colorScheme = Theme.of(context).colorScheme;
+    return Semantics(
+      label: name,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(40),
+        child: Column(
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorScheme.primaryContainer,
+              ),
+              child: Icon(
+                Icons.person,
+                size: 40,
+                color: colorScheme.primary,
+              ),
             ),
-            child: Icon(
-              Icons.person,
-              size: 40,
-              color: Theme.of(context).colorScheme.primary,
+            const SizedBox(height: 4),
+            SizedBox(
+              width: 80,
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 80,
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

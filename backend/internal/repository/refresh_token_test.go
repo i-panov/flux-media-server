@@ -28,6 +28,8 @@ func fileDB(t *testing.T) *gorm.DB {
 
 // TestRefreshTokenStore_RotateTokenReplay — параллельный refresh одним
 // токеном: ровно один выигрывает, второй получает ErrRecordNotFound.
+// Delete выполняется первым (до чтения), поэтому проигравший в WAL не
+// получает SQLITE_BUSY_SNAPSHOT — тест детерминирован.
 func TestRefreshTokenStore_RotateTokenReplay(t *testing.T) {
 	db := fileDB(t)
 	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
@@ -61,6 +63,68 @@ func TestRefreshTokenStore_RotateTokenReplay(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, successes, "ровно один параллельный refresh должен выиграть")
+
+	// В БД остался ровно один токен — победителя.
+	var count int64
+	require.NoError(t, db.Model(&models.RefreshToken{}).Where("user_id = ?", 1).Count(&count).Error)
+	assert.Equal(t, int64(1), count, "replay не должен создавать второй валидный токен")
+}
+
+// Regression test (MAJOR): RotateToken happy-path — старый токен удаляется,
+// возвращается НОВЫЙ токен с хешем нового значения.
+func TestRefreshTokenStore_RotateTokenHappyPath(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
+
+	store := NewRefreshTokenRepository(db)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, 1, "token-old", time.Now().Add(time.Hour)))
+
+	rt, err := store.RotateToken(ctx, "token-old", 1, "token-new", time.Now().Add(2*time.Hour))
+	require.NoError(t, err)
+	assert.NotNil(t, rt)
+	assert.Equal(t, HashRefreshToken("token-new"), rt.Token, "must return the NEW token")
+
+	// Старый токен недоступен, новый — доступен по сырому значению.
+	_, err = store.FindByToken(ctx, "token-old")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "old token must be gone")
+
+	found, err := store.FindByToken(ctx, "token-new")
+	require.NoError(t, err)
+	assert.Equal(t, HashRefreshToken("token-new"), found.Token)
+}
+
+// Regression test (MAJOR БЕЗОПАСНОСТЬ): в БД хранится только SHA-256 хеш
+// токена, никогда — сырое значение.
+func TestRefreshTokenStore_StoresHashOnly(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
+
+	store := NewRefreshTokenRepository(db)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, 1, "super-secret-raw-token", time.Now().Add(time.Hour)))
+
+	var stored models.RefreshToken
+	require.NoError(t, db.First(&stored).Error)
+	assert.Equal(t, HashRefreshToken("super-secret-raw-token"), stored.Token, "DB must contain the hash")
+	assert.NotEqual(t, "super-secret-raw-token", stored.Token, "raw token must never be stored")
+
+	// Поиск по сырому токену работает, по хешу (как сырому) — нет.
+	_, err = store.FindByToken(ctx, "super-secret-raw-token")
+	assert.NoError(t, err)
+	_, err = store.FindByToken(ctx, stored.Token)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "the hash itself must not work as a token")
+
+	// DeleteByToken также оперирует хешем.
+	require.NoError(t, store.DeleteByToken(ctx, "super-secret-raw-token"))
+	_, err = store.FindByToken(ctx, "super-secret-raw-token")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 // TestUserStore_DeleteCascades — удаление пользователя каскадно удаляет

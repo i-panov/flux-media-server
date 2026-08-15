@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 type MockScanner struct {
 	mock.Mock
 	scanCalled chan bool
+	mu         sync.Mutex
+	lastCtx    context.Context
 }
 
 func (m *MockScanner) ScanPath(ctx context.Context, path string, mediaType models.MediaType) error {
@@ -25,8 +28,19 @@ func (m *MockScanner) ScanPath(ctx context.Context, path string, mediaType model
 	return args.Error(0)
 }
 
+// LastCtx возвращает контекст последнего вызова ScanAll.
+func (m *MockScanner) LastCtx() context.Context {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastCtx
+}
+
 func (m *MockScanner) ScanAll(ctx context.Context) error {
 	m.Called(ctx)
+
+	m.mu.Lock()
+	m.lastCtx = ctx
+	m.mu.Unlock()
 
 	// Signal that ScanAll was called
 	if m.scanCalled != nil {
@@ -124,4 +138,75 @@ func TestWatcherDisabled(t *testing.T) {
 
 	// Assert that ScanAll was never called
 	mockScanner.AssertNotCalled(t, "ScanAll")
+}
+
+// TestWatcherRestartRecreatesContext: повторный StartWithPaths после Stop
+// обязан создать НОВЫЙ контекст — иначе loop мгновенно выходит и автоскан
+// мёртв навсегда (регрессия: старый cancel без пересоздания ctx).
+func TestWatcherRestartRecreatesContext(t *testing.T) {
+	mockScanner := &MockScanner{
+		scanCalled: make(chan bool, 10),
+	}
+	mockScanner.On("ScanAll", mock.Anything).Return(nil)
+
+	watcher := services.NewWatcherService(mockScanner)
+	tempDir := t.TempDir()
+
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
+	watcher.Stop()
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
+
+	testFile := filepath.Join(tempDir, "restart.mp4")
+	require.NoError(t, os.WriteFile(testFile, []byte("x"), 0644))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	select {
+	case <-mockScanner.scanCalled:
+	case <-ctx.Done():
+		t.Fatal("ScanAll was not called after restart: watcher is dead")
+	}
+
+	// Скан обязан пройти с ЖИВЫМ контекстом нового запуска, а не со
+	// старым отменённым.
+	lastCtx := mockScanner.LastCtx()
+	require.NotNil(t, lastCtx, "ScanAll должен получить контекст")
+	require.NoError(t, lastCtx.Err(), "ScanAll получил отменённый контекст после рестарта")
+
+	mockScanner.AssertNumberOfCalls(t, "ScanAll", 1)
+	watcher.Stop()
+}
+
+// TestWatcherRestartTwice: два рестарта подряд тоже не убивают watcher.
+func TestWatcherRestartTwice(t *testing.T) {
+	mockScanner := &MockScanner{
+		scanCalled: make(chan bool, 10),
+	}
+	mockScanner.On("ScanAll", mock.Anything).Return(nil)
+
+	watcher := services.NewWatcherService(mockScanner)
+	tempDir := t.TempDir()
+
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
+	watcher.Stop()
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
+	watcher.Stop()
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
+
+	testFile := filepath.Join(tempDir, "restart2.mp4")
+	require.NoError(t, os.WriteFile(testFile, []byte("x"), 0644))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	select {
+	case <-mockScanner.scanCalled:
+	case <-ctx.Done():
+		t.Fatal("ScanAll was not called after second restart")
+	}
+
+	lastCtx := mockScanner.LastCtx()
+	require.NotNil(t, lastCtx)
+	require.NoError(t, lastCtx.Err(), "ScanAll получил отменённый контекст после второго рестарта")
+
+	watcher.Stop()
 }

@@ -3,18 +3,19 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/features/audio/presentation/utils/download_batch.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/section_header.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/track_actions_mixin.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
-import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
-import 'package:flux_media_server/features/offline/presentation/widgets/download_toggle.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
-import 'package:flux_media_server/shared/models/favorite.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
@@ -32,102 +33,83 @@ class ArtistPage extends ConsumerStatefulWidget {
   ConsumerState<ArtistPage> createState() => _ArtistPageState();
 }
 
-class _ArtistPageState extends ConsumerState<ArtistPage> {
+class _ArtistPageState extends ConsumerState<ArtistPage>
+    with TrackActionsMixin<ArtistPage> {
   static const _mediaType = 'audio';
-  final ScrollController _scrollController = ScrollController();
   bool _downloadingAll = false;
   int _downloadedCount = 0;
   int _downloadTotal = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    final position = _scrollController.position;
-    if (position.maxScrollExtent > 0 &&
-        position.pixels >= position.maxScrollExtent * 0.8) {
-      ref.read(mediaListProvider(_mediaType).notifier).loadMore();
-    }
-  }
-
-  void _toggleFavorite(int mediaId) {
-    ref.read(favoriteToggleProvider(mediaId).notifier).toggle();
-  }
-
-  void _playTrack(List<Media> queue, int index) {
-    ref.read(playQueueProvider.notifier).setQueue(queue, startIndex: index);
-  }
-
-  void _addToQueue(Media media) {
-    ref.read(playQueueProvider.notifier).enqueue(media);
-    final l = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l.addedToQueue)),
-    );
-  }
-
+  /// Скачивает все треки артиста пачкой.
+  ///
+  /// CRITICAL #20: исключение в одном треке не роняет пачку и не
+  /// застреляет AppBar в «0/N» — try/finally + подсчёт ошибок; прогресс
+  /// обновляется живьём после каждого трека.
   Future<void> _downloadAll(List<Media> tracks) async {
     if (tracks.isEmpty) return;
 
     setState(() {
       _downloadingAll = true;
       _downloadedCount = 0;
-      _downloadTotal = tracks.length;
+      _downloadTotal = 0;
     });
 
     var downloaded = 0;
-    final pending = List<Media>.from(tracks);
-
-    // Параллельные загрузки с лимитом 4: не грузим все сразу.
-    const concurrency = 4;
-    Future<void> worker() async {
-      while (pending.isNotEmpty) {
-        if (!mounted) return;
-        final track = pending.removeAt(0);
-
-        // Уже скачанные пропускаем (и не считаем).
-        final cached =
-            await ref.read(offlineCacheServiceProvider).isCached(track.id);
-        if (cached) continue;
-
-        await ref
-            .read(downloadNotifierProvider(track.id).notifier)
-            .download(track);
-        final state = ref.read(downloadNotifierProvider(track.id));
-        if (state is DownloadDownloaded) downloaded++;
-      }
-    }
-
-    await Future.wait(List.generate(concurrency, (_) => worker()));
-
-    if (mounted) {
-      // Один setState по завершении — не на каждый трек.
-      setState(() {
-        _downloadingAll = false;
-        _downloadedCount = downloaded;
-      });
-      final l = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l.downloadedOfTotalTracks(downloaded, _downloadTotal),
-          ),
-        ),
+    var failed = 0;
+    try {
+      // Уже скачанные не входят ни в total, ни в счётчик.
+      final pending = await filterUncachedTracks(
+        tracks,
+        (id) => ref.read(offlineCacheServiceProvider).isCached(id),
       );
+      if (!mounted) return;
+      setState(() => _downloadTotal = pending.length);
+      if (pending.isEmpty) return;
+
+      final result = await downloadTracksBatch(
+        pending: pending,
+        download: (track) => ref
+            .read(downloadNotifierProvider(track.id).notifier)
+            .download(track),
+        isDownloaded: (id) =>
+            ref.read(downloadNotifierProvider(id)) is DownloadDownloaded,
+        isFailed: (id) =>
+            ref.read(downloadNotifierProvider(id)) is DownloadError,
+        onTrackDone: (done, fail) {
+          // Живой прогресс в AppBar, а не только по завершении пачки.
+          if (!mounted) return;
+          setState(() => _downloadedCount = done + fail);
+        },
+      );
+      downloaded = result.downloaded;
+      failed = result.failed;
+    } catch (_) {
+      // Кеш-проверка может упасть — не застреляем UI.
+      failed = 1;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _downloadingAll = false;
+          _downloadedCount = downloaded + failed;
+        });
+        final l = AppLocalizations.of(context)!;
+        final message = failed > 0
+            ? '${l.downloadedOfTotalTracks(downloaded, _downloadTotal)}, '
+                '${l.errorLabel}: $failed'
+            : l.downloadedOfTotalTracks(downloaded, _downloadTotal);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     }
   }
 
-  void _toggleDownload(int mediaId) {
-    toggleDownload(ref, mediaId: mediaId, mediaType: _mediaType);
+  void _playTrack(List<Media> queue, int index) {
+    ref.read(playQueueProvider.notifier).setQueue(queue, startIndex: index);
+  }
+
+  void _loadMore() {
+    ref.read(mediaListProvider(_mediaType).notifier).loadMore();
   }
 
   @override
@@ -135,7 +117,12 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     final l = AppLocalizations.of(context)!;
 
     final mediaListState = ref.watch(mediaListProvider(_mediaType));
-    final favoritesState = ref.watch(favoritesProvider);
+    final favoritesHasError =
+        ref.watch(favoritesProvider.select((s) => s.hasError));
+    final favoritesLoading =
+        ref.watch(favoritesProvider.select((s) => s.isLoading));
+    final favoriteIds =
+        ref.watch(favoriteMediaIdsProvider).valueOrNull ?? const <int>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -160,7 +147,9 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
         context: context,
         l: l,
         mediaListState: mediaListState,
-        favoritesState: favoritesState,
+        favoritesHasError: favoritesHasError,
+        favoritesLoading: favoritesLoading,
+        favoriteIds: favoriteIds,
       ),
     );
   }
@@ -183,48 +172,29 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     required BuildContext context,
     required AppLocalizations l,
     required AsyncValue<MediaListResult> mediaListState,
-    required AsyncValue<List<Favorite>> favoritesState,
+    required bool favoritesHasError,
+    required bool favoritesLoading,
+    required Set<int> favoriteIds,
   }) {
-    if (mediaListState.isLoading || favoritesState.isLoading) {
+    if (mediaListState.isLoading || favoritesLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (mediaListState.hasError || favoritesState.hasError) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              mediaListState.error?.toString() ??
-                  favoritesState.error?.toString() ??
-                  'Unknown error',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                ref
-                  ..invalidate(mediaListProvider(_mediaType))
-                  ..invalidate(favoritesProvider);
-              },
-              child: Text(l.retry),
-            ),
-          ],
-        ),
+    if (mediaListState.hasError || favoritesHasError) {
+      return ErrorRetryView(
+        message: mediaListState.hasError
+            ? mediaListState.error?.toString()
+            : ref.read(favoritesProvider).error?.toString(),
+        onRetry: () {
+          ref
+            ..invalidate(mediaListProvider(_mediaType))
+            ..invalidate(favoritesProvider);
+        },
       );
     }
 
     final mediaList = mediaListState.valueOrNull ??
         MediaListResult(items: <Media>[].toIList(), total: 0);
-    final favorites = favoritesState.valueOrNull ?? [];
-
-    final favoriteMediaIds = favorites
-        .where((Favorite f) => f.mediaId != null)
-        .map((Favorite f) => f.mediaId!)
-        .toSet();
 
     final allTracks = mediaList.items
         .where(
@@ -255,9 +225,9 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     }
 
     final likedTracks =
-        allTracks.where((Media t) => favoriteMediaIds.contains(t.id)).toList();
+        allTracks.where((Media t) => favoriteIds.contains(t.id)).toList();
     final otherTracks =
-        allTracks.where((Media t) => !favoriteMediaIds.contains(t.id)).toList();
+        allTracks.where((Media t) => !favoriteIds.contains(t.id)).toList();
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -266,14 +236,13 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
           ..invalidate(favoritesProvider);
         // Ошибка уже отражена в состоянии провайдера.
         try {
-          await ref.watch(mediaListProvider(_mediaType).future);
+          await ref.read(mediaListProvider(_mediaType).future);
         } catch (_) {}
       },
       child: CustomScrollView(
-        controller: _scrollController,
         slivers: [
           if (likedTracks.isNotEmpty) ...[
-            _buildSectionHeader(Icons.favorite, l.likedTracks),
+            SliverSectionHeader(icon: Icons.favorite, title: l.likedTracks),
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -282,9 +251,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
                     media: track,
                     isFavorite: true,
                     onPlay: () => _playTrack(likedTracks, index),
-                    onFavorite: () => _toggleFavorite(track.id),
-                    onDownload: () => _toggleDownload(track.id),
-                    onAddToQueue: () => _addToQueue(track),
+                    onFavorite: () => toggleFavoriteTrack(ref, track.id),
+                    onDownload: () =>
+                        toggleDownloadTrack(ref, _mediaType, track.id),
+                    onAddToQueue: () => addTrackToQueue(ref, track),
                     onAddToCollection: () => showAddToCollectionDialog(
                       context,
                       ref,
@@ -303,7 +273,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
             ),
           ],
           if (otherTracks.isNotEmpty) ...[
-            _buildSectionHeader(Icons.music_note, l.allTracks),
+            SliverSectionHeader(icon: Icons.music_note, title: l.allTracks),
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -311,9 +281,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
                   return AudioTrackRow(
                     media: track,
                     onPlay: () => _playTrack(otherTracks, index),
-                    onFavorite: () => _toggleFavorite(track.id),
-                    onDownload: () => _toggleDownload(track.id),
-                    onAddToQueue: () => _addToQueue(track),
+                    onFavorite: () => toggleFavoriteTrack(ref, track.id),
+                    onDownload: () =>
+                        toggleDownloadTrack(ref, _mediaType, track.id),
+                    onAddToQueue: () => addTrackToQueue(ref, track),
                     onAddToCollection: () => showAddToCollectionDialog(
                       context,
                       ref,
@@ -331,22 +302,21 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
               ),
             ),
           ],
+          // Вместо бесконечного скролла (который догружал весь аудио-список
+          // ради фильтра по артисту) — явная кнопка «загрузить ещё».
+          if (mediaList.items.length < mediaList.total)
+            SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: OutlinedButton(
+                    onPressed: _loadMore,
+                    child: Text(l.loadMore),
+                  ),
+                ),
+              ),
+            ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(IconData icon, String title) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-          ],
-        ),
       ),
     );
   }

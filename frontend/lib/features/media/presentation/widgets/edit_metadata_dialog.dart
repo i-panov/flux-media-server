@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/filename_parser.dart';
+import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
 import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -56,7 +58,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     _albumController = TextEditingController(text: widget.media.album ?? '');
     _genreController = TextEditingController(text: widget.media.genre ?? '');
     _yearController = TextEditingController(
-      text: (widget.media.year ?? 0) > 0
+      text: hasMediaYear(widget.media.year)
           ? widget.media.year.toString()
           : '',
     );
@@ -121,30 +123,22 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     return null;
   }
 
-  Map<String, dynamic> _collectData() {
-    final data = <String, dynamic>{
-      'title': _titleController.text.trim(),
-    };
-    final artistNames = _artistControllers
-        .map((c) => c.text.trim())
-        .where((name) => name.isNotEmpty)
-        .toList();
-    data['artists'] = artistNames;
-    if (_albumController.text.trim().isNotEmpty) {
-      data['album'] = _albumController.text.trim();
-    }
-    if (_genreController.text.trim().isNotEmpty) {
-      data['genre'] = _genreController.text.trim();
-    }
-    // Валидатор гарантирует корректный год (или пусто).
-    final yearParsed = int.tryParse(_yearController.text.trim());
-    if (yearParsed != null) {
-      data['year'] = yearParsed;
-    }
-    if (_descriptionController.text.trim().isNotEmpty) {
-      data['description'] = _descriptionController.text.trim();
-    }
-    return data;
+  MetadataEdit _collectData() {
+    final album = _albumController.text.trim();
+    final genre = _genreController.text.trim();
+    final description = _descriptionController.text.trim();
+    return MetadataEdit(
+      title: _titleController.text.trim(),
+      artists: _artistControllers
+          .map((c) => c.text.trim())
+          .where((name) => name.isNotEmpty)
+          .toList(),
+      album: album.isEmpty ? null : album,
+      genre: genre.isEmpty ? null : genre,
+      // Валидатор гарантирует корректный год (или пусто).
+      year: int.tryParse(_yearController.text.trim()),
+      description: description.isEmpty ? null : description,
+    );
   }
 
   Future<void> _save() async {
@@ -156,7 +150,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     final result = await updateMetadata(
       UpdateMetadataParams(
         mediaId: widget.media.id,
-        data: _collectData(),
+        edit: _collectData(),
       ),
     );
 
@@ -177,9 +171,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
         ref
             .read(mediaDetailProvider(widget.media.id).notifier)
             .updateMedia(updatedMedia);
-        ref
-          ..invalidate(mediaListProvider('video'))
-          ..invalidate(mediaListProvider('audio'));
+        refreshMediaLists(ref);
         Navigator.of(context).pop();
       },
     );

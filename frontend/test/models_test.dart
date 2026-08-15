@@ -145,6 +145,74 @@ void main() {
 
       expect(restored.type, MediaType.unknown);
     });
+
+    test('missing type becomes MediaType.unknown, not crash', () {
+      final media = Media.fromJson({
+        'id': 9,
+        'title': 'No type key',
+        'file_size': 1,
+      });
+
+      expect(media.type, MediaType.unknown);
+    });
+
+    test('null type becomes MediaType.unknown, not crash', () {
+      final media = Media.fromJson({
+        'id': 10,
+        'title': 'Null type',
+        'type': null,
+        'file_size': 1,
+      });
+
+      expect(media.type, MediaType.unknown);
+    });
+
+    test('type value is normalized (case and whitespace)', () {
+      final media = Media.fromJson({
+        'id': 11,
+        'title': 'Mixed case',
+        'type': 'Video',
+        'file_size': 1,
+      });
+
+      expect(media.type, MediaType.video);
+
+      final padded = Media.fromJson({
+        'id': 12,
+        'title': 'Padded',
+        'type': '  audio ',
+        'file_size': 1,
+      });
+
+      expect(padded.type, MediaType.audio);
+    });
+
+    test('createdAt parses from created_at and survives roundtrip', () {
+      final media = Media.fromJson({
+        'id': 13,
+        'title': 'With created_at',
+        'type': 'video',
+        'file_size': 1,
+        'created_at': '2024-06-01T10:00:00Z',
+      });
+
+      expect(media.createdAt, DateTime.utc(2024, 6, 1, 10));
+      expect(Media.fromJson(media.toJson()), equals(media));
+    });
+
+    test('updatedAt is null when updated_at is missing (roundtrip)', () {
+      const media = Media(
+        id: 14,
+        title: 'No updated_at',
+        type: MediaType.video,
+        fileSize: 1,
+      );
+
+      expect(media.updatedAt, isNull);
+      final restored = Media.fromJson(media.toJson());
+      expect(restored.updatedAt, isNull);
+      expect(restored, equals(media));
+    });
   });
 
   group('User', () {
@@ -161,6 +229,11 @@ void main() {
       final admin =
           User.fromJson({'id': 2, 'email': 'a@b.c', 'is_admin': true});
       expect(admin.isAdmin, isTrue);
+    });
+
+    test('toJson to fromJson roundtrip', () {
+      const user = User(id: 3, email: 'round@trip.io', isAdmin: true);
+      expect(User.fromJson(user.toJson()), equals(user));
     });
   });
 
@@ -265,6 +338,32 @@ void main() {
       expect(restored.cast, isNull);
     });
 
+    test('invalid JSON string in genres/cast yields empty list, not crash',
+        () {
+      final meta = Metadata.fromJson({
+        'id': 6,
+        'title': 'Broken genres',
+        'genres': '{not valid json',
+        'cast': 'nope',
+      });
+
+      expect(meta.genres, isEmpty);
+      expect(meta.cast, isEmpty);
+    });
+
+    test('list with non-strings in genres/cast yields empty list, not crash',
+        () {
+      final meta = Metadata.fromJson({
+        'id': 7,
+        'title': 'Mixed genres',
+        'genres': ['Rock', 42, null],
+        'cast': [1, 2],
+      });
+
+      expect(meta.genres, isEmpty);
+      expect(meta.cast, isEmpty);
+    });
+
     test('equality works', () {
       const a = Metadata(id: 5, title: 'T', genres: ['A']);
       const b = Metadata(id: 5, title: 'T', genres: ['A']);
@@ -286,6 +385,14 @@ void main() {
       const b = Artist(id: 1, name: 'X');
       expect(a, equals(b));
       expect(a, isNot(equals(const Artist(id: 2, name: 'X'))));
+    });
+
+    test('position parses, defaults to 0 and survives roundtrip', () {
+      final plain = Artist.fromJson({'id': 3, 'name': 'No Position'});
+      expect(plain.position, 0);
+
+      const ordered = Artist(id: 4, name: 'First', position: 1);
+      expect(Artist.fromJson(ordered.toJson()), equals(ordered));
     });
   });
 
@@ -322,6 +429,21 @@ void main() {
 
       expect(Collection.fromJson(json).type, MediaType.unknown);
     });
+
+    test('toJson to fromJson roundtrip', () {
+      final collection = Collection(
+        id: 3,
+        userId: 7,
+        name: 'Roundtrip',
+        type: MediaType.video,
+        createdAt: DateTime.utc(2024),
+        updatedAt: DateTime.utc(2024, 2, 2),
+      );
+
+      final restored = Collection.fromJson(collection.toJson());
+      expect(restored, equals(collection));
+      expect(restored.type, MediaType.video);
+    });
   });
 
   group('CollectionItem', () {
@@ -351,6 +473,18 @@ void main() {
       expect(item.mediaId, isNull);
       expect(item.addedAt, isNull);
       expect(item.position, isNull);
+    });
+
+    test('toJson to fromJson roundtrip', () {
+      final item = CollectionItem(
+        id: 3,
+        collectionId: 3,
+        mediaId: 5,
+        addedAt: DateTime.utc(2024, 3),
+        position: 2,
+      );
+
+      expect(CollectionItem.fromJson(item.toJson()), equals(item));
     });
   });
 
@@ -399,6 +533,19 @@ void main() {
         mediaId: 5,
       );
       expect(a, equals(b));
+    });
+
+    test('toJson to fromJson roundtrip', () {
+      final favorite = Favorite(
+        id: 2,
+        userId: 7,
+        createdAt: DateTime.utc(2024),
+        artistId: 3,
+      );
+
+      final restored = Favorite.fromJson(favorite.toJson());
+      expect(restored, equals(favorite));
+      expect(restored.artistId, 3);
     });
   });
 
@@ -482,6 +629,40 @@ void main() {
       expect(progress.duration, 0);
       expect(progress.completed, isFalse);
       expect(progress.updatedAt, isNull);
+    });
+
+    test('id is optional on the client and survives roundtrip', () {
+      const local = WatchProgress(
+        userId: 7,
+        mediaId: 5,
+        position: 100,
+        duration: 200,
+        completed: true,
+      );
+
+      expect(local.id, isNull);
+      expect(
+        const WatchProgress(userId: 7, mediaId: 5, position: 0),
+        equals(const WatchProgress(userId: 7, mediaId: 5, position: 0)),
+      );
+
+      final restored = WatchProgress.fromJson(local.toJson());
+      expect(restored, equals(local));
+      expect(restored.id, isNull);
+    });
+
+    test('toJson to fromJson roundtrip with id', () {
+      final progress = WatchProgress(
+        id: 9,
+        userId: 7,
+        mediaId: 5,
+        position: 3600,
+        duration: 7200,
+        updatedAt: DateTime.utc(2024, 4),
+      );
+
+      final restored = WatchProgress.fromJson(progress.toJson());
+      expect(restored, equals(progress));
     });
   });
 }

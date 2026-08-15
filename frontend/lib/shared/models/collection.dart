@@ -1,4 +1,4 @@
-import 'package:flux_media_server/shared/models/media.dart';
+import 'package:flux_media_server/shared/models/media_type.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 // ignore_for_file: invalid_annotation_target

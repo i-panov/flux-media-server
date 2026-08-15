@@ -5,9 +5,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/network/auth_token_refresher.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/session/settings_local_datasource.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/session/settings_repository_impl.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
@@ -64,15 +69,18 @@ class _StubAuthRepository implements AuthRepository {
       const Left(AuthFailure());
 }
 
-/// Фейковый auth-нотифаер: сразу «залогинен» как пользователь 7.
+/// Фейковый auth-нотифаер: «залогинен» как пользователь 7, либо
+/// в начальном состоянии (после рестарта), если user == null.
 class _FakeAuthNotifier extends AuthNotifier {
-  _FakeAuthNotifier({required super.ref, required User user})
+  _FakeAuthNotifier({required super.ref, User? user})
       : super(
           requestCode: RequestCode(_StubAuthRepository()),
           verifyCode: VerifyCode(_StubAuthRepository()),
           getCurrentUser: GetCurrentUser(_StubAuthRepository()),
         ) {
-    state = AuthState.authenticated(user: user);
+    state = user != null
+        ? AuthState.authenticated(user: user)
+        : const AuthState.initial();
   }
 }
 
@@ -347,6 +355,57 @@ void main() {
         isFalse,
       );
     });
+
+    test('removes files after restart without prior initialization',
+        () async {
+      // Рестарт: auth ещё не подтверждён, id пользователя только в prefs,
+      // _userId в сервисе == null (ни одна операция не инициализировала его).
+      final container2 = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          authProvider.overrideWith((ref) => _FakeAuthNotifier(ref: ref)),
+        ],
+      );
+      addTearDown(container2.dispose);
+      final svc = OfflineCacheService(
+        container2.read(_refProvider),
+        'http://localhost:8080/api',
+      );
+      final file = File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5')
+        ..writeAsStringSync('x');
+      await prefs.setInt('${_keyPrefix}flux_current_user_id', 7);
+
+      await svc.clearUserCache();
+
+      expect(file.existsSync(), isFalse);
+      expect(
+        prefs.containsKey('${_keyPrefix}flux_current_user_id'),
+        isFalse,
+      );
+    });
+
+    test('leaves files and metadata of other users intact', () async {
+      final otherFile =
+          File('${tempDir.path}/${_keyPrefix}user_9_flux_media_5')
+            ..writeAsStringSync('x');
+      await service.saveMetadata(_media(5));
+      await prefs.setString(
+        '${_keyPrefix}user_9_flux_meta_5',
+        jsonEncode(_media(5).toJson()),
+      );
+
+      await service.clearUserCache();
+
+      expect(otherFile.existsSync(), isTrue);
+      expect(
+        prefs.containsKey('${_keyPrefix}user_9_flux_meta_5'),
+        isTrue,
+      );
+      expect(
+        prefs.containsKey('${_keyPrefix}user_7_flux_meta_5'),
+        isFalse,
+      );
+    });
   });
 
   group('migration of legacy files', () {
@@ -470,23 +529,259 @@ void main() {
     });
   });
 
+  group('orphan .part cleanup', () {
+    test('removes .part without final file on first operation', () async {
+      File('${tempDir.path}/${_keyPrefix}user_7_flux_media_10.part')
+          .writeAsStringSync('x');
+      // .part с уже сохранённым финальным файлом — не сирота.
+      File('${tempDir.path}/${_keyPrefix}user_7_flux_media_11.part')
+          .writeAsStringSync('x');
+      File('${tempDir.path}/${_keyPrefix}user_7_flux_media_11')
+          .writeAsStringSync('full');
+      // Файлы чужого пользователя не трогаем.
+      File('${tempDir.path}/${_keyPrefix}user_9_flux_media_12.part')
+          .writeAsStringSync('x');
+
+      await service.getLocalPath(1);
+
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_10.part')
+            .existsSync(),
+        isFalse,
+      );
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_11.part')
+            .existsSync(),
+        isTrue,
+      );
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_9_flux_media_12.part')
+            .existsSync(),
+        isTrue,
+      );
+    });
+  });
+
+  group('download integrity', () {
+    test('rejects truncated download and cleans up .part', () async {
+      Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+        return http.StreamedResponse(
+          // Объявлено 5 байт, пришло 3 — усечённый ответ.
+          Stream.fromIterable([
+            [1, 2, 3],
+          ]),
+          200,
+          contentLength: 5,
+        );
+      }
+
+      await expectLater(
+        HttpOverrides.runZoned(
+          () => service.download(_media(6)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
+        ),
+        throwsA(
+          predicate((e) => e.toString().contains('Download incomplete')),
+        ),
+      );
+
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_6').existsSync(),
+        isFalse,
+      );
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_6.part')
+            .existsSync(),
+        isFalse,
+      );
+    });
+  });
+
+  group('download 401 retry', () {
+    test('retries with a fresh token after 401', () async {
+      var refreshCalls = 0;
+      final container2 = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          authProvider.overrideWith(
+            (ref) => _FakeAuthNotifier(
+              ref: ref,
+              user: const User(id: 7, email: 'u@example.com'),
+            ),
+          ),
+          settingsProvider.overrideWith((ref) {
+            return SettingsNotifier(
+              SettingsRepositoryImpl(
+                SettingsLocalDataSource(prefs, const FlutterSecureStorage()),
+              ),
+            );
+          }),
+          authTokenRefresherProvider.overrideWith(
+            (ref) => AuthTokenRefresher(
+              performRefresh: (refreshToken) async {
+                refreshCalls++;
+                expect(refreshToken, 'refresh-1');
+                await ref
+                    .read(settingsProvider.notifier)
+                    .setTokens('new-token', 'new-refresh');
+                return (token: 'new-token', refreshToken: 'new-refresh');
+              },
+              onRefreshFailure: () async {},
+            ),
+          ),
+        ],
+      );
+      addTearDown(container2.dispose);
+      await container2.read(settingsProvider.notifier).init();
+      await container2
+          .read(settingsProvider.notifier)
+          .setTokens('old-token', 'refresh-1');
+      final svc = OfflineCacheService(
+        container2.read(_refProvider),
+        'http://localhost:8080/api',
+      );
+
+      Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+        if (request.headers['Authorization'] == 'Bearer old-token') {
+          return http.StreamedResponse(
+            const Stream.empty(),
+            401,
+            contentLength: 0,
+          );
+        }
+        expect(request.headers['Authorization'], 'Bearer new-token');
+        return http.StreamedResponse(
+          Stream.fromIterable([
+            [1, 2, 3],
+          ]),
+          200,
+          contentLength: 3,
+        );
+      }
+
+      final path = await HttpOverrides.runZoned(
+        () => svc.download(_media(6)),
+        createHttpClient: (_) => _FakeHttpClient(handler),
+      );
+
+      expect(path, '${tempDir.path}/${_keyPrefix}user_7_flux_media_6');
+      expect(refreshCalls, 1);
+    });
+
+    test('parallel 401s share a single refresh instead of failing', () async {
+      var refreshCalls = 0;
+      final container2 = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          authProvider.overrideWith(
+            (ref) => _FakeAuthNotifier(
+              ref: ref,
+              user: const User(id: 7, email: 'u@example.com'),
+            ),
+          ),
+          settingsProvider.overrideWith((ref) {
+            return SettingsNotifier(
+              SettingsRepositoryImpl(
+                SettingsLocalDataSource(prefs, const FlutterSecureStorage()),
+              ),
+            );
+          }),
+          authTokenRefresherProvider.overrideWith(
+            (ref) => AuthTokenRefresher(
+              performRefresh: (refreshToken) async {
+                refreshCalls++;
+                await ref
+                    .read(settingsProvider.notifier)
+                    .setTokens('new-token', 'new-refresh');
+                return (token: 'new-token', refreshToken: 'new-refresh');
+              },
+              onRefreshFailure: () async {},
+            ),
+          ),
+        ],
+      );
+      addTearDown(container2.dispose);
+      await container2.read(settingsProvider.notifier).init();
+      await container2
+          .read(settingsProvider.notifier)
+          .setTokens('old-token', 'refresh-1');
+      final svc = OfflineCacheService(
+        container2.read(_refProvider),
+        'http://localhost:8080/api',
+      );
+
+      Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+        if (request.headers['Authorization'] == 'Bearer old-token') {
+          return http.StreamedResponse(
+            const Stream.empty(),
+            401,
+            contentLength: 0,
+          );
+        }
+        return http.StreamedResponse(
+          Stream.fromIterable([
+            [1, 2, 3],
+          ]),
+          200,
+          contentLength: 3,
+        );
+      }
+
+      await Future.wait([
+        HttpOverrides.runZoned(
+          () => svc.download(_media(6)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
+        ),
+        HttpOverrides.runZoned(
+          () => svc.download(_media(7)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
+        ),
+      ]);
+
+      // Второй 401-поток ждал результат общего refresh, а не фейлил.
+      expect(refreshCalls, 1);
+    });
+  });
+
   group('enforceCacheLimit', () {
     test('removes oldest downloads when the cache exceeds the limit',
         () async {
       final small =
           File('${tempDir.path}/${_keyPrefix}user_7_flux_media_1')
             ..writeAsStringSync('x' * 100);
+      // Гарантируем разный mtime (секундная точность на части ФС):
+      // вытеснение идёт от самого старого файла.
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
       // Разрежённый файл: 6 ГБ «на бумаге», но почти не занимает диск.
       final big = File('${tempDir.path}/${_keyPrefix}user_7_flux_media_2');
       big.openSync(mode: FileMode.write)
         ..truncateSync(6 * 1024 * 1024 * 1024)
         ..closeSync();
 
-      // remove() в конце вызывает _enforceCacheLimit.
-      await service.remove(999);
+      // Лимит проверяется после успешной загрузки (remove() его не
+      // вызывает): новая загрузка переполняет кеш и вытесняет старые.
+      Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+        return http.StreamedResponse(
+          Stream.fromIterable([
+            [1, 2, 3],
+          ]),
+          200,
+          contentLength: 3,
+        );
+      }
+
+      await HttpOverrides.runZoned(
+        () => service.download(_media(3)),
+        createHttpClient: (_) => _FakeHttpClient(handler),
+      );
 
       expect(small.existsSync(), isFalse);
       expect(big.existsSync(), isFalse);
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_3')
+            .existsSync(),
+        isTrue,
+      );
     });
   });
 }

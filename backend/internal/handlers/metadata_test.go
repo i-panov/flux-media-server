@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -32,10 +33,28 @@ func setupMetadataTestApp(t *testing.T) *fiber.App {
 	handler := NewMetadataHandler(mediaRepo)
 	app := fiber.New()
 
+	app.Get("/api/metadata/search", handler.Search)
 	app.Put("/api/metadata/:mediaId", handler.Update)
 	app.Post("/api/metadata/:mediaId/refresh", handler.Refresh)
 
 	return app
+}
+
+func TestMetadataHandler_SearchQueryTooLong(t *testing.T) {
+	app := setupMetadataTestApp(t)
+
+	query := strings.Repeat("a", 257)
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/metadata/search?q="+query, nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}
+
+func TestMetadataHandler_SearchValid(t *testing.T) {
+	app := setupMetadataTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/metadata/search?q=Interstellar.2014.mkv", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 }
 
 func TestMetadataHandler_UpdateInvalidYear(t *testing.T) {

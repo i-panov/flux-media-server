@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"flux/internal/models"
 
@@ -28,10 +29,17 @@ func (r *UserStore) FindByID(ctx context.Context, id uint) (*models.User, error)
 	return &user, err
 }
 
+// Create сохраняет пользователя. Бизнес-правило: первый пользователь
+// становится админом. Транзакции BEGIN IMMEDIATE (см. _txlock в InitDB)
+// сериализуют конкурентные регистрации, поэтому гонка двух параллельных
+// «первых» пользователей невозможна; уникальный индекс на email отсекает
+// дубликат той же почты.
 func (r *UserStore) Create(ctx context.Context, user *models.User) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		tx.Model(&models.User{}).Count(&count)
+		if err := tx.Model(&models.User{}).Count(&count).Error; err != nil {
+			return err
+		}
 		if count == 0 {
 			user.IsAdmin = true
 		}
@@ -46,8 +54,22 @@ func (r *UserStore) Count(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+// Update обновляет только переданные непустые поля (email, is_admin=true).
 func (r *UserStore) Update(ctx context.Context, user *models.User) error {
-	return r.db.WithContext(ctx).Save(user).Error
+	if user.ID == 0 {
+		return errors.New("repository: user ID required for Update")
+	}
+	updates := make(map[string]interface{})
+	if user.Email != "" {
+		updates["email"] = user.Email
+	}
+	if user.IsAdmin {
+		updates["is_admin"] = user.IsAdmin
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(user).Updates(updates).Error
 }
 
 // Delete removes a user and cascades to all dependent rows (refresh tokens,
@@ -56,21 +78,13 @@ func (r *UserStore) Update(ctx context.Context, user *models.User) error {
 // транзакции; для новых инсталляций это дополняется FK CASCADE.
 func (r *UserStore) Delete(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("user_id = ?", id).Delete(&models.RefreshToken{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("user_id = ?", id).Delete(&models.Favorite{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("user_id = ?", id).Delete(&models.WatchProgress{}).Error; err != nil {
-			return err
-		}
 		// Элементы коллекций пользователя (в старых БД FK отсутствует).
 		if err := tx.Where("collection_id IN (SELECT id FROM collections WHERE user_id = ?)", id).
 			Delete(&models.CollectionItem{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("user_id = ?", id).Delete(&models.Collection{}).Error; err != nil {
+		if err := cascadeDelete(tx, "user_id", id,
+			&models.RefreshToken{}, &models.Favorite{}, &models.WatchProgress{}, &models.Collection{}); err != nil {
 			return err
 		}
 		return tx.Delete(&models.User{}, id).Error

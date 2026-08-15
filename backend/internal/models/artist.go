@@ -11,10 +11,11 @@ type Artist struct {
 }
 
 // MediaArtist is the join table between Media and Artist with a position
-// for ordering artists on a track.
+// for ordering artists on a track. Уникальность пары (media_id, artist_id)
+// обеспечивается составным первичным ключом, отдельный uniqueIndex не нужен.
 type MediaArtist struct {
-	MediaID  uint `gorm:"primaryKey;uniqueIndex:idx_media_artist_pair" json:"media_id"`
-	ArtistID uint `gorm:"primaryKey;uniqueIndex:idx_media_artist_pair" json:"artist_id"`
+	MediaID  uint `gorm:"primaryKey" json:"media_id"`
+	ArtistID uint `gorm:"primaryKey" json:"artist_id"`
 	Position int  `gorm:"default:0" json:"position"`
 }
 
@@ -24,8 +25,8 @@ type MediaArtist struct {
 // column and would require a manual JOIN that causes duplicate artists
 // via a cartesian product across all media_artists rows of each artist).
 type ArtistLink struct {
-	MediaID  uint `gorm:"column:media_id"`
-	ArtistID uint `gorm:"column:artist_id"`
+	MediaID  uint   `gorm:"column:media_id"`
+	ArtistID uint   `gorm:"column:artist_id"`
 	Name     string `gorm:"column:name"`
-	Position int  `gorm:"column:position"`
+	Position int    `gorm:"column:position"`
 }

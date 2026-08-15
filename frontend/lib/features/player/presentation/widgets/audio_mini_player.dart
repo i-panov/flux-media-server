@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
@@ -26,13 +27,6 @@ class AudioMiniPlayer extends ConsumerStatefulWidget {
   ConsumerState<AudioMiniPlayer> createState() => _AudioMiniPlayerState();
 }
 
-String _formatDuration(Duration? d) {
-  if (d == null) return '0:00';
-  final m = d.inMinutes.remainder(60);
-  final s = d.inSeconds.remainder(60);
-  return '$m:${s.toString().padLeft(2, '0')}';
-}
-
 class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
   double _volume = 100;
   StreamSubscription<double>? _volumeSub;
@@ -47,6 +41,8 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
     // Volume slider is desktop-only; no need to track volume on mobile.
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       final audioDs = ref.read(audioPlayerDatasourceProvider);
+      // Показываем текущий уровень плеера, а не 100 до первого события.
+      _volume = audioDs.volume;
       _volumeSub = audioDs.volumeStream.listen((v) {
         if (mounted) setState(() => _volume = v);
       });
@@ -106,7 +102,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
           child: Row(
             children: [
               Text(
-                _formatDuration(position),
+                position.formatted,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Expanded(
@@ -114,7 +110,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 4,
                     thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 6,
+                      enabledThumbRadius: 7,
                     ),
                   ),
                   child: Slider(
@@ -141,7 +137,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                 ),
               ),
               Text(
-                _formatDuration(duration),
+                duration?.formatted ?? '0:00',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -248,8 +244,6 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       ref.read(playQueueProvider.notifier).previous();
                     },
                     iconSize: 24,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                   ),
                   // Play/pause
                   IconButton(
@@ -263,8 +257,6 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       }
                     },
                     iconSize: 28,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                   ),
                   // Next track
                   IconButton(
@@ -282,8 +274,6 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       }
                     },
                     iconSize: 24,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                   ),
                   // Volume slider — desktop only (mobile uses physical
                   // buttons).
@@ -321,7 +311,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                                     .withValues(alpha: 0.1),
                                 trackHeight: 3,
                                 thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 5,
+                                  enabledThumbRadius: 6,
                                 ),
                               ),
                               child: Slider(
@@ -351,13 +341,11 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     ),
                     tooltip: l.favorites,
                     onPressed: () {
-                    ref
-                        .read(favoriteToggleProvider(media.id).notifier)
-                        .toggle();
+                      ref
+                          .read(favoriteToggleProvider(media.id).notifier)
+                          .toggle();
                     },
                     iconSize: 20,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
@@ -369,8 +357,6 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       }
                     },
                     iconSize: 20,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),

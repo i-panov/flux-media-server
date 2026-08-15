@@ -19,6 +19,7 @@ func (mt MediaType) Valid() bool {
 }
 
 // Scan implements sql.Scanner so that MediaType can be used as a gorm datatype.
+// Регистр и пробелы нормализуются так же, как в ParseMediaType.
 func (mt *MediaType) Scan(value interface{}) error {
 	if value == nil {
 		return nil
@@ -27,7 +28,7 @@ func (mt *MediaType) Scan(value interface{}) error {
 	if !ok {
 		return fmt.Errorf("MediaType.Scan: cannot convert %T to string", value)
 	}
-	*mt = MediaType(s)
+	*mt = MediaType(strings.ToLower(strings.TrimSpace(s)))
 	return nil
 }
 

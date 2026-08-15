@@ -14,7 +14,6 @@ class AudioTrackRow extends ConsumerWidget {
   const AudioTrackRow({
     required this.media,
     super.key,
-    this.isPlaying = false,
     this.isFavorite = false,
     this.onPlay,
     this.onFavorite,
@@ -26,7 +25,6 @@ class AudioTrackRow extends ConsumerWidget {
   });
 
   final Media media;
-  final bool isPlaying;
   final bool isFavorite;
   final VoidCallback? onPlay;
   final VoidCallback? onFavorite;
@@ -72,6 +70,8 @@ class AudioTrackRow extends ConsumerWidget {
       }),
     );
     final isCurrentlyPlaying = playback?.mediaId == media.id;
+    final isCurrentlyPaused =
+        (playback?.isPaused ?? false) && isCurrentlyPlaying;
 
     return InkWell(
       onTap: onPlay,
@@ -107,7 +107,10 @@ class AudioTrackRow extends ConsumerWidget {
                       ? ColoredBox(
                           color: colorScheme.primaryContainer,
                           child: Icon(
-                            Icons.equalizer,
+                            // Индикатор паузы на обложке текущего трека.
+                            isCurrentlyPaused
+                                ? Icons.pause
+                                : Icons.equalizer,
                             color: colorScheme.primary,
                             size: 24,
                           ),
@@ -182,8 +185,7 @@ class AudioTrackRow extends ConsumerWidget {
                 size: 20,
               ),
               onPressed: onFavorite,
-              tooltip:
-                  isFavorite ? 'Remove from favorites' : 'Add to favorites',
+              tooltip: isFavorite ? l.removeFromFavorites : l.addToFavorites,
             ),
             if (onDownload != null)
               IconButton(
@@ -205,10 +207,10 @@ class AudioTrackRow extends ConsumerWidget {
                       ),
                 onPressed: onDownload,
                 tooltip: isDownloaded
-                    ? 'Downloaded'
+                    ? l.downloaded
                     : isDownloading
-                        ? 'Downloading...'
-                        : 'Download',
+                        ? l.downloading
+                        : l.download,
               ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 20),

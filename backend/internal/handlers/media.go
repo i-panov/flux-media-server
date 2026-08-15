@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -13,6 +14,9 @@ import (
 	"flux/internal/response"
 	"flux/internal/services"
 )
+
+// defaultMediaPageSize — размер страницы по умолчанию в списке медиа.
+const defaultMediaPageSize = 20
 
 type MediaHandler struct {
 	mediaRepo repository.MediaRepository
@@ -50,25 +54,17 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 		filters["type"] = mediaType
 	}
 	if year := c.Query("year"); year != "" {
-		filters["year"] = year
+		y, err := strconv.Atoi(year)
+		if err != nil {
+			return response.Error(c, fiber.StatusBadRequest, "invalid year")
+		}
+		filters["year"] = y
 	}
 	if q := c.Query("q"); q != "" {
 		filters["q"] = q
 	}
 
-	limit := c.QueryInt("limit", 20)
-	offset := c.QueryInt("offset", 0)
-	// Bound the page size: an unbounded limit allows fetching the whole
-	// library in one request (memory/DoS vector on large libraries).
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 200 {
-		limit = 200
-	}
-	if offset < 0 {
-		offset = 0
-	}
+	limit, offset := response.ClampPage(c.QueryInt("limit", defaultMediaPageSize), c.QueryInt("offset", 0), defaultMediaPageSize)
 
 	ctx := c.UserContext()
 	media, total, err := h.mediaRepo.FindAll(ctx, filters, limit, offset)
@@ -76,25 +72,23 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 		log.Printf("FindAll: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch media")
 	}
+	if media == nil {
+		media = []models.Media{}
+	}
 
-	return c.JSON(fiber.Map{
-		"items":  media,
-		"total":  total,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return response.Paginated(c, media, total, limit, offset)
 }
 
 func (h *MediaHandler) Get(c *fiber.Ctx) error {
-	id, err := c.ParamsInt("id")
+	id, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, uint(id))
+	media, err := h.mediaRepo.FindByID(ctx, id)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	return c.JSON(media)
@@ -143,15 +137,15 @@ func (h *MediaHandler) Create(c *fiber.Ctx) error {
 }
 
 func (h *MediaHandler) Update(c *fiber.Ctx) error {
-	id, err := c.ParamsInt("id")
+	id, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, uint(id))
+	media, err := h.mediaRepo.FindByID(ctx, id)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	var req CreateMediaRequest
@@ -165,7 +159,9 @@ func (h *MediaHandler) Update(c *fiber.Ctx) error {
 	if req.FilePath == "" {
 		return response.Error(c, fiber.StatusBadRequest, "FilePath is required")
 	}
-	if req.Type != "" && !models.ParseMediaType(string(req.Type)).Valid() {
+	// Тип обязателен как в Create: пустой type при Update молча игнорировался
+	// репозиторием (контракт «только непустые поля») и затирал бы изменение.
+	if req.Type == "" || !models.ParseMediaType(string(req.Type)).Valid() {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid type")
 	}
 
@@ -193,7 +189,7 @@ func (h *MediaHandler) Update(c *fiber.Ctx) error {
 }
 
 func (h *MediaHandler) Delete(c *fiber.Ctx) error {
-	id, err := c.ParamsInt("id")
+	id, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
@@ -201,23 +197,31 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Get media record to find file path.
-	media, err := h.mediaRepo.FindByID(ctx, uint(id))
+	media, err := h.mediaRepo.FindByID(ctx, id)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	// Delete the database record FIRST. If this fails the files remain on
 	// disk (safe — they can be cleaned up later). If we deleted files first
 	// and the DB delete failed, we'd be left with a "broken" record pointing
 	// to non-existent files.
-	if err := h.mediaRepo.Delete(ctx, uint(id)); err != nil {
+	if err := h.mediaRepo.Delete(ctx, id); err != nil {
 		log.Printf("Delete: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete media")
 	}
 
-	// Now safe to delete files from disk — the record is gone.
+	// Физический файл удаляем ТОЛЬКО если он лежит в зарегистрированной
+	// библиотеке — иначе Delete мог бы стереть произвольный файл системы
+	// по пути, проставленному вручную (Create/Update проходят проверку,
+	// но путь мог быть изменён в БД извне).
 	if media.FilePath != "" {
-		if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
+		allowed, err := h.streamer.IsPathAllowed(ctx, media.FilePath)
+		if err != nil {
+			log.Printf("Delete: IsPathAllowed %s: %v", media.FilePath, err)
+		} else if !allowed {
+			log.Printf("Delete: skip removing %s — outside registered libraries", media.FilePath)
+		} else if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Delete: remove file %s: %v", media.FilePath, err)
 		}
 	}
@@ -272,15 +276,15 @@ func (h *MediaHandler) CheckHash(c *fiber.Ctx) error {
 }
 
 func (h *MediaHandler) Stream(c *fiber.Ctx) error {
-	id, err := c.ParamsInt("id")
+	id, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, uint(id))
+	media, err := h.mediaRepo.FindByID(ctx, id)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	return h.streamer.Stream(c, media.FilePath)

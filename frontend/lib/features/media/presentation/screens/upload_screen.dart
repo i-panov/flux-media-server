@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -20,6 +23,9 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
+  /// Лимит сервера по умолчанию (configs/config.yaml: max_upload_size).
+  static const _maxUploadSizeBytes = 2 * 1024 * 1024 * 1024;
+
   bool _isUploading = false;
   File? _selectedFile;
   String? _selectedFileName;
@@ -31,6 +37,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   /// Прогресс загрузки (null, пока неизвестен размер).
   int? _sentBytes;
   int? _totalBytes;
+
+  /// Троттлинг прогресса: setState на каждый ~64КБ chunk давал бы
+  /// десятки тысяч rebuild'ов.
+  static const _progressThrottle = Duration(milliseconds: 150);
+  DateTime _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Текущая фаза: хэширование / проверка дубликата / загрузка.
   String? _phase;
@@ -65,66 +76,69 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     setState(() => _cancelled = true);
   }
 
+  void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
+    );
+  }
+
   Future<void> _startUpload() async {
-    if (_selectedFile == null) return;
+    final file = _selectedFile;
+    if (file == null) return;
 
     final l = AppLocalizations.of(context)!;
+    final fileSize = _selectedFileSize ?? await file.length();
+    if (fileSize == 0) {
+      _showSnackBar(l.uploadFileEmpty, Colors.red);
+      return;
+    }
+    if (fileSize > _maxUploadSizeBytes) {
+      _showSnackBar(
+        l.uploadFileTooLarge,
+        Colors.red,
+      );
+      return;
+    }
+
     setState(() {
       _cancelled = false;
       _sentBytes = null;
       _totalBytes = null;
-      _phase = null;
+      _phase = l.hashingFile;
+      _isUploading = true;
     });
 
     try {
-      setState(() {
-        _isUploading = true;
-        _phase = l.hashingFile;
-      });
+      // SHA-256 в фоновом изоляте: на файлах в 2+ ГБ синхронное
+      // хэширование в UI-изоляте замораживало интерфейс.
+      final filePath = file.path;
+      final hash = await Isolate.run(
+        () async => sha256.bind(File(filePath).openRead()).first,
+      );
+      if (_cancelled) throw const _UploadCancelled();
 
-      // Compute hash for duplicate check (прерываемо по флагу отмены).
-      final stream = _selectedFile!.openRead().map((chunk) {
-        if (_cancelled) {
-          throw const _UploadCancelled();
-        }
-        return chunk;
-      });
-      final hash = await sha256.bind(stream).first;
+      if (mounted) setState(() => _phase = l.checkingDuplicates);
 
       // Check duplicate — ошибка сети не должна молча превращаться
       // в «дубликатов нет»: показываем ошибку и прерываемся.
-      if (mounted) {
-        setState(() => _phase = l.checkingDuplicates);
-      }
       final checkMediaHash = ref.read(checkMediaHashProvider);
       final checkResult = await checkMediaHash(hash.toString());
       final exists = checkResult.fold(
         (failure) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${l.errorLabel}: ${failure.message}'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return false;
+          _showSnackBar(
+            '${l.errorLabel}: ${failure.message}',
+            Colors.red,
+          );
+          return null;
         },
         (data) => data.exists,
       );
+      if (exists == null) return;
       if (_cancelled) throw const _UploadCancelled();
-      // Если проверка не удалась — прерываемся, не пытаемся загружать.
-      if (checkResult.isLeft()) return;
 
       if (exists) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l.fileAlreadyExists),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+        _showSnackBar(l.fileAlreadyExists, Colors.orange);
         return;
       }
 
@@ -133,10 +147,18 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       final uploadMedia = ref.read(uploadMediaProvider);
       final result = await uploadMedia(
         UploadMediaParams(
-          filePath: _selectedFile!.path,
+          filePath: file.path,
           mediaType: widget.mediaType,
           fileName: _selectedFileName!,
           onProgress: (sent, total) {
+            // Троттлинг: финальное обновление проходим всегда.
+            final now = DateTime.now();
+            final isFinal = sent >= (total ?? sent);
+            if (!isFinal &&
+                now.difference(_lastProgressUpdate) < _progressThrottle) {
+              return;
+            }
+            _lastProgressUpdate = now;
             if (mounted) {
               setState(() {
                 _sentBytes = sent;
@@ -151,62 +173,32 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       if (!mounted) return;
 
       if (_cancelled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.uploadCancelled),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        _showSnackBar(l.uploadCancelled, Colors.orange);
         return;
       }
 
       result.fold(
         (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l.failedToAdd(failure.message)),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (failure is UploadCancelledFailure) {
+            _showSnackBar(l.uploadCancelled, Colors.orange);
+            return;
+          }
+          _showSnackBar(l.failedToAdd(failure.message), Colors.red);
         },
         (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l.uploadSuccess),
-              backgroundColor: Colors.green,
-            ),
-          );
-          ref
-            ..invalidate(mediaListProvider('video'))
-            ..invalidate(mediaListProvider('audio'));
+          _showSnackBar(l.uploadSuccess, Colors.green);
+          refreshMediaLists(ref);
           context.router.maybePop();
         },
       );
     } on _UploadCancelled {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.uploadCancelled),
-          backgroundColor: Colors.orange,
-        ),
+      _showSnackBar(l.uploadCancelled, Colors.orange);
+    } catch (e, st) {
+      AppLogger.error('Upload failed', e, st);
+      _showSnackBar(
+        _cancelled ? l.uploadCancelled : l.failedToAdd(l.errorLabel),
+        _cancelled ? Colors.orange : Colors.red,
       );
-    } catch (_) {
-      if (!mounted) return;
-      if (_cancelled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.uploadCancelled),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.failedToAdd(l.errorLabel)),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } finally {
       if (mounted) {
         setState(() {
@@ -228,7 +220,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       appBar: AppBar(
         title: Text(l.uploadMedia),
         actions: [
-          if (_selectedFile != null && !_isUploading)
+          if (_isUploading)
+            IconButton(
+              onPressed: _cancelUpload,
+              icon: const Icon(Icons.close),
+              tooltip: l.cancel,
+            )
+          else if (_selectedFile != null)
             TextButton.icon(
               onPressed: _startUpload,
               icon: const Icon(Icons.cloud_upload),

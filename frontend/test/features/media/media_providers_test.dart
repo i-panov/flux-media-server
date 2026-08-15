@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
@@ -109,7 +112,7 @@ class FakeMediaRepository implements MediaRepository {
   @override
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
-    Map<String, dynamic> data,
+    MetadataEdit edit,
   ) async =>
       Right(_fakeMedia(mediaId));
 
@@ -132,8 +135,9 @@ class FakeMediaRepository implements MediaRepository {
   @override
   Future<Either<Failure, void>> uploadCover(
     int mediaId,
-    String filePath,
-  ) async =>
+    String filePath, {
+    bool Function()? isCancelled,
+  }) async =>
       const Right(null);
 }
 
@@ -197,7 +201,8 @@ void main() {
       expect(fakeRepo.mediaListCalls.last.limit, 20);
     });
 
-    test('loadMore failure keeps the existing list', () async {
+    test('loadMore failure keeps existing items but surfaces the error',
+        () async {
       final first = [_fakeMedia(1), _fakeMedia(2)];
       fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
           Right((items: first, total: 4));
@@ -210,8 +215,41 @@ void main() {
       await container.read(mediaListProvider('video').notifier).loadMore();
 
       final state = container.read(mediaListProvider('video'));
+      // Ошибка видна пользователю (ранее copyWithPrevious был no-op)...
+      expect(state.hasError, isTrue);
+      expect(state.error.toString(), contains('Boom'));
+      // ...но уже загруженные элементы сохраняются.
       expect(state.value?.items, hasLength(2));
-      expect(state.hasError, isFalse);
+    });
+
+    test('loadMore result is discarded when query changes', () async {
+      final first = [_fakeMedia(1)];
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          Right((items: first, total: 4));
+
+      await container.read(mediaListProvider('video').future);
+
+      final completer =
+          Completer<Either<Failure, ({List<Media> items, int total})>>();
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) =>
+          completer.future;
+
+      final loadMoreFuture =
+          container.read(mediaListProvider('video').notifier).loadMore();
+
+      // Смена query пересоздаёт build — старый loadMore устарел.
+      container.read(searchQueryProvider('video').notifier).state = 'matrix';
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          const Right((items: [], total: 4));
+      await container.read(mediaListProvider('video').future);
+
+      completer.complete(const Right((items: [], total: 4)));
+      await loadMoreFuture;
+
+      final state = container.read(mediaListProvider('video'));
+      // Ответ устаревшего loadMore не дозаписался в новый список.
+      expect(state.value?.items, hasLength(0));
+      expect(fakeRepo.mediaListCalls.last.q, 'matrix');
     });
 
     test('loadMore at the end of the list does not make a request',
@@ -223,6 +261,39 @@ void main() {
       await container.read(mediaListProvider('video').notifier).loadMore();
 
       expect(fakeRepo.mediaListCalls, hasLength(1));
+    });
+
+    test('query change does not leave stale loadMore in flight', () async {
+      final first = [_fakeMedia(1), _fakeMedia(2)];
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          Right((items: first, total: 4));
+
+      await container.read(mediaListProvider('video').future);
+
+      final completer =
+          Completer<Either<Failure, ({List<Media> items, int total})>>();
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) =>
+          completer.future;
+
+      final loadMoreFuture =
+          container.read(mediaListProvider('video').notifier).loadMore();
+
+      container.read(searchQueryProvider('video').notifier).state = 'matrix';
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          const Right((items: [], total: 4));
+      await container.read(mediaListProvider('video').future);
+
+      // Новый список полностью загружен — loadMore с тем же счётчиком
+      // больше не должен блокироваться флагом старого запроса.
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          const Right((items: [], total: 4));
+      await container.read(mediaListProvider('video').notifier).loadMore();
+
+      completer.complete(const Right((items: [], total: 4)));
+      await loadMoreFuture;
+
+      // Старый loadMore отработал без исключений, состояние не испорчено.
+      expect(container.read(mediaListProvider('video')).hasError, isFalse);
     });
   });
 
@@ -330,6 +401,78 @@ void main() {
       final state = container.read(mediaDetailProvider(1));
       expect(state, isA<MediaDetailLoaded>());
       expect((state as MediaDetailLoaded).media.title, 'Cached Title');
+    });
+
+    test('stale load response does not override a newer one', () async {
+      final slow = Completer<Either<Failure, Media>>();
+      final fast = Completer<Either<Failure, Media>>();
+
+      fakeRepo.onGetMediaDetail = (_) => slow.future;
+      final notifier = container.read(mediaDetailProvider(1).notifier);
+      final firstLoad = notifier.load(1);
+
+      fakeRepo.onGetMediaDetail = (_) => fast.future;
+      final secondLoad = notifier.load(1);
+
+      fast.complete(Right(_fakeMedia(1, 'Fast')));
+      await secondLoad;
+
+      slow.complete(Right(_fakeMedia(1, 'Slow')));
+      await firstLoad;
+
+      final state = container.read(mediaDetailProvider(1));
+      expect(state, isA<MediaDetailLoaded>());
+      expect((state as MediaDetailLoaded).media.title, 'Fast');
+    });
+
+    test('load after provider dispose does not touch state', () async {
+      final completer = Completer<Either<Failure, Media>>();
+      fakeRepo.onGetMediaDetail = (_) => completer.future;
+
+      final notifier = container.read(mediaDetailProvider(1).notifier);
+      final loadFuture = notifier.load(1);
+
+      container.dispose();
+      completer.complete(Right(_fakeMedia(1, 'Late')));
+
+      // Не должно бросить и не должно писать в disposed StateNotifier.
+      await loadFuture;
+    });
+
+    test('refresh keeps state and updates from server', () async {
+      final media = _fakeMedia(1, 'Old');
+      fakeRepo.onGetMediaDetail = (_) async => Right(media);
+
+      final notifier = container.read(mediaDetailProvider(1).notifier);
+      await notifier.load(1);
+
+      final updated = _fakeMedia(1, 'New').copyWith(
+        updatedAt: DateTime.utc(2025),
+      );
+      fakeRepo.onGetMediaDetail = (_) async => Right(updated);
+
+      await notifier.refresh();
+
+      final state = container.read(mediaDetailProvider(1));
+      expect(state, isA<MediaDetailLoaded>());
+      expect((state as MediaDetailLoaded).media.title, 'New');
+    });
+
+    test('refresh failure keeps the current loaded state', () async {
+      fakeRepo.onGetMediaDetail =
+          (_) async => Right(_fakeMedia(1, 'Old'));
+
+      final notifier = container.read(mediaDetailProvider(1).notifier);
+      await notifier.load(1);
+
+      fakeRepo.onGetMediaDetail =
+          (_) async => const Left(ServerFailure(message: 'Offline'));
+
+      await notifier.refresh();
+
+      final state = container.read(mediaDetailProvider(1));
+      expect(state, isA<MediaDetailLoaded>());
+      expect((state as MediaDetailLoaded).media.title, 'Old');
     });
   });
 }

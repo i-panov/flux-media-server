@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/create_collection.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
@@ -50,31 +51,45 @@ class _AddToCollectionDialogState
       title: Text(l.addToCollection),
       content: SizedBox(
         width: double.maxFinite,
-        child: collectionsState.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text(l.failedToAdd(e.toString())),
-          data: (collections) {
-            return ListView.builder(
-              shrinkWrap: true,
-              itemCount: collections.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return ListTile(
-                    leading: const Icon(Icons.add),
-                    title: Text(l.create),
-                    onTap: _loading ? null : () => _showCreateDialog(l),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_loading) const LinearProgressIndicator(minHeight: 2),
+            const SizedBox(height: 4),
+            Flexible(
+              child: collectionsState.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Text(l.failedToAdd(_errorText(e))),
+                data: (collections) {
+                  final filtered = collections
+                      .where((c) => c.type.value == widget.mediaType)
+                      .toList();
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: filtered.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return ListTile(
+                          leading: const Icon(Icons.add),
+                          title: Text(l.create),
+                          onTap:
+                              _loading ? null : () => _showCreateDialog(l),
+                        );
+                      }
+                      final collection = filtered[index - 1];
+                      return _CollectionTile(
+                        collection: collection,
+                        mediaId: widget.mediaId,
+                        enabled: !_loading,
+                        onTap: () => _addToCollection(collection),
+                      );
+                    },
                   );
-                }
-                final collection = collections[index - 1];
-                return ListTile(
-                  leading: const Icon(Icons.folder),
-                  title: Text(collection.name),
-                  subtitle: Text(collection.type.value),
-                  onTap: _loading ? null : () => _addToCollection(collection),
-                );
-              },
-            );
-          },
+                },
+              ),
+            ),
+          ],
         ),
       ),
       actions: [
@@ -97,21 +112,20 @@ class _AddToCollectionDialogState
           mediaId: widget.mediaId,
         ),
       );
+      if (!mounted) return;
       result.fold(
         (failure) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l.failedToAdd(failure.message))),
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l.failedToAdd(failure.message))),
+          );
         },
         (_) {
-          if (mounted) {
-            Navigator.pop(context, true);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l.addedToCollection(collection.name))),
-            );
-          }
+          // Перечитываем элементы коллекции, чтобы показать новый элемент.
+          ref.invalidate(collectionItemsFullProvider(collection.id));
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l.addedToCollection(collection.name))),
+          );
         },
       );
     } catch (e) {
@@ -126,59 +140,143 @@ class _AddToCollectionDialogState
   }
 
   Future<void> _showCreateDialog(AppLocalizations l) async {
-    final nameController = TextEditingController();
-    final created = await showDialog<bool>(
+    final name = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.create),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(hintText: 'Name'),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l.create),
-          ),
-        ],
-      ),
+      builder: (_) => const _CreateCollectionDialog(),
     );
-    if ((created ?? false) && nameController.text.isNotEmpty) {
-      setState(() => _loading = true);
-      try {
-        final createCollection = ref.read(createCollectionProvider);
-        final collection = await createCollection(
-          CreateCollectionParams(
-            name: nameController.text,
-            type: widget.mediaType,
-          ),
-        );
-        collection.fold(
-          (failure) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l.failedToAdd(failure.message))),
-              );
-            }
-          },
-          (_) {
-            ref.invalidate(collectionsProvider);
-          },
-        );
-      } catch (e) {
-        if (mounted) {
+    if (name == null || name.isEmpty || !mounted) return;
+
+    setState(() => _loading = true);
+    try {
+      final createCollection = ref.read(createCollectionProvider);
+      final collection = await createCollection(
+        CreateCollectionParams(
+          name: name,
+          type: widget.mediaType,
+        ),
+      );
+      if (!mounted) return;
+      collection.fold(
+        (failure) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.failedToAdd(e.toString()))),
+            SnackBar(content: Text(l.failedToAdd(failure.message))),
           );
-        }
-      } finally {
-        if (mounted) setState(() => _loading = false);
+        },
+        (_) {
+          ref.invalidate(collectionsProvider);
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.failedToAdd(e.toString()))),
+        );
       }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _errorText(Object error) {
+    if (error is Failure) return error.message;
+    return error.toString();
+  }
+}
+
+/// Плитка коллекции: подсвечивает «уже добавлено» и блокирует тап.
+class _CollectionTile extends ConsumerWidget {
+  const _CollectionTile({
+    required this.collection,
+    required this.mediaId,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final Collection collection;
+  final int mediaId;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
+    final itemsState =
+        ref.watch(collectionItemsFullProvider(collection.id));
+    final alreadyAdded =
+        itemsState.valueOrNull?.any((m) => m.id == mediaId) ?? false;
+    return ListTile(
+      enabled: enabled && !alreadyAdded,
+      leading: Icon(alreadyAdded ? Icons.check_circle : Icons.folder),
+      title: Text(collection.name),
+      subtitle: Text(collection.type.value),
+      trailing: alreadyAdded ? Text(l.alreadyAdded) : null,
+      onTap: enabled && !alreadyAdded ? onTap : null,
+    );
+  }
+}
+
+/// Диалог создания коллекции: trim имени, Create активна при непустом
+/// поле, контроллер диспозится.
+class _CreateCollectionDialog extends StatefulWidget {
+  const _CreateCollectionDialog();
+
+  @override
+  State<_CreateCollectionDialog> createState() =>
+      _CreateCollectionDialogState();
+}
+
+class _CreateCollectionDialogState extends State<_CreateCollectionDialog> {
+  final TextEditingController _nameController = TextEditingController();
+  bool _canSubmit = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_onNameChanged);
+  }
+
+  @override
+  void dispose() {
+    _nameController
+      ..removeListener(_onNameChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onNameChanged() {
+    final canSubmit = _nameController.text.trim().isNotEmpty;
+    if (canSubmit != _canSubmit) {
+      setState(() => _canSubmit = canSubmit);
+    }
+  }
+
+  void _submit() {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return;
+    Navigator.pop(context, name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l.create),
+      content: TextField(
+        controller: _nameController,
+        decoration: InputDecoration(hintText: l.name),
+        autofocus: true,
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        TextButton(
+          onPressed: _canSubmit ? _submit : null,
+          child: Text(l.create),
+        ),
+      ],
+    );
   }
 }

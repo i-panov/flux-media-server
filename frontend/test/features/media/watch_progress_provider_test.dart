@@ -4,6 +4,7 @@ import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
+import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
@@ -69,7 +70,7 @@ class FakeMediaRepository implements MediaRepository {
   @override
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
-    Map<String, dynamic> data,
+    MetadataEdit edit,
   ) async =>
       const Left(ServerFailure(message: 'not used'));
 
@@ -85,8 +86,9 @@ class FakeMediaRepository implements MediaRepository {
   @override
   Future<Either<Failure, void>> uploadCover(
     int mediaId,
-    String filePath,
-  ) async =>
+    String filePath, {
+    bool Function()? isCancelled,
+  }) async =>
       const Left(ServerFailure(message: 'not used'));
 }
 

@@ -68,5 +68,16 @@ void main() {
         'http://host:8080/api/v2',
       );
     });
+
+    test('drops userInfo from the URL', () {
+      expect(
+        normalizeServerUrl('http://user:pass@host:8080'),
+        'http://host:8080/api',
+      );
+      expect(
+        normalizeServerUrl('https://user@host/api'),
+        'https://host/api',
+      );
+    });
   });
 }

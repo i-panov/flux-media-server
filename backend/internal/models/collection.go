@@ -6,7 +6,7 @@ import "time"
 type Collection struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	UserID    uint      `gorm:"index" json:"user_id"`
-	Name      string    `json:"name"`
+	Name      string    `gorm:"size:255" json:"name"`
 	Type      MediaType `gorm:"index;type:text" json:"type"` // video
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -15,7 +15,7 @@ type Collection struct {
 // CollectionItem links a media item to a collection.
 type CollectionItem struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
-	CollectionID uint      `gorm:"index;uniqueIndex:idx_collection_media;uniqueIndex:idx_collection_position" json:"collection_id"`
+	CollectionID uint      `gorm:"uniqueIndex:idx_collection_media;uniqueIndex:idx_collection_position" json:"collection_id"`
 	MediaID      uint      `gorm:"index;uniqueIndex:idx_collection_media" json:"media_id"`
 	Position     int       `gorm:"default:0;uniqueIndex:idx_collection_position" json:"position"`
 	AddedAt      time.Time `json:"added_at"`

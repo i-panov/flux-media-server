@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flux_media_server/core/utils/logger.dart';
+
 /// Единая точка обновления токенов для всего приложения.
 ///
 /// Гарантирует, что параллельные запросы, получившие 401, ждут один
@@ -27,39 +29,44 @@ class AuthTokenRefresher {
   /// Вызывается при неудачном refresh (очистка токенов и logout).
   final Future<void> Function() _onRefreshFailure;
 
-  /// Токены, полученные последним успешным refresh.
-  ({String token, String refreshToken})? _lastTokens;
-
-  Future<bool>? _inFlight;
-
-  /// Токены последнего успешного refresh (null, если refresh ещё не
-  /// выполнялся или завершился неудачей).
-  ({String token, String refreshToken})? get lastTokens => _lastTokens;
+  Future<({String token, String refreshToken})?>? _inFlight;
 
   /// Запускает refresh (или ожидает уже идущий) и возвращает успех.
   ///
-  /// [refreshToken] == null означает «нечего обновлять» — сразу false.
-  Future<bool> refresh(String? refreshToken) {
-    if (refreshToken == null || refreshToken.isEmpty) {
-      return Future<bool>.value(false);
-    }
-    return _inFlight ??= _doRefresh(refreshToken)
-        .whenComplete(() => _inFlight = null);
+  /// [refreshToken] == null означает «нечего обновлять» — это тоже
+  /// неудача: вызывается колбэк onRefreshFailure, возвращается false.
+  Future<bool> refresh(String? refreshToken) async {
+    final tokens = await refreshTokens(refreshToken);
+    return tokens != null;
   }
 
-  Future<bool> _doRefresh(String refreshToken) async {
-    _lastTokens = null;
+  /// Запускает refresh (или ожидает уже идущий) и возвращает новые
+  /// токены напрямую; `null` — обновить не удалось (нет токена,
+  /// отказ сервера, сетевая ошибка). При неудаче вызывается колбэк
+  /// onRefreshFailure. Токены возвращаются из результата, а не из
+  /// побочного поля, поэтому провал параллельного чужого refresh
+  /// не может «обнулить» результат успешного.
+  Future<({String token, String refreshToken})?> refreshTokens(
+    String? refreshToken,
+  ) {
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return _onRefreshFailure().then((_) => null);
+    }
+    return _inFlight ??=
+        _doRefresh(refreshToken).whenComplete(() => _inFlight = null);
+  }
+
+  Future<({String token, String refreshToken})?> _doRefresh(
+    String refreshToken,
+  ) async {
     try {
       final tokens = await _performRefresh(refreshToken)
           .timeout(const Duration(seconds: 10));
-      if (tokens != null) {
-        _lastTokens = tokens;
-        return true;
-      }
-    } on Exception {
-      // Сетевая ошибка или таймаут — считаем refresh неудачным.
+      if (tokens != null) return tokens;
+    } on Exception catch (e) {
+      AppLogger.error('Token refresh failed', e);
     }
     await _onRefreshFailure();
-    return false;
+    return null;
   }
 }

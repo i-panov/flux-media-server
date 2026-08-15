@@ -59,23 +59,25 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     );
   }
 
-  Future<void> setAuthToken(String token) async {
-    await _repository.setAuthToken(token);
-    state = SettingsState(
-      settings: state.settings.copyWith(authToken: token),
-    );
-  }
-
-  Future<void> setRefreshToken(String token) async {
-    await _repository.setRefreshToken(token);
-    state = SettingsState(
-      settings: state.settings.copyWith(refreshToken: token),
-    );
-  }
-
   Future<void> setTokens(String accessToken, String refreshToken) async {
+    final previousAuth = state.settings.authToken;
     await _repository.setAuthToken(accessToken);
-    await _repository.setRefreshToken(refreshToken);
+    try {
+      await _repository.setRefreshToken(refreshToken);
+    } catch (_) {
+      // Роллбек: refresh-токен не сохранился — откатываем access,
+      // чтобы пара токенов не «разъехалась» (атомарность записи).
+      try {
+        if (previousAuth != null) {
+          await _repository.setAuthToken(previousAuth);
+        } else {
+          await _repository.clearAuthToken();
+        }
+      } catch (_) {
+        // Роллбек тоже упал — исходная ошибка важнее.
+      }
+      rethrow;
+    }
     state = SettingsState(
       settings: state.settings.copyWith(
         authToken: accessToken,

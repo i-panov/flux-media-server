@@ -1,6 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
-import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_invalidator_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -44,14 +45,19 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
   OfflineCacheService get _cacheService =>
       ref.read(offlineCacheServiceProvider);
 
+  /// Время последнего обновления прогресса (троттлинг rebuild-ов).
+  DateTime? _lastProgressUpdate;
+
   /// Checks if the media item is already downloaded.
   Future<void> checkStatus(int mediaId) async {
     final cached = await _cacheService.isCached(mediaId);
-    if (state is! DownloadDownloading) {
-      state = cached
-          ? const DownloadState.downloaded()
-          : const DownloadState.idle();
-    }
+    // Применяем результат только из idle: гонка с download (результат
+    // isCached, полученный до завершения загрузки) не откатывает
+    // состояние downloaded/error/downloading.
+    if (state is! DownloadIdle) return;
+    state = cached
+        ? const DownloadState.downloaded()
+        : const DownloadState.idle();
   }
 
   /// Starts downloading the media item with progress tracking.
@@ -63,32 +69,34 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
         onProgress: (received, total) {
           if (total != null && total > 0) {
             final progress = received / total;
-            state = DownloadState.downloading(progress: progress);
+            // Троттлинг ~100 мс: иначе каждый чанк делает rebuild.
+            final now = DateTime.now();
+            if (_lastProgressUpdate == null ||
+                now.difference(_lastProgressUpdate!) >=
+                    const Duration(milliseconds: 100)) {
+              _lastProgressUpdate = now;
+              state = DownloadState.downloading(progress: progress);
+            }
           }
         },
       );
       state = const DownloadState.downloaded();
 
-      // Try to fetch and cache lyrics for offline access.
-      try {
-        final getLyrics = ref.read(getLyricsProvider);
-        final result = await getLyrics(media.id);
-        result.fold(
-          (_) => null,
-          (lyrics) {
-            if (lyrics != null) {
-              _cacheService.saveLyrics(media.id, lyrics);
-            }
-          },
-        );
-      } catch (_) {}
-
       ref.read(downloadsInvalidatorProvider.notifier).state++;
     } on DownloadCancelledException {
       state = const DownloadState.idle();
+    } on FileSystemException catch (e) {
+      // Маппим нехватку места на диске в человекочитаемое сообщение.
+      final noSpace = e.osError?.errorCode == 28 ||
+          e.message.toLowerCase().contains('no space');
+      state = DownloadError(
+        noSpace
+            ? 'Not enough storage space. Free up space and try again.'
+            : e.message,
+      );
     } catch (e, st) {
       AppLogger.error('Download failed', e, st);
-      state = DownloadState.error(e.toString());
+      state = DownloadError(e.toString());
     }
   }
 

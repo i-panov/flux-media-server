@@ -10,6 +10,7 @@ import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -42,8 +43,27 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     this._ref,
   ) : super(const PlaybackState.initial());
 
-  final AudioPlayerDatasource _audioPlayer;
+  final AudioPlaybackSource _audioPlayer;
   final String _baseUrl;
+
+  /// Порог для resume-оверлея: позиции не больше этого значения
+  /// применяются сразу (видео продолжается без диалога).
+  static const _resumeThreshold = Duration(seconds: 5);
+
+  /// Интервал автосохранения прогресса во время воспроизведения.
+  static const _progressSaveInterval = Duration(seconds: 10);
+
+  /// Последний начатый тип медиа. Нужен в stop(): при loading/completed
+  /// состояние не хранит тип, а остановить физический плеер всё равно
+  /// необходимо (например, закрытие экрана во время загрузки видео).
+  MediaType? _lastType;
+
+  /// Поколение play-операций: инкрементируется при каждом play/stop.
+  /// _playInternal проверяет его после каждого await — если stop() или
+  /// новый play прервал операцию (например, экран закрыт во время
+  /// PlaybackLoading), незавершённый open()/play() не должен перезапускать
+  /// воспроизведение и переписывать состояние.
+  int _playGeneration = 0;
 
   /// Used to lazily read the current auth token (so token refreshes don't
   /// reset the playback state) and to coordinate with the video player.
@@ -54,8 +74,15 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   /// Lazily reads the video player datasource. Using ref.read instead of
   /// ref.watch prevents this long-lived provider from keeping the
   /// autoDispose videoPlayerDatasourceProvider alive.
-  VideoPlayerDatasource get _videoPlayer =>
+  VideoPlaybackSource get _videoPlayer =>
       _ref.read(videoPlayerDatasourceProvider);
+
+  /// Сериализует сохранения прогресса: параллельные вызовы (completed
+  /// при завершении трека, save таймера, сохранение предыдущего трека
+  /// при переключении) выполняются строго по очереди, чтобы более
+  /// позднее сохранение не перезаписало более раннее (гонка
+  /// completed:true vs completed:false).
+  Future<void> _saveChain = Future.value();
 
   void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
@@ -104,7 +131,12 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   }
 
   Future<void> _playInternal(Media media) async {
+    final generation = ++_playGeneration;
+    _lastType = media.type;
     // Save progress of the current playback before switching.
+    // Не сохраняется при автопродвижении: _onCompleted уже отправил
+    // completed:true и перевёл состояние в loading (иначе гонка
+    // completed:true vs completed:false).
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
       await _saveProgress(
@@ -120,6 +152,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     // Use local file if downloaded, otherwise stream from server.
     final cacheService = _ref.read(offlineCacheServiceProvider);
     final localPath = await cacheService.getLocalPath(media.id);
+    if (generation != _playGeneration) return;
     final url = localPath ?? '$_baseUrl/media/${media.id}/stream';
     final token = _ref.read(settingsProvider).settings.authToken;
     final headers = localPath == null && token != null
@@ -151,7 +184,9 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
             media.duration != null ? Duration(seconds: media.duration!) : null,
         httpHeaders: headers,
       );
+      if (generation != _playGeneration) return;
       await _audioPlayer.play();
+      if (generation != _playGeneration) return;
 
       state = PlaybackState.playing(
         media: media,
@@ -182,22 +217,24 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
 
       // Start video playback
       await _videoPlayer.open(url, httpHeaders: headers);
+      if (generation != _playGeneration) return;
       await _videoPlayer.play();
+      if (generation != _playGeneration) return;
 
       // Load saved position for resume dialog (video only).
       final resumePosition = await _loadSavedPosition(media.id);
+      if (generation != _playGeneration) return;
 
       state = PlaybackState.playing(
         media: media,
         type: MediaType.video,
-        savedPosition: resumePosition != null &&
-                resumePosition > const Duration(seconds: 5)
-            ? resumePosition
-            : null,
+        savedPosition:
+            resumePosition != null && resumePosition > _resumeThreshold
+                ? resumePosition
+                : null,
       );
 
-      if (resumePosition != null &&
-          resumePosition <= const Duration(seconds: 5)) {
+      if (resumePosition != null && resumePosition <= _resumeThreshold) {
         await _videoPlayer.seek(resumePosition);
       }
 
@@ -224,17 +261,18 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     _startProgressTimer();
   }
 
-  void _onCompleted(bool completed) {
+  Future<void> _onCompleted(bool completed) async {
     if (!completed) return;
     final current = state;
     if (current is PlaybackPlaying) {
-      unawaited(
-        _saveProgress(
-          current.media.id,
-          current.duration ?? current.position,
-          current.duration ?? Duration.zero,
-          completed: true,
-        ),
+      // Await: сериализованное сохранение должно завершиться до старта
+      // следующего трека, иначе _playInternal может отправить
+      // completed:false поверх completed:true.
+      await _saveProgress(
+        current.media.id,
+        current.duration ?? current.position,
+        current.duration ?? Duration.zero,
+        completed: true,
       );
     }
     _cancelProgressTimer();
@@ -245,7 +283,10 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     // Auto-advance to next track in queue if available.
     final queue = _ref.read(playQueueProvider);
     if (queue.hasNext) {
-      unawaited(_ref.read(playQueueProvider.notifier).next());
+      // Фиксируем завершённость до старта следующего трека: loading
+      // исключает повторное сохранение предыдущего в _playInternal.
+      state = const PlaybackState.loading();
+      await _ref.read(playQueueProvider.notifier).next();
     } else {
       state = const PlaybackState.completed();
     }
@@ -289,8 +330,26 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
 
   /// Saves watch progress to the backend. Best-effort: errors are logged
   /// and ignored. Отправляет duration и completed — бэкенд их принимает
-  /// и сохраняет.
+  /// и сохраняет. Вызовы сериализуются через [_saveChain].
   Future<void> _saveProgress(
+    int mediaId,
+    Duration position,
+    Duration duration, {
+    bool? completed,
+  }) {
+    final result = _saveChain.then(
+      (_) => _doSaveProgress(
+        mediaId,
+        position,
+        duration,
+        completed: completed,
+      ),
+    );
+    _saveChain = result.catchError((_) {});
+    return result;
+  }
+
+  Future<void> _doSaveProgress(
     int mediaId,
     Duration position,
     Duration duration, {
@@ -312,7 +371,8 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   /// Periodically persists watch progress while playing.
   void _startProgressTimer() {
     _cancelProgressTimer();
-    _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _progressTimer =
+        Timer.periodic(_progressSaveInterval, (_) {
       final current = state;
       if (current is PlaybackPlaying && !current.isPaused) {
         unawaited(
@@ -371,7 +431,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
       if (current.media.type == MediaType.video) {
-        await _videoPlayer.player.setRate(speed);
+        await _videoPlayer.setRate(speed);
         state = current.copyWith(speed: speed);
       }
     }
@@ -404,6 +464,10 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
 
   @override
   Future<void> stop() async {
+    // Прерываем незавершённые play-операции (например, закрытие экрана
+    // во время PlaybackLoading): _playInternal на ближайшей проверке
+    // поколения выйдет и не запустит воспроизведение после stop.
+    _playGeneration++;
     _cancelSubscriptions();
     _cancelProgressTimer();
     if (state is PlaybackPlaying) {
@@ -413,12 +477,20 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
         current.position,
         current.duration ?? Duration.zero,
       );
-      if (current.media.type == MediaType.audio) {
-        await _audioPlayer.stop();
-      } else {
-        await _videoPlayer.stop();
-      }
     }
+    // Останавливаем физический плеер независимо от состояния (в т.ч.
+    // loading/completed): при loading видео уже может играть после open(),
+    // а при completed аудио нужно убрать системное уведомление.
+    switch (_lastType) {
+      case MediaType.audio:
+        await _audioPlayer.stop();
+      case MediaType.video:
+        await _videoPlayer.stop();
+      case MediaType.unknown:
+      case null:
+        break;
+    }
+    _lastType = null;
     state = const PlaybackState.initial();
   }
 
@@ -434,7 +506,7 @@ final audioHandlerProvider = Provider<FluxAudioHandler>((ref) {
 });
 
 /// Provider for audio player datasource.
-final audioPlayerDatasourceProvider = Provider<AudioPlayerDatasource>((ref) {
+final audioPlayerDatasourceProvider = Provider<AudioPlaybackSource>((ref) {
   final handler = ref.watch(audioHandlerProvider);
   final ds = AudioPlayerDatasource(handler);
   ref.onDispose(ds.dispose);
@@ -446,7 +518,7 @@ final audioPlayerDatasourceProvider = Provider<AudioPlayerDatasource>((ref) {
 /// multiple await points. If it were autoDispose, the player could be
 /// disposed and recreated between open() and play(), causing operations
 /// on different player instances.
-final videoPlayerDatasourceProvider = Provider<VideoPlayerDatasource>((ref) {
+final videoPlayerDatasourceProvider = Provider<VideoPlaybackSource>((ref) {
   final ds = VideoPlayerDatasource();
   ref.onDispose(ds.dispose);
   return ds;

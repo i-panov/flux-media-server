@@ -4,8 +4,7 @@ extension StringExtensions on String {
   String get capitalize {
     if (isEmpty) return this;
     final chars = Characters(this);
-    final first = chars.first;
-    return '$first${chars.skip(1)}'.replaceFirst(first, first.toUpperCase());
+    return '${chars.first.toUpperCase()}${chars.skip(1)}';
   }
 }
 

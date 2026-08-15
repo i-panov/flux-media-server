@@ -20,7 +20,11 @@ class AuthRepositoryImpl implements AuthRepository {
     final result =
         await safeRepositoryCall(() => remoteDataSource.requestCode(email));
     return result.fold(
-      Left.new,
+      (failure) {
+        // Не оставляем debug-код от предыдущего успешного запроса.
+        _lastDebugCode = null;
+        return Left(failure);
+      },
       (debugCode) {
         _lastDebugCode = debugCode;
         return const Right(unit);

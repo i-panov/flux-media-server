@@ -5,11 +5,13 @@
 server:
   host: "0.0.0.0"
   port: 8080
+  # env: "dev" is required when debug: true; everything else must be "production"
+  env: "production"
   # debug: true returns OTP codes in API responses and enables verbose SQL
   # logging (including secrets). NEVER enable outside local development.
   debug: false
   cors_origins: "*"  # Set to your frontend origin in production
-  max_upload_size: 2147483648  # 2GB in bytes
+  max_upload_size: 2147483648  # 2GB in bytes. Applies to /api/media/upload and cover endpoints; the rest of the API is capped at 4 MB.
 
 database:
   path: "./data/flux.db"

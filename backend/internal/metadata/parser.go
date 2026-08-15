@@ -16,13 +16,16 @@ const MinYear = 1888
 const maxYearOffset = 2
 
 var (
-	// S01E01 / s01e01 / S01.E01 (регистронезависимо); разделитель перед
-	// маркером сезона — точка или пробел, чтобы ловить "Show (2020) S01E01".
-	episodePattern = regexp.MustCompile(`(?i)^(.+)[.\s]S(\d{2})\.?E(\d{2})(?:\..+)?$`)
+	// S01E01 / S1E01 / S01E1 / s01e01 / S01.E01 (регистронезависимо);
+	// разделитель перед маркером сезона — точка или пробел, чтобы ловить
+	// "Show (2020) S01E01".
+	episodePattern = regexp.MustCompile(`(?i)^(.+)[.\s]S(\d{1,2})\.?E(\d{1,3})(?:\..+)?$`)
 	// 1x01 / 12x345 (регистронезависимо).
 	xEpisodePattern = regexp.MustCompile(`(?i)^(.+?)\.(\d{1,2})x(\d{1,3})(?:\..+)?$`)
-	parenPattern    = regexp.MustCompile(`(?i)^(.+?)\s*\((\d{4})\)(?:\.[^.]+)?$`)
-	dotPattern      = regexp.MustCompile(`(?i)^(.+)\.(\d{4})(?:\.[^.]+)?$`)
+	// Год в скобках с произвольным числом сегментов после: "Movie (2020).1080p.BluRay.mkv".
+	parenPattern = regexp.MustCompile(`(?i)^(.+?)\s*\((\d{4})\)(?:\..+)*$`)
+	// Год через точку с произвольным числом сегментов после: "Interstellar.2014.1080p.BluRay.mkv".
+	dotPattern = regexp.MustCompile(`(?i)^(.+)\.(\d{4})(?:\..+)*$`)
 	// Год через пробел после названия, без точек и скобок: "The Matrix 1999".
 	trailingYearPattern = regexp.MustCompile(`(?i)^(.+?)\s+(\d{4})$`)
 	// Год в скобках в конце названия сериала ("Show (2020) S01E01").
@@ -63,11 +66,9 @@ func ParseFilename(filename string) (string, int) {
 		return title, validYear(matches[2])
 	}
 
-	parts := strings.Split(base, ".")
-	if len(parts) > 1 {
-		parts = parts[:len(parts)-1]
-	}
-	return strings.TrimSpace(parts[0]), 0
+	// Fallback: название без года — склеиваем все сегменты точками,
+	// чтобы "The.Matrix.mkv" → "The Matrix", а не первый сегмент.
+	return normalizeTitle(base), 0
 }
 
 // normalizeTitle заменяет точки на пробелы и убирает лишние пробелы —
@@ -93,7 +94,14 @@ func validYear(s string) int {
 	return year
 }
 
-// IsValidYear проверяет, попадает ли год в допустимый диапазон.
+// IsValidYear проверяет, попадает ли год в допустимый диапазон
+// относительно текущего года.
 func IsValidYear(year int) bool {
-	return year >= MinYear && year <= time.Now().Year()+maxYearOffset
+	return IsValidYearAt(year, time.Now())
+}
+
+// IsValidYearAt проверяет год относительно переданного момента времени —
+// вынесено из IsValidYear ради тестируемости.
+func IsValidYearAt(year int, now time.Time) bool {
+	return year >= MinYear && year <= now.Year()+maxYearOffset
 }

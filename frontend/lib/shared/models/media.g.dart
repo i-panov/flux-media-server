@@ -9,7 +9,7 @@ part of 'media.dart';
 _$MediaImpl _$$MediaImplFromJson(Map<String, dynamic> json) => _$MediaImpl(
       id: (json['id'] as num).toInt(),
       title: json['title'] as String,
-      type: const MediaTypeConverter().fromJson(json['type'] as String),
+      type: const MediaTypeConverter().fromJson(json['type']),
       fileSize: (json['file_size'] as num).toInt(),
       filename: json['filename'] as String? ?? '',
       year: (json['year'] as num?)?.toInt(),
@@ -30,6 +30,9 @@ _$MediaImpl _$$MediaImplFromJson(Map<String, dynamic> json) => _$MediaImpl(
       updatedAt: json['updated_at'] == null
           ? null
           : DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] == null
+          ? null
+          : DateTime.parse(json['created_at'] as String),
     );
 
 Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
@@ -50,4 +53,5 @@ Map<String, dynamic> _$$MediaImplToJson(_$MediaImpl instance) =>
       'metadata': instance.metadata?.toJson(),
       'file_hash': instance.fileHash,
       'updated_at': instance.updatedAt?.toIso8601String(),
+      'created_at': instance.createdAt?.toIso8601String(),
     };

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -17,7 +18,9 @@ import (
 )
 
 func setupCollectionTestApp(t *testing.T) *fiber.App {
-	db, err := repository.InitDB(":memory:")
+	// Файловая БД, а не :memory:: параллельные запросы получают разные
+	// коннекты пула, а каждая in-memory БД была бы пустой и без таблиц.
+	db, err := repository.InitDB(filepath.Join(t.TempDir(), "test.db"))
 	require.NoError(t, err)
 	require.NoError(t, repository.AutoMigrate(db))
 
@@ -30,6 +33,16 @@ func setupCollectionTestApp(t *testing.T) *fiber.App {
 		Title:    "Test Movie",
 		Type:     models.MediaTypeVideo,
 		FilePath: "/test.mkv",
+	}))
+	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
+		Title:    "Test Movie 2",
+		Type:     models.MediaTypeVideo,
+		FilePath: "/test2.mkv",
+	}))
+	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
+		Title:    "Test Movie 3",
+		Type:     models.MediaTypeVideo,
+		FilePath: "/test3.mkv",
 	}))
 
 	handler := NewCollectionHandler(colRepo, itemRepo, mediaRepo)
@@ -251,4 +264,51 @@ func TestCollectionHandler_AddAndRemoveItem(t *testing.T) {
 	resp, err = app.Test(req)
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
+func TestCollectionHandler_AddItemConcurrent(t *testing.T) {
+	app := setupCollectionTestApp(t)
+
+	// Create collection
+	body, _ := json.Marshal(map[string]string{"name": "My List", "type": string(models.MediaTypeVideo)})
+	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	var col models.Collection
+	buf := bytes.Buffer{}
+	buf.ReadFrom(resp.Body)
+	json.Unmarshal(buf.Bytes(), &col)
+
+	// 30 параллельных добавлений трёх медиа: каждый медиа должен
+	// добавиться ровно один раз (201), остальные — 409, но НЕ 500
+	// (позиция и дубликат обрабатываются атомарно).
+	const requests = 30
+	statuses := make(chan int, requests)
+	for i := 0; i < requests; i++ {
+		go func(mediaID uint) {
+			b, _ := json.Marshal(map[string]uint{"media_id": mediaID})
+			req := httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(col.ID))+"/items", bytes.NewReader(b))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+			statuses <- resp.StatusCode
+		}(uint(i%3 + 1))
+	}
+
+	created, conflicts, serverErrors := 0, 0, 0
+	for i := 0; i < requests; i++ {
+		switch <-statuses {
+		case fiber.StatusCreated:
+			created++
+		case fiber.StatusConflict:
+			conflicts++
+		default:
+			serverErrors++
+		}
+	}
+	assert.Equal(t, 3, created, "каждое медиа добавляется ровно один раз")
+	assert.Equal(t, requests-3, conflicts)
+	assert.Equal(t, 0, serverErrors, "конкурентные добавления не должны давать 500")
 }

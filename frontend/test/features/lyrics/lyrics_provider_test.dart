@@ -2,67 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/lyrics/data/repositories/offline_lyrics_cache_repository.dart';
-import 'package:flux_media_server/features/lyrics/domain/repositories/lyrics_cache_repository.dart';
-import 'package:flux_media_server/features/lyrics/domain/repositories/lyrics_repository.dart';
 import 'package:flux_media_server/features/lyrics/domain/usecases/get_lyrics.dart';
 import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
-import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:fpdart/fpdart.dart';
 
-Lyrics _lyrics([int mediaId = 5]) => Lyrics(
-      id: 1,
-      mediaId: mediaId,
-      source: 'musixmatch',
-      createdAt: DateTime.utc(2024),
-      updatedAt: DateTime.utc(2024),
-      lyricsText: 'La la la',
-      translation: 'Ля-ля-ля',
-    );
-
-class FakeLyricsRepository implements LyricsRepository {
-  Future<Either<Failure, Lyrics?>> Function(int)? onGetLyrics;
-  Future<Either<Failure, Lyrics>> Function(
-    int, {
-    required String lyricsText,
-    required String source,
-    String? translation,
-    String? syncData,
-  })? onUpsertLyrics;
-
-  @override
-  Future<Either<Failure, Lyrics?>> getLyrics(int mediaId) =>
-      onGetLyrics!(mediaId);
-
-  @override
-  Future<Either<Failure, Lyrics>> upsertLyrics(
-    int mediaId, {
-    required String lyricsText,
-    required String source,
-    String? translation,
-    String? syncData,
-  }) =>
-      onUpsertLyrics!(
-        mediaId,
-        lyricsText: lyricsText,
-        source: source,
-        translation: translation,
-        syncData: syncData,
-      );
-}
-
-class FakeLyricsCacheRepository implements LyricsCacheRepository {
-  final Map<int, Lyrics> cache = {};
-  final List<(int, Lyrics)> saved = [];
-
-  @override
-  Future<Lyrics?> getCachedLyrics(int mediaId) async => cache[mediaId];
-
-  @override
-  Future<void> saveLyrics(int mediaId, Lyrics lyrics) async {
-    saved.add((mediaId, lyrics));
-    cache[mediaId] = lyrics;
-  }
-}
+import '../helpers/fake_repositories.dart';
 
 void main() {
   late ProviderContainer container;
@@ -84,16 +28,30 @@ void main() {
 
   group('lyricsProvider', () {
     test('returns lyrics and persists them to cache', () async {
-      final lyrics = _lyrics();
-      fakeRepo.onGetLyrics = (_) async => Right(lyrics);
+      final data = fakeLyrics();
+      fakeRepo.onGetLyrics = (_) async => Right(data);
 
       final result = await container.read(lyricsProvider(5).future);
+      // Кеш-запись fire-and-forget — дожидаемся её фонового завершения.
+      await pumpEventQueue();
 
-      expect(result.lyrics, lyrics);
+      expect(result.lyrics, data);
       expect(result.fromCache, isFalse);
-      // Сохранение awaited: к моменту завершения провайдера кеш заполнен.
-      expect(fakeCache.cache[5], lyrics);
-      expect(fakeCache.saved, [(5, lyrics)]);
+      expect(fakeCache.cache[5], data);
+      expect(fakeCache.saved, [(5, data)]);
+    });
+
+    test('cache write failure does not fail the provider', () async {
+      final data = fakeLyrics();
+      fakeRepo.onGetLyrics = (_) async => Right(data);
+      fakeCache.throwOnSave = true;
+
+      final result = await container.read(lyricsProvider(5).future);
+      await pumpEventQueue();
+
+      // Успешный GET не превращается в AsyncError из-за сбоя кеша.
+      expect(result.lyrics, data);
+      expect(container.read(lyricsProvider(5)).hasError, isFalse);
     });
 
     test('returns empty result when the server has no lyrics', () async {
@@ -107,7 +65,7 @@ void main() {
     });
 
     test('falls back to cached lyrics on network failure', () async {
-      final cached = _lyrics();
+      final cached = fakeLyrics();
       fakeCache.cache[5] = cached;
       fakeRepo.onGetLyrics =
           (_) async => const Left(NetworkFailure(message: 'Offline'));

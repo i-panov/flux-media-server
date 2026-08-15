@@ -18,22 +18,25 @@ Future<void> toggleDownload(
     // Повторный тап во время загрузки отменяет её.
     await ref.read(downloadNotifierProvider(mediaId).notifier).cancel(mediaId);
   } else {
-    final mediaList = ref.read(mediaListProvider(mediaType)).valueOrNull;
-    if (mediaList != null) {
-      final media = mediaList.items.firstWhere(
-        (m) => m.id == mediaId,
-        orElse: () => Media(
-          id: mediaId,
-          title: '',
-          type: mediaType == MediaType.audio.value
-              ? MediaType.audio
-              : MediaType.video,
-          fileSize: 0,
-        ),
-      );
-      await ref
-          .read(downloadNotifierProvider(mediaId).notifier)
-          .download(media);
+    var media = _findInLoadedPages(ref, mediaId, mediaType);
+    if (media == null) {
+      // Трек вне загруженных страниц пагинации — берём детали с сервера.
+      final result =
+          await ref.read(mediaRepositoryProvider).getMediaDetail(mediaId);
+      media = result.fold((_) => null, (m) => m);
     }
+    // Фолбэк-заглушки больше нет: без реальных метаданных не скачиваем,
+    // иначе в кеш попадут пустые записи.
+    if (media == null) return;
+    await ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
   }
+}
+
+Media? _findInLoadedPages(WidgetRef ref, int mediaId, String mediaType) {
+  final mediaList = ref.read(mediaListProvider(mediaType)).valueOrNull;
+  if (mediaList == null) return null;
+  for (final m in mediaList.items) {
+    if (m.id == mediaId) return m;
+  }
+  return null;
 }

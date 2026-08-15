@@ -9,7 +9,7 @@ type Lyrics struct {
 	LyricsText  string `gorm:"type:text" json:"lyrics_text"`
 	Translation string `gorm:"type:text" json:"translation"`
 	SyncData    string `gorm:"type:text" json:"sync_data"` // JSON array of {timestamp, text} pairs
-	Source      string `json:"source"`                     // id3, manual, external
+	Source      string `gorm:"size:255" json:"source"`     // id3, manual, external
 	// FK-ассоциация с каскадным удалением (для новых инсталляций).
 	Media     *Media    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
 	CreatedAt time.Time `json:"created_at"`

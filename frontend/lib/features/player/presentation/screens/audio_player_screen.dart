@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/features/audio/presentation/utils/lyrics_sync_parser.dart';
 import 'package:flux_media_server/features/lyrics/domain/usecases/upsert_lyrics.dart';
 import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
@@ -111,16 +112,19 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
     setState(() => _isSaving = true);
     final upsert = ref.read(upsertLyricsProvider);
 
-    // Preserve existing translation and sync_data — the user may only be
-    // editing the lyrics text and we don't want to overwrite those fields.
-    // Ждём загрузки lyricsProvider, чтобы не затереть поля пустыми
-    // значениями (ref.read(...).valueOrNull — гонка).
+    // CRITICAL #12: при ошибке загрузки существующего документа прерываем
+    // сохранение — иначе translation/sync_data затираются пустыми значениями.
     Lyrics? existing;
     try {
       final loaded = await ref.read(lyricsProvider(widget.media.id).future);
       existing = loaded.lyrics;
     } catch (_) {
-      existing = null;
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.errorLoadingLyrics)),
+      );
+      return;
     }
 
     final result = await upsert(
@@ -129,7 +133,8 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
         lyricsText: _controller.text,
         translation: existing?.translation,
         syncData: existing?.syncData,
-        source: 'user',
+        // Сохраняем source существующего документа (как во вкладке перевода).
+        source: existing?.source ?? 'user',
       ),
     );
     if (!mounted) return;
@@ -159,7 +164,6 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
   @override
   Widget build(BuildContext context) {
     final lyricsState = ref.watch(lyricsProvider(widget.media.id));
-    final playbackState = ref.watch(playbackCoordinatorProvider);
 
     if (_isEditing) {
       return Column(
@@ -260,11 +264,7 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
             ),
           )
         else
-          _SyncedLyricsView(
-            syncLines: syncLines,
-            playbackState:
-                playbackState is PlaybackPlaying ? playbackState : null,
-          ),
+          _SyncedLyricsView(syncLines: syncLines),
         if (result.fromCache)
           Positioned(
             top: 8,
@@ -293,95 +293,104 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
   List<({Duration time, String text})> _parseLyricsSync(String syncData) {
     if (syncData == _parsedSyncKey) return _parsedSync;
     _parsedSyncKey = syncData;
-    return _parsedSync = _doParseLyricsSync(syncData);
-  }
-
-  List<({Duration time, String text})> _doParseLyricsSync(String syncData) {
-    if (syncData.isEmpty) return [];
-    final lines = syncData.split('\n');
-    final result = <({Duration time, String text})>[];
-
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-      final match =
-          RegExp(r'\[(\d+):(\d+(?:\.\d+)?)\](.*)').firstMatch(trimmed);
-      if (match != null) {
-        final minutes = int.parse(match.group(1)!);
-        final seconds = double.parse(match.group(2)!);
-        final text = match.group(3) ?? '';
-        result.add(
-          (
-            time: Duration(minutes: minutes, seconds: seconds.toInt()),
-            text: text.trim(),
-          ),
-        );
-      }
-    }
-    return result;
+    return _parsedSync = parseSyncedLyrics(syncData);
   }
 }
 
-class _SyncedLyricsView extends StatelessWidget {
-  const _SyncedLyricsView({
-    required this.syncLines,
-    required this.playbackState,
-  });
+class _SyncedLyricsView extends ConsumerStatefulWidget {
+  const _SyncedLyricsView({required this.syncLines});
+
   final List<({Duration time, String text})> syncLines;
-  final PlaybackPlaying? playbackState;
+
+  @override
+  ConsumerState<_SyncedLyricsView> createState() => _SyncedLyricsViewState();
+}
+
+class _SyncedLyricsViewState extends ConsumerState<_SyncedLyricsView> {
+  static const double _lineExtent = 64;
+  final ScrollController _scrollController = ScrollController();
+  int _currentIndex = 0;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final position = playbackState?.position ?? Duration.zero;
+    // select: перестройка только при изменении позиции, а не всего
+    // playbackCoordinatorProvider.
+    final position = ref.watch(
+      playbackCoordinatorProvider.select(
+        (state) => state is PlaybackPlaying ? state.position : Duration.zero,
+      ),
+    );
 
-    var currentLineIndex = 0;
-    for (var i = syncLines.length - 1; i >= 0; i--) {
-      if (position >= syncLines[i].time) {
-        currentLineIndex = i;
+    var index = 0;
+    for (var i = widget.syncLines.length - 1; i >= 0; i--) {
+      if (position >= widget.syncLines[i].time) {
+        index = i;
         break;
       }
     }
+    if (index != _currentIndex) {
+      _currentIndex = index;
+      // Автоскролл к текущей строке при её смене.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final target = (index * _lineExtent -
+                _scrollController.position.viewportDimension / 2 +
+                _lineExtent / 2)
+            .clamp(0.0, _scrollController.position.maxScrollExtent);
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      });
+    }
 
-    return SingleChildScrollView(
+    return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: syncLines.asMap().entries.map((entry) {
-          final index = entry.key;
-          final line = entry.value;
-          final isCurrentLine = index == currentLineIndex;
-          final isPastLine = index < currentLineIndex;
-          final defaultStyle =
-              Theme.of(context).textTheme.bodyLarge ?? const TextStyle();
+      itemExtent: _lineExtent,
+      itemCount: widget.syncLines.length,
+      itemBuilder: (context, i) {
+        final line = widget.syncLines[i];
+        final isCurrentLine = i == _currentIndex;
+        final isPastLine = i < _currentIndex;
+        final defaultStyle =
+            Theme.of(context).textTheme.bodyLarge ?? const TextStyle();
 
-          TextStyle style;
-          if (isCurrentLine) {
-            style = Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ) ??
-                defaultStyle;
-          } else if (isPastLine) {
-            style = defaultStyle.copyWith(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.4),
-            );
-          } else {
-            style = defaultStyle;
-          }
-
-          return AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 300),
-            style: style,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Text(line.text),
-            ),
+        final TextStyle style;
+        if (isCurrentLine) {
+          style = Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ) ??
+              defaultStyle;
+        } else if (isPastLine) {
+          style = defaultStyle.copyWith(
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.4),
           );
-        }).toList(),
-      ),
+        } else {
+          style = defaultStyle;
+        }
+
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            line.text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        );
+      },
     );
   }
 }
@@ -406,13 +415,19 @@ class _TranslationTabState extends ConsumerState<_TranslationTab> {
 
   Future<void> _save() async {
     setState(() => _isSaving = true);
-    // Ждём загрузки lyricsProvider: не затираем поля пустыми значениями.
+    // CRITICAL #12: при ошибке загрузки существующего документа прерываем
+    // сохранение — иначе lyricsText/sync_data затираются пустыми значениями.
     Lyrics? existing;
     try {
       final loaded = await ref.read(lyricsProvider(widget.media.id).future);
       existing = loaded.lyrics;
     } catch (_) {
-      existing = null;
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.errorLoadingTranslation)),
+      );
+      return;
     }
     final upsert = ref.read(upsertLyricsProvider);
     final result = await upsert(

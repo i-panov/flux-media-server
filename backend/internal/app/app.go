@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/valyala/fasthttp"
 
 	"flux/internal/config"
 	"flux/internal/email"
@@ -26,6 +28,39 @@ import (
 // maxAPIBodySize caps request bodies for all non-upload endpoints (JSON API).
 const maxAPIBodySize = 4 << 20 // 4 MB
 
+// globalBodyLimit — запасной глобальный потолок размера тела запроса для
+// fasthttp. Реальный per-route лимит задаёт HeaderReceived (см. ниже):
+// не-upload роуты ограничены maxAPIBodySize, upload/cover — MaxUploadSize.
+// Этот запасной лимит применяется только если HeaderReceived по какой-то
+// причине не сработал, поэтому он не должен быть ниже maxAPIBodySize.
+const globalBodyLimit = 25 << 20 // 25 MB
+
+// maxConcurrentConnections — потолок одновременных соединений (fasthttp
+// Concurrency). Ограничивает число параллельно буферизуемых тел.
+const maxConcurrentConnections = 256
+
+// refreshTokensPurgeInterval — периодичность очистки истёкших refresh-токенов.
+const refreshTokensPurgeInterval = 24 * time.Hour
+
+// Пути upload/cover: используются и в body-size middleware, и при
+// регистрации роутов ниже — держать синхронными.
+const (
+	apiMediaRoute     = "/api/media"
+	uploadRouteSuffix = "/upload" // POST /api/media/upload
+	coverRouteSuffix  = "/cover"  // PUT /api/media/:id/cover
+)
+
+// isUploadPath определяет запросы, которым разрешены большие тела
+// (multipart upload и смена обложки). Единая точка для HeaderReceived
+// (лимит применяется до чтения тела) и body-size middleware.
+func isUploadPath(method, path string) bool {
+	if path == apiMediaRoute+uploadRouteSuffix {
+		return method == fiber.MethodPost
+	}
+	return method == fiber.MethodPut &&
+		strings.HasPrefix(path, apiMediaRoute+"/") && strings.HasSuffix(path, coverRouteSuffix)
+}
+
 // App holds all application dependencies and the Fiber instance.
 type App struct {
 	Fiber       *fiber.App
@@ -33,6 +68,7 @@ type App struct {
 	OTPStore    *services.OTPStore
 	Watcher     *services.WatcherService
 	Version     string
+	sqlDB       *sql.DB
 	cleanupStop chan struct{}
 	cleanupOnce sync.Once
 }
@@ -52,6 +88,11 @@ func New(cfg *config.Config, version string) (*App, error) {
 		return nil, fmt.Errorf("migrate database: %w", err)
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get sql db: %w", err)
+	}
+
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
 	mediaRepo := repository.NewMediaRepository(db)
@@ -69,6 +110,16 @@ func New(cfg *config.Config, version string) (*App, error) {
 		cfg.Auth.CodeLength,
 		cfg.Auth.MaxOTPEntries,
 	)
+
+	// На error-путях освобождаем созданные ресурсы: горутину OTPStore и
+	// подключение к БД. ok=true ставится перед успешным возвратом.
+	ok := false
+	defer func() {
+		if !ok {
+			otpStore.Stop()
+			_ = sqlDB.Close()
+		}
+	}()
 
 	jwtService := services.NewJWTService(
 		cfg.Auth.JWTSecret,
@@ -121,10 +172,18 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	// Fiber app
 	fiberApp := fiber.New(fiber.Config{
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Minute,
+		ReadTimeout: 10 * time.Second,
+		// WriteTimeout: 0 — fasthttp ставит write-deadline на весь ответ
+		// один раз, поэтому лимит 10 мин обрывал бы стримы/скачивания
+		// больших файлов. Защита от slowloris остаётся на ReadTimeout и
+		// IdleTimeout.
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
-		BodyLimit:    int(cfg.Server.MaxUploadSize),
+		// Запасной глобальный лимит тела: реальные per-route лимиты задаёт
+		// HeaderReceived (см. выше), это значение — только fallback.
+		BodyLimit: int(min(cfg.Server.MaxUploadSize, globalBodyLimit)),
+		// Ограничение одновременных соединений против исчерпания памяти.
+		Concurrency: maxConcurrentConnections,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
@@ -132,7 +191,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 			}
 			if code == fiber.StatusRequestEntityTooLarge {
 				return c.Status(code).JSON(fiber.Map{
-					"error": fmt.Sprintf("File too large. Maximum upload size is %d MB", cfg.Server.MaxUploadSize/(1<<20)),
+					"error": "Request body too large",
 				})
 			}
 			if code >= fiber.StatusInternalServerError {
@@ -148,22 +207,34 @@ func New(cfg *config.Config, version string) (*App, error) {
 		},
 	})
 	fiberApp.Use(fiberrecover.New())
+	fiberApp.Use(middleware.SecurityHeaders())
 	fiberApp.Use(logger.New())
 
-	// fasthttp buffers the whole request body in memory. The global BodyLimit
-	// equals the max upload size (potentially gigabytes), so cap the body size
-	// for all non-upload routes to prevent memory exhaustion.
-	// ContentLength == -1 means chunked/streamed — fasthttp will buffer the
-	// whole body anyway, so we reject those outright for non-upload routes.
-	// Исключения задаются по конкретным зарегистрированным путям:
+	// Per-route лимиты тела: fasthttp буферизует тело целиком ДО вызова
+	// хендлеров, но HeaderReceived позволяет выбрать лимит по одним лишь
+	// заголовкам — до начала чтения тела. Обычные роуты ограничены
+	// maxAPIBodySize (защита от DoS), upload/cover получают настоящий
+	// MaxUploadSize. Остаточный риск (атакующий шлёт большие тела на
+	// upload-роут до проверки auth) ограничен Concurrency и upload rate
+	// limiter'ом — это плата за поддержку больших загрузок.
+	fiberApp.Server().HeaderReceived = func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
+		var u fasthttp.URI
+		_ = u.Parse(nil, h.RequestURI()) // при ошибке path пуст → лимит 4 МБ (безопасный дефолт)
+		limit := maxAPIBodySize
+		if isUploadPath(string(h.Method()), string(u.Path())) {
+			limit = int(cfg.Server.MaxUploadSize)
+		}
+		return fasthttp.RequestConfig{MaxRequestBodySize: limit}
+	}
+
+	// fasthttp буферизует тело запроса в памяти; реальные лимиты задаёт
+	// HeaderReceived (см. выше) — этот middleware остаётся страховкой для
+	// chunked/streamed запросов (ContentLength == -1), которые fasthttp
+	// буферизует без Content-Length.
+	// Исключения — по зарегистрированным путям (см. константы):
 	// POST /api/media/upload и PUT /api/media/:id/cover (multipart).
 	fiberApp.Use(func(c *fiber.Ctx) error {
-		p := c.Path()
-		if p == "/api/media/upload" {
-			return c.Next()
-		}
-		if c.Method() == fiber.MethodPut &&
-			strings.HasPrefix(p, "/api/media/") && strings.HasSuffix(p, "/cover") {
+		if isUploadPath(c.Method(), c.Path()) {
 			return c.Next()
 		}
 		if c.Request().Header.ContentLength() == -1 {
@@ -208,6 +279,21 @@ func New(cfg *config.Config, version string) (*App, error) {
 		},
 	})
 
+	// Upload limiter — upload-запросы тяжёлые (multipart, ffprobe), их
+	// нужно лимитировать отдельно от auth-роутов.
+	uploadRateLimiter := limiter.New(limiter.Config{
+		Max:        cfg.RateLimiter.Max,
+		Expiration: time.Duration(cfg.RateLimiter.Expiration) * time.Second,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return getClientIP(c)
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
+
 	// Public auth routes. All of them are rate-limited: verify-code without a
 	// limiter would allow brute-forcing the 6-digit OTP within its TTL.
 	auth := fiberApp.Group("/api/auth")
@@ -228,14 +314,14 @@ func New(cfg *config.Config, version string) (*App, error) {
 	media.Get("", mediaHandler.List)
 	media.Get("/:id", mediaHandler.Get)
 	media.Post("", requireAdmin, mediaHandler.Create)
-	media.Post("/upload", requireAdmin, uploadHandler.Upload)
+	media.Post(uploadRouteSuffix, requireAdmin, uploadRateLimiter, uploadHandler.Upload)
 	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Put("/:id", requireAdmin, mediaHandler.Update)
 	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
 	media.Get("/:id/stream", mediaHandler.Stream)
 	media.Get("/:id/thumb", thumbHandler.Get)
 	media.Get("/:id/cover", thumbHandler.GetCover)
-	media.Put("/:id/cover", requireAdmin, thumbHandler.UploadCover)
+	media.Put("/:id"+coverRouteSuffix, requireAdmin, thumbHandler.UploadCover)
 
 	progress := api.Group("/progress")
 	progress.Get("", progressHandler.List)
@@ -244,8 +330,8 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	metadataGroup := api.Group("/metadata")
 	metadataGroup.Get("/search", metadataHandler.Search)
-	metadataGroup.Post("/:mediaId/refresh", metadataHandler.Refresh)
-	metadataGroup.Put("/:mediaId", metadataHandler.Update)
+	metadataGroup.Post("/:mediaId/refresh", requireAdmin, metadataHandler.Refresh)
+	metadataGroup.Put("/:mediaId", requireAdmin, metadataHandler.Update)
 
 	// Favorites
 	api.Post("/media/:id/favorite", favoriteHandler.AddFavorite)
@@ -289,7 +375,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	// unboundedly.
 	cleanupStop := make(chan struct{})
 	goSafe(func() {
-		ticker := time.NewTicker(24 * time.Hour)
+		ticker := time.NewTicker(refreshTokensPurgeInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -303,12 +389,14 @@ func New(cfg *config.Config, version string) (*App, error) {
 		}
 	})
 
+	ok = true
 	return &App{
 		Fiber:       fiberApp,
 		Config:      cfg,
 		OTPStore:    otpStore,
 		Watcher:     watcherService,
 		Version:     version,
+		sqlDB:       sqlDB,
 		cleanupStop: cleanupStop,
 	}, nil
 }
@@ -317,9 +405,6 @@ func New(cfg *config.Config, version string) (*App, error) {
 func (a *App) Listen() error {
 	host := a.Config.Server.Host
 	port := a.Config.Server.Port
-	if port == 0 {
-		port = 8080
-	}
 	log.Printf("Flux Media Server %s starting on %s:%d", a.Version, host, port)
 	return a.Fiber.Listen(fmt.Sprintf("%s:%d", host, port))
 }
@@ -327,8 +412,8 @@ func (a *App) Listen() error {
 // getClientIP returns the client IP for rate limiting. We deliberately do
 // NOT trust X-Forwarded-For / X-Real-IP headers because an attacker can
 // trivially spoof them, obtaining a unique key per request and bypassing
-// the rate limiter. If the server runs behind a reverse proxy, configure
-// Fiber's TrustedProxies instead.
+// the rate limiter. Note: this also means that behind a reverse proxy all
+// clients share the proxy's IP; TrustedProxies is not configurable yet.
 func getClientIP(c *fiber.Ctx) string {
 	return c.IP()
 }
@@ -346,13 +431,28 @@ func goSafe(fn func()) {
 	}()
 }
 
-// Shutdown gracefully stops the application.
-func (a *App) Shutdown() {
+// Shutdown gracefully stops the application: background workers, the HTTP
+// server and the database. ctx bounds the time spent waiting for in-flight
+// requests; when omitted, context.Background() is used.
+func (a *App) Shutdown(ctx ...context.Context) error {
+	shutdownCtx := context.Background()
+	if len(ctx) > 0 {
+		shutdownCtx = ctx[0]
+	}
+
+	a.cleanupOnce.Do(func() {
+		close(a.cleanupStop)
+	})
 	if a.Watcher != nil {
 		a.Watcher.Stop()
 	}
 	a.OTPStore.Stop()
-	a.cleanupOnce.Do(func() {
-		close(a.cleanupStop)
-	})
+
+	err := a.Fiber.ShutdownWithContext(shutdownCtx)
+	if a.sqlDB != nil {
+		if dbErr := a.sqlDB.Close(); dbErr != nil && err == nil {
+			err = dbErr
+		}
+	}
+	return err
 }

@@ -7,10 +7,14 @@ class UploadCoverParams {
   const UploadCoverParams({
     required this.mediaId,
     required this.filePath,
+    this.isCancelled,
   });
 
   final int mediaId;
   final String filePath;
+
+  /// Пользователь отменил загрузку — прервать запрос.
+  final bool Function()? isCancelled;
 }
 
 class UploadCover extends UseCase<Either<Failure, void>, UploadCoverParams> {
@@ -20,6 +24,10 @@ class UploadCover extends UseCase<Either<Failure, void>, UploadCoverParams> {
 
   @override
   Future<Either<Failure, void>> call(UploadCoverParams params) {
-    return repository.uploadCover(params.mediaId, params.filePath);
+    return repository.uploadCover(
+      params.mediaId,
+      params.filePath,
+      isCancelled: params.isCancelled,
+    );
   }
 }

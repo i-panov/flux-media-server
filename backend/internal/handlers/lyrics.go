@@ -67,7 +67,7 @@ func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
 
 	// Проверяем существование медиа до создания/обновления текста.
 	if _, err := h.mediaRepo.FindByID(ctx, uint(mediaID)); err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	lyrics := &models.Lyrics{

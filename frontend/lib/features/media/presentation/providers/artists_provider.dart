@@ -6,12 +6,10 @@ import 'package:flux_media_server/shared/models/artist.dart';
 /// Fetches all artists from the backend. Used by the edit metadata dialog
 /// for autocomplete suggestions.
 ///
-/// keepAlive: список исполнителей не должен перезапрашиваться при каждом
-/// переходе на экран/открытии диалога.
-final artistsProvider = FutureProvider.autoDispose<List<Artist>>((ref) async {
-  final keepAlive = ref.keepAlive();
-  ref.onDispose(keepAlive.close);
-
+/// Обычный (не autoDispose) FutureProvider: список маленький и редко
+/// меняется. Раньше autoDispose + keepAlive противоречили друг другу —
+/// keepAlive отменял автоочистку, а инвалидации после мутаций не было.
+final artistsProvider = FutureProvider<List<Artist>>((ref) async {
   final getArtists = ref.watch(getArtistsProvider);
   final result = await getArtists(const NoParams());
   return result.fold(

@@ -22,22 +22,40 @@ final tokenRefreshInterceptorProvider =
 ///
 /// Выполняет POST /auth/refresh через Chopper-клиент и сохраняет токены;
 /// при неудаче очищает токены (logout на уровне сессии).
+/// Разбирает тело ответа `/auth/refresh`.
+///
+/// Возвращает токены или `null` при неожиданной форме ответа — вместо
+/// TypeError-краша (приведение `as String` бросало Error, которое не
+/// ловилось ни одним catch).
+({String token, String refreshToken})? parseRefreshTokens(Object? body) {
+  if (body is! Map<String, dynamic>) return null;
+  final token = body['token'];
+  final refreshToken = body['refresh_token'];
+  if (token is! String || refreshToken is! String) return null;
+  if (token.isEmpty || refreshToken.isEmpty) return null;
+  return (token: token, refreshToken: refreshToken);
+}
+
 final authTokenRefresherProvider = Provider<AuthTokenRefresher>((ref) {
   return AuthTokenRefresher(
     performRefresh: (refreshToken) async {
-      final response = await ref
-          .read(authApiClientProvider)
-          .refreshToken({'refresh_token': refreshToken});
-      if (response.statusCode != 200 || response.body == null) return null;
-      final body = response.body!;
-      final tokens = (
-        token: body['token'] as String,
-        refreshToken: body['refresh_token'] as String,
-      );
-      await ref
-          .read(settingsProvider.notifier)
-          .setTokens(tokens.token, tokens.refreshToken);
-      return tokens;
+      try {
+        final response = await ref
+            .read(authApiClientProvider)
+            .refreshToken({'refresh_token': refreshToken});
+        if (response.statusCode != 200) return null;
+        final tokens = parseRefreshTokens(response.body);
+        if (tokens == null) return null;
+        await ref
+            .read(settingsProvider.notifier)
+            .setTokens(tokens.token, tokens.refreshToken);
+        return tokens;
+        // ignore: avoid_catching_errors
+      } on Error {
+        // Неожиданная форма ответа (TypeError и пр.) не должна
+        // ронять приложение: считаем refresh неудачным.
+        return null;
+      }
     },
     onRefreshFailure: () => ref.read(settingsProvider.notifier).logout(),
   );
@@ -50,10 +68,10 @@ final authTokenRefresherProvider = Provider<AuthTokenRefresher>((ref) {
 /// и без него запросы уходили бы мимо API (404).
 /// Меняется только при реальной смене serverUrl.
 final baseUrlProvider = Provider<String>((ref) {
-  final settings = ref.watch(settingsProvider);
-  return normalizeServerUrl(
-    settings.settings.serverUrl ?? defaultServerAddress,
+  final serverUrl = ref.watch(
+    settingsProvider.select((s) => s.settings.serverUrl),
   );
+  return normalizeServerUrl(serverUrl ?? defaultServerAddress);
 });
 
 /// Chopper-сервис аутентификации. Пересоздаётся при смене baseUrl,

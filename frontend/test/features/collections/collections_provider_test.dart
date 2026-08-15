@@ -1,86 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
-import 'package:flux_media_server/features/collections/domain/repositories/collections_repository.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/remove_collection_item.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
-import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
-Collection _collection(int id, [String? name]) => Collection(
-      id: id,
-      userId: 7,
-      name: name ?? 'Collection $id',
-      type: MediaType.audio,
-      createdAt: DateTime.utc(2024),
-      updatedAt: DateTime.utc(2024),
-    );
-
-Media _media(int id) => Media(
-      id: id,
-      title: 'Media $id',
-      year: 2024,
-      type: MediaType.audio,
-      fileSize: 100,
-    );
-
-class FakeCollectionsRepository implements CollectionsRepository {
-  Future<Either<Failure, List<Collection>>> Function()? onGetCollections;
-  Future<Either<Failure, CollectionItem>> Function(int, int)? onAddItem;
-  Future<Either<Failure, void>> Function(int, int)? onRemoveItem;
-  Future<Either<Failure, List<Media>>> Function(int)? onGetItemsFull;
-
-  final List<(int, int)> addItemCalls = [];
-  final List<(int, int)> removeItemCalls = [];
-
-  @override
-  Future<Either<Failure, List<Collection>>> getCollections() =>
-      onGetCollections!();
-
-  @override
-  Future<Either<Failure, Collection>> createCollection({
-    required String name,
-    required String type,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
-
-  @override
-  Future<Either<Failure, Collection>> updateCollection(
-    int id, {
-    String? name,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
-
-  @override
-  Future<Either<Failure, void>> deleteCollection(int id) async =>
-      const Left(ServerFailure(message: 'not used'));
-
-  @override
-  Future<Either<Failure, CollectionItem>> addCollectionItem(
-    int collectionId,
-    int mediaId,
-  ) {
-    addItemCalls.add((collectionId, mediaId));
-    return onAddItem!(collectionId, mediaId);
-  }
-
-  @override
-  Future<Either<Failure, void>> removeCollectionItem(
-    int collectionId,
-    int mediaId,
-  ) {
-    removeItemCalls.add((collectionId, mediaId));
-    return onRemoveItem!(collectionId, mediaId);
-  }
-
-  @override
-  Future<Either<Failure, List<Media>>> getCollectionItemsFull(
-    int collectionId,
-  ) =>
-      onGetItemsFull!(collectionId);
-}
+import '../helpers/fake_repositories.dart';
 
 void main() {
   late ProviderContainer container;
@@ -100,7 +27,7 @@ void main() {
   group('collectionsProvider', () {
     test('loads the list of collections', () async {
       fakeRepo.onGetCollections =
-          () async => Right([_collection(1), _collection(2, 'Second')]);
+          () async => Right([collection(1), collection(2, 'Second')]);
 
       final result = await container.read(collectionsProvider.future);
 
@@ -113,9 +40,10 @@ void main() {
       fakeRepo.onGetCollections =
           () async => const Left(ServerFailure(message: 'Boom'));
 
+      // Тип Failure сохраняется — не заворачивается в Exception.
       await expectLater(
         container.read(collectionsProvider.future),
-        throwsA(isA<Exception>()),
+        throwsA(isA<ServerFailure>()),
       );
     });
   });
@@ -123,7 +51,7 @@ void main() {
   group('collectionItemsFullProvider', () {
     test('loads full media items for a collection', () async {
       fakeRepo.onGetItemsFull = (collectionId) async => Right(
-            [_media(1), _media(2)],
+            [media(1), media(2)],
           );
 
       final result =
@@ -139,8 +67,82 @@ void main() {
 
       await expectLater(
         container.read(collectionItemsFullProvider(5).future),
-        throwsA(isA<Exception>()),
+        throwsA(isA<ServerFailure>()),
       );
+    });
+
+    test('removeLocal removes an item without a refetch', () async {
+      fakeRepo.onGetItemsFull = (collectionId) async => Right(
+            [media(1), media(2)],
+          );
+      final sub = container.listen(
+        collectionItemsFullProvider(5),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+      await container.read(collectionItemsFullProvider(5).future);
+
+      container.read(collectionItemsFullProvider(5).notifier).removeLocal(1);
+
+      expect(fakeRepo.getItemsFullCalls, 1);
+      final items = container.read(collectionItemsFullProvider(5)).value;
+      expect(items?.map((m) => m.id), [2]);
+    });
+
+    test('addLocal appends an item without a refetch', () async {
+      fakeRepo.onGetItemsFull = (collectionId) async => Right(
+            [media(1)],
+          );
+      final sub = container.listen(
+        collectionItemsFullProvider(5),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+      await container.read(collectionItemsFullProvider(5).future);
+
+      container
+          .read(collectionItemsFullProvider(5).notifier)
+          .addLocal(media(3));
+
+      expect(fakeRepo.getItemsFullCalls, 1);
+      final items = container.read(collectionItemsFullProvider(5)).value;
+      expect(items?.map((m) => m.id), [1, 3]);
+    });
+
+    test('addLocal dedupes by media id', () async {
+      fakeRepo.onGetItemsFull = (collectionId) async => Right(
+            [media(1)],
+          );
+      final sub = container.listen(
+        collectionItemsFullProvider(5),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+      await container.read(collectionItemsFullProvider(5).future);
+
+      container
+          .read(collectionItemsFullProvider(5).notifier)
+          .addLocal(media(1));
+
+      final items = container.read(collectionItemsFullProvider(5)).value;
+      expect(items, hasLength(1));
+    });
+
+    test('invalidate refetches the collection items', () async {
+      fakeRepo.onGetItemsFull = (collectionId) async => Right(
+            [media(1)],
+          );
+      final sub = container.listen(
+        collectionItemsFullProvider(5),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+      await container.read(collectionItemsFullProvider(5).future);
+
+      container.invalidate(collectionItemsFullProvider(5));
+      await container.read(collectionItemsFullProvider(5).future);
+
+      expect(fakeRepo.getItemsFullCalls, 2);
     });
   });
 

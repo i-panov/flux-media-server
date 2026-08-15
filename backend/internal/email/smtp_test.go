@@ -2,6 +2,7 @@ package email
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -39,9 +40,21 @@ func (s *smtpSession) getMailFrom() string { s.mu.Lock(); defer s.mu.Unlock(); r
 func (s *smtpSession) getData() string     { s.mu.Lock(); defer s.mu.Unlock(); return s.data.String() }
 func (s *smtpSession) wasAuth() bool       { s.mu.Lock(); defer s.mu.Unlock(); return s.authSeen }
 
+// smtpServerOptions задаёт поведение тестового SMTP-сервера.
+type smtpServerOptions struct {
+	advertiseSTARTTLS bool
+	startTLSReply     string // ответ на команду STARTTLS (например "454 TLS not available")
+	advertiseAuth     bool
+}
+
 // startSMTPServer поднимает минимальный локальный SMTP-сервер
 // (net.Listener + построчные ответы по протоколу SMTP) для тестов.
 func startSMTPServer(t *testing.T) (addr string, session *smtpSession) {
+	t.Helper()
+	return startSMTPServerWithOptions(t, smtpServerOptions{advertiseAuth: true})
+}
+
+func startSMTPServerWithOptions(t *testing.T, opts smtpServerOptions) (addr string, session *smtpSession) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -71,8 +84,15 @@ func startSMTPServer(t *testing.T) (addr string, session *smtpSession) {
 			switch {
 			case strings.HasPrefix(upper, "EHLO"), strings.HasPrefix(upper, "HELO"):
 				write("250-test.example")
-				write("250-AUTH PLAIN")
+				if opts.advertiseSTARTTLS {
+					write("250-STARTTLS")
+				}
+				if opts.advertiseAuth {
+					write("250-AUTH PLAIN")
+				}
 				write("250 OK")
+			case upper == "STARTTLS":
+				write(opts.startTLSReply)
 			case strings.HasPrefix(upper, "AUTH"):
 				session.setAuth(line)
 				write("235 2.7.0 Authentication successful")
@@ -184,10 +204,36 @@ func TestSendCodeFromHeaderInjectionRejected(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid From address")
 }
 
-// TestSendCodeWithAuth проверяет AUTH-режим: сервер объявляет AUTH PLAIN
-// и отвечает 235, письмо успешно доставляется.
-func TestSendCodeWithAuth(t *testing.T) {
+// TestSendCodeHeadersPresent проверяет, что письмо содержит полный набор
+// заголовков (Date, Message-ID, MIME-Version, Content-Type), которые
+// повышают доставляемость.
+func TestSendCodeHeadersPresent(t *testing.T) {
 	addr, session := startSMTPServer(t)
+	host, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	client := NewSMTPClient(SMTPConfig{
+		Host: host,
+		Port: mustPort(t, port),
+		From: "Flux Test <sender@example.com>",
+	})
+
+	err = client.SendCode("user@example.com", "123456", 5)
+	require.NoError(t, err)
+
+	data := session.getData()
+	assert.Contains(t, data, "Date: ")
+	assert.Contains(t, data, "Message-ID: <")
+	assert.Contains(t, data, "MIME-Version: 1.0")
+	assert.Contains(t, data, "Content-Type: text/plain; charset=UTF-8")
+	assert.Contains(t, data, "Subject: Flux Media Server - Login Code\r\n")
+}
+
+// TestSendCodeAuthRefusedOnPlaintext — креденшелы никогда не должны
+// уходить по незащищённому соединению: если сервер не поддерживает
+// STARTTLS, а RequireTLS=false, письмо с AUTH отклоняется.
+func TestSendCodeAuthRefusedOnPlaintext(t *testing.T) {
+	addr, _ := startSMTPServer(t)
 	host, port, err := net.SplitHostPort(addr)
 	require.NoError(t, err)
 
@@ -200,9 +246,70 @@ func TestSendCodeWithAuth(t *testing.T) {
 	})
 
 	err = client.SendCode("user@example.com", "123456", 5)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "plaintext connection")
+}
+
+// TestSendCodeRequireTLSNoSTARTTLS — RequireTLS=true при сервере без
+// STARTTLS отклоняет отправку.
+func TestSendCodeRequireTLSNoSTARTTLS(t *testing.T) {
+	addr, _ := startSMTPServer(t)
+	host, port, err := net.SplitHostPort(addr)
 	require.NoError(t, err)
-	assert.True(t, session.wasAuth(), "AUTH command must be sent when credentials are set")
-	assert.Contains(t, session.getData(), "Your login code is: 123456")
+
+	client := NewSMTPClient(SMTPConfig{
+		Host:       host,
+		Port:       mustPort(t, port),
+		RequireTLS: true,
+		From:       "Flux <sender@example.com>",
+	})
+
+	err = client.SendCode("user@example.com", "123456", 5)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not support STARTTLS")
+}
+
+// TestSendCodeSTARTTLSDeclined — сервер объявляет STARTTLS, но отклоняет
+// команду (454): клиент должен вернуть ошибку, а не продолжать в plaintext.
+func TestSendCodeSTARTTLSDeclined(t *testing.T) {
+	addr, session := startSMTPServerWithOptions(t, smtpServerOptions{
+		advertiseSTARTTLS: true,
+		startTLSReply:     "454 4.7.0 TLS not available",
+		advertiseAuth:     true,
+	})
+	host, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	client := NewSMTPClient(SMTPConfig{
+		Host:     host,
+		Port:     mustPort(t, port),
+		Username: "smtpuser",
+		Password: "smtppass",
+		From:     "Flux <sender@example.com>",
+	})
+
+	err = client.SendCode("user@example.com", "123456", 5)
+	require.Error(t, err)
+	assert.False(t, session.wasAuth(), "AUTH must not be sent when STARTTLS was declined")
+}
+
+// TestSendCodeContextCancelled — отменённый контекст отклоняет отправку.
+func TestSendCodeContextCancelled(t *testing.T) {
+	addr, _ := startSMTPServer(t)
+	host, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	client := NewSMTPClient(SMTPConfig{
+		Host: host,
+		Port: mustPort(t, port),
+		From: "Flux <sender@example.com>",
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = client.SendCodeContext(ctx, "user@example.com", "123456", 5)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
 }
 
 // TestSendCodeNoAuthWithoutCredentials — без креденшелов AUTH не шлётся.

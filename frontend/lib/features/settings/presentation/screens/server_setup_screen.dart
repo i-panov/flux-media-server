@@ -20,6 +20,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
   final _controller = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isChecking = false;
+  bool _trustSelfSigned = false;
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
   }
 
   Future<void> _save() async {
+    final l = AppLocalizations.of(context)!;
     // Заблокируем двойной сабмит: кнопка и onFieldSubmitted.
     if (_isChecking) return;
     if (!_formKey.currentState!.validate()) return;
@@ -49,7 +51,10 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
       // Check if server is reachable. Health-check — на /api/health
       // (нормализованный адрес уже содержит сегмент /api).
       final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 5);
+        // Самоподписанные сертификаты принимаем только при явном согласии
+        // пользователя (чекбокс ниже), иначе сервер «недоступен».
+        ..connectionTimeout = const Duration(seconds: 5)
+        ..badCertificateCallback = (cert, host, port) => _trustSelfSigned;
       try {
         final request = await client.getUrl(Uri.parse('$normalized/health'));
         final response = await request.close();
@@ -57,7 +62,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
         await response.drain<void>();
 
         if (response.statusCode != HttpStatus.ok) {
-          throw Exception('Сервер вернул статус ${response.statusCode}');
+          throw Exception(l.serverStatusError(response.statusCode));
         }
       } finally {
         // Закрываем клиент в любом случае, чтобы не было утечки сокетов.
@@ -72,7 +77,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Не удалось подключиться к серверу: $e'),
+          content: Text(l.connectionFailed(e.toString())),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -130,6 +135,15 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
                     return null;
                   },
                   onFieldSubmitted: (_) => _save(),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.trustSelfSignedCertificate),
+                  subtitle: Text(l.trustSelfSignedHint),
+                  value: _trustSelfSigned,
+                  onChanged: (value) {
+                    setState(() => _trustSelfSigned = value ?? false);
+                  },
                 ),
                 const SizedBox(height: 16),
                 SizedBox(

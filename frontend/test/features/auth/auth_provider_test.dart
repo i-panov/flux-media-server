@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:chopper/chopper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/network/auth_token_refresher.dart';
+import 'package:flux_media_server/core/network/interceptors/token_refresh_interceptor.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
@@ -14,7 +18,11 @@ import 'package:flux_media_server/features/auth/presentation/providers/auth_prov
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/user.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Exposes Ref for building the token refresh interceptor in tests.
+final _refProvider = Provider<Ref>((ref) => ref);
 
 class FakeAuthRepository implements AuthRepository {
   Future<Either<Failure, Unit>> Function(String)? onRequestCode;
@@ -114,6 +122,13 @@ void main() {
         requestCodeProvider.overrideWithValue(RequestCode(fakeRepo)),
         verifyCodeProvider.overrideWithValue(VerifyCode(fakeRepo)),
         getCurrentUserProvider.overrideWithValue(GetCurrentUser(fakeRepo)),
+        // Фейковый refresher: не ходит в сеть, refresh всегда неудачен.
+        authTokenRefresherProvider.overrideWith(
+          (ref) => AuthTokenRefresher(
+            performRefresh: (_) async => null,
+            onRefreshFailure: () async {},
+          ),
+        ),
       ],
     );
     fakeCache = container.read(offlineCacheServiceProvider)
@@ -338,6 +353,130 @@ void main() {
       expect(mockStorage.containsKey('${keyPrefix}refresh_token'), isFalse);
       final state = container.read(authProvider);
       expect(state, isA<AuthInitial>());
+    });
+
+    test('verifyCode does not emit AuthLoading (CodeScreen stays mounted)',
+        () async {
+      fakeRepo.onVerifyCode = (_, __) async =>
+          const Left(ServerFailure(message: 'Invalid or expired code'));
+
+      final states = <AuthState>[];
+      container.listen<AuthState>(
+        authProvider,
+        (prev, next) {
+          states.add(next);
+        },
+        fireImmediately: true,
+      );
+
+      await container
+          .read(authProvider.notifier)
+          .verifyCode('test@example.com', '000000');
+
+      // Глобальный AuthLoading размонтировал бы Navigator через splash
+      // (потеря cooldown и формы) — его не должно быть ни до, ни после.
+      expect(states.whereType<AuthLoading>(), isEmpty);
+      expect(states.last, isA<AuthError>());
+    });
+
+    test('requestCode returns true when the code was sent', () async {
+      fakeRepo.onRequestCode = (_) async {
+        fakeRepo.lastDebugCode = '123456';
+        return const Right(unit);
+      };
+
+      final sent =
+          await container.read(authProvider.notifier).requestCode('a@b.c');
+      expect(sent, isTrue);
+      expect(
+        container.read(authProvider.notifier).lastRequestedEmail,
+        'a@b.c',
+      );
+    });
+
+    test('requestCode returns false on failure', () async {
+      fakeRepo.onRequestCode =
+          (_) async => const Left(NetworkFailure(message: 'No connection'));
+
+      final sent =
+          await container.read(authProvider.notifier).requestCode('a@b.c');
+      expect(sent, isFalse);
+    });
+
+    test('concurrent requestCode returns false for the swallowed call',
+        () async {
+      final gate = Completer<void>();
+      fakeRepo.onRequestCode = (_) async {
+        await gate.future;
+        return const Right(unit);
+      };
+
+      final first =
+          container.read(authProvider.notifier).requestCode('a@b.c');
+      final second =
+          container.read(authProvider.notifier).requestCode('a@b.c');
+      gate.complete();
+      final results = await Future.wait([first, second]);
+
+      expect(results, [true, false]);
+      expect(fakeRepo.requestCodeCalls, 1);
+    });
+
+    test('checkAuthStatus result is ignored after logout', () async {
+      final gate = Completer<void>();
+      fakeRepo.onGetCurrentUser = () async {
+        await gate.future;
+        return const Right(User(id: 1, email: 'test@example.com'));
+      };
+
+      final pending = container.read(authProvider.notifier).checkAuthStatus();
+      await container.read(authProvider.notifier).logout();
+      gate.complete();
+      await pending;
+
+      // Устаревший ответ не должен вернуть AuthAuthenticated после logout.
+      expect(container.read(authProvider), isA<AuthInitial>());
+    });
+
+    test('expireSession resets state to initial', () async {
+      const user = User(id: 1, email: 'test@example.com');
+      fakeRepo.onVerifyCode = (_, __) async => const Right(
+            (token: 't', refreshToken: 'r', user: user),
+          );
+      await container
+          .read(authProvider.notifier)
+          .verifyCode('test@example.com', '123456');
+      expect(container.read(authProvider), isA<AuthAuthenticated>());
+
+      container.read(authProvider.notifier).expireSession();
+
+      expect(container.read(authProvider), isA<AuthInitial>());
+    });
+
+    test('failed token refresh resets auth state via interceptor', () async {
+      await container
+          .read(settingsProvider.notifier)
+          .setTokens('token', 'refresh');
+      const user = User(id: 1, email: 'test@example.com');
+      fakeRepo.onVerifyCode = (_, __) async => const Right(
+            (token: 't', refreshToken: 'r', user: user),
+          );
+      await container
+          .read(authProvider.notifier)
+          .verifyCode('test@example.com', '123456');
+      expect(container.read(authProvider), isA<AuthAuthenticated>());
+
+      final interceptor = TokenRefreshInterceptor(
+        container.read(_refProvider),
+      );
+      final response =
+          Response<String>(http.Response('unauthorized', 401), 'unauthorized');
+      final result = await interceptor.onResponse(response);
+
+      // 401 + неудачный refresh → сессия сброшена в AuthInitial,
+      // а не «залогиненный» пользователь со стейлыми токенами.
+      expect(result.statusCode, 401);
+      expect(container.read(authProvider), isA<AuthInitial>());
     });
   });
 }

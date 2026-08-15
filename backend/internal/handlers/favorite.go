@@ -14,6 +14,9 @@ import (
 	"flux/internal/response"
 )
 
+// defaultPageSize — размер страницы по умолчанию (favorites, progress).
+const defaultPageSize = 50
+
 type FavoriteHandler struct {
 	favRepo    repository.FavoriteRepository
 	mediaRepo  repository.MediaRepository
@@ -31,7 +34,7 @@ func (h *FavoriteHandler) AddFavorite(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	mediaID, err := c.ParamsInt("id")
+	mediaID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
@@ -39,14 +42,13 @@ func (h *FavoriteHandler) AddFavorite(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Verify media exists
-	if _, err := h.mediaRepo.FindByID(ctx, uint(mediaID)); err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+	if _, err := h.mediaRepo.FindByID(ctx, mediaID); err != nil {
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
-	mediaIDUint := uint(mediaID)
 	fav := &models.Favorite{
 		UserID:  userID,
-		MediaID: &mediaIDUint,
+		MediaID: &mediaID,
 	}
 
 	if err := h.favRepo.Create(ctx, fav); err != nil {
@@ -70,14 +72,14 @@ func (h *FavoriteHandler) RemoveFavorite(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	mediaID, err := c.ParamsInt("id")
+	mediaID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
 
-	if err := h.favRepo.Delete(ctx, userID, uint(mediaID)); err != nil {
+	if err := h.favRepo.Delete(ctx, userID, mediaID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.Error(c, fiber.StatusNotFound, "Favorite not found")
 		}
@@ -100,17 +102,7 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "invalid type")
 	}
 
-	limit := c.QueryInt("limit", 50)
-	offset := c.QueryInt("offset", 0)
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 200 {
-		limit = 200
-	}
-	if offset < 0 {
-		offset = 0
-	}
+	limit, offset := response.ClampPage(c.QueryInt("limit", defaultPageSize), c.QueryInt("offset", 0), defaultPageSize)
 
 	ctx := c.UserContext()
 	favs, total, err := h.favRepo.FindByUser(ctx, userID, mediaType, limit, offset)
@@ -118,13 +110,11 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 		log.Printf("FindByUser favorites: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch favorites")
 	}
+	if favs == nil {
+		favs = []models.Favorite{}
+	}
 
-	return c.JSON(fiber.Map{
-		"items":  favs,
-		"total":  total,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return response.Paginated(c, favs, total, limit, offset)
 }
 
 // AddArtistFavorite adds an artist to the user's favorites.
@@ -148,11 +138,7 @@ func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 
 	// Verify the artist exists before creating the favorite.
 	if _, err := h.artistRepo.FindByID(ctx, req.ArtistID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.Error(c, fiber.StatusNotFound, "Artist not found")
-		}
-		log.Printf("FindByID artist: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to add artist favorite")
+		return repoError(c, err, "Artist not found", "Failed to add artist favorite")
 	}
 
 	artistID := req.ArtistID
@@ -174,14 +160,20 @@ func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fav)
 }
 
-// isUniqueViolation checks if the error is a SQLite UNIQUE constraint violation.
+// isUniqueViolation проверяет, что ошибка — именно нарушение уникального
+// индекса favorites (по медиа или артисту), а не иной UNIQUE-конфликт.
+// Проверка по колонкам вместо широкого "UNIQUE": сообщение SQLite
+// содержит имена колонок, а не имя индекса.
 func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
 	msg := err.Error()
-	return strings.Contains(msg, "UNIQUE constraint failed") ||
-		strings.Contains(msg, "UNIQUE")
+	if !strings.Contains(msg, "UNIQUE constraint failed") {
+		return false
+	}
+	return strings.Contains(msg, "favorites.user_id") &&
+		(strings.Contains(msg, "favorites.media_id") || strings.Contains(msg, "favorites.artist_id"))
 }
 
 // RemoveArtistFavorite removes an artist from the user's favorites.

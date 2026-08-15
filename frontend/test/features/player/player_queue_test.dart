@@ -82,6 +82,24 @@ void main() {
       expect(notifier.state.currentIndex, -1);
       expect(fakeController.playCalls, isEmpty);
     });
+
+    test('setQueue clamps startIndex above items length', () async {
+      final items = [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)];
+      await notifier.setQueue(items, startIndex: 5);
+
+      expect(notifier.state.currentIndex, 2);
+      expect(fakeController.playCalls, hasLength(1));
+      expect(fakeController.playCalls.first.id, 3);
+    });
+
+    test('setQueue clamps negative startIndex to zero', () async {
+      final items = [_fakeMedia(), _fakeMedia(2)];
+      await notifier.setQueue(items, startIndex: -3);
+
+      expect(notifier.state.currentIndex, 0);
+      expect(fakeController.playCalls, hasLength(1));
+      expect(fakeController.playCalls.first.id, 1);
+    });
   });
 
   group('PlayQueueNotifier.enqueue', () {
@@ -95,12 +113,27 @@ void main() {
       expect(notifier.state.items[1].id, 2);
     });
 
+    test('enqueue into empty queue makes the item current', () {
+      notifier.enqueue(_fakeMedia());
+
+      expect(notifier.state.items, hasLength(1));
+      expect(notifier.state.currentIndex, 0);
+      expect(notifier.current?.id, 1);
+    });
+
     test('enqueueAll adds multiple items', () {
       notifier
         ..setQueue([_fakeMedia()])
         ..enqueueAll([_fakeMedia(2), _fakeMedia(3)]);
 
       expect(notifier.state.items, hasLength(3));
+    });
+
+    test('enqueueAll into empty queue makes first item current', () {
+      notifier.enqueueAll([_fakeMedia(), _fakeMedia(2)]);
+
+      expect(notifier.state.items, hasLength(2));
+      expect(notifier.state.currentIndex, 0);
     });
   });
 
@@ -237,13 +270,13 @@ void main() {
       expect(notifier.state.currentIndex, 0);
     });
 
-    test('remove item before current shifts currentIndex', () {
+    test('remove item before current shifts currentIndex down', () {
       notifier
-        ..setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)])
-        ..removeAt(0); // Remove first, current is at 0
+        ..setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)], startIndex: 2)
+        ..removeAt(0); // Remove first, current is at index 2
 
       expect(notifier.state.items, hasLength(2));
-      expect(notifier.state.currentIndex, 0);
+      expect(notifier.state.currentIndex, 1);
       expect(notifier.state.items.first.id, 2);
     });
 
@@ -274,6 +307,34 @@ void main() {
 
       expect(notifier.state.items, isEmpty);
       expect(notifier.state.currentIndex, -1);
+    });
+
+    test('clear stops playback', () async {
+      await notifier.setQueue([_fakeMedia()]);
+      fakeController.stopCalls = 0;
+
+      notifier.clear();
+
+      expect(fakeController.stopCalls, 1);
+    });
+  });
+
+  group('PlayQueueNotifier.playCurrent', () {
+    test('replays the current track', () async {
+      await notifier.setQueue([_fakeMedia(), _fakeMedia(2)]);
+      fakeController.playCalls.clear();
+
+      final result = await notifier.playCurrent();
+
+      expect(result, isTrue);
+      expect(fakeController.playCalls, hasLength(1));
+      expect(fakeController.playCalls.first.id, 1);
+    });
+
+    test('returns false on empty queue', () async {
+      final result = await notifier.playCurrent();
+      expect(result, isFalse);
+      expect(fakeController.playCalls, isEmpty);
     });
   });
 

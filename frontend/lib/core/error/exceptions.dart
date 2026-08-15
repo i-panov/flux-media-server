@@ -21,3 +21,8 @@ class NetworkException implements Exception {
 
   final String message;
 }
+
+/// Сигнал отмены загрузки (upload/download) пользователем.
+class UploadCancelledException implements Exception {
+  const UploadCancelledException();
+}

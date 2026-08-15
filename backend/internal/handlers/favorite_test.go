@@ -152,3 +152,16 @@ func TestFavoriteHandler_RemoveArtistFavorite(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 }
+
+func TestFavoriteHandler_ListEmptyItems(t *testing.T) {
+	app := setupFavoriteTestApp(t)
+
+	// Без добавленных избранных список сериализуется как [], а не null.
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/favorites", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	buf := bytes.Buffer{}
+	buf.ReadFrom(resp.Body)
+	assert.Contains(t, buf.String(), `"items":[]`)
+}

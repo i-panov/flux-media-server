@@ -44,7 +44,7 @@ func main() {
 	}
 
 	if cfg.Server.Debug {
-		log.Println("WARNING: debug mode is enabled — OTP codes are returned in API responses and SQL queries are logged. Do NOT use in production.")
+		log.Println("WARNING: debug mode is enabled — OTP codes are returned in API responses and SQL queries are logged. This requires server.env: \"dev\" and must never be used in production.")
 	}
 
 	application, err := app.New(cfg, version)
@@ -65,20 +65,21 @@ func main() {
 		// Perform graceful shutdown before exiting so background goroutines
 		// (watcher, OTP purge, etc.) are cleaned up.
 		log.Printf("Server error: %v", err)
-		application.Shutdown()
+		shutdown(application)
 		os.Exit(1)
 	case <-quit:
 		log.Println("Shutting down server...")
 	}
 
-	application.Shutdown()
+	shutdown(application)
+	log.Println("Server stopped")
+}
 
+// shutdown выполняет полный цикл остановки: воркеры, HTTP-сервер, БД.
+func shutdown(application *app.App) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	if err := application.Fiber.ShutdownWithContext(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+	if err := application.Shutdown(ctx); err != nil {
+		log.Printf("Shutdown error: %v", err)
 	}
-
-	log.Println("Server stopped")
 }

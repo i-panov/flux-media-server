@@ -51,7 +51,12 @@ func (r *ArtistStore) FindOrCreateByName(ctx context.Context, name string) (*mod
 
 	artist = models.Artist{Name: name}
 	if err := r.db.WithContext(ctx).Create(&artist).Error; err != nil {
-		// Race condition: another goroutine created it first.
+		// Гонка: такой артист уже создан конкурентным запросом. Маскируем
+		// ошибку только если это UNIQUE-нарушение и запись теперь существует;
+		// реальные сбои БД возвращаются как есть.
+		if !isUniqueViolation(err) {
+			return nil, err
+		}
 		if err2 := r.db.WithContext(ctx).Where("name = ?", name).First(&artist).Error; err2 != nil {
 			return nil, err
 		}

@@ -2,11 +2,19 @@ package repository
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
 
 	"flux/internal/models"
 
 	"gorm.io/gorm"
 )
+
+// ErrDuplicateItem — элемент коллекции уже существует
+// (уникальный индекс (collection_id, media_id)).
+var ErrDuplicateItem = errors.New("collection item already exists")
 
 type CollectionStore struct {
 	db *gorm.DB
@@ -32,14 +40,28 @@ func (r *CollectionStore) Create(ctx context.Context, collection *models.Collect
 	return r.db.WithContext(ctx).Create(collection).Error
 }
 
+// Update обновляет только переданные непустые поля (name, type).
 func (r *CollectionStore) Update(ctx context.Context, collection *models.Collection) error {
-	return r.db.WithContext(ctx).Save(collection).Error
+	if collection.ID == 0 {
+		return errors.New("repository: collection ID required for Update")
+	}
+	updates := make(map[string]interface{})
+	if collection.Name != "" {
+		updates["name"] = collection.Name
+	}
+	if collection.Type != "" {
+		updates["type"] = collection.Type
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(collection).Updates(updates).Error
 }
 
 func (r *CollectionStore) Delete(ctx context.Context, id uint) error {
 	// Delete items and the collection atomically to avoid orphaned items.
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("collection_id = ?", id).Delete(&models.CollectionItem{}).Error; err != nil {
+		if err := cascadeDelete(tx, "collection_id", id, &models.CollectionItem{}); err != nil {
 			return err
 		}
 		return tx.Delete(&models.Collection{}, id).Error
@@ -102,6 +124,50 @@ func (r *CollectionItemStore) Add(ctx context.Context, item *models.CollectionIt
 		}
 		return tx.Create(item).Error
 	})
+}
+
+// AddItemAtomic добавляет элемент в коллекцию и присваивает следующую
+// позицию (MAX(position)+1) атомарно — в одной транзакции с INSERT
+// (без этого параллельные AddItem получают одинаковую позицию и падают
+// на уникальном индексе idx_collection_position). При коллизии позиции
+// (конкурентное добавление) транзакция повторяется с актуальным MAX.
+// Дубликат (collection_id, media_id) возвращается как ErrDuplicateItem.
+func (r *CollectionItemStore) AddItemAtomic(ctx context.Context, collectionID, mediaID uint) (models.CollectionItem, error) {
+	for attempt := 0; ; attempt++ {
+		var item models.CollectionItem
+		err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			var maxPos *int
+			if err := tx.
+				Model(&models.CollectionItem{}).
+				Where("collection_id = ?", collectionID).
+				Select("MAX(position)").
+				Scan(&maxPos).Error; err != nil {
+				return err
+			}
+			item = models.CollectionItem{
+				CollectionID: collectionID,
+				MediaID:      mediaID,
+				AddedAt:      time.Now().UTC(),
+			}
+			// 1-базированная нумерация — контракт хендлера (MaxPosition+1).
+			item.Position = 1
+			if maxPos != nil {
+				item.Position = *maxPos + 1
+			}
+			return tx.Create(&item).Error
+		})
+		if err == nil {
+			return item, nil
+		}
+		if !isUniqueViolation(err) {
+			return models.CollectionItem{}, err
+		}
+		// UNIQUE на позиции — конкурентное добавление: повторяем с новым MAX.
+		if strings.Contains(err.Error(), "position") && attempt < 4 {
+			continue
+		}
+		return models.CollectionItem{}, fmt.Errorf("%w: %v", ErrDuplicateItem, err)
+	}
 }
 
 func (r *CollectionItemStore) Remove(ctx context.Context, collectionID, mediaID uint) error {

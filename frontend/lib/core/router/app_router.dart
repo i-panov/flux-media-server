@@ -65,7 +65,7 @@ class MainRoutePage extends ConsumerWidget {
       settingsRoute: const SettingsRoute(),
       miniPlayer: const AudioMiniPlayer(),
       isOffline: isOffline,
-      onRetry: () => ref.invalidate(authProvider),
+      onRetry: () => ref.read(authProvider.notifier).checkAuthStatus(),
     );
   }
 }

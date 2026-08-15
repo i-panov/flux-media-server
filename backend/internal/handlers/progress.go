@@ -37,17 +37,7 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	limit := c.QueryInt("limit", 50)
-	offset := c.QueryInt("offset", 0)
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 200 {
-		limit = 200
-	}
-	if offset < 0 {
-		offset = 0
-	}
+	limit, offset := response.ClampPage(c.QueryInt("limit", defaultPageSize), c.QueryInt("offset", 0), defaultPageSize)
 
 	ctx := c.UserContext()
 	progress, total, err := h.progressRepo.FindByUser(ctx, userID, limit, offset)
@@ -55,13 +45,11 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 		log.Printf("FindByUser: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch progress")
 	}
+	if progress == nil {
+		progress = []models.WatchProgress{}
+	}
 
-	return c.JSON(fiber.Map{
-		"items":  progress,
-		"total":  total,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return response.Paginated(c, progress, total, limit, offset)
 }
 
 func (h *ProgressHandler) Update(c *fiber.Ctx) error {
@@ -69,7 +57,7 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
-	mediaID, err := c.ParamsInt("mediaId")
+	mediaID, err := parseIDParam(c, "mediaId")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
@@ -85,15 +73,20 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 	if req.Duration < 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Duration must be non-negative")
 	}
+	// Позиция за пределами длительности — признак испорченного клиента;
+	// при неизвестной длительности (0) проверка пропускается.
+	if req.Duration > 0 && req.Position > req.Duration {
+		return response.Error(c, fiber.StatusBadRequest, "Position must not exceed duration")
+	}
 
 	ctx := c.UserContext()
 
 	// Проверяем существование медиа до создания/обновления прогресса.
-	if _, err := h.mediaRepo.FindByID(ctx, uint(mediaID)); err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+	if _, err := h.mediaRepo.FindByID(ctx, mediaID); err != nil {
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
-	progress, err := h.progressRepo.FindByUserAndMedia(ctx, userID, uint(mediaID))
+	progress, err := h.progressRepo.FindByUserAndMedia(ctx, userID, mediaID)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("FindByUserAndMedia: %v", err)
@@ -101,7 +94,7 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 		}
 		progress = &models.WatchProgress{
 			UserID:  userID,
-			MediaID: uint(mediaID),
+			MediaID: mediaID,
 		}
 	}
 
@@ -121,13 +114,21 @@ func (h *ProgressHandler) Delete(c *fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
-	mediaID, err := c.ParamsInt("mediaId")
+	mediaID, err := parseIDParam(c, "mediaId")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	if err := h.progressRepo.Delete(ctx, userID, uint(mediaID)); err != nil {
+
+	// Delete не возвращает RowsAffected через интерфейс, поэтому
+	// отсутствие записи определяем предварительным поиском.
+	if _, err := h.progressRepo.FindByUserAndMedia(ctx, userID, mediaID); err != nil {
+		return repoError(c, err, "Progress not found", "Failed to delete progress")
+	}
+
+	if err := h.progressRepo.Delete(ctx, userID, mediaID); err != nil {
+		log.Printf("Delete progress: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete progress")
 	}
 

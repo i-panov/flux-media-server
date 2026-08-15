@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
 )
@@ -24,6 +25,9 @@ func (h *ArtistHandler) List(c *fiber.Ctx) error {
 	if err != nil {
 		log.Printf("ArtistHandler.List: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch artists")
+	}
+	if artists == nil {
+		artists = []models.Artist{}
 	}
 	return c.JSON(fiber.Map{"items": artists})
 }

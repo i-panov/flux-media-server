@@ -46,13 +46,14 @@ class AuthRemoteDataSource {
   /// Refreshes the access token using a refresh token.
   ///
   /// Использует единый [AuthTokenRefresher], чтобы параллельные вызовы
-  /// ждали один общий refresh.
+  /// ждали один общий refresh. Токены возвращаются напрямую (не через
+  /// побочное поле refresher), чтобы провал чужого параллельного
+  /// refresh не обнулял результат успешного.
   Future<({String token, String refreshToken})> refreshTokens(
     String refreshToken,
   ) async {
-    final refreshed = await refresher.refresh(refreshToken);
-    final tokens = refresher.lastTokens;
-    if (!refreshed || tokens == null) {
+    final tokens = await refresher.refreshTokens(refreshToken);
+    if (tokens == null) {
       throw const ServerException(message: 'Failed to refresh token');
     }
     return tokens;

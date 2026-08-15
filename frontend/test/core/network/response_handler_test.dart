@@ -37,6 +37,32 @@ void main() {
         );
       });
 
+      test('throws AuthException with error from body for 401', () {
+        expect(
+          () => checkResponse(
+            response(401, body: {'error': 'Invalid or expired code'}),
+            'Default message',
+          ),
+          throwsA(
+            isA<AuthException>()
+                .having((e) => e.message, 'message', 'Invalid or expired code'),
+          ),
+        );
+      });
+
+      test('uses default message for 401 without a usable error field', () {
+        expect(
+          () => checkResponse(response(401, body: {'error': 42}), 'Default'),
+          throwsA(
+            isA<AuthException>().having(
+            (e) => e.message,
+            'message',
+            'Session expired',
+          ),
+          ),
+        );
+      });
+
       test('throws ServerException with body message for 500', () {
         expect(
           () => checkResponse(
@@ -104,6 +130,28 @@ void main() {
         final failure = result.fold((l) => l, (_) => null);
         expect(failure, isA<ServerFailure>());
         expect(failure?.message, 'Still failing');
+      });
+
+      test('second 401 after retry maps to AuthFailure', () async {
+        var calls = 0;
+        final result = await safeRepositoryCall(() async {
+          calls++;
+          throw const TokenRefreshedException();
+        });
+
+        expect(calls, 2);
+        expect(result.isLeft(), isTrue);
+        final failure = result.fold((l) => l, (_) => null);
+        expect(failure, isA<AuthFailure>());
+      });
+
+      test('UploadCancelledException maps to UploadCancelledFailure', () async {
+        final result = await safeRepositoryCall(
+          () async => throw const UploadCancelledException(),
+        );
+
+        final failure = result.fold((l) => l, (_) => null);
+        expect(failure, isA<UploadCancelledFailure>());
       });
     });
 

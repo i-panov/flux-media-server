@@ -28,14 +28,33 @@ class AuthNetworkImage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final token =
         ref.watch(settingsProvider.select((s) => s.settings.authToken));
+    final baseUrl =
+        ref.watch(settingsProvider.select((s) => s.settings.serverUrl));
+    final headers = shouldAttachAuthHeader(imageUrl, baseUrl, token)
+        ? {'Authorization': 'Bearer $token'}
+        : null;
     return CachedNetworkImage(
+      // Пересоздание загрузки при смене токена: после refresh старый
+      // 401-ответ не должен показываться навсегда.
+      key: ValueKey<String?>(headers?['Authorization']),
       imageUrl: imageUrl,
       fit: fit,
       width: width,
       height: height,
-      httpHeaders: token == null ? null : {'Authorization': 'Bearer $token'},
+      httpHeaders: headers,
       placeholder: placeholder,
       errorWidget: errorWidget,
     );
   }
+}
+
+/// Bearer-токен уходит только на хост приложения: для сторонних
+/// URL (например, внешние обложки) авторизация не прикладывается.
+bool shouldAttachAuthHeader(String imageUrl, String? baseUrl, String? token) {
+  if (token == null || token.isEmpty) return false;
+  if (baseUrl == null) return false;
+  final image = Uri.tryParse(imageUrl);
+  final base = Uri.tryParse(baseUrl);
+  if (image == null || base == null) return false;
+  return image.scheme == base.scheme && image.host == base.host;
 }

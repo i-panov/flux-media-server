@@ -967,6 +967,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add media'**
   String get addMedia;
+
+  /// No description provided for @loadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get loadMore;
+
+  /// No description provided for @showAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all'**
+  String get showAll;
+
+  /// No description provided for @changeEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get changeEmail;
+
+  /// No description provided for @failedToRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to remove: {error}'**
+  String failedToRemove(String error);
+
+  /// No description provided for @alreadyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Already added'**
+  String get alreadyAdded;
+
+  /// No description provided for @uploadFileEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected file is empty'**
+  String get uploadFileEmpty;
+
+  /// No description provided for @uploadFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'File exceeds the server upload limit (2 GB)'**
+  String get uploadFileTooLarge;
+
+  /// No description provided for @addToFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to favorites'**
+  String get addToFavorites;
+
+  /// No description provided for @removeFromFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from favorites'**
+  String get removeFromFavorites;
+
+  /// No description provided for @invalidServerUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid URL starting with http:// or https://'**
+  String get invalidServerUrl;
+
+  /// No description provided for @failedToSaveSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save settings: {error}'**
+  String failedToSaveSettings(String error);
+
+  /// No description provided for @logoutConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out?'**
+  String get logoutConfirmTitle;
+
+  /// No description provided for @logoutConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You have {size} of offline media. Logging out will delete the offline cache.'**
+  String logoutConfirmMessage(String size);
+
+  /// No description provided for @offlineCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline cache'**
+  String get offlineCache;
+
+  /// No description provided for @cacheSizeCalculating.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating cache size...'**
+  String get cacheSizeCalculating;
+
+  /// No description provided for @cacheSizeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline cache: {size}'**
+  String cacheSizeLabel(String size);
+
+  /// No description provided for @cacheCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline cache cleared'**
+  String get cacheCleared;
+
+  /// No description provided for @trustSelfSignedCertificate.
+  ///
+  /// In en, this message translates to:
+  /// **'Trust self-signed certificate'**
+  String get trustSelfSignedCertificate;
+
+  /// No description provided for @trustSelfSignedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use only for private servers with your own certificate. Enables insecure HTTPS.'**
+  String get trustSelfSignedHint;
+
+  /// No description provided for @connectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to connect to the server: {error}'**
+  String connectionFailed(String error);
+
+  /// No description provided for @serverStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Server returned status {code}'**
+  String serverStatusError(int code);
 }
 
 class _AppLocalizationsDelegate

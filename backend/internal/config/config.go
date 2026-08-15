@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -23,6 +25,7 @@ type ServerConfig struct {
 	Host          string `yaml:"host"`
 	Port          int    `yaml:"port"`
 	Debug         bool   `yaml:"debug"`
+	Env           string `yaml:"env"` // "dev" | "production" (default)
 	CORSOrigins   string `yaml:"cors_origins"`
 	MaxUploadSize int64  `yaml:"max_upload_size"`
 }
@@ -93,15 +96,27 @@ func Load(path string) (*Config, error) {
 	// KnownFields(true) отклоняет неизвестные поля конфига — опечатка в
 	// ключе YAML не останется незамеченной (молча игнорируемой).
 	cfg := &Config{}
-	dec := yaml.NewDecoder(strings.NewReader(string(data)))
+	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(cfg); err != nil {
 		return nil, err
 	}
 
+	// Чувствительные поля можно задать через окружение: env имеет
+	// приоритет над YAML, чтобы секреты не лежали в открытом конфиге.
+	if v := os.Getenv("FLUX_JWT_SECRET"); v != "" {
+		cfg.Auth.JWTSecret = v
+	}
+	if v := os.Getenv("FLUX_SMTP_PASSWORD"); v != "" {
+		cfg.Auth.SMTP.Password = v
+	}
+
 	// Set defaults
 	if cfg.Server.Port == 0 {
 		cfg.Server.Port = 8080
+	}
+	if cfg.Server.Env == "" {
+		cfg.Server.Env = "production"
 	}
 	if cfg.Server.MaxUploadSize == 0 {
 		cfg.Server.MaxUploadSize = 100 * 1024 * 1024 // 100MB
@@ -128,9 +143,37 @@ func Load(path string) (*Config, error) {
 		cfg.RateLimiter.Expiration = 60
 	}
 
-	// Validate code length
-	if cfg.Auth.CodeLength < 6 {
-		return nil, errors.New("auth.code_length must be >= 6")
+	// Validation
+	if cfg.Database.Path == "" {
+		return nil, errors.New("database.path must not be empty (use ':memory:' only for tests)")
+	}
+	if cfg.Server.Port < 1 || cfg.Server.Port > 65535 {
+		return nil, fmt.Errorf("server.port must be between 1 and 65535, got %d", cfg.Server.Port)
+	}
+	if cfg.Server.MaxUploadSize <= 0 {
+		return nil, fmt.Errorf("server.max_upload_size must be > 0, got %d", cfg.Server.MaxUploadSize)
+	}
+	if cfg.Auth.CodeLength < 4 || cfg.Auth.CodeLength > 12 {
+		return nil, fmt.Errorf("auth.code_length must be between 4 and 12, got %d", cfg.Auth.CodeLength)
+	}
+	if cfg.Auth.JWTExpiry <= 0 {
+		return nil, fmt.Errorf("auth.jwt_expiry must be > 0, got %d", cfg.Auth.JWTExpiry)
+	}
+	if cfg.RateLimiter.Max <= 0 {
+		return nil, fmt.Errorf("rate_limiter.max must be > 0, got %d", cfg.RateLimiter.Max)
+	}
+
+	// "*" нельзя комбинировать с конкретными origins: браузеры в этом
+	// случае игнорируют Access-Control-Allow-Origin, а Allow-Credentials
+	// с wildcard запрещён спецификацией.
+	if err := validateCORS(cfg.Server.CORSOrigins); err != nil {
+		return nil, err
+	}
+
+	// Debug-режим возвращает OTP-коды в ответах API и пишет SQL с
+	// секретами — запускать его вне локальной разработки нельзя.
+	if cfg.Server.Debug && cfg.Server.Env != "dev" {
+		return nil, errors.New("server.debug is enabled but server.env is not \"dev\": debug mode is only allowed in development")
 	}
 
 	// Validate JWT secret
@@ -144,4 +187,16 @@ func Load(path string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func validateCORS(origins string) error {
+	if origins == "" || origins == "*" {
+		return nil
+	}
+	for _, o := range strings.Split(origins, ",") {
+		if strings.TrimSpace(o) == "*" {
+			return errors.New("server.cors_origins cannot combine \"*\" with specific origins")
+		}
+	}
+	return nil
 }

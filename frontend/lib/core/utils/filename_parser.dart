@@ -28,7 +28,7 @@ class FilenameParser {
     final parenMatch =
         RegExp(r'^(.+)\s*\((\d{4})\)\.[^.]+$').firstMatch(filename);
     if (parenMatch != null) {
-      final title = parenMatch.group(1)!.trim();
+      final title = parenMatch.group(1)!.trim().replaceAll('.', ' ');
       final year = int.tryParse(parenMatch.group(2)!);
       return FilenameParseResult(title: title, year: year);
     }

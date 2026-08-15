@@ -2,60 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
-import 'package:flux_media_server/features/favorites/domain/repositories/favorites_repository.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:flux_media_server/shared/models/favorite.dart';
 import 'package:fpdart/fpdart.dart';
 
-Favorite _favorite({
-  int id = 1,
-  int? mediaId,
-  int? artistId,
-}) =>
-    Favorite(
-      id: id,
-      userId: 7,
-      createdAt: DateTime.utc(2024),
-      mediaId: mediaId,
-      artistId: artistId,
-    );
-
-class FakeFavoritesRepository implements FavoritesRepository {
-  Future<Either<Failure, List<Favorite>>> Function()? onGetFavorites;
-  Future<Either<Failure, Favorite>> Function(int)? onAddFavorite;
-  Future<Either<Failure, void>> Function(int)? onRemoveFavorite;
-
-  int getFavoritesCalls = 0;
-  final List<int> addFavoriteCalls = [];
-  final List<int> removeFavoriteCalls = [];
-
-  @override
-  Future<Either<Failure, List<Favorite>>> getFavorites() {
-    getFavoritesCalls++;
-    return onGetFavorites!();
-  }
-
-  @override
-  Future<Either<Failure, Favorite>> addFavorite(int mediaId) {
-    addFavoriteCalls.add(mediaId);
-    return onAddFavorite!(mediaId);
-  }
-
-  @override
-  Future<Either<Failure, void>> removeFavorite(int mediaId) {
-    removeFavoriteCalls.add(mediaId);
-    return onRemoveFavorite!(mediaId);
-  }
-
-  @override
-  Future<Either<Failure, Favorite>> addArtistFavorite(int artistId) async =>
-      const Left(ServerFailure(message: 'not used'));
-
-  @override
-  Future<Either<Failure, void>> removeArtistFavorite(int artistId) async =>
-      const Left(ServerFailure(message: 'not used'));
-}
+import '../helpers/fake_repositories.dart';
 
 void main() {
   late ProviderContainer container;
@@ -75,7 +26,7 @@ void main() {
   group('favoritesProvider', () {
     test('loads favorites', () async {
       fakeRepo.onGetFavorites = () async => Right(
-            [_favorite(mediaId: 1), _favorite(id: 2, mediaId: 2)],
+            [favorite(mediaId: 1), favorite(id: 2, mediaId: 2)],
           );
 
       final result = await container.read(favoritesProvider.future);
@@ -96,12 +47,12 @@ void main() {
 
     test('addLocal appends without an extra GET', () async {
       fakeRepo.onGetFavorites =
-          () async => Right([_favorite(mediaId: 1)]);
+          () async => Right([favorite(mediaId: 1)]);
 
       await container.read(favoritesProvider.future);
       container
           .read(favoritesProvider.notifier)
-          .addLocal(_favorite(id: 2, mediaId: 2));
+          .addLocal(favorite(id: 2, mediaId: 2));
 
       expect(fakeRepo.getFavoritesCalls, 1);
       final favorites = container.read(favoritesProvider).value;
@@ -110,12 +61,12 @@ void main() {
 
     test('addLocal dedupes by mediaId', () async {
       fakeRepo.onGetFavorites =
-          () async => Right([_favorite(mediaId: 1)]);
+          () async => Right([favorite(mediaId: 1)]);
 
       await container.read(favoritesProvider.future);
       container
           .read(favoritesProvider.notifier)
-          .addLocal(_favorite(id: 99, mediaId: 1));
+          .addLocal(favorite(id: 99, mediaId: 1));
 
       final favorites = container.read(favoritesProvider).value;
       expect(favorites, hasLength(1));
@@ -124,7 +75,7 @@ void main() {
 
     test('removeLocal removes by mediaId without an extra GET', () async {
       fakeRepo.onGetFavorites = () async => Right(
-            [_favorite(mediaId: 1), _favorite(id: 2, mediaId: 2)],
+            [favorite(mediaId: 1), favorite(id: 2, mediaId: 2)],
           );
 
       await container.read(favoritesProvider.future);
@@ -137,12 +88,12 @@ void main() {
   });
 
   group('favoriteMediaIdsProvider', () {
-    test('derives media ids and skips nulls', () async {
+    test('derives media ids and skips artist favorites', () async {
       fakeRepo.onGetFavorites = () async => Right(
             [
-              _favorite(mediaId: 1),
-              _favorite(id: 2, artistId: 3),
-              _favorite(id: 3, mediaId: 5),
+              favorite(mediaId: 1),
+              favorite(id: 2, artistId: 3),
+              favorite(id: 3, mediaId: 5),
             ],
           );
 
@@ -166,20 +117,27 @@ void main() {
 
     tearDown(() => toggleContainer.dispose());
 
+    /// Загружает избранное и дожидается пересчёта множества id.
+    Future<void> loadState() async {
+      await toggleContainer.read(favoritesProvider.future);
+      await toggleContainer.read(favoriteMediaIdsProvider.future);
+    }
+
     test('toggle adds a favorite without refetching the list', () async {
       fakeRepo
         ..onGetFavorites = (() async => const Right([]))
         ..onAddFavorite = ((mediaId) async =>
-            Right(_favorite(id: 10, mediaId: mediaId)));
-      // Держим провайдер живым, чтобы проверить состояние после toggle.
-      final sub = toggleContainer.listen(favoritesProvider, (_, __) {});
-      addTearDown(sub.close);
+            Right(favorite(id: 10, mediaId: mediaId)));
 
+      await loadState();
       await toggleContainer
           .read(favoriteToggleProvider(1).notifier)
           .toggle();
+      // Пересчёт ids после локальной мутации.
+      await toggleContainer.read(favoriteMediaIdsProvider.future);
 
       expect(fakeRepo.addFavoriteCalls, [1]);
+      // keepAlive-провайдер не пересоздаётся — никакого второго GET.
       expect(fakeRepo.getFavoritesCalls, 1);
       expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
       final favorites = toggleContainer.read(favoritesProvider).value;
@@ -189,14 +147,14 @@ void main() {
     test('toggle removes a favorite without refetching the list', () async {
       fakeRepo
         ..onGetFavorites =
-            (() async => Right([_favorite(id: 10, mediaId: 1)]))
-        ..onRemoveFavorite = ((_) async => const Right(null));
-      final sub = toggleContainer.listen(favoritesProvider, (_, __) {});
-      addTearDown(sub.close);
+            (() async => Right([favorite(id: 10, mediaId: 1)]))
+        ..onRemoveFavorite = (_) async => const Right(null);
 
+      await loadState();
       await toggleContainer
           .read(favoriteToggleProvider(1).notifier)
           .toggle();
+      await toggleContainer.read(favoriteMediaIdsProvider.future);
 
       expect(fakeRepo.removeFavoriteCalls, [1]);
       expect(fakeRepo.getFavoritesCalls, 1);
@@ -211,11 +169,90 @@ void main() {
         ..onAddFavorite =
             ((_) async => const Left(ServerFailure(message: 'Conflict')));
 
+      await loadState();
       await toggleContainer
           .read(favoriteToggleProvider(1).notifier)
           .toggle();
 
       expect(toggleContainer.read(favoriteToggleProvider(1)).value, isFalse);
+      expect(fakeRepo.getFavoritesCalls, 1);
+    });
+
+    test(
+        'icon stays in sync across screens when the list changes locally',
+        () async {
+      fakeRepo.onGetFavorites =
+          () async => Right([favorite(id: 10, mediaId: 1)]);
+      await loadState();
+      // Эмуляция UI: экран следит за иконкой избранного трека.
+      final sub = toggleContainer.listen(
+        favoriteToggleProvider(1),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+
+      expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
+
+      // «Другой экран» снял избранное через локальную мутацию.
+      toggleContainer.read(favoritesProvider.notifier).removeLocal(1);
+      await toggleContainer.read(favoriteMediaIdsProvider.future);
+      expect(toggleContainer.read(favoriteToggleProvider(1)).value, isFalse);
+
+      toggleContainer
+          .read(favoritesProvider.notifier)
+          .addLocal(favorite(id: 11, mediaId: 1));
+      await toggleContainer.read(favoriteMediaIdsProvider.future);
+      expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
+    });
+
+    test('offline toggle keeps current state and makes no network calls',
+        () async {
+      fakeRepo.onGetFavorites =
+          () async => Right([favorite(id: 10, mediaId: 1)]);
+      final offlineContainer = ProviderContainer(
+        overrides: [
+          favoritesRepositoryProvider.overrideWithValue(fakeRepo),
+          isOfflineProvider.overrideWithValue(true),
+        ],
+      );
+      addTearDown(offlineContainer.dispose);
+      await offlineContainer.read(favoritesProvider.future);
+      await offlineContainer.read(favoriteMediaIdsProvider.future);
+      final sub =
+          offlineContainer.listen(favoriteToggleProvider(1), (_, __) {});
+      addTearDown(sub.close);
+
+      await offlineContainer
+          .read(favoriteToggleProvider(1).notifier)
+          .toggle();
+
+      // Офлайн: состояние не меняется на «снято», а остаётся текущим.
+      expect(offlineContainer.read(favoriteToggleProvider(1)).value, isTrue);
+      expect(fakeRepo.addFavoriteCalls, isEmpty);
+      expect(fakeRepo.removeFavoriteCalls, isEmpty);
+      expect(fakeRepo.getFavoritesCalls, 1);
+    });
+
+    test('toggle state derives from fresh list when recreated', () async {
+      fakeRepo
+        ..onGetFavorites = (() async => const Right([]))
+        ..onAddFavorite = ((mediaId) async =>
+            Right(favorite(id: 10, mediaId: mediaId)));
+
+      await loadState();
+      await toggleContainer
+          .read(favoriteToggleProvider(1).notifier)
+          .toggle();
+      await toggleContainer.read(favoriteMediaIdsProvider.future);
+
+      // Пересоздание нотифаера (например, повторный вход на экран)
+      // читает актуальное состояние из источника истины.
+      final sub = toggleContainer.listen(
+        favoriteToggleProvider(1),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+      expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
     });
   });
 }

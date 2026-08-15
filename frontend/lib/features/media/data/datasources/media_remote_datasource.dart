@@ -10,15 +10,6 @@ import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart' show MultipartFile;
-
-/// Загрузка отменена пользователем.
-class UploadCancelledException implements Exception {
-  const UploadCancelledException();
-
-  @override
-  String toString() => 'Upload cancelled';
-}
 
 /// Multipart-файл, считающий отправленные байты и поддерживающий отмену.
 /// Прогресс недоступен через Chopper, поэтому загрузка выполняется
@@ -29,8 +20,8 @@ class _CountingMultipartFile extends http.MultipartFile {
     required String field,
     required String filename,
     required int length,
-    required void Function(int sent) onProgress,
-    required bool Function()? isCancelled,
+    void Function(int sent)? onProgress,
+    bool Function()? isCancelled,
   }) : super(
           field,
           _buildStream(file, onProgress, isCancelled),
@@ -40,7 +31,7 @@ class _CountingMultipartFile extends http.MultipartFile {
 
   static Stream<List<int>> _buildStream(
     File file,
-    void Function(int sent) onProgress,
+    void Function(int sent)? onProgress,
     bool Function()? isCancelled,
   ) {
     return file.openRead().transform(
@@ -50,7 +41,7 @@ class _CountingMultipartFile extends http.MultipartFile {
                 sink.addError(const UploadCancelledException());
                 return;
               }
-              onProgress(chunk.length);
+              onProgress?.call(chunk.length);
               sink.add(chunk);
             },
           ),
@@ -65,16 +56,22 @@ class MediaRemoteDataSource {
   /// [libraryApiClient] нужен для `getArtists` (артисты живут в library API).
   /// [uploadBaseUrl], [authToken] и [refreshAuth] используются для
   /// прямой загрузки файлов через http (Chopper не даёт прогресс/отмену).
+  /// Провайдеры токенов берутся те же, что у Chopper-перехватчиков
+  /// (settingsProvider + authTokenRefresherProvider), чтобы не плодить
+  /// второй путь аутентификации.
+  /// [clientFactory] инъектируется в тестах.
   MediaRemoteDataSource(
     this.apiClient, {
     LibraryApiClient? libraryApiClient,
     String? uploadBaseUrl,
     String? Function()? authToken,
     Future<String?> Function()? refreshAuth,
+    http.Client Function()? clientFactory,
   })  : _libraryApiClient = libraryApiClient,
         _uploadBaseUrl = uploadBaseUrl,
         _authToken = authToken,
-        _refreshAuth = refreshAuth;
+        _refreshAuth = refreshAuth,
+        _clientFactory = clientFactory ?? http.Client.new;
 
   /// The API client used for HTTP requests.
   final MediaApiClient apiClient;
@@ -83,6 +80,7 @@ class MediaRemoteDataSource {
   final String? _uploadBaseUrl;
   final String? Function()? _authToken;
   final Future<String?> Function()? _refreshAuth;
+  final http.Client Function() _clientFactory;
 
   /// Fetches a paginated list of media items.
   Future<({List<Map<String, dynamic>> items, int total})> getMediaList({
@@ -167,9 +165,6 @@ class MediaRemoteDataSource {
   }) async {
     final file = File(filePath);
     final totalBytes = await file.length();
-    final baseUrl = _uploadBaseUrl ??
-        apiClient.client.baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
-    var token = _authToken?.call();
 
     var sent = 0;
     void report(int chunkSize) {
@@ -177,39 +172,105 @@ class MediaRemoteDataSource {
       onProgress?.call(sent, totalBytes);
     }
 
+    final body = await _postMultipart(
+      '/media/upload',
+      fields: {'media_type': mediaType},
+      // Строим файлы на каждую попытку: MultipartFile можно
+      // финализировать только один раз, а retry строит новый запрос.
+      createFiles: () => [
+        _CountingMultipartFile(
+          file,
+          field: 'file',
+          filename: fileName,
+          length: totalBytes,
+          onProgress: report,
+          isCancelled: isCancelled,
+        ),
+      ],
+      isCancelled: isCancelled,
+      onRetry: () => sent = 0,
+    );
+    return Media.fromJson(body);
+  }
+
+  /// Uploads a cover image for a media item.
+  ///
+  /// В отличие от [uploadFile] ответ тела не разбирается (сервер
+  /// возвращает только cover_url), но аутентификация, refresh и отмена
+  /// работают так же.
+  Future<void> uploadCover(
+    int mediaId,
+    String filePath, {
+    bool Function()? isCancelled,
+  }) async {
+    final file = File(filePath);
+    final length = await file.length();
+    await _postMultipart(
+      '/media/$mediaId/cover',
+      fields: const {},
+      createFiles: () => [
+        _CountingMultipartFile(
+          file,
+          field: 'cover',
+          filename: filePath.split('/').last,
+          length: length,
+          isCancelled: isCancelled,
+        ),
+      ],
+      isCancelled: isCancelled,
+    );
+  }
+
+  /// Multipart-POST с тем же контрактом, что у основного пути:
+  /// Bearer-токен из настроек, один refresh при 401 (через тот же
+  /// AuthTokenRefresher, что и Chopper-перехватчики), повторная
+  /// попытка только если пользователь не отменил загрузку, 401 после
+  /// неудачного refresh → [AuthException].
+  Future<Map<String, dynamic>> _postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required List<http.MultipartFile> Function() createFiles,
+    bool Function()? isCancelled,
+    void Function()? onRetry,
+  }) async {
+    final baseUrl = _uploadBaseUrl ??
+        apiClient.client.baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
+    var token = _authToken?.call();
+
     for (var attempt = 0; attempt < 2; attempt++) {
-      final client = http.Client();
+      if (isCancelled?.call() ?? false) {
+        throw const UploadCancelledException();
+      }
+      final client = _clientFactory();
       try {
         final request = http.MultipartRequest(
           'POST',
-          Uri.parse('$baseUrl/media/upload'),
+          Uri.parse('$baseUrl$path'),
         );
         if (token != null) {
           request.headers['Authorization'] = 'Bearer $token';
         }
-        request.fields['media_type'] = mediaType;
-        request.files.add(
-          _CountingMultipartFile(
-            file,
-            field: 'file',
-            filename: fileName,
-            length: totalBytes,
-            onProgress: report,
-            isCancelled: isCancelled,
-          ),
-        );
+        request.fields.addAll(fields);
+        request.files.addAll(createFiles());
 
         final streamed = await client.send(request);
         if (isCancelled?.call() ?? false) {
           throw const UploadCancelledException();
         }
 
-        if (streamed.statusCode == 401 && attempt == 0) {
-          final refreshed = await _refreshAuth?.call();
-          if (refreshed != null) {
-            token = refreshed;
-            sent = 0;
-            continue;
+        if (streamed.statusCode == 401) {
+          if (attempt == 0) {
+            final refreshed = await _refreshAuth?.call();
+            // Повторная попытка — только если пользователь не отменил
+            // загрузку, иначе свежий токен уйдёт в никуда.
+            if (isCancelled?.call() ?? false) {
+              throw const UploadCancelledException();
+            }
+            if (refreshed != null) {
+              token = refreshed;
+              onRetry?.call();
+              continue;
+            }
           }
           throw const AuthException(message: 'Session expired');
         }
@@ -217,20 +278,32 @@ class MediaRemoteDataSource {
         final responseBody =
             await streamed.stream.bytesToString().timeout(
                   const Duration(minutes: 10),
-                  onTimeout: () => throw Exception('Upload response timed out'),
+                  onTimeout: () => throw const NetworkException(
+                    message: 'Upload response timed out',
+                  ),
                 );
         if (isCancelled?.call() ?? false) {
           throw const UploadCancelledException();
         }
 
-        final body = jsonDecode(responseBody) as Map<String, dynamic>;
+        // 502 от proxy или HTML-ответ — не JSON: не тащим сырой текст
+        // в Failure, а отдаём понятное сообщение.
+        final Map<String, dynamic> body;
+        try {
+          body = jsonDecode(responseBody) as Map<String, dynamic>;
+        } on FormatException {
+          throw const ServerException(
+            message: 'Unexpected server response during upload',
+          );
+        }
+
         if (streamed.statusCode != 200 && streamed.statusCode != 201) {
           final error = body['error'];
           throw ServerException(
             message: error is String ? error : 'Failed to upload file',
           );
         }
-        return Media.fromJson(body);
+        return body;
       } finally {
         client.close();
       }
@@ -273,12 +346,5 @@ class MediaRemoteDataSource {
     );
     checkResponse(response, 'Failed to update progress');
     return WatchProgress.fromJson(response.body!);
-  }
-
-  /// Uploads a cover image for a media item.
-  Future<void> uploadCover(int mediaId, String filePath) async {
-    final cover = await MultipartFile.fromPath('cover', filePath);
-    final response = await apiClient.uploadCover(mediaId, cover);
-    checkResponse(response, 'Failed to upload cover');
   }
 }

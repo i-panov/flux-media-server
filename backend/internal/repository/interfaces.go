@@ -22,9 +22,14 @@ type MediaRepository interface {
 	FindAll(ctx context.Context, filters map[string]interface{}, limit, offset int) ([]models.Media, int64, error)
 	FindByID(ctx context.Context, id uint) (*models.Media, error)
 	FindByPath(ctx context.Context, path string) (*models.Media, error)
+	// FindByPathBasic ищет по пути одним SELECT без Preload — для горячих
+	// путей, где Metadata/Artists не нужны (сканирование больших библиотек).
+	FindByPathBasic(ctx context.Context, path string) (*models.Media, error)
 	FindByHash(ctx context.Context, hash string) (*models.Media, error)
 	FindByPathPrefix(ctx context.Context, prefix string, limit, offset int) ([]models.Media, int64, error)
 	Create(ctx context.Context, media *models.Media) error
+	// Update обновляет только непустые поля; ассоциации Artists заменяются
+	// целиком, Metadata сохраняется upsert'ом при наличии.
 	Update(ctx context.Context, media *models.Media) error
 	Delete(ctx context.Context, id uint) error
 }
@@ -71,6 +76,10 @@ type CollectionItemRepository interface {
 	FindByCollectionAndMedia(ctx context.Context, collectionID, mediaID uint) (*models.CollectionItem, error)
 	FindMediaByCollection(ctx context.Context, collectionID uint) ([]models.Media, error)
 	Add(ctx context.Context, item *models.CollectionItem) error
+	// AddItemAtomic добавляет элемент и присваивает позицию MAX(position)+1
+	// в одной транзакции. Дубликат (collection_id, media_id) возвращается
+	// как ErrDuplicateItem.
+	AddItemAtomic(ctx context.Context, collectionID, mediaID uint) (models.CollectionItem, error)
 	Remove(ctx context.Context, collectionID, mediaID uint) error
 	MaxPosition(ctx context.Context, collectionID uint) (int, error)
 }

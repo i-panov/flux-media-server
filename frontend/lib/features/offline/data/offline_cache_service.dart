@@ -45,6 +45,9 @@ class OfflineCacheService {
   /// Кэшированный id пользователя (null, пока не определён).
   int? _userId;
 
+  /// Выполнена ли очистка осиротевших .part-файлов (один раз за сессию).
+  bool _partsCleaned = false;
+
   /// Идентификатор активного пользователя или 0, если неизвестен.
   int get _resolvedUserId => _userId ?? 0;
 
@@ -59,8 +62,9 @@ class OfflineCacheService {
 
   String? get _authToken => _ref.read(settingsProvider).settings.authToken;
 
-  /// Guard against parallel token refresh calls.
-  bool _isRefreshing = false;
+  /// Выполняющийся refresh-запрос: параллельные 401-вызовы ждут его
+  /// результат, а не отказываются мгновенно.
+  Future<bool>? _refreshInFlight;
 
   /// Track active downloads by mediaId to prevent parallel downloads
   /// of the same file (which would corrupt the .part file).
@@ -90,6 +94,9 @@ class OfflineCacheService {
       _userId = _prefs.getInt(_userIdKey);
     }
     await _migrateLegacyFiles();
+    // Сироты .part удаляем один раз, до начала активных загрузок:
+    // _activeDownloads на этом этапе всегда пуст.
+    await _cleanupOrphanParts();
   }
 
   /// Мигрирует файлы/метаданные, сохранённые до введения user-префикса,
@@ -223,7 +230,11 @@ class OfflineCacheService {
 
         var received = 0;
         try {
-          await response.stream.map((chunk) {
+          // Таймаут на чтении тела: применяется к интервалам между чанками,
+          // зависшее соединение не держит загрузку вечно.
+          await response.stream
+              .timeout(const Duration(minutes: 10))
+              .map((chunk) {
             if (_cancelledDownloads.contains(media.id)) {
               throw const DownloadCancelledException();
             }
@@ -239,6 +250,17 @@ class OfflineCacheService {
             // закрыт, повторный close() кидает «File closed» и маскирует
             // исходное исключение (DownloadCancelledException).
           }
+        }
+
+        // Отмена после последнего чанка, но до rename — не сохраняем файл.
+        if (_cancelledDownloads.contains(media.id)) {
+          throw const DownloadCancelledException();
+        }
+        // Проверка целостности: усечённый mid-body файл не годится в кеш.
+        if (total != null && received != total) {
+          throw Exception(
+            'Download incomplete: received $received of $total bytes',
+          );
         }
 
         if (await localFile.exists()) {
@@ -261,6 +283,12 @@ class OfflineCacheService {
             // Best-effort cleanup of the partial file.
           }
         }
+        // Отмена во время зависания/таймаута потока: возвращаем
+        // ожидаемое исключение отмены, а не исходную ошибку.
+        if (_cancelledDownloads.contains(media.id) &&
+            e is! DownloadCancelledException) {
+          throw const DownloadCancelledException();
+        }
         rethrow;
       } finally {
         client.close();
@@ -276,21 +304,21 @@ class OfflineCacheService {
   }
 
   Future<String?> _refreshToken() async {
-    // Guard against parallel refresh calls — two concurrent 401s would
-    // each POST /auth/refresh, both succeed, and invalidate each other's
-    // tokens (only the last one survives).
-    if (_isRefreshing) return null;
-    _isRefreshing = true;
+    final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
+    if (refreshToken == null) return null;
+    // Если другой поток уже выполняет refresh — ждём его результат.
+    final inFlight = _refreshInFlight;
+    if (inFlight == null) {
+      _refreshInFlight =
+          _ref.read(authTokenRefresherProvider).refresh(refreshToken);
+    }
     try {
-      final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
-      // Используем единый refresher: параллельные 401-запросы (включая
-      // запросы из интерцептора) ждут один общий refresh.
-      final refreshed =
-          await _ref.read(authTokenRefresherProvider).refresh(refreshToken);
-      if (!refreshed) return null;
-      return _ref.read(settingsProvider).settings.authToken;
+      final ok = await (inFlight ?? _refreshInFlight);
+      return ok ?? false
+          ? _ref.read(settingsProvider).settings.authToken
+          : null;
     } finally {
-      _isRefreshing = false;
+      _refreshInFlight = null;
     }
   }
 
@@ -344,8 +372,8 @@ class OfflineCacheService {
       }
       await _prefs.remove(_metaKey(mediaId));
       await _prefs.remove(_lyricsKey(mediaId));
-      // Enforce cache size limit after removal.
-      await _enforceCacheLimit();
+      // Лимит кеша проверяется только после download — удаление само по
+      // себе уменьшает занятое место и не требует полного скана.
     } catch (e) {
       AppLogger.error('Error removing cached file', e);
     }
@@ -356,25 +384,35 @@ class OfflineCacheService {
     return await getLocalPath(mediaId) != null;
   }
 
+  /// Листинг файлов кеша текущего пользователя (файлы и .part-хвосты).
+  /// Если [includeParts] == false — только завершённые файлы.
+  Future<List<File>> _listCachedFiles({bool includeParts = false}) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final entries = await dir.list().toList();
+    final prefix = '${_prefix}user_${_resolvedUserId}_';
+    final idPattern = RegExp(r'flux_media_(\d+)(?:\.part)?$');
+    final files = <File>[];
+    for (final e in entries) {
+      if (e is! File) continue;
+      final name = e.uri.pathSegments.last;
+      if (!name.startsWith(prefix)) continue;
+      if (idPattern.hasMatch(name)) {
+        if (includeParts || !name.endsWith('.part')) files.add(e);
+      }
+    }
+    return files;
+  }
+
   /// Returns a list of cached media IDs (только текущего пользователя).
   Future<List<int>> getCachedIds() async {
     try {
       await _ensureUserId();
-      final dir = await getApplicationDocumentsDirectory();
-      final entries = await dir.list().toList();
-      final prefix = '${_prefix}user_${_resolvedUserId}_';
+      final files = await _listCachedFiles();
       final idPattern = RegExp(r'flux_media_(\d+)$');
-      final ids = <int>[];
-      for (final e in entries) {
-        if (e is! File) continue;
-        final name = e.uri.pathSegments.last;
-        if (!name.startsWith(prefix)) continue;
-        final match = idPattern.firstMatch(name);
-        if (match != null) {
-          ids.add(int.parse(match.group(1)!));
-        }
-      }
-      return ids;
+      return [
+        for (final f in files)
+          int.parse(idPattern.firstMatch(f.uri.pathSegments.last)!.group(1)!),
+      ];
     } catch (e) {
       AppLogger.error('Error listing cached files', e);
       return [];
@@ -387,37 +425,32 @@ class OfflineCacheService {
     _enforcingLimit = true;
     try {
       await _ensureUserId();
-      final dir = await getApplicationDocumentsDirectory();
-      final entries = await dir.list().toList();
-      final prefix = '${_prefix}user_${_resolvedUserId}_';
-      final idPattern = RegExp(r'flux_media_(\d+)$');
-      final fileStats = <(int, int)>[]; // (mediaId, fileSize)
+      // .part-файлы тоже занимают место и учитываются в лимите.
+      final files = await _listCachedFiles(includeParts: true);
+      final stats = <({int id, int size, DateTime modified})>[];
+      final idPattern = RegExp(r'flux_media_(\d+)(?:\.part)?$');
 
-      for (final e in entries) {
-        if (e is! File) continue;
-        final name = e.uri.pathSegments.last;
-        if (!name.startsWith(prefix)) continue;
+      for (final f in files) {
+        final name = f.uri.pathSegments.last;
         final match = idPattern.firstMatch(name);
-        if (match != null) {
-          final id = int.parse(match.group(1)!);
-          try {
-            final stat = await e.stat();
-            fileStats.add((id, stat.size));
-          } on Exception {
-            // Best-effort: skip files we can't stat.
-          }
+        if (match == null) continue;
+        final id = int.parse(match.group(1)!);
+        try {
+          final stat = await f.stat();
+          stats.add((id: id, size: stat.size, modified: stat.modified));
+        } on Exception {
+          // Best-effort: skip files we can't stat.
         }
       }
 
-      var totalSize =
-          fileStats.fold<int>(0, (prev, curr) => prev + curr.$2);
+      var totalSize = stats.fold<int>(0, (prev, curr) => prev + curr.size);
 
-      // Remove oldest downloads (sorted by mediaId as a proxy for age).
-      fileStats.sort((a, b) => a.$1.compareTo(b.$1));
-      for (final (id, size) in fileStats) {
+      // Remove oldest downloads (by file modification time).
+      stats.sort((a, b) => a.modified.compareTo(b.modified));
+      for (final s in stats) {
         if (totalSize <= _maxCacheBytes) break;
-        await remove(id);
-        totalSize -= size;
+        await remove(s.id);
+        totalSize -= s.size;
       }
     } catch (e) {
       AppLogger.error('Error enforcing cache limit', e);
@@ -452,18 +485,18 @@ class OfflineCacheService {
   /// Полная очистка кеша текущего пользователя: файлы, метаданные,
   /// лирика. Вызывается при logout.
   Future<void> clearUserCache() async {
+    // Без инициализации после рестарта _userId == null и файлы
+    // пользователя не удаляются (чистится только user_0_* в prefs).
+    await _ensureUserId();
     final uid = _userId;
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final entries = await dir.list().toList();
-      final idPattern = RegExp(r'flux_media_(\d+)(?:\.part)?$');
       if (uid != null) {
-        final prefix = '${_prefix}user_${uid}_';
-        for (final e in entries) {
-          if (e is! File) continue;
-          final name = e.uri.pathSegments.last;
-          if (name.startsWith(prefix) && idPattern.hasMatch(name)) {
-            await e.delete();
+        final files = await _listCachedFiles(includeParts: true);
+        for (final f in files) {
+          try {
+            await f.delete();
+          } on Exception {
+            // Best-effort: файл мог быть удалён параллельно.
           }
         }
         final migratedKey = '${_prefix}flux_migrated_user_$uid';
@@ -479,10 +512,58 @@ class OfflineCacheService {
       }
       await _prefs.remove(_userIdKey);
       _userId = null;
+      // Закрываем окно параллельной записи: активные загрузки больше
+      // не имеют права писать в кеш текущего пользователя.
       _activeDownloads.clear();
       _cancelledDownloads.clear();
     } catch (e) {
       AppLogger.error('Error clearing user cache', e);
+    }
+  }
+
+  /// Удаляет осиротевшие `.part`-файлы (обрыв загрузки при падении
+  /// приложения). Вызывается один раз при первой операции.
+  Future<void> _cleanupOrphanParts() async {
+    if (_partsCleaned) return;
+    _partsCleaned = true;
+    try {
+      final files = await _listCachedFiles(includeParts: true);
+      for (final f in files) {
+        final name = f.uri.pathSegments.last;
+        if (!name.endsWith('.part')) continue;
+        final match = RegExp(r'flux_media_(\d+)\.part$').firstMatch(name);
+        if (match == null) continue;
+        final id = int.parse(match.group(1)!);
+        if (_activeDownloads.contains(id)) continue;
+        final dir = f.parent;
+        if (await File('${dir.path}/$name'.replaceFirst('.part', ''))
+            .exists()) {
+          continue;
+        }
+        await f.delete();
+      }
+    } catch (e) {
+      AppLogger.error('Error cleaning orphan .part files', e);
+    }
+  }
+
+  /// Суммарный размер кеша текущего пользователя (включая .part).
+  Future<int> getCacheSize() async {
+    try {
+      await _ensureUserId();
+      var total = 0;
+      final files = await _listCachedFiles(includeParts: true);
+      for (final f in files) {
+        try {
+          total += (await f.stat()).size;
+        } on Exception {
+          // Best-effort: skip files we can't stat.
+        }
+      }
+      return total;
+    } catch (e) {
+      AppLogger.error('Error computing cache size', e);
+      return 0;
     }
   }
 }

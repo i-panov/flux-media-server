@@ -37,38 +37,33 @@ func (r *RefreshTokenStore) Create(ctx context.Context, userID uint, rawToken st
 	return r.db.WithContext(ctx).Create(record).Error
 }
 
-// RotateToken atomically finds a token by oldRawToken, deletes it, and
-// creates a new one — prevents TOCTOU races during refresh rotation.
-//
-// Replay protection: the Delete result's RowsAffected is checked. If two
-// parallel requests try to rotate the same token, only one can delete the
-// row (RowsAffected == 1) and create the new token. The loser either finds
-// no row (ErrRecordNotFound) or deletes 0 rows and the transaction fails —
-// in both cases no second valid token is created.
+// RotateToken атомарно заменяет старый токен новым: Delete старого
+// выполняется ПЕРВЫМ, до любого чтения, поэтому в WAL проигравший запрос
+// не получает SQLITE_BUSY_SNAPSHOT (снапшот не берётся). RowsAffected == 0
+// означает, что токен уже израсходован параллельным запросом (replay) —
+// возвращается gorm.ErrRecordNotFound, и новый токен не создаётся.
+// Возвращается НОВЫЙ токен (старый после удаления уже недоступен).
 func (r *RefreshTokenStore) RotateToken(ctx context.Context, oldRawToken string, userID uint, newRawToken string, expiresAt time.Time) (*models.RefreshToken, error) {
-	var rt models.RefreshToken
 	oldHash := HashRefreshToken(oldRawToken)
-	newHash := HashRefreshToken(newRawToken)
+	rt := &models.RefreshToken{
+		UserID:    userID,
+		Token:     HashRefreshToken(newRawToken),
+		ExpiresAt: expiresAt,
+	}
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("token = ? AND user_id = ?", oldHash, userID).First(&rt).Error; err != nil {
-			return err
-		}
-		result := tx.Where("token = ?", oldHash).Delete(&models.RefreshToken{})
+		result := tx.Where("token = ? AND user_id = ?", oldHash, userID).Delete(&models.RefreshToken{})
 		if result.Error != nil {
 			return result.Error
 		}
-		// RowsAffected == 0 means the token was already consumed by a
-		// parallel request — reject the replay.
 		if result.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
 		}
-		return tx.Create(&models.RefreshToken{
-			UserID:    userID,
-			Token:     newHash,
-			ExpiresAt: expiresAt,
-		}).Error
+		return tx.Create(rt).Error
 	})
-	return &rt, err
+	if err != nil {
+		return nil, err
+	}
+	return rt, nil
 }
 
 func (r *RefreshTokenStore) FindByToken(ctx context.Context, rawToken string) (*models.RefreshToken, error) {

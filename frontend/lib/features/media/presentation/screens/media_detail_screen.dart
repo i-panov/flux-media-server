@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +14,7 @@ import 'package:flux_media_server/features/favorites/presentation/providers/favo
 import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
@@ -42,14 +45,24 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
           orElse: () => null,
         );
     // Cache-buster: force reload when the cover changes on the server.
-    final cacheBuster = media?.updatedAt?.millisecondsSinceEpoch;
-    final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
-    if (media == null) return '$baseUrl/media/${widget.mediaId}/thumb$buster';
-    // Use embedded cover if available, thumbnail otherwise
-    if (media.coverUrl != null && media.coverUrl!.isNotEmpty) {
-      return '$baseUrl/media/${media.id}/cover$buster';
+    final cacheBust = media?.updatedAt?.millisecondsSinceEpoch;
+    if (media == null) {
+      return buildMediaImageUrl(
+        baseUrl: baseUrl,
+        mediaId: widget.mediaId,
+        kind: MediaImageKind.thumb,
+        cacheBust: cacheBust,
+      );
     }
-    return '$baseUrl/media/${media.id}/thumb$buster';
+    // Use embedded cover if available, thumbnail otherwise.
+    return buildMediaImageUrl(
+      baseUrl: baseUrl,
+      mediaId: media.id,
+      kind: media.coverUrl != null && media.coverUrl!.isNotEmpty
+          ? MediaImageKind.cover
+          : MediaImageKind.thumb,
+      cacheBust: cacheBust,
+    );
   }
 
   bool _hasCover() {
@@ -121,16 +134,14 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        // Точечно обновляем обложку в состоянии — без полного reload
-        // (иначе весь экран мигает спиннером).
-        final baseUrl = ref.read(baseUrlProvider);
-        ref
-            .read(mediaDetailProvider(widget.mediaId).notifier)
-            .setCoverUrl('$baseUrl/media/${widget.mediaId}/cover');
+        // Обновляем детали с сервера: серверный updatedAt даёт честный
+        // cache-buster для обложки (клиентское время врало бы его).
+        // Тихий перезапрос — без мигания спиннером.
+        unawaited(
+          ref.read(mediaDetailProvider(widget.mediaId).notifier).refresh(),
+        );
         // Refresh media lists so cards show the new cover.
-        ref
-          ..invalidate(mediaListProvider('video'))
-          ..invalidate(mediaListProvider('audio'));
+        refreshMediaLists(ref);
       },
     );
   }
@@ -160,7 +171,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
 
       if (!mounted) return;
       final newState = ref.read(downloadNotifierProvider(widget.mediaId));
-      if (newState is DownloadError && mounted) {
+      if (newState is DownloadError) {
         final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${l.errorLabel}: ${newState.message}')),
@@ -206,9 +217,7 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
         );
       },
       (_) {
-        ref
-          ..invalidate(mediaListProvider('video'))
-          ..invalidate(mediaListProvider('audio'));
+        refreshMediaLists(ref);
         context.maybePop();
       },
     );
@@ -275,21 +284,18 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
           children: [
             // Backdrop image / placeholder
             if (_hasCover())
-              Hero(
-                tag: 'media-thumb-${media.id}',
-                child: AuthNetworkImage(
-                  imageUrl: _imageUrl(),
-                  fit: BoxFit.cover,
+              AuthNetworkImage(
+                imageUrl: _imageUrl(),
+                fit: BoxFit.cover,
+                height: 300,
+                width: double.infinity,
+                placeholder: (_, __) => const SizedBox(
                   height: 300,
-                  width: double.infinity,
-                  placeholder: (_, __) => const SizedBox(
-                    height: 300,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (_, __, ___) => const SizedBox(
-                    height: 300,
-                    child: Center(child: Icon(Icons.broken_image, size: 64)),
-                  ),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (_, __, ___) => const SizedBox(
+                  height: 300,
+                  child: Center(child: Icon(Icons.broken_image, size: 64)),
                 ),
               )
             else if (media.type == MediaType.audio)
@@ -344,9 +350,9 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                         const SizedBox(height: 8),
                         Text(
                           () {
-                            // 0 = «нет данных» на бэкенде — не показываем год.
+                            // 0 = «нет данных» на бэкенде — не показываем.
                             final parts = <String>[
-                              if (media.year != null && media.year! > 0)
+                              if (hasMediaYear(media.year))
                                 '${media.year}',
                               media.type.value,
                             ];

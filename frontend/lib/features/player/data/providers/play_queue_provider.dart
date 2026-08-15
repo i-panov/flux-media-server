@@ -20,29 +20,50 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
   final PlaybackController _coordinator;
 
   /// Sets the queue to [items], starting playback from [startIndex].
+  /// [startIndex] зажимается в допустимый диапазон.
   Future<void> setQueue(List<Media> items, {int startIndex = 0}) async {
     if (items.isEmpty) {
       state = const PlayQueueState();
       return;
     }
-    state = PlayQueueState(items: items, currentIndex: startIndex);
-    if (startIndex < items.length) {
-      // Ошибка воспроизведения уже отражена в PlaybackState.error —
-      // не пробрасываем её в UI-вызовы (часто fire-and-forget).
-      try {
-        await _coordinator.play(items[startIndex]);
-      } catch (_) {}
-    }
+    final index = startIndex.clamp(0, items.length - 1);
+    state = PlayQueueState(items: items, currentIndex: index);
+    // Ошибка воспроизведения уже отражена в PlaybackState.error —
+    // не пробрасываем её в UI-вызовы (часто fire-and-forget).
+    try {
+      await _coordinator.play(items[index]);
+    } catch (_) {}
   }
 
   /// Adds a single item to the end of the queue.
   void enqueue(Media item) {
-    state = state.copyWith(items: [...state.items, item]);
+    final items = [...state.items, item];
+    state = PlayQueueState(
+      items: items,
+      // Первый трек в пустой очереди становится текущим.
+      currentIndex: state.currentIndex < 0 ? 0 : state.currentIndex,
+    );
   }
 
   /// Adds multiple items to the queue.
   void enqueueAll(List<Media> items) {
-    state = state.copyWith(items: [...state.items, ...items]);
+    final newItems = [...state.items, ...items];
+    state = PlayQueueState(
+      items: newItems,
+      currentIndex: state.currentIndex < 0 ? 0 : state.currentIndex,
+    );
+  }
+
+  /// Перезапускает текущий трек очереди (например, play из системного
+  /// уведомления после завершения воспроизведения).
+  Future<bool> playCurrent() async {
+    if (state.currentIndex < 0 || state.currentIndex >= state.items.length) {
+      return false;
+    }
+    try {
+      await _coordinator.play(state.items[state.currentIndex]);
+    } catch (_) {}
+    return true;
   }
 
   /// Plays the next track in the queue.
@@ -95,7 +116,7 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     // If we removed the currently playing item, stop playback.
     // The queue is now empty — coordinator should stop playback.
     if (items.isEmpty) {
-      _coordinator.stop();
+      unawaited(_coordinator.stop());
     }
     // If we removed the currently playing track and there are more items,
     // auto-advance to the new currentIndex (which is the next track).
@@ -106,9 +127,10 @@ class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
     }
   }
 
-  /// Clears the queue.
+  /// Clears the queue and stops playback.
   void clear() {
     state = const PlayQueueState();
+    unawaited(_coordinator.stop());
   }
 
   /// Returns the current media item, or null if queue is empty.

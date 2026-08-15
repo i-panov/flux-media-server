@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
@@ -11,6 +12,11 @@ import 'package:flux_media_server/features/media/presentation/widgets/media_card
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
+
+String _errorText(Object error) {
+  if (error is Failure) return error.message;
+  return error.toString();
+}
 
 @RoutePage()
 class CollectionDetailScreen extends ConsumerStatefulWidget {
@@ -54,7 +60,7 @@ class _CollectionDetailScreenState
             children: [
               const Icon(Icons.error_outline, size: 64, color: Colors.red),
               const SizedBox(height: 16),
-              Text(e.toString(), textAlign: TextAlign.center),
+              Text(_errorText(e), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => ref.invalidate(
@@ -99,22 +105,22 @@ class _CollectionDetailScreenState
                       MediaDetailRoute(mediaId: media.id),
                     ),
                   ),
-                  // Кнопка удаления элемента из коллекции.
+                  // Кнопка удаления элемента из коллекции (зона тапа 48dp).
                   Positioned(
                     top: 4,
                     left: 4,
                     child: Material(
                       color: Colors.black54,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(24),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(24),
                         onTap: () => _confirmRemoveItem(context, media),
                         child: const SizedBox(
-                          width: 28,
-                          height: 28,
+                          width: 48,
+                          height: 48,
                           child: Icon(
                             Icons.playlist_remove,
-                            size: 16,
+                            size: 20,
                             color: Colors.white,
                           ),
                         ),
@@ -163,11 +169,14 @@ class _CollectionDetailScreenState
     result.fold(
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.failedToAdd(failure.message))),
+          SnackBar(content: Text('Failed to remove: ${failure.message}')),
         );
       },
       (_) {
-        ref.invalidate(collectionItemsFullProvider(widget.collection.id));
+        // Оптимистичное обновление списка — без refetch.
+        ref
+            .read(collectionItemsFullProvider(widget.collection.id).notifier)
+            .removeLocal(media.id);
       },
     );
   }
@@ -176,13 +185,12 @@ class _CollectionDetailScreenState
   /// медиа типа коллекции и клиентским фильтром-поиском).
   Future<void> _showAddMediaDialog(BuildContext context) async {
     final l = AppLocalizations.of(context)!;
-    final typeValue = widget.collection.type.value;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => _AddMediaDialog(
         collection: widget.collection,
-        mediaType: typeValue,
+        mediaType: widget.collection.type.value,
         l: l,
       ),
     );
@@ -249,7 +257,9 @@ class _CollectionDetailScreenState
                 result.fold(
                   (failure) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l.failedToAdd(failure.message))),
+                      SnackBar(
+                        content: Text(l.failedToRemove(failure.message)),
+                      ),
                     );
                   },
                   (_) {
@@ -318,11 +328,10 @@ class _AddMediaDialogState extends ConsumerState<_AddMediaDialog> {
             Expanded(
               child: mediaListState.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text(l.failedToAdd(e.toString())),
+                error: (e, _) => Text(_errorText(e)),
                 data: (result) {
                   final query = _filter.toLowerCase();
                   final items = result.items
-                      .where((m) => m.type.value == widget.mediaType)
                       .where(
                         (m) =>
                             query.isEmpty ||
@@ -380,7 +389,10 @@ class _AddMediaDialogState extends ConsumerState<_AddMediaDialog> {
         );
       },
       (_) {
-        ref.invalidate(collectionItemsFullProvider(widget.collection.id));
+        // Оптимистичное обновление списка — без refetch.
+        ref
+            .read(collectionItemsFullProvider(widget.collection.id).notifier)
+            .addLocal(media);
         Navigator.pop(context);
       },
     );

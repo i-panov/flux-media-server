@@ -16,17 +16,15 @@ import (
 
 // FileMetadata holds metadata extracted from a media file.
 type FileMetadata struct {
-	Title        string
-	Artist       string
-	Album        string
-	Genre        string
-	Year         int
-	Duration     int    // seconds
-	Width        int    // video only
-	Height       int    // video only
-	Codec        string // video only
-	AlbumArt     []byte // embedded album art (audio only)
-	AlbumArtMIME string
+	Title    string
+	Artist   string
+	Album    string
+	Genre    string
+	Year     int
+	Duration int    // seconds
+	Width    int    // video only
+	Height   int    // video only
+	Codec    string // video only
 }
 
 // MetadataExtractor extracts metadata from media files.
@@ -39,25 +37,34 @@ func NewMetadataExtractor() *MetadataExtractor {
 
 // ExtractFromFile reads metadata from a media file based on its extension.
 // If probeData is provided and non-nil, it is used for video files instead of
-// calling ffprobe again.
+// calling ffprobe again. Без контекста — для внешних вызовов (upload handler).
 func (e *MetadataExtractor) ExtractFromFile(path string, probeData ...*ffprobe.ProbeData) *FileMetadata {
+	return e.ExtractFromFileContext(context.Background(), path, probeData...)
+}
+
+// ExtractFromFileContext — то же, что ExtractFromFile, но с учётом отмены
+// контекста: ffprobe и чтение файла прерываются при отмене скана.
+func (e *MetadataExtractor) ExtractFromFileContext(ctx context.Context, path string, probeData ...*ffprobe.ProbeData) *FileMetadata {
 	ext := strings.ToLower(filepath.Ext(path))
 
-	switch ext {
-	case ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".wav":
-		return e.extractAudio(path)
-	case ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".flv", ".ts":
+	switch {
+	case audioExtensions[ext]:
+		return e.extractAudio(ctx, path)
+	case videoExtensions[ext]:
 		if len(probeData) > 0 && probeData[0] != nil {
 			return extractVideoFromData(probeData[0])
 		}
-		return e.extractVideo(path)
+		return e.extractVideo(ctx, path)
 	default:
 		return nil
 	}
 }
 
 // extractAudio reads ID3/Vorbis/MP4 tags from an audio file.
-func (e *MetadataExtractor) extractAudio(path string) *FileMetadata {
+func (e *MetadataExtractor) extractAudio(ctx context.Context, path string) *FileMetadata {
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		log.Printf("metadata: open audio file %s: %v", path, err)
@@ -65,7 +72,7 @@ func (e *MetadataExtractor) extractAudio(path string) *FileMetadata {
 	}
 	defer f.Close()
 
-	m, err := tag.ReadFrom(f)
+	m, err := tag.ReadFrom(contextReadSeeker{contextReader{ctx: ctx, r: f}})
 	if err != nil {
 		log.Printf("metadata: read tags from %s: %v", path, err)
 		return nil
@@ -76,29 +83,21 @@ func (e *MetadataExtractor) extractAudio(path string) *FileMetadata {
 		return nil
 	}
 
-	meta := &FileMetadata{
+	return &FileMetadata{
 		Title:  m.Title(),
 		Artist: m.Artist(),
 		Album:  m.Album(),
 		Genre:  m.Genre(),
 		Year:   m.Year(),
 	}
-
-	// Extract album art if present.
-	if pic := m.Picture(); pic != nil {
-		meta.AlbumArt = pic.Data
-		meta.AlbumArtMIME = pic.MIMEType
-	}
-
-	return meta
 }
 
 // extractVideo calls ffprobe to get video metadata.
-func (e *MetadataExtractor) extractVideo(path string) *FileMetadata {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func (e *MetadataExtractor) extractVideo(ctx context.Context, path string) *FileMetadata {
+	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	data, err := ffprobe.ProbeURL(ctx, path)
+	data, err := ffprobe.ProbeURL(probeCtx, path)
 	if err != nil {
 		log.Printf("metadata: ffprobe %s: %v", path, err)
 		return nil

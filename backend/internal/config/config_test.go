@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,6 +18,7 @@ func TestLoadConfig(t *testing.T) {
 server:
   host: "127.0.0.1"
   port: 9090
+  env: "dev"
   debug: true
   cors_origins: "https://example.com"
 
@@ -56,6 +58,7 @@ media:
 	assert.Equal(t, "127.0.0.1", cfg.Server.Host)
 	assert.Equal(t, 9090, cfg.Server.Port)
 	assert.True(t, cfg.Server.Debug)
+	assert.Equal(t, "dev", cfg.Server.Env)
 	assert.Equal(t, "https://example.com", cfg.Server.CORSOrigins)
 
 	// Database
@@ -101,6 +104,7 @@ auth:
 	assert.NoError(t, err)
 
 	assert.Equal(t, 8080, cfg.Server.Port)
+	assert.Equal(t, "production", cfg.Server.Env)
 	assert.Equal(t, 6, cfg.Auth.CodeLength)
 	assert.Equal(t, 300, cfg.Auth.CodeExpiry)
 	assert.Equal(t, 1, cfg.Auth.JWTExpiry)
@@ -112,6 +116,8 @@ func TestLoadConfigShortSecret(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	yamlContent := `
+database:
+  path: "./test.db"
 auth:
   jwt_secret: "too-short"
 `
@@ -126,4 +132,225 @@ auth:
 func TestLoadConfigMissingFile(t *testing.T) {
 	_, err := Load("/nonexistent/config.yaml")
 	assert.Error(t, err)
+}
+
+func TestLoadConfigEmptyDatabasePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	_, err = Load(configPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "database.path")
+}
+
+func TestLoadConfigMemoryDatabaseAllowed(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+database:
+  path: ":memory:"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	_, err = Load(configPath)
+	assert.NoError(t, err)
+}
+
+func TestLoadConfigInvalidValues(t *testing.T) {
+	cases := []struct {
+		name    string
+		yaml    string
+		errPart string
+	}{
+		{
+			name:    "port too large",
+			yaml:    "server:\n  port: 70000\n",
+			errPart: "server.port",
+		},
+		{
+			name:    "port negative",
+			yaml:    "server:\n  port: -1\n",
+			errPart: "server.port",
+		},
+		{
+			name:    "negative max_upload_size",
+			yaml:    "server:\n  max_upload_size: -5\n",
+			errPart: "server.max_upload_size",
+		},
+		{
+			name:    "code_length too small",
+			yaml:    "auth:\n  code_length: 3\n  jwt_secret: \"test-secret-that-is-at-least-32-chars\"\n",
+			errPart: "auth.code_length",
+		},
+		{
+			name:    "code_length too large",
+			yaml:    "auth:\n  code_length: 13\n  jwt_secret: \"test-secret-that-is-at-least-32-chars\"\n",
+			errPart: "auth.code_length",
+		},
+		{
+			name:    "negative jwt_expiry",
+			yaml:    "auth:\n  jwt_expiry: -1\n  jwt_secret: \"test-secret-that-is-at-least-32-chars\"\n",
+			errPart: "auth.jwt_expiry",
+		},
+		{
+			name:    "negative rate_limiter.max",
+			yaml:    "rate_limiter:\n  max: -1\n",
+			errPart: "rate_limiter.max",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+			content := "database:\n  path: \"./test.db\"\n" + tc.yaml
+			err := os.WriteFile(configPath, []byte(content), 0644)
+			require.NoError(t, err)
+
+			_, err = Load(configPath)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.errPart)
+		})
+	}
+}
+
+func TestLoadConfigEnvOverrides(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+database:
+  path: "./test.db"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+  smtp:
+    password: "yaml-pass"
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	t.Setenv("FLUX_JWT_SECRET", "env-secret-that-is-also-at-least-32-chars")
+	t.Setenv("FLUX_SMTP_PASSWORD", "env-pass")
+
+	cfg, err := Load(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "env-secret-that-is-also-at-least-32-chars", cfg.Auth.JWTSecret)
+	assert.Equal(t, "env-pass", cfg.Auth.SMTP.Password)
+}
+
+func TestLoadConfigEnvShortSecretRejected(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+database:
+  path: "./test.db"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	t.Setenv("FLUX_JWT_SECRET", "short")
+
+	_, err = Load(configPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "jwt_secret must be at least 32 characters")
+}
+
+func TestLoadConfigCORSValidation(t *testing.T) {
+	base := `
+database:
+  path: "./test.db"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+`
+
+	write := func(t *testing.T, origins string) string {
+		t.Helper()
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config.yaml")
+		content := base
+		if origins != "" {
+			content = "server:\n  cors_origins: \"" + origins + "\"\n" + content
+		}
+		err := os.WriteFile(configPath, []byte(content), 0644)
+		require.NoError(t, err)
+		return configPath
+	}
+
+	t.Run("wildcard with specific origins rejected", func(t *testing.T) {
+		_, err := Load(write(t, "*, https://x.com"))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cors_origins")
+	})
+
+	t.Run("wildcard alone allowed", func(t *testing.T) {
+		_, err := Load(write(t, "*"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("specific origins allowed", func(t *testing.T) {
+		_, err := Load(write(t, "https://a.com, https://b.com"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("empty means wildcard", func(t *testing.T) {
+		_, err := Load(write(t, ""))
+		assert.NoError(t, err)
+	})
+}
+
+func TestLoadConfigDebugRequiresDevEnv(t *testing.T) {
+	write := func(t *testing.T, debug bool, env string) string {
+		t.Helper()
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config.yaml")
+		envLine := ""
+		if env != "" {
+			envLine = "  env: \"" + env + "\"\n"
+		}
+		content := "server:\n" + envLine + "  debug: " + strconv.FormatBool(debug) + "\n"
+		content += `
+database:
+  path: "./test.db"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+`
+		err := os.WriteFile(configPath, []byte(content), 0644)
+		require.NoError(t, err)
+		return configPath
+	}
+
+	t.Run("debug without env rejected", func(t *testing.T) {
+		_, err := Load(write(t, true, ""))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "debug")
+	})
+
+	t.Run("debug with production env rejected", func(t *testing.T) {
+		_, err := Load(write(t, true, "production"))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "debug")
+	})
+
+	t.Run("debug with dev env allowed", func(t *testing.T) {
+		_, err := Load(write(t, true, "dev"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("no debug allowed", func(t *testing.T) {
+		_, err := Load(write(t, false, ""))
+		assert.NoError(t, err)
+	})
 }

@@ -7,10 +7,15 @@ part 'metadata.g.dart';
 
 List<String>? _stringListFromJson(Object? json) {
   if (json == null) return null;
-  if (json is List) return json.cast<String>();
-  if (json is String && json.isNotEmpty) {
-    final decoded = jsonDecode(json);
-    if (decoded is List) return decoded.cast<String>();
+  try {
+    if (json is List) return List<String>.from(json);
+    if (json is String && json.isNotEmpty) {
+      final decoded = jsonDecode(json);
+      if (decoded is List) return List<String>.from(decoded);
+    }
+  } catch (_) {
+    // Кривой элемент не должен ронять парсинг всего списка медиа.
+    return const <String>[];
   }
   return null;
 }

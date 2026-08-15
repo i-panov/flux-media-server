@@ -1,8 +1,8 @@
 package handlers
 
 import (
+	"errors"
 	"log"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -88,15 +88,15 @@ func (h *CollectionHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	id, err := c.ParamsInt("id")
+	id, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
 
 	ctx := c.UserContext()
-	col, err := h.colRepo.FindByID(ctx, uint(id))
+	col, err := h.colRepo.FindByID(ctx, id)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Collection not found")
+		return repoError(c, err, "Collection not found", "Failed to fetch collection")
 	}
 
 	if col.UserID != userID {
@@ -132,22 +132,22 @@ func (h *CollectionHandler) Delete(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
 
-	id, err := c.ParamsInt("id")
+	id, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
 
 	ctx := c.UserContext()
-	col, err := h.colRepo.FindByID(ctx, uint(id))
+	col, err := h.colRepo.FindByID(ctx, id)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Collection not found")
+		return repoError(c, err, "Collection not found", "Failed to fetch collection")
 	}
 
 	if col.UserID != userID {
 		return response.Error(c, fiber.StatusForbidden, "Not your collection")
 	}
 
-	if err := h.colRepo.Delete(ctx, uint(id)); err != nil {
+	if err := h.colRepo.Delete(ctx, id); err != nil {
 		log.Printf("Delete collection: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete collection")
 	}
@@ -160,7 +160,7 @@ type AddItemRequest struct {
 }
 
 func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
-	collectionID, err := c.ParamsInt("id")
+	collectionID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
@@ -176,39 +176,23 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Only the owner may modify a collection.
-	if _, err := h.getOwnedCollection(c, uint(collectionID)); err != nil {
+	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
 		return err
 	}
 
 	// Verify media exists
 	if _, err := h.mediaRepo.FindByID(ctx, req.MediaID); err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
-	// Determine the next position in the collection.
-	// Use MAX(position)+1 from DB to handle gaps after deletions.
-	nextPos, err := h.itemRepo.MaxPosition(ctx, uint(collectionID))
+	// Позиция и проверка дубликата выполняются атомарно в репозитории:
+	// параллельные добавления больше не дают 500 на UNIQUE-индексе.
+	item, err := h.itemRepo.AddItemAtomic(ctx, collectionID, req.MediaID)
 	if err != nil {
-		log.Printf("MaxPosition: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to add item")
-	}
-	nextPos++
-
-	// Check for duplicate
-	existing, err := h.itemRepo.FindByCollectionAndMedia(ctx, uint(collectionID), req.MediaID)
-	if err == nil && existing != nil {
-		return response.Error(c, fiber.StatusConflict, "Media already in collection")
-	}
-
-	item := &models.CollectionItem{
-		CollectionID: uint(collectionID),
-		MediaID:      req.MediaID,
-		Position:     nextPos,
-		AddedAt:      time.Now().UTC(),
-	}
-
-	if err := h.itemRepo.Add(ctx, item); err != nil {
-		log.Printf("Add collection item: %v", err)
+		if errors.Is(err, repository.ErrDuplicateItem) {
+			return response.Error(c, fiber.StatusConflict, "Media already in collection")
+		}
+		log.Printf("AddItemAtomic: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to add item to collection")
 	}
 
@@ -216,24 +200,24 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 }
 
 func (h *CollectionHandler) RemoveItem(c *fiber.Ctx) error {
-	collectionID, err := c.ParamsInt("id")
+	collectionID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
 
-	mediaID, err := c.ParamsInt("mediaId")
+	mediaID, err := parseIDParam(c, "mediaId")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	// Only the owner may modify a collection.
-	if _, err := h.getOwnedCollection(c, uint(collectionID)); err != nil {
+	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
 		return err
 	}
 
 	ctx := c.UserContext()
 
-	if err := h.itemRepo.Remove(ctx, uint(collectionID), uint(mediaID)); err != nil {
+	if err := h.itemRepo.Remove(ctx, collectionID, mediaID); err != nil {
 		log.Printf("Remove collection item: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to remove item")
 	}
@@ -242,22 +226,25 @@ func (h *CollectionHandler) RemoveItem(c *fiber.Ctx) error {
 }
 
 func (h *CollectionHandler) ListItems(c *fiber.Ctx) error {
-	collectionID, err := c.ParamsInt("id")
+	collectionID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
 
 	// Only the owner may view a collection's contents.
-	if _, err := h.getOwnedCollection(c, uint(collectionID)); err != nil {
+	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
 		return err
 	}
 
 	ctx := c.UserContext()
 	// Return full media objects so clients don't need N+1 requests.
-	media, err := h.itemRepo.FindMediaByCollection(ctx, uint(collectionID))
+	media, err := h.itemRepo.FindMediaByCollection(ctx, collectionID)
 	if err != nil {
 		log.Printf("List collection items: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch items")
+	}
+	if media == nil {
+		media = []models.Media{}
 	}
 
 	return c.JSON(media)
@@ -273,7 +260,7 @@ func (h *CollectionHandler) getOwnedCollection(c *fiber.Ctx, collectionID uint) 
 
 	col, err := h.colRepo.FindByID(c.UserContext(), collectionID)
 	if err != nil {
-		return nil, response.Error(c, fiber.StatusNotFound, "Collection not found")
+		return nil, repoError(c, err, "Collection not found", "Failed to fetch collection")
 	}
 
 	if col.UserID != userID {

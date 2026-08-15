@@ -99,3 +99,35 @@ func TestProgressHandler_UpdateNegativePosition(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 }
+
+func TestProgressHandler_UpdatePositionBeyondDuration(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	// Позиция не может превышать длительность (400).
+	body, _ := json.Marshal(map[string]int{"position": 100, "duration": 50})
+	req := httptest.NewRequest("PUT", "/api/progress/1", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}
+
+func TestProgressHandler_DeleteNotFound(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest("DELETE", "/api/progress/999", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+}
+
+func TestProgressHandler_ListEmptyItems(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	buf := bytes.Buffer{}
+	buf.ReadFrom(resp.Body)
+	assert.Contains(t, buf.String(), `"items":[]`)
+}

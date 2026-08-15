@@ -31,11 +31,13 @@ final removeFavoriteProvider = Provider<RemoveFavorite>((ref) {
   return RemoveFavorite(ref.watch(favoritesRepositoryProvider));
 });
 
-/// Избранное текущего пользователя.
+/// Избранное текущего пользователя — единый источник истины.
 ///
-/// Notifier-обёртка нужна для локальных мутаций кеша при toggle: после
-/// успешного add/remove мы обновляем список напрямую (без лишнего GET).
-class FavoritesNotifier extends AutoDisposeAsyncNotifier<List<Favorite>> {
+/// keepAlive (не autoDispose): нотифаер не пересоздаётся при toggle с
+/// экрана без подписчиков, поэтому мутации через [addLocal]/[removeLocal]
+/// не вызывают лишних GET. Локальные апдейты сразу видны всем экранам
+/// через [favoriteMediaIdsProvider].
+class FavoritesNotifier extends AsyncNotifier<List<Favorite>> {
   @override
   Future<List<Favorite>> build() async {
     final getFavorites = ref.watch(getFavoritesProvider);
@@ -47,13 +49,12 @@ class FavoritesNotifier extends AutoDisposeAsyncNotifier<List<Favorite>> {
   }
 
   /// Добавляет [favorite] в кеш без сетевого запроса.
+  ///
+  /// Если список ещё не загружен — ничего не делаем: серверный запрос
+  /// (в полёте либо при следующем входе) сам принесёт изменение.
   void addLocal(Favorite favorite) {
     final current = state.valueOrNull;
-    if (current == null) {
-      // Данные ещё не загружены — перечитываем с сервера.
-      ref.invalidateSelf();
-      return;
-    }
+    if (current == null) return;
     if (current.any((f) => f.mediaId == favorite.mediaId)) return;
     state = AsyncValue.data([...current, favorite]);
   }
@@ -61,10 +62,7 @@ class FavoritesNotifier extends AutoDisposeAsyncNotifier<List<Favorite>> {
   /// Удаляет избранное [mediaId] из кеша без сетевого запроса.
   void removeLocal(int mediaId) {
     final current = state.valueOrNull;
-    if (current == null) {
-      ref.invalidateSelf();
-      return;
-    }
+    if (current == null) return;
     state = AsyncValue.data(
       current.where((f) => f.mediaId != mediaId).toList(),
     );
@@ -72,12 +70,16 @@ class FavoritesNotifier extends AutoDisposeAsyncNotifier<List<Favorite>> {
 }
 
 /// Fetches all favorites for the current user.
-final favoritesProvider = AsyncNotifierProvider.autoDispose<FavoritesNotifier,
-    List<Favorite>>(FavoritesNotifier.new);
+final favoritesProvider =
+    AsyncNotifierProvider<FavoritesNotifier, List<Favorite>>(
+  FavoritesNotifier.new,
+);
 
 /// Tracks favorite media IDs for quick lookup.
-final favoriteMediaIdsProvider =
-    FutureProvider.autoDispose<Set<int>>((ref) async {
+///
+/// keepAlive: производная от [favoritesProvider], пересчитывается при
+/// локальных мутациях — единый источник истины для иконок избранного.
+final favoriteMediaIdsProvider = FutureProvider<Set<int>>((ref) async {
   final favorites = await ref.watch(favoritesProvider.future);
   return favorites
       .where((f) => f.mediaId != null)

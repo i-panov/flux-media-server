@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"flux/internal/models"
 
@@ -58,12 +59,17 @@ func (r *FavoriteStore) FindByUserAndArtist(ctx context.Context, userID, artistI
 	return &fav, err
 }
 
+// IsFavorited сообщает, есть ли у пользователя медиа-фavorite на запись.
+// Общая логика с FindByUserAndMedia — тот же WHERE (user_id, media_id).
 func (r *FavoriteStore) IsFavorited(ctx context.Context, userID, mediaID uint) (bool, error) {
-	var count int64
-	err := r.db.WithContext(ctx).Model(&models.Favorite{}).
-		Where("user_id = ? AND media_id = ?", userID, mediaID).
-		Count(&count).Error
-	return count > 0, err
+	_, err := r.FindByUserAndMedia(ctx, userID, mediaID)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, err
 }
 
 func (r *FavoriteStore) IsArtistFavorited(ctx context.Context, userID, artistID uint) (bool, error) {

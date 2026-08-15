@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
@@ -27,8 +28,16 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
   final _codeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  /// Локальная загрузка верификации: глобальный AuthLoading размонтировал
+  /// бы Navigator (splash) и потерял бы состояние экрана.
+  bool _isVerifying = false;
+
+  /// Debug-код из state на момент открытия экрана — переживает ошибку
+  /// верификации (state в это время AuthError без debug-кода).
+  String? _debugCode;
+
+  final ValueNotifier<int> _cooldown = ValueNotifier(0);
   Timer? _cooldownTimer;
-  int _cooldownSeconds = 0;
 
   @override
   void initState() {
@@ -36,59 +45,62 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
     // Автозаполняем debug-код из актуального состояния провайдера,
     // а не из параметров конструктора.
     final state = ref.read(authProvider);
-    if (state is AuthCodeSent && state.debugCode != null) {
-      _codeController.text = state.debugCode!;
+    if (state is AuthCodeSent) {
+      _debugCode = state.debugCode;
+      if (state.debugCode != null) {
+        _codeController.text = state.debugCode!;
+      }
     }
   }
 
   @override
   void dispose() {
     _cooldownTimer?.cancel();
+    _cooldown.dispose();
     _codeController.dispose();
     super.dispose();
   }
 
-  void _verifyCode() {
-    if (_formKey.currentState!.validate()) {
-      ref.read(authProvider.notifier).verifyCode(
-            widget.email,
-            _codeController.text.trim(),
-          );
-    }
+  Future<void> _verifyCode() async {
+    if (_isVerifying || !_formKey.currentState!.validate()) return;
+    setState(() => _isVerifying = true);
+    await ref
+        .read(authProvider.notifier)
+        .verifyCode(widget.email, _codeController.text.trim());
+    // При успехе FluxApp уводит на MainRoute и экран размонтируется.
+    if (mounted) setState(() => _isVerifying = false);
   }
 
   void _startCooldown() {
     _cooldownTimer?.cancel();
-    setState(() => _cooldownSeconds = _resendCooldown.inSeconds);
+    _cooldown.value = _resendCooldown.inSeconds;
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      setState(() {
-        if (_cooldownSeconds > 0) {
-          _cooldownSeconds--;
-        } else {
-          timer.cancel();
-        }
-      });
+      if (_cooldown.value > 0) {
+        _cooldown.value--;
+      } else {
+        timer.cancel();
+      }
     });
   }
 
-  void _resendCode() {
-    // Ресенд недоступен во время верификации и пока идёт cooldown.
-    final state = ref.read(authProvider);
-    if (state is AuthLoading || _cooldownSeconds > 0) return;
-    ref.read(authProvider.notifier).requestCode(widget.email);
-    _startCooldown();
+  Future<void> _resendCode() async {
+    if (_cooldown.value > 0 || _isVerifying) return;
+    final sent =
+        await ref.read(authProvider.notifier).requestCode(widget.email);
+    if (!mounted) return;
+    // Cooldown — только если код реально отправлен; при ошибке (в т.ч.
+    // сетевой) не блокируем повторную попытку.
+    if (sent) _startCooldown();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final authState = ref.watch(authProvider);
-    final debugCode = authState is AuthCodeSent ? authState.debugCode : null;
-    final isVerifying = authState is AuthLoading;
 
     return Scaffold(
       appBar: AppBar(
@@ -118,7 +130,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
-                if (debugCode != null) ...[
+                if (_debugCode != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -133,7 +145,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                         Icon(Icons.bug_report, color: Colors.orange.shade700),
                         const SizedBox(width: 8),
                         Text(
-                          l.debugCodeLabel(debugCode),
+                          l.debugCodeLabel(_debugCode!),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.orange.shade900,
@@ -146,8 +158,16 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _codeController,
+                  autofocus: true,
+                  maxLength: 6,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: [
+                    // allow() вместо digitsOnly: пропускает вставку из
+                    // буфера обмена (digitsOnly блокирует вставку).
+                    FilteringTextInputFormatter.allow(RegExp(r'\d{0,6}')),
+                  ],
+                  onFieldSubmitted: (_) => _verifyCode(),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 24,
@@ -157,6 +177,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                     labelText: l.code,
                     border: const OutlineInputBorder(),
                     hintText: '000000',
+                    counterText: '',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -173,8 +194,8 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: isVerifying ? null : _verifyCode,
-                    child: isVerifying
+                    onPressed: _isVerifying ? null : _verifyCode,
+                    child: _isVerifying
                         ? const CircularProgressIndicator()
                         : Text(l.verify),
                   ),
@@ -187,14 +208,29 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
+                ValueListenableBuilder<int>(
+                  valueListenable: _cooldown,
+                  builder: (context, seconds, _) {
+                    final enabled = seconds == 0 && !_isVerifying;
+                    return Semantics(
+                      label: l.resendCode,
+                      enabled: enabled,
+                      button: true,
+                      child: TextButton(
+                        onPressed: enabled ? _resendCode : null,
+                        child: Text(
+                          seconds > 0
+                              ? '${l.resendCode} (${seconds}s)'
+                              : l.resendCode,
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 TextButton(
-                  onPressed:
-                      isVerifying || _cooldownSeconds > 0 ? null : _resendCode,
-                  child: Text(
-                    _cooldownSeconds > 0
-                        ? '${l.resendCode} (${_cooldownSeconds}s)'
-                        : l.resendCode,
-                  ),
+                  onPressed: () =>
+                      context.router.replace(const LoginRoute()),
+                  child: Text(l.changeEmail),
                 ),
               ],
             ),

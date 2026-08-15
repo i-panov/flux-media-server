@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -40,14 +41,22 @@ class MainScreen extends StatelessWidget {
     final width = MediaQuery.of(context).size.width;
     final isWide = width >= 900;
 
+    // SystemNavigator.pop работает только на мобильных (Android/iOS):
+    // на web/desktop он no-op, а блокировка back съедала бы навигацию.
+    final isMobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+
     return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          // Exit the app instead of navigating back to ServerSetup.
-          SystemNavigator.pop();
-        }
-      },
+      canPop: !isMobile,
+      onPopInvokedWithResult: isMobile
+          ? (didPop, _) {
+              if (!didPop) {
+                // Exit the app instead of navigating back to ServerSetup.
+                SystemNavigator.pop();
+              }
+            }
+          : null,
       child: isWide ? _buildWide(l) : _buildNarrow(l),
     );
   }

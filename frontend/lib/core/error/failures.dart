@@ -33,3 +33,8 @@ class CacheFailure extends Failure {
 class AuthFailure extends Failure {
   const AuthFailure({super.message = 'Authentication error occurred'});
 }
+
+/// Операция загрузки (upload/download) была отменена пользователем.
+class UploadCancelledFailure extends Failure {
+  const UploadCancelledFailure({super.message = 'Upload cancelled'});
+}

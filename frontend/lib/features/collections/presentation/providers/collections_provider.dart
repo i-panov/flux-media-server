@@ -54,21 +54,52 @@ final collectionsProvider =
   final getCollections = ref.watch(getCollectionsProvider);
   final result = await getCollections(const NoParams());
   return result.fold(
-    (failure) => throw Exception(failure.message),
+    // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
+    // ignore: only_throw_errors
+    (failure) => throw failure,
     (collections) => collections,
   );
 });
 
-/// Fetches full media items for a specific collection (API returns
-/// Media objects).
-final collectionItemsFullProvider =
-    FutureProvider.autoDispose.family<List<Media>, int>(
-  (ref, collectionId) async {
+/// Полные элементы коллекции с локальными мутациями.
+///
+/// [addLocal]/[removeLocal] обновляют список без refetch после
+/// добавления/удаления элемента (оптимистичные апдейты).
+class CollectionItemsNotifier
+    extends AutoDisposeFamilyAsyncNotifier<List<Media>, int> {
+  @override
+  Future<List<Media>> build(int collectionId) async {
     final getItemsFull = ref.watch(getCollectionItemsFullProvider);
     final result = await getItemsFull(collectionId);
     return result.fold(
-      (failure) => throw Exception(failure.message),
+      // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
+      // ignore: only_throw_errors
+      (failure) => throw failure,
       (items) => items,
     );
-  },
+  }
+
+  /// Добавляет [media] в кеш без сетевого запроса.
+  void addLocal(Media media) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    if (current.any((m) => m.id == media.id)) return;
+    state = AsyncValue.data([...current, media]);
+  }
+
+  /// Удаляет медиа с [mediaId] из кеша без сетевого запроса.
+  void removeLocal(int mediaId) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncValue.data(
+      current.where((m) => m.id != mediaId).toList(),
+    );
+  }
+}
+
+/// Fetches full media items for a specific collection (API returns
+/// Media objects).
+final collectionItemsFullProvider = AsyncNotifierProvider.autoDispose
+    .family<CollectionItemsNotifier, List<Media>, int>(
+  CollectionItemsNotifier.new,
 );

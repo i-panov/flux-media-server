@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,29 +16,64 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  /// Клиентский cooldown: не даёт спамить requestCode.
+  static const _requestCooldown = Duration(seconds: 30);
+
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
+  final ValueNotifier<int> _cooldown = ValueNotifier(0);
+  Timer? _cooldownTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Восстанавливаем email после возврата с экрана кода
+    // (ошибка верификации, «изменить email»).
+    final lastEmail = ref.read(authProvider.notifier).lastRequestedEmail;
+    if (lastEmail != null && lastEmail.isNotEmpty) {
+      _emailController.text = lastEmail;
+    }
+  }
+
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
+    _cooldown.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    _cooldown.value = _requestCooldown.inSeconds;
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_cooldown.value > 0) {
+        _cooldown.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   Future<void> _requestCode() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      final email = _emailController.text.trim();
-      await ref.read(authProvider.notifier).requestCode(email);
-      if (mounted) {
-        final state = ref.read(authProvider);
-        if (state is AuthCodeSent) {
-          await context.router.replace(
-            CodeRoute(email: state.email),
-          );
-        }
-        setState(() => _isLoading = false);
+    if (_isLoading || _cooldown.value > 0) return;
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+    final email = _emailController.text.trim();
+    final sent = await ref.read(authProvider.notifier).requestCode(email);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (sent) {
+        _startCooldown();
+        await context.router.replace(
+          CodeRoute(email: email),
+        );
       }
     }
   }
@@ -83,7 +120,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     if (value == null || value.isEmpty) {
                       return l.pleaseEnterEmail;
                     }
-                    if (!RegExp(r'^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,4}$')
+                    // Без ограничения длины TLD: {2,4} отсекает новые
+                    // домены (например .technology); достаточно наличия
+                    // хотя бы одной точки в доменной части.
+                    if (!RegExp(r'^[\w\-.]+@([\w\-]+\.)+[\w\-]+$')
                         .hasMatch(value)) {
                       return l.pleaseEnterValidEmail;
                     }
@@ -91,15 +131,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _requestCode,
-                    child: _isLoading
-                        ? const CircularProgressIndicator()
-                        : Text(l.getCode),
-                  ),
+                ValueListenableBuilder<int>(
+                  valueListenable: _cooldown,
+                  builder: (context, seconds, _) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed:
+                            _isLoading || seconds > 0 ? null : _requestCode,
+                        child: _isLoading
+                            ? const CircularProgressIndicator()
+                            : Text(
+                                seconds > 0
+                                    ? '${l.getCode} (${seconds}s)'
+                                    : l.getCode,
+                              ),
+                      ),
+                    );
+                  },
                 ),
                 if (authState is AuthError) ...[
                   const SizedBox(height: 16),

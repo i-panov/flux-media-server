@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"context"
 	"mime/multipart"
 	"net/http/httptest"
 	"os"
@@ -45,7 +46,8 @@ func setupUploadTest(t *testing.T) (*fiber.App, repository.MediaRepository, func
 	})
 
 	mediaCfg := config.MediaConfig{
-		VideoPath:     libraryPath,
+		VideoPath:     filepath.Join(libraryPath, "video"),
+		AudioPath:     filepath.Join(libraryPath, "audio"),
 		ThumbnailPath: thumbDir,
 	}
 	cfg := handlers.UploadConfig{
@@ -145,4 +147,72 @@ func TestUploadFileTooLarge(t *testing.T) {
 	_, err := app.Test(req, 10000)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "body size exceeds the given limit")
+}
+
+func TestUploadDuplicateFile(t *testing.T) {
+	app, _, cleanup := setupUploadTest(t)
+	defer cleanup()
+
+	fileContent := []byte("duplicate content")
+	body, contentType := createMultipartForm(t, "dup.mp4", fileContent, string(models.MediaTypeVideo))
+
+	req := httptest.NewRequest("POST", "/api/media/upload", body)
+	req.Header.Set("Content-Type", contentType)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+
+	// Тот же контент — тот же хэш: дубликат → 409, а не 500.
+	body, contentType = createMultipartForm(t, "dup.mp4", fileContent, string(models.MediaTypeVideo))
+	req = httptest.NewRequest("POST", "/api/media/upload", body)
+	req.Header.Set("Content-Type", contentType)
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+}
+
+func TestUploadMediaTypeFromForm(t *testing.T) {
+	app, mediaRepo, cleanup := setupUploadTest(t)
+	defer cleanup()
+
+	// media_type=audio задан явно: в Type записи сохраняется именно он,
+	// а не определение по расширению (.mp4 → video).
+	fileContent := []byte("audio content")
+	body, contentType := createMultipartForm(t, "song.mp4", fileContent, string(models.MediaTypeAudio))
+
+	req := httptest.NewRequest("POST", "/api/media/upload", body)
+	req.Header.Set("Content-Type", contentType)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+
+	mediaList, _, err := mediaRepo.FindAll(context.Background(), nil, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, mediaList, 1)
+	assert.Equal(t, models.MediaTypeAudio, mediaList[0].Type)
+}
+
+func TestUploadMediaTypeByExtension(t *testing.T) {
+	app, mediaRepo, cleanup := setupUploadTest(t)
+	defer cleanup()
+
+	// media_type не задан: тип определяется по расширению (.mp3 → audio).
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "song.mp3")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("audio content"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest("POST", "/api/media/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+
+	mediaList, _, err := mediaRepo.FindAll(context.Background(), nil, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, mediaList, 1)
+	assert.Equal(t, models.MediaTypeAudio, mediaList[0].Type)
 }

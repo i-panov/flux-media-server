@@ -56,8 +56,9 @@ func coverMultipartForm(t *testing.T, filename string, content []byte) (*bytes.B
 func TestThumbHandler_UploadCoverValidJPEG(t *testing.T) {
 	app := setupThumbTestApp(t)
 
-	// Минимальный JPEG: достаточно magic bytes FF D8 FF.
-	content := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00}
+	// Минимальный валидный JPEG-заголовок: magic FF D8 FF + маркер JFIF
+	// (не менее 12 байт).
+	content := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01}
 	body, contentType := coverMultipartForm(t, "cover.jpg", content)
 
 	req := httptest.NewRequest("PUT", "/api/media/1/cover", body)
@@ -71,6 +72,20 @@ func TestThumbHandler_UploadCoverValidJPEG(t *testing.T) {
 	buf.ReadFrom(resp.Body)
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &parsed))
 	assert.Equal(t, "/api/media/1/cover", parsed["cover_url"])
+}
+
+func TestThumbHandler_UploadCoverTooSmall(t *testing.T) {
+	app := setupThumbTestApp(t)
+
+	// 3 байта "FF D8 FF" — фрагмент magic, но не валидный JPEG.
+	content := []byte{0xFF, 0xD8, 0xFF}
+	body, contentType := coverMultipartForm(t, "cover.jpg", content)
+
+	req := httptest.NewRequest("PUT", "/api/media/1/cover", body)
+	req.Header.Set("Content-Type", contentType)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 }
 
 func TestThumbHandler_UploadCoverInvalidMagicBytes(t *testing.T) {

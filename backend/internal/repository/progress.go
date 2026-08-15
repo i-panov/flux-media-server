@@ -20,7 +20,10 @@ func NewProgressRepository(db *gorm.DB) *ProgressStore {
 func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.WatchProgress, int64, error) {
 	var progress []models.WatchProgress
 	var total int64
-	query := r.db.WithContext(ctx).Model(&models.WatchProgress{}).Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).
+		Preload("Media"). // «продолжить просмотр» — клиенту нужен объект медиа
+		Model(&models.WatchProgress{}).
+		Where("user_id = ?", userID)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

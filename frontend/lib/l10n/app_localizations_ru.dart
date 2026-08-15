@@ -473,4 +473,83 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get addMedia => 'Добавить медиа';
+
+  @override
+  String get loadMore => 'Загрузить ещё';
+
+  @override
+  String get showAll => 'Показать все';
+
+  @override
+  String get changeEmail => 'Изменить email';
+
+  @override
+  String failedToRemove(String error) {
+    return 'Не удалось удалить: $error';
+  }
+
+  @override
+  String get alreadyAdded => 'Уже добавлено';
+
+  @override
+  String get uploadFileEmpty => 'Выбранный файл пуст';
+
+  @override
+  String get uploadFileTooLarge =>
+      'Файл превышает лимит загрузки сервера (2 ГБ)';
+
+  @override
+  String get addToFavorites => 'Добавить в избранное';
+
+  @override
+  String get removeFromFavorites => 'Убрать из избранного';
+
+  @override
+  String get invalidServerUrl =>
+      'Введите корректный URL, начинающийся с http:// или https://';
+
+  @override
+  String failedToSaveSettings(String error) {
+    return 'Не удалось сохранить настройки: $error';
+  }
+
+  @override
+  String get logoutConfirmTitle => 'Выйти?';
+
+  @override
+  String logoutConfirmMessage(String size) {
+    return 'У вас $size офлайн-медиа. Выход удалит офлайн-кэш.';
+  }
+
+  @override
+  String get offlineCache => 'Офлайн-кэш';
+
+  @override
+  String get cacheSizeCalculating => 'Расчёт размера кэша...';
+
+  @override
+  String cacheSizeLabel(String size) {
+    return 'Офлайн-кэш: $size';
+  }
+
+  @override
+  String get cacheCleared => 'Офлайн-кэш очищен';
+
+  @override
+  String get trustSelfSignedCertificate =>
+      'Доверять самоподписанному сертификату';
+
+  @override
+  String get trustSelfSignedHint =>
+      'Только для частных серверов с собственным сертификатом. Включает небезопасный HTTPS.';
+
+  @override
+  String connectionFailed(String error) {
+    return 'Не удалось подключиться к серверу: $error';
+  }
+
+  @override
+  String serverStatusError(int code) {
+    return 'Сервер вернул статус $code';
+  }
 }

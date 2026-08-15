@@ -1,6 +1,8 @@
+import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
+import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -60,7 +62,7 @@ class MediaRepositoryImpl implements MediaRepository {
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) =>
-      safeRepositoryCall(
+      _cancellableCall(
         () => remoteDataSource.uploadFile(
           filePath: filePath,
           mediaType: mediaType,
@@ -77,9 +79,11 @@ class MediaRepositoryImpl implements MediaRepository {
   @override
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
-    Map<String, dynamic> data,
+    MetadataEdit edit,
   ) =>
-      safeRepositoryCall(() => remoteDataSource.updateMetadata(mediaId, data));
+      safeRepositoryCall(
+        () => remoteDataSource.updateMetadata(mediaId, _editToJson(edit)),
+      );
 
   @override
   Future<Either<Failure, WatchProgress>> updateProgress(
@@ -98,6 +102,40 @@ class MediaRepositoryImpl implements MediaRepository {
       );
 
   @override
-  Future<Either<Failure, void>> uploadCover(int mediaId, String filePath) =>
-      safeRepositoryCall(() => remoteDataSource.uploadCover(mediaId, filePath));
+  Future<Either<Failure, void>> uploadCover(
+    int mediaId,
+    String filePath, {
+    bool Function()? isCancelled,
+  }) =>
+      _cancellableCall(
+        () => remoteDataSource.uploadCover(
+          mediaId,
+          filePath,
+          isCancelled: isCancelled,
+        ),
+      );
+
+  /// Обёртка над [safeRepositoryCall] для операций с отменой: общий маппинг
+  /// уже превращает [UploadCancelledException] в [UploadCancelledFailure],
+  /// этот catch — дополнительная страховка на случай будущих изменений.
+  Future<Either<Failure, T>> _cancellableCall<T>(
+    Future<T> Function() call,
+  ) async {
+    try {
+      return await safeRepositoryCall(call);
+      // ignore: avoid_catching_errors
+    } on UploadCancelledException {
+      return const Left(UploadCancelledFailure());
+    }
+  }
+
+  /// Маппинг типизированного редактирования в JSON — остаётся в data-слое.
+  static Map<String, dynamic> _editToJson(MetadataEdit edit) => {
+        'title': edit.title,
+        'artists': edit.artists,
+        if (edit.album != null) 'album': edit.album,
+        if (edit.genre != null) 'genre': edit.genre,
+        if (edit.year != null) 'year': edit.year,
+        if (edit.description != null) 'description': edit.description,
+      };
 }

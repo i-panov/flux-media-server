@@ -382,5 +382,83 @@
   "removeFromCollection": "Remove from collection",
   "@removeFromCollection": {},
   "addMedia": "Add media",
-  "@addMedia": {}
+  "@addMedia": {},
+  "loadMore": "Load more",
+  "@loadMore": {},
+  "showAll": "Show all",
+  "@showAll": {},
+  "changeEmail": "Change email",
+  "@changeEmail": {},
+  "failedToRemove": "Failed to remove: {error}",
+  "@failedToRemove": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "alreadyAdded": "Already added",
+  "@alreadyAdded": {},
+  "uploadFileEmpty": "Selected file is empty",
+  "@uploadFileEmpty": {},
+  "uploadFileTooLarge": "File exceeds the server upload limit (2 GB)",
+  "@uploadFileTooLarge": {},
+  "addToFavorites": "Add to favorites",
+  "@addToFavorites": {},
+  "removeFromFavorites": "Remove from favorites",
+  "@removeFromFavorites": {},
+  "invalidServerUrl": "Please enter a valid URL starting with http:// or https://",
+  "@invalidServerUrl": {},
+  "failedToSaveSettings": "Failed to save settings: {error}",
+  "@failedToSaveSettings": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "logoutConfirmTitle": "Log out?",
+  "@logoutConfirmTitle": {},
+  "logoutConfirmMessage": "You have {size} of offline media. Logging out will delete the offline cache.",
+  "@logoutConfirmMessage": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "offlineCache": "Offline cache",
+  "@offlineCache": {},
+  "cacheSizeCalculating": "Calculating cache size...",
+  "@cacheSizeCalculating": {},
+  "cacheSizeLabel": "Offline cache: {size}",
+  "@cacheSizeLabel": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheCleared": "Offline cache cleared",
+  "@cacheCleared": {},
+  "trustSelfSignedCertificate": "Trust self-signed certificate",
+  "@trustSelfSignedCertificate": {},
+  "trustSelfSignedHint": "Use only for private servers with your own certificate. Enables insecure HTTPS.",
+  "@trustSelfSignedHint": {},
+  "connectionFailed": "Failed to connect to the server: {error}",
+  "@connectionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "serverStatusError": "Server returned status {code}",
+  "@serverStatusError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  }
 }

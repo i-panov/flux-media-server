@@ -13,6 +13,7 @@ import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -47,6 +48,18 @@ void main() async {
   audioHandler
     ..onNext = queue.next
     ..onPrevious = queue.previous
+    ..onPlay = () async {
+      final playback = container.read(playbackCoordinatorProvider);
+      if (playback is PlaybackPlaying &&
+          playback.type == MediaType.audio &&
+          playback.isPaused) {
+        await container.read(playbackCoordinatorProvider.notifier).resume();
+      } else if (playback is PlaybackCompleted) {
+        // Перезапускаем текущий трек: прямой player.play() оставил бы
+        // UI в состоянии completed, а музыка играла бы «в фоне».
+        await queue.playCurrent();
+      }
+    }
     ..onToggleFavorite = () {
       final state = container.read(playbackCoordinatorProvider);
       if (state is PlaybackPlaying) {
@@ -125,12 +138,19 @@ class _FluxAppState extends ConsumerState<FluxApp> {
       if (next is AuthAuthenticated) {
         widget.router.replaceAll([const MainRoute()]);
       } else if (next is AuthError && _hasServerUrl) {
-        // Server unreachable — enter offline mode.
+        // Редирект — только для стартовой проверки сессии и перехода
+        // из авторизованного состояния; ошибки форм (verifyCode,
+        // requestCode) маршрут не меняют — экран показывает ошибку сам.
         final shouldRedirect = previous == null ||
             previous is AuthLoading ||
             previous is AuthAuthenticated;
-        if (shouldRedirect) {
+        if (!shouldRedirect) return;
+        if (next.isOffline) {
+          // Server unreachable — enter offline mode.
           widget.router.replaceAll([const MainRoute()]);
+        } else if (previous is AuthAuthenticated) {
+          // Session expired — back to login.
+          widget.router.replaceAll([const LoginRoute()]);
         }
       } else if (next is AuthInitial && _hasServerUrl) {
         // Выход из офлайн-режима (AuthError → AuthInitial) тоже ведёт

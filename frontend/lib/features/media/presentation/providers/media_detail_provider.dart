@@ -29,14 +29,22 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
   final GetMediaDetail _getMediaDetail;
   final Ref _ref;
 
+  /// Поколение запроса: повторный Retry не должен давать гонку, когда
+  /// старый ответ перезаписывает свежий. Ответ устаревшего поколения
+  /// отбрасывается.
+  int _generation = 0;
+
   Future<void> load(int id) async {
+    final generation = ++_generation;
     state = const MediaDetailState.loading();
     final result = await _getMediaDetail(id);
+    if (!mounted || generation != _generation) return;
     await result.fold<Future<void>>(
       (failure) async {
         // API failed — try local metadata (offline mode).
         final cacheService = _ref.read(offlineCacheServiceProvider);
         final cachedMedia = await cacheService.getCachedMedia();
+        if (!mounted || generation != _generation) return;
         final local = cachedMedia.where((m) => m.id == id).firstOrNull;
         if (local != null) {
           state = MediaDetailState.loaded(media: local);
@@ -49,6 +57,7 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
         unawaited(
           _ref.read(offlineCacheServiceProvider).saveMetadata(media),
         );
+        if (!mounted || generation != _generation) return;
         state = MediaDetailState.loaded(media: media);
       },
     );
@@ -58,20 +67,28 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
     state = MediaDetailState.loaded(media: media);
   }
 
-  /// Точечно обновляет обложку без перевода экрана в loading.
+  /// Тихий перезапрос с сервера: экран не переводится в loading.
   ///
-  /// [coverUrl] используется как флаг наличия обложки; обновление
-  /// `updatedAt` меняет cache-buster в URL картинки, чтобы обновилась
-  /// картинка.
-  void setCoverUrl(String coverUrl) {
-    state = state.maybeWhen(
-      loaded: (media) => MediaDetailState.loaded(
-        media: media.copyWith(
-          coverUrl: coverUrl,
-          updatedAt: DateTime.now(),
-        ),
-      ),
-      orElse: () => state,
+  /// Используется после загрузки обложки: серверный `updatedAt` даёт
+  /// честный cache-buster для картинки (клиентское время в setCoverUrl
+  /// врало бы его).
+  Future<void> refresh() async {
+    final current = state;
+    if (current is! MediaDetailLoaded) return;
+    final generation = ++_generation;
+    final result = await _getMediaDetail(current.media.id);
+    if (!mounted || generation != _generation) return;
+    result.fold(
+      (failure) {
+        // Молча: обложка уже загружена, старое состояние тоже валидно.
+      },
+      (media) {
+        unawaited(
+          _ref.read(offlineCacheServiceProvider).saveMetadata(media),
+        );
+        if (!mounted || generation != _generation) return;
+        state = MediaDetailState.loaded(media: media);
+      },
     );
   }
 }

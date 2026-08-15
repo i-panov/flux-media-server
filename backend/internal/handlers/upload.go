@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 
 	"flux/internal/config"
 	"flux/internal/metadata"
@@ -22,7 +23,6 @@ import (
 // UploadHandler handles file uploads.
 type UploadHandler struct {
 	mediaRepo repository.MediaRepository
-	scanner   services.ScannerInterface
 	thumbSvc  *services.ThumbnailService
 	extractor *services.MetadataExtractor
 	config    UploadConfig
@@ -35,16 +35,17 @@ type UploadConfig struct {
 }
 
 // NewUploadHandler creates a new UploadHandler.
+// Параметр scanner устарел (загрузка больше не триггерит сканер), но
+// сохранён в сигнатуре — app.go передаёт его при конструировании.
 func NewUploadHandler(
 	mediaRepo repository.MediaRepository,
-	scanner services.ScannerInterface,
+	_ services.ScannerInterface,
 	thumbSvc *services.ThumbnailService,
 	mediaCfg config.MediaConfig,
 	config UploadConfig,
 ) *UploadHandler {
 	return &UploadHandler{
 		mediaRepo: mediaRepo,
-		scanner:   scanner,
 		thumbSvc:  thumbSvc,
 		extractor: services.NewMetadataExtractor(),
 		mediaCfg:  mediaCfg,
@@ -56,8 +57,9 @@ func NewUploadHandler(
 func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	// Resolve destination path by media_type. Невалидное непустое значение —
-	// ошибка 400, а не молчаливое падение в video.
+	// Тип определяем консистентно: заданный валидный media_type имеет
+	// приоритет (он и каталог выбирает, и в запись Type попадает);
+	// при отсутствии media_type — по расширению файла.
 	rawType := c.FormValue("media_type")
 	mediaType := models.MediaTypeVideo
 	if rawType != "" {
@@ -65,13 +67,6 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		if !mediaType.Valid() {
 			return response.Error(c, fiber.StatusBadRequest, "Invalid media_type")
 		}
-	}
-	destPath := h.mediaCfg.VideoPath
-	if mediaType == models.MediaTypeAudio {
-		destPath = h.mediaCfg.AudioPath
-	}
-	if destPath == "" {
-		return response.Error(c, fiber.StatusInternalServerError, "No path configured for media type: "+string(mediaType))
 	}
 
 	// Get uploaded file.
@@ -102,6 +97,18 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "File type not allowed: "+ext)
 	}
 
+	// Resolve destination path by media_type.
+	if rawType == "" {
+		mediaType = services.DetermineMediaType(filename)
+	}
+	destPath := h.mediaCfg.VideoPath
+	if mediaType == models.MediaTypeAudio {
+		destPath = h.mediaCfg.AudioPath
+	}
+	if destPath == "" {
+		return response.Error(c, fiber.StatusInternalServerError, "No path configured for media type: "+string(mediaType))
+	}
+
 	// Ensure destination directory exists.
 	if err := os.MkdirAll(destPath, 0755); err != nil {
 		log.Printf("upload: mkdir %s: %v", destPath, err)
@@ -125,7 +132,7 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	}
 
 	// Create media record using scanner logic (hash, metadata, thumbnail).
-	media, err := h.createMediaFromUpload(ctx, dstPath, filename)
+	media, err := h.createMediaFromUpload(ctx, dstPath, filename, mediaType)
 	if err != nil {
 		log.Printf("upload: create media: %v", err)
 		// Remove the orphaned file so we don't leave untracked data on disk.
@@ -143,24 +150,27 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 }
 
 // createMediaFromUpload creates a media record from an uploaded file.
-func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, filename string) (*models.Media, error) {
+func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, filename string, mediaType models.MediaType) (*models.Media, error) {
 	// Compute hashes.
 	hash, err := services.HashFile(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check for duplicates.
+	// Check for duplicates. FindByHash возвращает gorm.ErrRecordNotFound при
+	// отсутствии записи — любые прочие ошибки БД пробрасываем как сбой,
+	// а не как «не дубликат».
 	existing, err := h.mediaRepo.FindByHash(ctx, hash)
-	if err == nil && existing != nil {
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	} else if existing != nil {
 		return nil, fiber.NewError(fiber.StatusConflict, "Duplicate file")
 	}
 
 	// Parse filename for metadata
 	title, year := metadata.ParseFilename(filename)
-
-	// Determine media type
-	mediaType := services.DetermineMediaType(filePath)
 
 	info, _ := os.Stat(filePath)
 	fileSize := int64(0)

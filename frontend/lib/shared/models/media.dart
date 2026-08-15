@@ -1,43 +1,14 @@
 import 'package:flux_media_server/shared/models/artist.dart';
+import 'package:flux_media_server/shared/models/media_type.dart';
 import 'package:flux_media_server/shared/models/metadata.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 // ignore_for_file: invalid_annotation_target
 
+export 'media_type.dart';
+
 part 'media.freezed.dart';
 part 'media.g.dart';
-
-/// Custom converter for MediaType enum to/from JSON string.
-class MediaTypeConverter implements JsonConverter<MediaType, String> {
-  const MediaTypeConverter();
-
-  @override
-  MediaType fromJson(String json) => _mediaTypeFromValue(json);
-
-  @override
-  String toJson(MediaType object) => object.value;
-}
-
-MediaType _mediaTypeFromValue(String value) {
-  switch (value) {
-    case 'video':
-      return MediaType.video;
-    case 'audio':
-      return MediaType.audio;
-    default:
-      // Не маскируем нераспознанные значения под video.
-      return MediaType.unknown;
-  }
-}
-
-enum MediaType {
-  video('video'),
-  audio('audio'),
-  unknown('');
-
-  const MediaType(this.value);
-  final String value;
-}
 
 @freezed
 class Media with _$Media {
@@ -58,6 +29,7 @@ class Media with _$Media {
     Metadata? metadata,
     @JsonKey(name: 'file_hash') @Default('') String fileHash,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
   }) = _Media;
 
   factory Media.fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);

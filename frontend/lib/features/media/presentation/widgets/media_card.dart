@@ -4,6 +4,8 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
+import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
+import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 class MediaCard extends ConsumerWidget {
@@ -26,15 +28,18 @@ class MediaCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final baseUrl = ref.watch(baseUrlProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
     // Cache-buster: CachedNetworkImage caches by URL, so append updatedAt
     // to force a reload when the cover changes on the server.
-    final cacheBuster = media.updatedAt?.millisecondsSinceEpoch;
-    final imageUrl = hasCover
-        ? '$baseUrl/media/${media.id}/cover${cacheBuster != null ? '?v=$cacheBuster' : ''}'
-        : '$baseUrl/media/${media.id}/thumb${cacheBuster != null ? '?v=$cacheBuster' : ''}';
+    final imageUrl = buildMediaImageUrl(
+      baseUrl: baseUrl,
+      mediaId: media.id,
+      kind: hasCover ? MediaImageKind.cover : MediaImageKind.thumb,
+      cacheBust: media.updatedAt?.millisecondsSinceEpoch,
+    );
 
     Widget imageWidget = AuthNetworkImage(
       imageUrl: imageUrl,
@@ -91,7 +96,7 @@ class MediaCard extends ConsumerWidget {
                           ),
                         ],
                         // 0 = «нет данных» на бэкенде — не показываем.
-                        if (media.year != null && media.year! > 0) ...[
+                        if (hasMediaYear(media.year)) ...[
                           const SizedBox(height: 2),
                           Text(
                             '${media.year}',
@@ -110,19 +115,28 @@ class MediaCard extends ConsumerWidget {
               Positioned(
                 top: 4,
                 right: 4,
-                child: Material(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: onFavorite,
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                        size: 16,
-                        color: isFavorite ? Colors.red : Colors.white,
+                child: Semantics(
+                  button: true,
+                  label: l.favorites,
+                  child: Tooltip(
+                    message: l.favorites,
+                    child: Material(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: onFavorite,
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: Icon(
+                            isFavorite
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            size: 16,
+                            color: isFavorite ? Colors.red : Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -133,22 +147,30 @@ class MediaCard extends ConsumerWidget {
                 Positioned(
                   bottom: 4,
                   right: 4,
-                  child: Material(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: onDownload,
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: Icon(
-                          isDownloaded
-                              ? Icons.check_circle
-                              : Icons.cloud_download_outlined,
-                          size: 16,
-                          color:
-                              isDownloaded ? colorScheme.primary : Colors.white,
+                  child: Semantics(
+                    button: true,
+                    label: isDownloaded ? l.downloaded : l.download,
+                    child: Tooltip(
+                      message: isDownloaded ? l.downloaded : l.download,
+                      child: Material(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: onDownload,
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: Icon(
+                              isDownloaded
+                                  ? Icons.check_circle
+                                  : Icons.cloud_download_outlined,
+                              size: 16,
+                              color: isDownloaded
+                                  ? colorScheme.primary
+                                  : Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),

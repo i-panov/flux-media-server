@@ -2,8 +2,10 @@ package metadata
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseFilename(t *testing.T) {
@@ -31,6 +33,26 @@ func TestParseFilename(t *testing.T) {
 		{"Movie (1800).avi", "Movie", 0},
 		// Файл без расширения.
 		{"The Matrix 1999", "The Matrix", 1999},
+		// Точки без года: fallback не должен терять название.
+		{"The.Matrix.mkv", "The Matrix", 0},
+		{"Show.Name.1080p.mkv", "Show Name 1080p", 0},
+		// Кириллица.
+		{"Фильм.2024.mkv", "Фильм", 2024},
+		{"Кино.Без.Года.mkv", "Кино Без Года", 0},
+		{"Игра (2014).mkv", "Игра", 2014},
+		// S1E01 / S01E1 — короткие сезон и серия.
+		{"Show.S1E01.mkv", "Show", 0},
+		{"Show.S01E1.mkv", "Show", 0},
+		{"Series.Name.S1E1.720p.mkv", "Series Name", 0},
+		// Несколько сегментов после года.
+		{"Interstellar.2014.1080p.BluRay.mkv", "Interstellar", 2014},
+		{"Movie (2020).1080p.BluRay.mkv", "Movie", 2020},
+		{"Title.2021.2160p.WEB-DL.mkv", "Title", 2021},
+		// Пустая строка.
+		{"", "", 0},
+		{"   ", "", 0},
+		// Скобки без расширения.
+		{"Movie (2020)", "Movie", 2020},
 	}
 
 	for _, tt := range tests {
@@ -48,4 +70,19 @@ func TestIsValidYear(t *testing.T) {
 	assert.False(t, IsValidYear(1887))
 	assert.False(t, IsValidYear(0))
 	assert.False(t, IsValidYear(-1))
+}
+
+func TestIsValidYearAt(t *testing.T) {
+	now := mustTime(t, "2030-01-01T00:00:00Z")
+	assert.True(t, IsValidYearAt(1888, now))
+	assert.True(t, IsValidYearAt(2032, now))
+	assert.False(t, IsValidYearAt(2033, now))
+	assert.False(t, IsValidYearAt(1887, now))
+}
+
+func mustTime(t *testing.T, s string) time.Time {
+	t.Helper()
+	tm, err := time.Parse(time.RFC3339, s)
+	require.NoError(t, err)
+	return tm
 }

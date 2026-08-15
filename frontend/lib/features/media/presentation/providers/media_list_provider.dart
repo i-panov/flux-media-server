@@ -14,6 +14,14 @@ import 'package:flux_media_server/features/media/domain/usecases/upload_cover.da
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
+/// Инвалидирует списки медиа обоих типов после мутаций (загрузка,
+/// удаление, смена обложки, редактирование метаданных).
+void refreshMediaLists(WidgetRef ref) {
+  ref
+    ..invalidate(mediaListProvider('video'))
+    ..invalidate(mediaListProvider('audio'));
+}
+
 class MediaListResult {
   const MediaListResult({required this.items, required this.total});
 
@@ -91,6 +99,10 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
 
   @override
   Future<MediaListResult> build(String type) async {
+    // Смена query (или тип) пересоздаёт список: сбрасываем флаг,
+    // иначе незавершённый loadMore заблокирует подгрузку нового списка.
+    _isLoadingMore = false;
+
     final getMediaList = ref.watch(getMediaListProvider);
     final q = ref.watch(searchQueryProvider(type));
     final result = await getMediaList(
@@ -144,9 +156,12 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
 
     result.fold(
       (failure) {
-        // Don't replace the whole state on loadMore failure — keep the
-        // existing data and show an error overlay instead.
-        state = state.copyWithPrevious(state);
+        // Данные сохраняем, но ошибку показываем: без `AsyncValue.error`
+        // copyWithPrevious — no-op, и пользователь не узнал бы о провале.
+        state = AsyncValue<MediaListResult>.error(
+          Exception(failure.message),
+          StackTrace.current,
+        ).copyWithPrevious(state);
       },
       (data) => state = AsyncValue.data(
         MediaListResult(

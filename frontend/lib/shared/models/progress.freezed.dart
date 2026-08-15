@@ -20,7 +20,6 @@ WatchProgress _$WatchProgressFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$WatchProgress {
-  int get id => throw _privateConstructorUsedError;
   @JsonKey(name: 'user_id')
   int get userId => throw _privateConstructorUsedError;
   @JsonKey(name: 'media_id')
@@ -30,6 +29,7 @@ mixin _$WatchProgress {
   bool get completed => throw _privateConstructorUsedError;
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
+  int? get id => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -44,13 +44,13 @@ abstract class $WatchProgressCopyWith<$Res> {
       _$WatchProgressCopyWithImpl<$Res, WatchProgress>;
   @useResult
   $Res call(
-      {int id,
-      @JsonKey(name: 'user_id') int userId,
+      {@JsonKey(name: 'user_id') int userId,
       @JsonKey(name: 'media_id') int mediaId,
       int position,
       int duration,
       bool completed,
-      @JsonKey(name: 'updated_at') DateTime? updatedAt});
+      @JsonKey(name: 'updated_at') DateTime? updatedAt,
+      int? id});
 }
 
 /// @nodoc
@@ -66,19 +66,15 @@ class _$WatchProgressCopyWithImpl<$Res, $Val extends WatchProgress>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? id = null,
     Object? userId = null,
     Object? mediaId = null,
     Object? position = null,
     Object? duration = null,
     Object? completed = null,
     Object? updatedAt = freezed,
+    Object? id = freezed,
   }) {
     return _then(_value.copyWith(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as int,
       userId: null == userId
           ? _value.userId
           : userId // ignore: cast_nullable_to_non_nullable
@@ -103,6 +99,10 @@ class _$WatchProgressCopyWithImpl<$Res, $Val extends WatchProgress>
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -116,13 +116,13 @@ abstract class _$$WatchProgressImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {int id,
-      @JsonKey(name: 'user_id') int userId,
+      {@JsonKey(name: 'user_id') int userId,
       @JsonKey(name: 'media_id') int mediaId,
       int position,
       int duration,
       bool completed,
-      @JsonKey(name: 'updated_at') DateTime? updatedAt});
+      @JsonKey(name: 'updated_at') DateTime? updatedAt,
+      int? id});
 }
 
 /// @nodoc
@@ -136,19 +136,15 @@ class __$$WatchProgressImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? id = null,
     Object? userId = null,
     Object? mediaId = null,
     Object? position = null,
     Object? duration = null,
     Object? completed = null,
     Object? updatedAt = freezed,
+    Object? id = freezed,
   }) {
     return _then(_$WatchProgressImpl(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as int,
       userId: null == userId
           ? _value.userId
           : userId // ignore: cast_nullable_to_non_nullable
@@ -173,6 +169,10 @@ class __$$WatchProgressImplCopyWithImpl<$Res>
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -181,19 +181,17 @@ class __$$WatchProgressImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$WatchProgressImpl implements _WatchProgress {
   const _$WatchProgressImpl(
-      {required this.id,
-      @JsonKey(name: 'user_id') required this.userId,
+      {@JsonKey(name: 'user_id') required this.userId,
       @JsonKey(name: 'media_id') required this.mediaId,
       required this.position,
       this.duration = 0,
       this.completed = false,
-      @JsonKey(name: 'updated_at') this.updatedAt});
+      @JsonKey(name: 'updated_at') this.updatedAt,
+      this.id});
 
   factory _$WatchProgressImpl.fromJson(Map<String, dynamic> json) =>
       _$$WatchProgressImplFromJson(json);
 
-  @override
-  final int id;
   @override
   @JsonKey(name: 'user_id')
   final int userId;
@@ -211,10 +209,12 @@ class _$WatchProgressImpl implements _WatchProgress {
   @override
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
+  @override
+  final int? id;
 
   @override
   String toString() {
-    return 'WatchProgress(id: $id, userId: $userId, mediaId: $mediaId, position: $position, duration: $duration, completed: $completed, updatedAt: $updatedAt)';
+    return 'WatchProgress(userId: $userId, mediaId: $mediaId, position: $position, duration: $duration, completed: $completed, updatedAt: $updatedAt, id: $id)';
   }
 
   @override
@@ -222,7 +222,6 @@ class _$WatchProgressImpl implements _WatchProgress {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$WatchProgressImpl &&
-            (identical(other.id, id) || other.id == id) &&
             (identical(other.userId, userId) || other.userId == userId) &&
             (identical(other.mediaId, mediaId) || other.mediaId == mediaId) &&
             (identical(other.position, position) ||
@@ -232,13 +231,14 @@ class _$WatchProgressImpl implements _WatchProgress {
             (identical(other.completed, completed) ||
                 other.completed == completed) &&
             (identical(other.updatedAt, updatedAt) ||
-                other.updatedAt == updatedAt));
+                other.updatedAt == updatedAt) &&
+            (identical(other.id, id) || other.id == id));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, userId, mediaId, position,
-      duration, completed, updatedAt);
+  int get hashCode => Object.hash(runtimeType, userId, mediaId, position,
+      duration, completed, updatedAt, id);
 
   @JsonKey(ignore: true)
   @override
@@ -256,20 +256,17 @@ class _$WatchProgressImpl implements _WatchProgress {
 
 abstract class _WatchProgress implements WatchProgress {
   const factory _WatchProgress(
-          {required final int id,
-          @JsonKey(name: 'user_id') required final int userId,
-          @JsonKey(name: 'media_id') required final int mediaId,
-          required final int position,
-          final int duration,
-          final bool completed,
-          @JsonKey(name: 'updated_at') final DateTime? updatedAt}) =
-      _$WatchProgressImpl;
+      {@JsonKey(name: 'user_id') required final int userId,
+      @JsonKey(name: 'media_id') required final int mediaId,
+      required final int position,
+      final int duration,
+      final bool completed,
+      @JsonKey(name: 'updated_at') final DateTime? updatedAt,
+      final int? id}) = _$WatchProgressImpl;
 
   factory _WatchProgress.fromJson(Map<String, dynamic> json) =
       _$WatchProgressImpl.fromJson;
 
-  @override
-  int get id;
   @override
   @JsonKey(name: 'user_id')
   int get userId;
@@ -285,6 +282,8 @@ abstract class _WatchProgress implements WatchProgress {
   @override
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
+  @override
+  int? get id;
   @override
   @JsonKey(ignore: true)
   _$$WatchProgressImplCopyWith<_$WatchProgressImpl> get copyWith =>

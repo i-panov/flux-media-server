@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 
 /// Signal that a token refresh succeeded and the request should be retried.
 class TokenRefreshedException implements Exception {
@@ -24,19 +26,28 @@ class TokenRefreshInterceptor implements ResponseInterceptor {
   FutureOr<Response<dynamic>> onResponse(Response<dynamic> response) async {
     if (response.statusCode != 401) return response;
 
-    // Запросы на /auth/refresh не должны рекурсивно вызывать refresh.
+    // 401 на auth-эндпоинтах — бизнес-ошибка, а не истёкшая сессия:
+    // неверный код/токен не должны триггерить refresh.
     final path = response.base.request?.url.path ?? '';
-    if (path.contains('/auth/refresh')) return response;
+    if (path.contains('/auth/refresh') ||
+        path.contains('/auth/request-code') ||
+        path.contains('/auth/verify-code')) {
+      return response;
+    }
 
     final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
     final refresher = _ref.read(authTokenRefresherProvider);
-    final refreshSucceeded = await refresher.refresh(refreshToken);
+    final tokens = await refresher.refreshTokens(refreshToken);
 
-    if (refreshSucceeded) {
+    if (tokens != null) {
       throw const TokenRefreshedException();
     }
 
-    // Refresh failed — tokens were cleared. Return 401 to force re-login.
+    // Refresh не удался — сессия мертва: сбрасываем auth, иначе
+    // приложение остаётся «залогиненным» со стейлым user и пустыми
+    // токенами (каждый запрос — 401 без редиректа).
+    AppLogger.error('Token refresh failed — session expired');
+    _ref.read(authProvider.notifier).expireSession();
     return response;
   }
 }

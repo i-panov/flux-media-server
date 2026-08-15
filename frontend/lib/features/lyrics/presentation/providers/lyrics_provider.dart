@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/lyrics/data/datasources/lyrics_remote_datasource.dart';
 import 'package:flux_media_server/features/lyrics/data/repositories/lyrics_repository_impl.dart';
 import 'package:flux_media_server/features/lyrics/data/repositories/offline_lyrics_cache_repository.dart';
@@ -64,15 +67,21 @@ final lyricsProvider =
         throw Exception(failure.message);
       },
       (lyrics) async {
-        // Persist lyrics for offline access (ждём сохранения).
+        // Кеш-запись fire-and-forget: сбой сохранения не должен
+        // превращать успешный GET в AsyncError.
         if (lyrics != null) {
-          await ref.read(lyricsCacheRepositoryProvider).saveLyrics(
-                mediaId,
-                lyrics,
-              );
+          unawaited(_persistToCache(ref, mediaId, lyrics));
         }
         return LyricsLoadResult(lyrics: lyrics);
       },
     );
   },
 );
+
+Future<void> _persistToCache(Ref ref, int mediaId, Lyrics lyrics) async {
+  try {
+    await ref.read(lyricsCacheRepositoryProvider).saveLyrics(mediaId, lyrics);
+  } catch (e) {
+    AppLogger.error('Failed to cache lyrics for media $mediaId', e);
+  }
+}

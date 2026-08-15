@@ -35,29 +35,34 @@ func NewWatcherService(scanner ScannerInterface) *WatcherService {
 }
 
 // StartWithPaths begins watching the given directory paths.
-// It is idempotent: if already running, it stops the old watcher and starts fresh.
+// It is idempotent: if already running, it stops the old watcher and starts
+// fresh. Each start creates a NEW context/cancel — the previous ctx (possibly
+// cancelled by a prior Stop/restart) must never leak into the new loop.
 func (w *WatcherService) StartWithPaths(paths []string) error {
-	// Stop any existing watcher first (idempotent).
 	w.mu.Lock()
 	if w.isRunning {
 		w.cancel()
 		if w.watcher != nil {
 			w.watcher.Close()
 		}
+		w.watcher = nil
 	}
-	w.mu.Unlock()
 
+	ctx, cancel := context.WithCancel(context.Background())
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
+		cancel()
+		w.mu.Unlock()
 		return err
 	}
 
-	w.mu.Lock()
+	w.ctx = ctx
+	w.cancel = cancel
 	w.watcher = watcher
 	w.isRunning = true
 	w.mu.Unlock()
 
-	go w.loop()
+	go w.loop(ctx, watcher)
 
 	for _, p := range paths {
 		w.AddPath(p)
@@ -120,12 +125,15 @@ func (w *WatcherService) Stop() {
 	log.Println("watcher: stopped")
 }
 
-func (w *WatcherService) loop() {
+// loop reads events from the given watcher. ctx and watcher are captured at
+// start time (under w.mu in StartWithPaths) and passed as arguments: reading
+// w.watcher/w.ctx here without the lock would race with Start/Stop writes.
+func (w *WatcherService) loop(ctx context.Context, watcher *fsnotify.Watcher) {
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
-		case event, ok := <-w.watcher.Events:
+		case event, ok := <-watcher.Events:
 			if !ok {
 				return
 			}
@@ -134,8 +142,8 @@ func (w *WatcherService) loop() {
 				continue
 			}
 
-			w.scheduleScan()
-		case err, ok := <-w.watcher.Errors:
+			w.scheduleScan(ctx)
+		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
 			}
@@ -147,7 +155,7 @@ func (w *WatcherService) loop() {
 // scheduleScan resets a single global debounce timer: any burst of fs events
 // results in exactly one ScanAll after the burst settles (instead of one full
 // scan per event, which is O(events × library size)).
-func (w *WatcherService) scheduleScan() {
+func (w *WatcherService) scheduleScan(ctx context.Context) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -157,7 +165,7 @@ func (w *WatcherService) scheduleScan() {
 
 	w.debounce = time.AfterFunc(w.debounceDur, func() {
 		log.Printf("watcher: file changes settled, triggering scan")
-		if err := w.scanner.ScanAll(w.ctx); err != nil {
+		if err := w.scanner.ScanAll(ctx); err != nil {
 			log.Printf("watcher: scan error: %v", err)
 		}
 	})

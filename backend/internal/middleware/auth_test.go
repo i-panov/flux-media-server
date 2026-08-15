@@ -123,3 +123,23 @@ func TestAdminMiddlewareAdminTokenOnAdminRoute(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 }
+
+func TestAuthSchemeCaseInsensitive(t *testing.T) {
+	_, userRepo, jwtService := setupTestDBAndServices(t)
+
+	user := createTestUser(t, userRepo, "admin@example.com", true)
+	token, err := jwtService.GenerateToken(user.ID, user.Email)
+	require.NoError(t, err)
+
+	app := fiber.New()
+	app.Get("/protected", middleware.AuthMiddleware(jwtService), func(c *fiber.Ctx) error {
+		return c.SendString("OK")
+	})
+
+	// RFC 7235: схема авторизации регистронезависима.
+	req := httptest.NewRequest("GET", "/protected", nil)
+	req.Header.Set("Authorization", "bearer "+token)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}

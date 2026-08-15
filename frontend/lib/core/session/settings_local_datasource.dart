@@ -13,14 +13,22 @@ const String storageKeyPrefix = kDebugMode ? 'debug_' : 'release_';
 ///
 /// Token storage strategy:
 /// - Auth tokens are stored in FlutterSecureStorage (encrypted).
-/// - On platforms where secure storage is unavailable (e.g. iOS simulator),
-///   tokens fall back to SharedPreferences (insecure, for development only).
+/// - In debug builds, on platforms where secure storage is unavailable
+///   (e.g. iOS simulator), tokens fall back to SharedPreferences (insecure,
+///   for development only).
+/// - In release builds the fallback is disabled entirely: any secure storage
+///   failure is rethrown instead of storing tokens in plaintext.
 /// - Server URL and locale are always stored in SharedPreferences.
 class SettingsLocalDataSource {
-  SettingsLocalDataSource(this._prefs, this._secureStorage);
+  SettingsLocalDataSource(
+    this._prefs,
+    this._secureStorage, {
+    bool? allowInsecureFallback,
+  }) : _allowInsecureFallback = allowInsecureFallback ?? !kReleaseMode;
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
+  final bool _allowInsecureFallback;
 
   static const _keyServerUrl = 'server_url';
   static const _keyAuthToken = 'auth_token';
@@ -48,12 +56,13 @@ class SettingsLocalDataSource {
   Future<void> setLocale(String locale) =>
       _prefs.setString(_p(_keyLocale), locale);
 
-  /// Reads the auth token from secure storage. Falls back to SharedPreferences
-  /// only when secure storage is unavailable (e.g. iOS simulator).
+  /// Reads the auth token from secure storage. In debug builds falls back
+  /// to SharedPreferences when secure storage is unavailable.
   Future<String?> getAuthToken() async {
     try {
       return await _secureStorage.read(key: _p(_keyAuthToken));
     } catch (e) {
+      if (!_allowInsecureFallback) rethrow;
       developer.log('Secure storage unavailable, using fallback: $e');
       return _prefs.getString(_p(_keyAuthTokenFallback));
     }
@@ -63,6 +72,7 @@ class SettingsLocalDataSource {
     try {
       await _secureStorage.write(key: _p(_keyAuthToken), value: token);
     } catch (e) {
+      if (!_allowInsecureFallback) rethrow;
       developer.log('Secure storage unavailable, using fallback: $e');
       await _prefs.setString(_p(_keyAuthTokenFallback), token);
     }
@@ -72,22 +82,25 @@ class SettingsLocalDataSource {
     try {
       await _secureStorage.delete(key: _p(_keyAuthToken));
     } catch (e) {
-      developer.log('Secure storage unavailable, using fallback: $e');
-      await _prefs.remove(_p(_keyAuthTokenFallback));
+      if (!_allowInsecureFallback) rethrow;
+      developer.log('Secure storage unavailable: $e');
     }
+    // Безусловно чистим fallback-ключ: при успешном secure delete
+    // старый plaintext-токен не должен оставаться в SharedPreferences.
+    await _prefs.remove(_p(_keyAuthTokenFallback));
   }
 
-  /// Reads the refresh token from secure storage. Falls back to
-  /// SharedPreferences only when secure storage is unavailable (e.g. iOS
-  /// simulator).
+  /// Reads the refresh token from secure storage. In debug builds falls back
+  /// to SharedPreferences when secure storage is unavailable.
   ///
-  /// NOTE: In production builds the fallback path should never be hit. If it
-  /// is, tokens are stored insecurely — log a warning so developers catch
-  /// this during testing.
+  /// In production builds the fallback path should never be hit. If it is,
+  /// tokens are stored insecurely — log a warning so developers catch this
+  /// during testing.
   Future<String?> getRefreshToken() async {
     try {
       return await _secureStorage.read(key: _p(_keyRefreshToken));
     } catch (e) {
+      if (!_allowInsecureFallback) rethrow;
       developer.log(
           'WARNING: refresh token stored in insecure SharedPreferences: $e',
       );
@@ -99,6 +112,7 @@ class SettingsLocalDataSource {
     try {
       await _secureStorage.write(key: _p(_keyRefreshToken), value: token);
     } catch (e) {
+      if (!_allowInsecureFallback) rethrow;
       developer.log(
           'WARNING: refresh token stored in insecure SharedPreferences: $e',
       );
@@ -110,10 +124,13 @@ class SettingsLocalDataSource {
     try {
       await _secureStorage.delete(key: _p(_keyRefreshToken));
     } catch (e) {
+      if (!_allowInsecureFallback) rethrow;
       developer.log(
           'WARNING: refresh token stored in insecure SharedPreferences: $e',
       );
-      await _prefs.remove(_p(_keyRefreshTokenFallback));
     }
+    // Безусловно чистим fallback-ключ: при успешном secure delete
+    // старый plaintext-токен не должен оставаться в SharedPreferences.
+    await _prefs.remove(_p(_keyRefreshTokenFallback));
   }
 }

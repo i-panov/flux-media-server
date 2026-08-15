@@ -13,6 +13,9 @@ import (
 	"flux/internal/response"
 )
 
+// maxSearchQueryLen — предел длины запроса поиска по имени файла.
+const maxSearchQueryLen = 256
+
 type MetadataHandler struct {
 	mediaRepo repository.MediaRepository
 }
@@ -31,6 +34,9 @@ func (h *MetadataHandler) Search(c *fiber.Ctx) error {
 	if query == "" {
 		return response.Error(c, fiber.StatusBadRequest, "Query parameter 'q' is required")
 	}
+	if len(query) > maxSearchQueryLen {
+		return response.Error(c, fiber.StatusBadRequest, "Query parameter 'q' is too long")
+	}
 
 	title, year := metadata.ParseFilename(query)
 
@@ -42,15 +48,15 @@ func (h *MetadataHandler) Search(c *fiber.Ctx) error {
 }
 
 func (h *MetadataHandler) Refresh(c *fiber.Ctx) error {
-	mediaID, err := c.ParamsInt("mediaId")
+	mediaID, err := parseIDParam(c, "mediaId")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, uint(mediaID))
+	media, err := h.mediaRepo.FindByID(ctx, mediaID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	// Parse only the filename, not the full path (otherwise directories
@@ -69,15 +75,15 @@ func (h *MetadataHandler) Refresh(c *fiber.Ctx) error {
 }
 
 func (h *MetadataHandler) Update(c *fiber.Ctx) error {
-	mediaID, err := c.ParamsInt("mediaId")
+	mediaID, err := parseIDParam(c, "mediaId")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, uint(mediaID))
+	media, err := h.mediaRepo.FindByID(ctx, mediaID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Media not found")
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	// Pointer fields allow distinguishing "not provided" from "set to empty",

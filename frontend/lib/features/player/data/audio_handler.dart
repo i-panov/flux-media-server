@@ -26,6 +26,12 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<bool> Function()? onPrevious;
   void Function()? onToggleFavorite;
 
+  /// Делегат для play из системного уведомления. Маршрутизируется через
+  /// координатор (см. main.dart), чтобы состояние UI не расходилось с
+  /// реальным воспроизведением (например, play после completed должен
+  /// перезапускать трек, а не играть «в фоне» с состоянием completed).
+  Future<void> Function()? onPlay;
+
   /// Whether the current track is favorited (for notification icon).
   bool isFavorite = false;
 
@@ -147,6 +153,11 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// Downloads [artUri] with auth headers to a temp file and returns a
   /// `file://` URI. Falls back to the original URI on failure.
+  ///
+  /// Имя файла содержит хеш URL: для одного трека файл перезаписывается
+  /// (стабильный кеш), коллизии между треками с одинаковыми путями
+  /// (`/media/{id}/cover`) исключены. Старые обложки других треков
+  /// удаляются при записи новой.
   Future<Uri?> _resolveArtUri(
     String artUri,
     Map<String, String>? httpHeaders,
@@ -163,7 +174,8 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
       if (response.statusCode != 200) return uri;
 
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/flux_art_${uri.pathSegments.last}');
+      final file = File('${dir.path}/${_artFileName(uri)}');
+      await _cleanupArtwork(dir, keep: file);
       await file.writeAsBytes(response.bodyBytes);
       return file.uri;
     } catch (_) {
@@ -171,9 +183,34 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
     }
   }
 
+  String _artFileName(Uri uri) {
+    final hash = uri.toString().hashCode.abs().toRadixString(16);
+    return 'flux_art_${uri.pathSegments.last}_$hash.jpg';
+  }
+
+  /// Best-effort: удаляет устаревшие обложки, оставляя только [keep].
+  Future<void> _cleanupArtwork(Directory dir, {required File keep}) async {
+    try {
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last;
+        if (name.startsWith('flux_art_') && entity.path != keep.path) {
+          await entity.delete();
+        }
+      }
+    } catch (_) {
+      // Не критично — мусорные файлы удалятся при следующей загрузке.
+    }
+  }
+
   @override
   Future<void> play() async {
-    await player.play();
+    if (onPlay != null) {
+      // Play из системного уведомления: маршрутизируем через координатор.
+      await onPlay!();
+    } else {
+      await player.play();
+    }
   }
 
   @override
