@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
@@ -193,6 +194,35 @@ void main() {
       expect(call.q, isNull);
       expect(call.limit, 20);
       expect(call.offset, 0);
+    });
+
+    test('network failure marks the app offline (internet lost after launch)',
+        () async {
+      // Имитация: приложение уже работало, но сеть пропала —
+      // запрос списка падает с NetworkFailure.
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          const Left(NetworkFailure(message: 'No internet'));
+
+      // Слушаем провайдер: build упадёт асинхронно, дожидаемся состояния.
+      final errored = Completer<void>();
+      final sub = container.listen<AsyncValue<MediaListResult>>(
+        mediaListProvider('video'),
+        (_, next) {
+          if (next.hasError && !errored.isCompleted) errored.complete();
+        },
+      );
+      await errored.future;
+      sub.close();
+
+      // Офлайн-режим включён: экраны покажут скачанные треки, а не ошибку.
+      expect(container.read(networkStatusProvider), isTrue);
+
+      // Сеть вернулась: успешный запрос сбрасывает флаг.
+      fakeRepo.onGetMediaList = ({type, year, q, limit, offset}) async =>
+          const Right((items: [], total: 0));
+
+      await container.refresh(mediaListProvider('video').future);
+      expect(container.read(networkStatusProvider), isFalse);
     });
 
     test('loadMore appends items', () async {

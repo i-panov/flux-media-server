@@ -1,7 +1,9 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
@@ -89,10 +91,23 @@ final updateMetadataProvider = Provider<UpdateMetadata>((ref) {
   return UpdateMetadata(ref.watch(mediaRepositoryProvider));
 });
 
-/// Current search query scoped to a media type ('video' or 'audio').
-/// Using a family avoids state leakage between audio/video tabs.
+/// Текущий поисковый запрос, ограниченный типом медиа ('video'/'audio').
+/// Family не даёт состоянию «протекать» между вкладками.
+class SearchQueryNotifier extends FamilyNotifier<String, String> {
+  @override
+  String build(String type) => '';
+
+  /// Текущий поисковый запрос для типа медиа.
+  String get query => state;
+
+  /// Обновляет поисковый запрос для типа медиа.
+  set query(String value) => state = value;
+}
+
 final searchQueryProvider =
-    StateProvider.family<String, String>((ref, type) => '');
+    NotifierProvider.family<SearchQueryNotifier, String, String>(
+  SearchQueryNotifier.new,
+);
 
 /// Media list scoped to a media type ('video' or 'audio').
 /// Using a family avoids state leakage between audio/video tabs that
@@ -124,11 +139,22 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
       ),
     );
     return result.fold(
-      (failure) => throw Exception(failure.message),
-      (data) => MediaListResult(
-        items: data.items.toIList(),
-        total: data.total,
-      ),
+      (failure) {
+        // Сеть пропала после запуска: включаем офлайн-режим, чтобы
+        // экраны показали скачанные треки, а не ошибку. Сброс — при
+        // следующем успешном запросе (build/loadMore) или checkAuthStatus.
+        if (failure is NetworkFailure) {
+          ref.read(networkStatusProvider.notifier).markOffline();
+        }
+        throw Exception(failure.message);
+      },
+      (data) {
+        ref.read(networkStatusProvider.notifier).markOnline();
+        return MediaListResult(
+          items: data.items.toIList(),
+          total: data.total,
+        );
+      },
     );
   }
 
@@ -166,6 +192,9 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
 
     result.fold(
       (failure) {
+        if (failure is NetworkFailure) {
+          ref.read(networkStatusProvider.notifier).markOffline();
+        }
         // Данные сохраняем, но ошибку показываем: без `AsyncValue.error`
         // copyWithPrevious — no-op, и пользователь не узнал бы о провале.
         state = AsyncValue<MediaListResult>.error(
@@ -173,12 +202,15 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
           StackTrace.current,
         ).copyWithPrevious(state);
       },
-      (data) => state = AsyncValue.data(
-        MediaListResult(
-          items: current.items.addAll(data.items),
-          total: data.total,
-        ),
-      ),
+      (data) {
+        ref.read(networkStatusProvider.notifier).markOnline();
+        state = AsyncValue.data(
+          MediaListResult(
+            items: current.items.addAll(data.items),
+            total: data.total,
+          ),
+        );
+      },
     );
   }
 }

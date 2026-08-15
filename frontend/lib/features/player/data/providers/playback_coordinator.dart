@@ -264,14 +264,18 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     if (!completed) return;
     final current = state;
     if (current is PlaybackPlaying) {
-      // Await: сериализованное сохранение должно завершиться до старта
-      // следующего трека, иначе _playInternal может отправить
-      // completed:false поверх completed:true.
-      await _saveProgress(
-        current.media.id,
-        current.duration ?? current.position,
-        current.duration ?? Duration.zero,
-        completed: true,
+      // НЕ ждём сохранение: сетевой запрос (особенно в фоне/при слабой
+      // связи) блокировал бы автопродвижение, и музыка «застревала» на
+      // конце трека. Гонки completed:true vs completed:false нет:
+      // следующий трек стартует из состояния loading, и _playInternal
+      // не сохраняет предыдущий трек повторно.
+      unawaited(
+        _saveProgress(
+          current.media.id,
+          current.duration ?? current.position,
+          current.duration ?? Duration.zero,
+          completed: true,
+        ),
       );
     }
     _cancelProgressTimer();

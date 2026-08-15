@@ -9,6 +9,7 @@ import 'package:flux_media_server/features/auth/data/repositories/auth_repositor
 import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
 import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -133,13 +134,21 @@ class AuthNotifier extends Notifier<AuthState> {
         } else {
           // Network/server error — keep the stored session so the user
           // isn't logged out just because the server is unreachable.
+          if (failure.isNetworkFailure) {
+            ref.read(networkStatusProvider.notifier).markOffline();
+          }
           state = AuthState.error(
             message: failure.message,
             isOffline: failure.isNetworkFailure,
           );
         }
       },
-      (user) async => state = AuthState.authenticated(user: user),
+      (user) async {
+        // Сеть снова доступна (Retry на офлайн-баннере) — сбрасываем
+        // флаг, зафиксированный сетевыми ошибками других запросов.
+        ref.read(networkStatusProvider.notifier).markOnline();
+        state = AuthState.authenticated(user: user);
+      },
     );
   }
 

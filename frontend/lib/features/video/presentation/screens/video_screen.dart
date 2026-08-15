@@ -43,6 +43,13 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // Восстанавливаем строку поиска из провайдера: query живёт в
+    // провайдере, а текст поля — в State; при пересоздании экрана
+    // поле иначе осталось бы пустым при уже отфильтрованном списке.
+    final savedQuery = ref.read(searchQueryProvider(_mediaType));
+    if (savedQuery.isNotEmpty) {
+      _searchController.text = savedQuery;
+    }
   }
 
   @override
@@ -66,10 +73,10 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
     _searchDebounce?.cancel();
     final query = value.trim();
     if (query.isEmpty) {
-      ref.read(searchQueryProvider(_mediaType).notifier).state = '';
+      ref.read(searchQueryProvider(_mediaType).notifier).query = '';
     } else {
       _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-        ref.read(searchQueryProvider(_mediaType).notifier).state = query;
+        ref.read(searchQueryProvider(_mediaType).notifier).query = query;
       });
     }
   }
@@ -77,7 +84,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
   void _clearSearch() {
     _searchDebounce?.cancel();
     _searchController.clear();
-    ref.read(searchQueryProvider(_mediaType).notifier).state = '';
+    ref.read(searchQueryProvider(_mediaType).notifier).query = '';
   }
 
   @override
@@ -170,7 +177,15 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
     final mediaItems =
         mediaListState.valueOrNull?.items.toList() ?? const <Media>[];
 
-    return RefreshIndicator(
+    // Системный back при активном поиске сначала очищает поиск (возврат
+    // к полному списку), а не «проглатывается» корневым PopScope
+    // (выход из приложения на мобильных).
+    return PopScope(
+      canPop: _searchController.text.isEmpty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _clearSearch();
+      },
+      child: RefreshIndicator(
       onRefresh: () async {
         ref
           ..invalidate(mediaListProvider(_mediaType))
@@ -270,6 +285,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
             ),
           ],
         ],
+        ),
       ),
     );
   }
