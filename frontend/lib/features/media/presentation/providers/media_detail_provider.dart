@@ -18,16 +18,25 @@ class MediaDetailState with _$MediaDetailState {
       MediaDetailError;
 }
 
-class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
-  MediaDetailNotifier({
-    required GetMediaDetail getMediaDetail,
-    required Ref ref,
-  })  : _getMediaDetail = getMediaDetail,
-        _ref = ref,
-        super(const MediaDetailState.loading());
+class MediaDetailNotifier
+    extends AutoDisposeFamilyNotifier<MediaDetailState, int> {
+  late final GetMediaDetail _getMediaDetail;
 
-  final GetMediaDetail _getMediaDetail;
-  final Ref _ref;
+  /// Замена `mounted` из StateNotifier: нотифаер может быть автоутилизирован
+  /// во время полёта запроса (уход с экрана).
+  bool _disposed = false;
+
+  @override
+  MediaDetailState build(int mediaId) {
+    _getMediaDetail = ref.watch(getMediaDetailUseCaseProvider);
+    ref.onDispose(() => _disposed = true);
+    // Первичную загрузку запускаем из build(): Notifier запрещает
+    // модификацию состояния, если провайдер создан и изменён в фазе
+    // построения виджета (вызов load() из initState экрана падал бы с
+    // "Tried to modify a provider while the widget tree was building").
+    Future.microtask(() => load(mediaId));
+    return const MediaDetailState.loading();
+  }
 
   /// Поколение запроса: повторный Retry не должен давать гонку, когда
   /// старый ответ перезаписывает свежий. Ответ устаревшего поколения
@@ -35,16 +44,17 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
   int _generation = 0;
 
   Future<void> load(int id) async {
+    if (_disposed) return;
     final generation = ++_generation;
     state = const MediaDetailState.loading();
     final result = await _getMediaDetail(id);
-    if (!mounted || generation != _generation) return;
+    if (_disposed || generation != _generation) return;
     await result.fold<Future<void>>(
       (failure) async {
         // API failed — try local metadata (offline mode).
-        final cacheService = _ref.read(offlineCacheServiceProvider);
+        final cacheService = ref.read(offlineCacheServiceProvider);
         final cachedMedia = await cacheService.getCachedMedia();
-        if (!mounted || generation != _generation) return;
+        if (_disposed || generation != _generation) return;
         final local = cachedMedia.where((m) => m.id == id).firstOrNull;
         if (local != null) {
           state = MediaDetailState.loaded(media: local);
@@ -55,9 +65,9 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
       (media) async {
         // Persist metadata for offline access.
         unawaited(
-          _ref.read(offlineCacheServiceProvider).saveMetadata(media),
+          ref.read(offlineCacheServiceProvider).saveMetadata(media),
         );
-        if (!mounted || generation != _generation) return;
+        if (_disposed || generation != _generation) return;
         state = MediaDetailState.loaded(media: media);
       },
     );
@@ -77,16 +87,16 @@ class MediaDetailNotifier extends StateNotifier<MediaDetailState> {
     if (current is! MediaDetailLoaded) return;
     final generation = ++_generation;
     final result = await _getMediaDetail(current.media.id);
-    if (!mounted || generation != _generation) return;
+    if (_disposed || generation != _generation) return;
     result.fold(
       (failure) {
         // Молча: обложка уже загружена, старое состояние тоже валидно.
       },
       (media) {
         unawaited(
-          _ref.read(offlineCacheServiceProvider).saveMetadata(media),
+          ref.read(offlineCacheServiceProvider).saveMetadata(media),
         );
-        if (!mounted || generation != _generation) return;
+        if (_disposed || generation != _generation) return;
         state = MediaDetailState.loaded(media: media);
       },
     );
@@ -97,10 +107,7 @@ final getMediaDetailUseCaseProvider = Provider<GetMediaDetail>((ref) {
   return GetMediaDetail(ref.watch(mediaRepositoryProvider));
 });
 
-final mediaDetailProvider = StateNotifierProvider.autoDispose
+final mediaDetailProvider = NotifierProvider.autoDispose
     .family<MediaDetailNotifier, MediaDetailState, int>(
-  (ref, mediaId) => MediaDetailNotifier(
-    getMediaDetail: ref.watch(getMediaDetailUseCaseProvider),
-    ref: ref,
-  ),
+  MediaDetailNotifier.new,
 );

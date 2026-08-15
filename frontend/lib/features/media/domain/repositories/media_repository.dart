@@ -1,5 +1,7 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
@@ -25,13 +27,22 @@ abstract class MediaRepository {
     String hash,
   );
 
-  Future<Either<Failure, Media>> uploadFile({
+  /// Асинхронный upload: POST возвращает id джоба, файл обрабатывается
+  /// сервером в фоне. Статус — через [getUploadStatus], отмена — через
+  /// [cancelUpload].
+  Future<Either<Failure, UploadResult>> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   });
+
+  Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId);
+  Future<Either<Failure, void>> cancelUpload(int jobId);
+
+  /// Пакетная загрузка медиа по id (для офлайн-кеша вместо N+1).
+  Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids);
 
   Future<Either<Failure, List<WatchProgress>>> getProgress();
 

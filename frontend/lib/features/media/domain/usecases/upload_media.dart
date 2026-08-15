@@ -1,7 +1,7 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/usecases/usecase.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
-import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
 class UploadMediaParams {
@@ -24,13 +24,14 @@ class UploadMediaParams {
   final bool Function()? isCancelled;
 }
 
-class UploadMedia extends UseCase<Either<Failure, Media>, UploadMediaParams> {
+class UploadMedia
+    extends UseCase<Either<Failure, UploadResult>, UploadMediaParams> {
   UploadMedia(this.repository);
 
   final MediaRepository repository;
 
   @override
-  Future<Either<Failure, Media>> call(UploadMediaParams params) {
+  Future<Either<Failure, UploadResult>> call(UploadMediaParams params) {
     return repository.uploadFile(
       filePath: params.filePath,
       mediaType: params.mediaType,

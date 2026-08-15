@@ -330,7 +330,6 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                       addTrackToQueue(ref, likedToShow[index]),
                   onAddToCollection: () => showAddToCollectionDialog(
                     context,
-                    ref,
                     likedToShow[index].id,
                     mediaType: 'audio',
                   ),
@@ -387,7 +386,6 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                       addTrackToQueue(ref, downloadedAudio[index]),
                   onAddToCollection: () => showAddToCollectionDialog(
                     context,
-                    ref,
                     downloadedAudio[index].id,
                     mediaType: 'audio',
                   ),
@@ -419,7 +417,6 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                 onAddToQueue: () => addTrackToQueue(ref, allTracks[index]),
                 onAddToCollection: () => showAddToCollectionDialog(
                   context,
-                  ref,
                   allTracks[index].id,
                   mediaType: 'audio',
                 ),

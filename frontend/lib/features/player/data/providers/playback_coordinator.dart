@@ -35,16 +35,23 @@ class PlaybackState with _$PlaybackState {
 
 /// Manages unified playback across audio and video.
 /// Handles mutual exclusion: starting video stops audio and vice versa.
-class PlaybackCoordinator extends StateNotifier<PlaybackState>
+class PlaybackCoordinator extends Notifier<PlaybackState>
     implements PlaybackController {
-  PlaybackCoordinator(
-    this._audioPlayer,
-    this._baseUrl,
-    this._ref,
-  ) : super(const PlaybackState.initial());
+  late final AudioPlaybackSource _audioPlayer;
+  late final String _baseUrl;
 
-  final AudioPlaybackSource _audioPlayer;
-  final String _baseUrl;
+  @override
+  PlaybackState build() {
+    _audioPlayer = ref.watch(audioPlayerDatasourceProvider);
+    _baseUrl = ref.watch(baseUrlProvider);
+    // В Notifier (Riverpod 2.x) нет переопределяемого dispose() —
+    // cleanup при утилизации провайдера делаем через onDispose.
+    ref.onDispose(() {
+      _cancelSubscriptions();
+      _cancelProgressTimer();
+    });
+    return const PlaybackState.initial();
+  }
 
   /// Порог для resume-оверлея: позиции не больше этого значения
   /// применяются сразу (видео продолжается без диалога).
@@ -67,7 +74,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
 
   /// Used to lazily read the current auth token (so token refreshes don't
   /// reset the playback state) and to coordinate with the video player.
-  final Ref _ref;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _progressTimer;
 
@@ -75,7 +81,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   /// ref.watch prevents this long-lived provider from keeping the
   /// autoDispose videoPlayerDatasourceProvider alive.
   VideoPlaybackSource get _videoPlayer =>
-      _ref.read(videoPlayerDatasourceProvider);
+      ref.read(videoPlayerDatasourceProvider);
 
   /// Сериализует сохранения прогресса: параллельные вызовы (completed
   /// при завершении трека, save таймера, сохранение предыдущего трека
@@ -94,13 +100,6 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   void _cancelProgressTimer() {
     _progressTimer?.cancel();
     _progressTimer = null;
-  }
-
-  @override
-  void dispose() {
-    _cancelSubscriptions();
-    _cancelProgressTimer();
-    super.dispose();
   }
 
   /// Serializes concurrent play() calls through a Future chain: each call
@@ -150,11 +149,11 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     _cancelProgressTimer();
 
     // Use local file if downloaded, otherwise stream from server.
-    final cacheService = _ref.read(offlineCacheServiceProvider);
+    final cacheService = ref.read(offlineCacheServiceProvider);
     final localPath = await cacheService.getLocalPath(media.id);
     if (generation != _playGeneration) return;
     final url = localPath ?? '$_baseUrl/media/${media.id}/stream';
-    final token = _ref.read(settingsProvider).settings.authToken;
+    final token = ref.read(settingsProvider).settings.authToken;
     final headers = localPath == null && token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : null;
@@ -281,12 +280,12 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
     if (state is PlaybackLoading) return;
 
     // Auto-advance to next track in queue if available.
-    final queue = _ref.read(playQueueProvider);
+    final queue = ref.read(playQueueProvider);
     if (queue.hasNext) {
       // Фиксируем завершённость до старта следующего трека: loading
       // исключает повторное сохранение предыдущего в _playInternal.
       state = const PlaybackState.loading();
-      await _ref.read(playQueueProvider.notifier).next();
+      await ref.read(playQueueProvider.notifier).next();
     } else {
       state = const PlaybackState.completed();
     }
@@ -314,7 +313,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   /// Returns the saved watch position for [mediaId], or null if there is
   /// none (or the media was already completed).
   Future<Duration?> _loadSavedPosition(int mediaId) async {
-    final result = await _ref.read(mediaRepositoryProvider).getProgress();
+    final result = await ref.read(mediaRepositoryProvider).getProgress();
     return result.fold(
       (_) => null,
       (progressList) {
@@ -357,7 +356,7 @@ class PlaybackCoordinator extends StateNotifier<PlaybackState>
   }) async {
     if (position <= Duration.zero) return;
     try {
-      await _ref.read(mediaRepositoryProvider).updateProgress(
+      await ref.read(mediaRepositoryProvider).updateProgress(
             mediaId,
             position: position.inSeconds,
             duration: duration.inSeconds,
@@ -526,10 +525,6 @@ final videoPlayerDatasourceProvider = Provider<VideoPlaybackSource>((ref) {
 
 /// Provider for playback coordinator.
 final playbackCoordinatorProvider =
-    StateNotifierProvider<PlaybackCoordinator, PlaybackState>((ref) {
-  return PlaybackCoordinator(
-    ref.watch(audioPlayerDatasourceProvider),
-    ref.watch(baseUrlProvider),
-    ref,
-  );
-});
+    NotifierProvider<PlaybackCoordinator, PlaybackState>(
+  PlaybackCoordinator.new,
+);

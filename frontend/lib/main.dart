@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/features/auth/presentation/auth_guard.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
@@ -168,19 +169,30 @@ class _FluxAppState extends ConsumerState<FluxApp> {
 
   @override
   Widget build(BuildContext context) {
-    final locale = ref.watch(settingsProvider.select((s) => s.settings.locale));
+    // Суженный watch: MaterialApp пересоздаётся только при реальной
+    // смене локали или условий показа splash, а не при любой смене
+    // настроек (токены и пр.).
+    final settings = ref.watch(
+      settingsProvider.select(
+        (s) => (
+          locale: s.settings.locale,
+          serverUrl: s.settings.serverUrl,
+          authToken: s.settings.authToken,
+        ),
+      ),
+    );
     final authState = ref.watch(authProvider);
-    final settings = ref.watch(settingsProvider);
 
     ref.listen(authProvider, _handleAuthStateChange);
 
     final showSplash = authState is AuthLoading ||
         (authState is AuthInitial &&
-            settings.settings.serverUrl != null &&
-            settings.settings.authToken != null);
+            settings.serverUrl != null &&
+            settings.authToken != null);
 
     return MaterialApp.router(
       title: 'Flux',
+      scaffoldMessengerKey: scaffoldMessengerKey,
       theme: ThemeData(
         colorSchemeSeed: Colors.deepPurple,
         useMaterial3: true,
@@ -191,7 +203,7 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         useMaterial3: true,
         brightness: Brightness.dark,
       ),
-      locale: Locale(locale),
+      locale: Locale(settings.locale),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,

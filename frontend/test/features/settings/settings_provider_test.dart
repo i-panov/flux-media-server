@@ -70,9 +70,12 @@ void main() {
       expect(dataSource.getServerUrl(), isNull);
     });
 
-    test('setServerUrl persists value', () async {
+    test(
+        'setServerUrl persists value as-is '
+        '(normalization is in SettingsNotifier)',
+        () async {
       await dataSource.setServerUrl('http://localhost:8080');
-      expect(dataSource.getServerUrl(), 'http://localhost:8080/api');
+      expect(dataSource.getServerUrl(), 'http://localhost:8080');
     });
 
     test('getAuthToken returns null when empty', () async {
@@ -179,7 +182,7 @@ void main() {
     test('setServerUrl persists and returns value', () async {
       await repository.setServerUrl('http://localhost:8080');
       final settings = await repository.getSettings();
-      expect(settings.serverUrl, 'http://localhost:8080/api');
+      expect(settings.serverUrl, 'http://localhost:8080');
     });
 
     test('setAuthToken and clearAuthToken work', () async {

@@ -9,10 +9,7 @@ import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
-
-// Version is read from pubspec.yaml via package_info_plus in production.
-// For now, keep it as a single source of truth here.
-const String appVersion = '1.0.0';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Порог, при котором logout требует подтверждения (объём кеша в байтах).
 const int _logoutConfirmCacheBytes = 100 * 1024 * 1024;
@@ -44,11 +41,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// Размер офлайн-кеша (обновляется при открытии и после очистки).
   Future<int>? _cacheSizeFuture;
 
+  /// Версия приложения из package_info_plus ('—', если недоступна).
+  String _appVersion = '—';
+
   @override
   void initState() {
     super.initState();
     _cacheSizeFuture =
         ref.read(offlineCacheServiceProvider).getCacheSize();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _appVersion = info.version);
+    } catch (_) {
+      // Фолбэк '—': package_info недоступен в редких тестовых окружениях.
+    }
   }
 
   @override
@@ -319,7 +330,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('${l.version}: $appVersion'),
+              child: Text('${l.version}: $_appVersion'),
             ),
           ),
         ],

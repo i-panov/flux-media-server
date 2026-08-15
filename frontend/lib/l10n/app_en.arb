@@ -297,6 +297,18 @@
   "@downloading": {},
   "downloaded": "Downloaded",
   "@downloaded": {},
+  "downloadStarted": "Download started",
+  "@downloadStarted": {},
+  "downloadCancelled": "Download cancelled",
+  "@downloadCancelled": {},
+  "downloadFailed": "Error: {error}",
+  "@downloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "errorLabel": "Error",
   "@errorLabel": {},
   "addToQueue": "Add to Queue",
@@ -351,6 +363,8 @@
   "@uploadSuccess": {},
   "changeCover": "Change cover",
   "@changeCover": {},
+  "uploadingCover": "Uploading cover...",
+  "@uploadingCover": {},
   "editLyrics": "Edit lyrics",
   "@editLyrics": {},
   "editTranslation": "Edit translation",
@@ -375,6 +389,8 @@
   "@hashingFile": {},
   "checkingDuplicates": "Checking for duplicates...",
   "@checkingDuplicates": {},
+  "serverProcessing": "Processing on server...",
+  "@serverProcessing": {},
   "offlineCopy": "Offline copy",
   "@offlineCopy": {},
   "audioPlayingInBackground": "Playing audio track",

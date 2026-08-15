@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-
 	"flux/internal/models"
 )
 
@@ -41,7 +39,9 @@ type ScanStatus struct {
 }
 
 // StreamerInterface defines the interface for file streaming operations.
+// Сервис не знает про HTTP: ResolveStreamPath возвращает разрешённый путь,
+// отдачу файла и маппинг ошибок делает хендлер.
 type StreamerInterface interface {
 	IsPathAllowed(ctx context.Context, filePath string) (bool, error)
-	Stream(c *fiber.Ctx, filePath string) error
+	ResolveStreamPath(ctx context.Context, filePath string) (allowed bool, resolvedPath string, err error)
 }

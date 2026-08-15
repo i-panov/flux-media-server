@@ -4,12 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
-import 'package:flux_media_server/shared/models/media.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-const _mediaJson = '''
-{"id": 1, "title": "movie.mp4", "type": "video", "file_size": 1024}
+const _jobJson = '''
+{"job_id": 42}
+''';
+
+const _statusJson = '''
+{"id": 42, "status": "processing", "error": null, "media": null}
 ''';
 
 late Directory _tempDir;
@@ -44,7 +47,8 @@ void main() {
   });
 
   group('MediaRemoteDataSource.uploadFile auth/refresh', () {
-    test('retries once after 401 with the refreshed token', () async {
+    test('returns job id from the 202 response after 401 refresh',
+        () async {
       var calls = 0;
       var refreshCalls = 0;
       final client = MockClient((request) async {
@@ -56,7 +60,7 @@ void main() {
         if (calls == 1) {
           return http.Response('{"error": "expired"}', 401);
         }
-        return http.Response(_mediaJson, 201);
+        return http.Response(_jobJson, 202);
       });
 
       final dataSource = _dataSource(
@@ -68,14 +72,13 @@ void main() {
         },
       );
 
-      final media = await dataSource.uploadFile(
+      final jobId = await dataSource.uploadFile(
         filePath: _movieFile.path,
         mediaType: 'video',
         fileName: 'movie.mp4',
       );
 
-      expect(media.id, 1);
-      expect(media.title, 'movie.mp4');
+      expect(jobId, 42);
       expect(calls, 2);
       expect(refreshCalls, 1);
     });
@@ -133,17 +136,17 @@ void main() {
 
     test('successful upload cancels the retry loop immediately', () async {
       final client = MockClient(
-        (_) async => http.Response(_mediaJson, 201),
+        (_) async => http.Response(_jobJson, 202),
       );
 
       final dataSource = _dataSource(client: client);
-      final media = await dataSource.uploadFile(
+      final jobId = await dataSource.uploadFile(
         filePath: _movieFile.path,
         mediaType: 'video',
         fileName: 'movie.mp4',
       );
 
-      expect(media.type, MediaType.video);
+      expect(jobId, 42);
     });
   });
 
@@ -210,7 +213,7 @@ void main() {
       var cancelled = false;
       final client = MockClient((_) async {
         cancelled = true;
-        return http.Response(_mediaJson, 200);
+        return http.Response(_jobJson, 202);
       });
 
       final dataSource = _dataSource(
@@ -225,6 +228,76 @@ void main() {
           isCancelled: () => cancelled,
         ),
         throwsA(isA<UploadCancelledException>()),
+      );
+    });
+  });
+
+  group('MediaRemoteDataSource upload job status/cancel', () {
+    test('getUploadJobStatus returns parsed job status', () async {
+      final client = MockClient(
+        (_) async => http.Response(_statusJson, 200),
+      );
+
+      final dataSource = _dataSource(client: client);
+      final status = await dataSource.getUploadJobStatus(42);
+
+      expect(status.id, 42);
+      expect(status.status, 'processing');
+      expect(status.error, isNull);
+      expect(status.media, isNull);
+    });
+
+    test('getUploadJobStatus sends the job id path', () async {
+      late http.Request captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response(_statusJson, 200);
+      });
+
+      final dataSource = _dataSource(
+        client: client,
+        authToken: () => 'status-token',
+      );
+      await dataSource.getUploadJobStatus(7);
+
+      expect(captured.method, 'GET');
+      expect(captured.url.path, '/api/media/uploads/7');
+      expect(captured.headers['Authorization'], 'Bearer status-token');
+    });
+
+    test('cancelUploadJob accepts 204 and 409 as success', () async {
+      var statusCalls = 0;
+      final client = MockClient((request) async {
+        statusCalls++;
+        if (request.url.path.endsWith('/uploads/1')) {
+          return http.Response('', 204);
+        }
+        return http.Response('', 409);
+      });
+
+      final dataSource = _dataSource(client: client);
+      await dataSource.cancelUploadJob(1);
+      await dataSource.cancelUploadJob(2);
+
+      expect(statusCalls, 2);
+    });
+
+    test('cancelUploadJob fails on unexpected status', () async {
+      final client = MockClient(
+        (_) async => http.Response('{"error": "forbidden"}', 403),
+      );
+
+      final dataSource = _dataSource(client: client);
+
+      await expectLater(
+        dataSource.cancelUploadJob(1),
+        throwsA(
+          isA<ServerException>().having(
+            (e) => e.message,
+            'message',
+            'forbidden',
+          ),
+        ),
       );
     });
   });

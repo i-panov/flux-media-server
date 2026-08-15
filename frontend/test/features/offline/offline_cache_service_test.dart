@@ -7,22 +7,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_local_datasource.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/session/settings_repository_impl.dart';
-import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/user.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,41 +39,20 @@ Lyrics _lyrics(int mediaId) => Lyrics(
       lyricsText: 'Text',
     );
 
-class _StubAuthRepository implements AuthRepository {
-  @override
-  String? get lastDebugCode => null;
-
-  @override
-  Future<Either<Failure, Unit>> requestCode(String email) async =>
-      const Left(AuthFailure());
-
-  @override
-  Future<Either<Failure, ({String token, String refreshToken, User user})>>
-      verifyCode(String email, String code) async =>
-          const Left(AuthFailure());
-
-  @override
-  Future<Either<Failure, User>> getCurrentUser() async =>
-      const Left(AuthFailure());
-
-  @override
-  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
-    String refreshToken,
-  ) async =>
-      const Left(AuthFailure());
-}
 
 /// Фейковый auth-нотифаер: «залогинен» как пользователь 7, либо
 /// в начальном состоянии (после рестарта), если user == null.
 class _FakeAuthNotifier extends AuthNotifier {
-  _FakeAuthNotifier({required super.ref, User? user})
-      : super(
-          requestCode: RequestCode(_StubAuthRepository()),
-          verifyCode: VerifyCode(_StubAuthRepository()),
-          getCurrentUser: GetCurrentUser(_StubAuthRepository()),
-        ) {
-    state = user != null
-        ? AuthState.authenticated(user: user)
+  _FakeAuthNotifier({User? user}) : _user = user;
+
+  final User? _user;
+
+  @override
+  AuthState build() {
+    // НЕ вызываем super.build(): он поднимает цепочку API-клиентов,
+    // которая в этом тесте ломается (фейковый HTTP без connectionTimeout).
+    return _user != null
+        ? AuthState.authenticated(user: _user)
         : const AuthState.initial();
   }
 }
@@ -254,8 +227,7 @@ void main() {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         authProvider.overrideWith(
-          (ref) => _FakeAuthNotifier(
-            ref: ref,
+          () => _FakeAuthNotifier(
             user: const User(id: 7, email: 'u@example.com'),
           ),
         ),
@@ -363,7 +335,7 @@ void main() {
       final container2 = ProviderContainer(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
-          authProvider.overrideWith((ref) => _FakeAuthNotifier(ref: ref)),
+          authProvider.overrideWith(_FakeAuthNotifier.new),
         ],
       );
       addTearDown(container2.dispose);
@@ -604,18 +576,15 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
           authProvider.overrideWith(
-            (ref) => _FakeAuthNotifier(
-              ref: ref,
+            () => _FakeAuthNotifier(
               user: const User(id: 7, email: 'u@example.com'),
             ),
           ),
-          settingsProvider.overrideWith((ref) {
-            return SettingsNotifier(
-              SettingsRepositoryImpl(
-                SettingsLocalDataSource(prefs, const FlutterSecureStorage()),
-              ),
-            );
-          }),
+          settingsRepositoryProvider.overrideWithValue(
+            SettingsRepositoryImpl(
+              SettingsLocalDataSource(prefs, const FlutterSecureStorage()),
+            ),
+          ),
           authTokenRefresherProvider.overrideWith(
             (ref) => AuthTokenRefresher(
               performRefresh: (refreshToken) async {
@@ -674,18 +643,15 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
           authProvider.overrideWith(
-            (ref) => _FakeAuthNotifier(
-              ref: ref,
+            () => _FakeAuthNotifier(
               user: const User(id: 7, email: 'u@example.com'),
             ),
           ),
-          settingsProvider.overrideWith((ref) {
-            return SettingsNotifier(
-              SettingsRepositoryImpl(
-                SettingsLocalDataSource(prefs, const FlutterSecureStorage()),
-              ),
-            );
-          }),
+          settingsRepositoryProvider.overrideWithValue(
+            SettingsRepositoryImpl(
+              SettingsLocalDataSource(prefs, const FlutterSecureStorage()),
+            ),
+          ),
           authTokenRefresherProvider.overrideWith(
             (ref) => AuthTokenRefresher(
               performRefresh: (refreshToken) async {

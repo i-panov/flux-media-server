@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
@@ -32,10 +33,17 @@ class MediaDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
+  /// Идёт загрузка новой обложки (кнопка в AppBar показывает спиннер).
+  bool _isUploadingCover = false;
+
+  /// Пользователь отменил загрузку обложки повторным тапом.
+  bool _coverUploadCancelled = false;
+
   @override
   void initState() {
     super.initState();
-    ref.read(mediaDetailProvider(widget.mediaId).notifier).load(widget.mediaId);
+    // Загрузка запускается самим провайдером (build + microtask):
+    // модифицировать Notifier из initState запрещено.
   }
 
   String _imageUrl() {
@@ -93,7 +101,6 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     final type = media?.type.value ?? 'video';
     await showAddToCollectionDialog(
       context,
-      ref,
       widget.mediaId,
       mediaType: type,
     );
@@ -101,6 +108,12 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
 
   Future<void> _changeCover() async {
     final l = AppLocalizations.of(context)!;
+    // Повторный тап во время загрузки отменяет её.
+    if (_isUploadingCover) {
+      setState(() => _coverUploadCancelled = true);
+      return;
+    }
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
@@ -112,38 +125,57 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
 
     final uploadCover = ref.read(uploadCoverProvider);
 
-    final r = await uploadCover(
-      UploadCoverParams(mediaId: widget.mediaId, filePath: file.path!),
-    );
+    setState(() {
+      _isUploadingCover = true;
+      _coverUploadCancelled = false;
+    });
 
-    if (!mounted) return;
+    try {
+      final r = await uploadCover(
+        UploadCoverParams(
+          mediaId: widget.mediaId,
+          filePath: file.path!,
+          isCancelled: () => _coverUploadCancelled,
+        ),
+      );
 
-    r.fold(
-      (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.failedToAdd(failure.message)),
-            backgroundColor: Colors.red,
-          ),
-        );
-      },
-      (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.uploadSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Обновляем детали с сервера: серверный updatedAt даёт честный
-        // cache-buster для обложки (клиентское время врало бы его).
-        // Тихий перезапрос — без мигания спиннером.
-        unawaited(
-          ref.read(mediaDetailProvider(widget.mediaId).notifier).refresh(),
-        );
-        // Refresh media lists so cards show the new cover.
-        refreshMediaLists(ref);
-      },
-    );
+      if (!mounted) return;
+
+      r.fold(
+        (failure) {
+          if (failure is UploadCancelledFailure) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l.failedToAdd(failure.message)),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+        (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l.uploadSuccess),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Обновляем детали с сервера: серверный updatedAt даёт честный
+          // cache-buster для обложки (клиентское время врало бы его).
+          // Тихий перезапрос — без мигания спиннером.
+          unawaited(
+            ref.read(mediaDetailProvider(widget.mediaId).notifier).refresh(),
+          );
+          // Refresh media lists so cards show the new cover.
+          refreshMediaLists(ref);
+        },
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingCover = false;
+          _coverUploadCancelled = false;
+        });
+      }
+    }
   }
 
   Future<void> _download() async {
@@ -230,7 +262,9 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
     final favoriteState = ref.watch(favoriteToggleProvider(widget.mediaId));
     final downloadState = ref.watch(downloadNotifierProvider(widget.mediaId));
 
-    final isFavorite = favoriteState.valueOrNull ?? false;
+    // Пока ids избранного грузятся впервые (нет предыдущего значения),
+    // кнопка нейтральная — без ложного «не избранное».
+    final isFavorite = favoriteState.valueOrNull;
 
     final downloadProgress = switch (downloadState) {
       DownloadDownloading(:final progress) => progress,
@@ -254,9 +288,22 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
           actions: [
             IconButton(
               color: Colors.white,
-              icon: const Icon(Icons.image),
+              // Во время загрузки кнопка превращается в отмену со
+              // спиннером (загрузка обложки идёт без индикации ранее).
+              icon: _isUploadingCover
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.image),
+              tooltip: _isUploadingCover
+                  ? l.uploadingCover
+                  : l.changeCover,
               onPressed: _changeCover,
-              tooltip: l.changeCover,
             ),
             IconButton(
               color: Colors.white,
@@ -443,12 +490,16 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
                               child: Tooltip(
                                 message: l.favorites,
                                 child: OutlinedButton.icon(
-                                  onPressed: _toggleFavorite,
+                                  onPressed: isFavorite == null
+                                      ? null
+                                      : _toggleFavorite,
                                   icon: Icon(
-                                    isFavorite
+                                    (isFavorite ?? false)
                                         ? Icons.favorite
                                         : Icons.favorite_border,
-                                    color: isFavorite ? Colors.red : null,
+                                    color: isFavorite == null
+                                        ? null
+                                        : (isFavorite ? Colors.red : null),
                                   ),
                                   label: Text(l.favorites),
                                 ),

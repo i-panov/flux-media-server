@@ -3,6 +3,8 @@ import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -55,7 +57,7 @@ class MediaRepositoryImpl implements MediaRepository {
           safeRepositoryCall(() => remoteDataSource.checkHash(hash));
 
   @override
-  Future<Either<Failure, Media>> uploadFile({
+  Future<Either<Failure, UploadResult>> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
@@ -69,8 +71,31 @@ class MediaRepositoryImpl implements MediaRepository {
           fileName: fileName,
           onProgress: onProgress,
           isCancelled: isCancelled,
-        ),
+        ).then((jobId) => UploadResult(jobId: jobId)),
       );
+
+  @override
+  Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) =>
+      safeRepositoryCall(() async {
+        final status = await remoteDataSource.getUploadJobStatus(jobId);
+        return UploadStatus(
+          id: status.id,
+          status: status.status,
+          error: status.error,
+          media: status.media == null ? null : Media.fromJson(status.media!),
+        );
+      });
+
+  @override
+  Future<Either<Failure, void>> cancelUpload(int jobId) =>
+      safeRepositoryCall(() => remoteDataSource.cancelUploadJob(jobId));
+
+  @override
+  Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids) =>
+      safeRepositoryCall(() async {
+        final items = await remoteDataSource.getMediaBulk(ids);
+        return items.map(Media.fromJson).toList();
+      });
 
   @override
   Future<Either<Failure, List<WatchProgress>>> getProgress() =>

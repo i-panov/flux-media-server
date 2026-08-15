@@ -5,6 +5,8 @@ import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
@@ -58,13 +60,25 @@ class FakeMediaRepository implements MediaRepository {
           const Left(ServerFailure(message: 'not used'));
 
   @override
-  Future<Either<Failure, Media>> uploadFile({
+  Future<Either<Failure, UploadResult>> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) async =>
+      const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) async =>
+      const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, void>> cancelUpload(int jobId) async =>
+      const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids) async =>
       const Left(ServerFailure(message: 'not used'));
 
   @override

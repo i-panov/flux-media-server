@@ -26,6 +26,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   /// Лимит сервера по умолчанию (configs/config.yaml: max_upload_size).
   static const _maxUploadSizeBytes = 2 * 1024 * 1024 * 1024;
 
+  /// Интервал опроса статуса асинхронного upload-джоба.
+  static const _statusPollInterval = Duration(milliseconds: 1500);
+
+  /// Сколько подряд неудачных опросов статуса допустимо, прежде чем
+  /// показать ошибку (сеть может моргнуть).
+  static const _maxStatusPollFailures = 3;
+
   bool _isUploading = false;
   File? _selectedFile;
   String? _selectedFileName;
@@ -43,7 +50,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   static const _progressThrottle = Duration(milliseconds: 150);
   DateTime _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Текущая фаза: хэширование / проверка дубликата / загрузка.
+  /// Текущая фаза: хэширование / проверка дубликата / загрузка /
+  /// обработка сервером.
   String? _phase;
 
   String _formatSize(int bytes) {
@@ -177,20 +185,29 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         return;
       }
 
-      result.fold(
+      final jobId = result.fold(
         (failure) {
           if (failure is UploadCancelledFailure) {
             _showSnackBar(l.uploadCancelled, Colors.orange);
-            return;
+          } else {
+            _showSnackBar(l.failedToAdd(failure.message), Colors.red);
           }
-          _showSnackBar(l.failedToAdd(failure.message), Colors.red);
+          return null;
         },
-        (_) {
-          _showSnackBar(l.uploadSuccess, Colors.green);
-          refreshMediaLists(ref);
-          context.router.maybePop();
-        },
+        (r) => r.jobId,
       );
+      if (jobId == null) return;
+
+      // Отмена ровно между POST и первым опросом: джоб уже создан на
+      // сервере — отменяем его явно.
+      if (_cancelled) {
+        _showSnackBar(l.uploadCancelled, Colors.orange);
+        await _cancelJob(jobId);
+        return;
+      }
+
+      if (mounted) setState(() => _phase = l.serverProcessing);
+      await _pollUploadStatus(jobId);
     } on _UploadCancelled {
       _showSnackBar(l.uploadCancelled, Colors.orange);
     } catch (e, st) {
@@ -207,6 +224,73 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         });
       }
     }
+  }
+
+  /// Опрашивает статус джоба каждые ~1.5 с до done/error/отмены.
+  ///
+  /// При отмене — DELETE джоба на сервере. Уход с экрана проверяется
+  /// через [mounted] + [_cancelled]: цикл не трогает состояние после
+  /// dispose.
+  Future<void> _pollUploadStatus(int jobId) async {
+    final l = AppLocalizations.of(context)!;
+    var consecutiveFailures = 0;
+
+    while (!_cancelled && mounted) {
+      await Future<void>.delayed(_statusPollInterval);
+      if (_cancelled || !mounted) break;
+
+      final result = await ref.read(getUploadStatusProvider)(jobId);
+      if (_cancelled || !mounted) break;
+
+      final shouldStop = result.fold(
+        (failure) {
+          if (failure is UploadCancelledFailure) return true;
+          consecutiveFailures++;
+          if (consecutiveFailures >= _maxStatusPollFailures) {
+            _showSnackBar(l.failedToAdd(failure.message), Colors.red);
+            return true;
+          }
+          return false;
+        },
+        (status) {
+          consecutiveFailures = 0;
+          if (status.isError) {
+            _showSnackBar(
+              status.error ?? l.failedToAdd(l.errorLabel),
+              Colors.red,
+            );
+            return true;
+          }
+          if (status.isDone) {
+            // Готово: медиа уже на сервере — инвалидируем списки,
+            // чтобы карточка появилась, и закрываем экран.
+            refreshMediaLists(ref);
+            _showSnackBar(l.uploadSuccess, Colors.green);
+            context.router.maybePop();
+            return true;
+          }
+          // queued/processing — продолжаем опрос.
+          return false;
+        },
+      );
+      if (shouldStop) break;
+    }
+
+    // Пользователь отменил во время обработки — отменяем джоб на
+    // сервере, чтобы файл не сохранился в библиотеке.
+    if (_cancelled && mounted) {
+      _showSnackBar(l.uploadCancelled, Colors.orange);
+      await _cancelJob(jobId);
+    }
+  }
+
+  Future<void> _cancelJob(int jobId) async {
+    final result = await ref.read(cancelUploadProvider)(jobId);
+    result.fold(
+      (failure) =>
+          AppLogger.error('Failed to cancel upload job $jobId', failure),
+      (_) {},
+    );
   }
 
   @override

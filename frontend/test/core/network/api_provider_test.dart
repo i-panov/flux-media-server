@@ -45,88 +45,67 @@ class _FakeSettingsRepository implements SettingsRepository {
   Future<void> setLocale(String locale) async {}
 }
 
+
 void main() {
+  Future<ProviderContainer> makeContainerWithSettings(
+    AppSettings settings,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        settingsRepositoryProvider.overrideWithValue(
+          _FakeSettingsRepository(settings),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(settingsProvider.notifier).init();
+    return container;
+  }
+
   group('baseUrlProvider', () {
     test('appends missing /api to legacy saved serverUrl', () async {
       // Имитация значения, сохранённого до рефакторинга: без сегмента
       // `/api`. Раньше api_provider добавлял его магией, теперь это
       // делает baseUrlProvider — иначе запросы уходили бы на 404.
-      final notifier = SettingsNotifier(
-        _FakeSettingsRepository(
-          const AppSettings(serverUrl: 'http://192.168.1.5:8080'),
-        ),
+      final container = await makeContainerWithSettings(
+        const AppSettings(serverUrl: 'http://192.168.1.5:8080'),
       );
-      await notifier.init();
-
-      final container = ProviderContainer(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
-      );
-      addTearDown(container.dispose);
 
       expect(container.read(baseUrlProvider), 'http://192.168.1.5:8080/api');
     });
 
     test('keeps normalized serverUrl unchanged', () async {
-      final notifier = SettingsNotifier(
-        _FakeSettingsRepository(
-          const AppSettings(serverUrl: 'http://192.168.1.5:8080/api'),
-        ),
+      final container = await makeContainerWithSettings(
+        const AppSettings(serverUrl: 'http://192.168.1.5:8080/api'),
       );
-      await notifier.init();
-
-      final container = ProviderContainer(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
-      );
-      addTearDown(container.dispose);
 
       expect(container.read(baseUrlProvider), 'http://192.168.1.5:8080/api');
     });
 
-    test('normalizes default address when serverUrl is null', () {
-      final container = ProviderContainer(
-        overrides: [
-          settingsProvider.overrideWith(
-            (ref) => SettingsNotifier(
-              _FakeSettingsRepository(const AppSettings()),
-            ),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+    test('normalizes default address when serverUrl is null', () async {
+      final container = await makeContainerWithSettings(const AppSettings());
 
       expect(container.read(baseUrlProvider), 'http://localhost:8080/api');
     });
 
     test('does not change when tokens change (no client recreation)', () async {
-      final notifier = SettingsNotifier(
-        _FakeSettingsRepository(
-          const AppSettings(serverUrl: 'http://host:8080/api'),
-        ),
+      final container = await makeContainerWithSettings(
+        const AppSettings(serverUrl: 'http://host:8080/api'),
       );
-      await notifier.init();
-
-      final container = ProviderContainer(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
-      );
-      addTearDown(container.dispose);
 
       final client1 = container.read(authApiClientProvider);
 
       // setTokens/logout меняют настройки, но не serverUrl —
       // клиенты пересоздаваться не должны.
-      await notifier.setTokens('access-1', 'refresh-1');
+      await container
+          .read(settingsProvider.notifier)
+          .setTokens('access-1', 'refresh-1');
       expect(
         identical(container.read(authApiClientProvider), client1),
         isTrue,
       );
 
-      await notifier.logout();
+      await container.read(settingsProvider.notifier).logout();
       expect(
         identical(container.read(authApiClientProvider), client1),
         isTrue,
@@ -134,27 +113,69 @@ void main() {
     });
 
     test('recreates clients when serverUrl changes', () async {
-      final notifier = SettingsNotifier(
-        _FakeSettingsRepository(
-          const AppSettings(serverUrl: 'http://host:8080/api'),
-        ),
+      final container = await makeContainerWithSettings(
+        const AppSettings(serverUrl: 'http://host:8080/api'),
       );
-      await notifier.init();
-
-      final container = ProviderContainer(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
-      );
-      addTearDown(container.dispose);
 
       final client1 = container.read(authApiClientProvider);
 
-      await notifier.setServerUrl('http://other:9000/api');
+      await container
+          .read(settingsProvider.notifier)
+          .setServerUrl('http://other:9000/api');
       final client2 = container.read(authApiClientProvider);
 
       expect(identical(client1, client2), isFalse);
       expect(container.read(baseUrlProvider), 'http://other:9000/api');
+    });
+  });
+
+  group('shared http client', () {
+    Future<ProviderContainer> makeContainer() async {
+      return makeContainerWithSettings(const AppSettings(serverUrl: 'http://host:8080/api'));
+    }
+
+    test('auth, media and library clients share one http client instance',
+        () async {
+      final container = await makeContainer();
+      final shared = container.read(httpClientProvider);
+
+      expect(
+        identical(
+          shared,
+          container.read(authApiClientProvider).client.httpClient,
+        ),
+        isTrue,
+      );
+      expect(
+        identical(
+          shared,
+          container.read(mediaApiClientProvider).client.httpClient,
+        ),
+        isTrue,
+      );
+      expect(
+        identical(
+          shared,
+          container.read(libraryApiClientProvider).client.httpClient,
+        ),
+        isTrue,
+      );
+    });
+
+    test('shared http client survives serverUrl change (no new pools)',
+        () async {
+      final container = await makeContainer();
+      final notifier = container.read(settingsProvider.notifier);
+      final shared = container.read(httpClientProvider);
+
+      // Реальная смена адреса сервера.
+      await notifier.setServerUrl('http://other:9000/api');
+      final authClient = container.read(authApiClientProvider);
+
+      // Новый ChopperClient создан, но http.Client остался общим —
+      // connection-pool не плодится.
+      expect(container.read(httpClientProvider), same(shared));
+      expect(identical(shared, authClient.client.httpClient), isTrue);
     });
   });
 

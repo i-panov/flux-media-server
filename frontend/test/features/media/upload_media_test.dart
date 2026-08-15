@@ -5,6 +5,8 @@ import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
@@ -13,7 +15,7 @@ import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 
 class FakeMediaRepository implements MediaRepository {
-  Future<Either<Failure, Media>> Function({
+  Future<Either<Failure, UploadResult>> Function({
     required String filePath,
     required String mediaType,
     required String fileName,
@@ -28,7 +30,7 @@ class FakeMediaRepository implements MediaRepository {
   final List<(int, int?)> progressEvents = [];
 
   @override
-  Future<Either<Failure, Media>> uploadFile({
+  Future<Either<Failure, UploadResult>> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
@@ -47,6 +49,18 @@ class FakeMediaRepository implements MediaRepository {
       isCancelled: isCancelled,
     );
   }
+
+  @override
+  Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) async =>
+      const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, void>> cancelUpload(int jobId) async =>
+      const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids) async =>
+      const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, ({List<Media> items, int total})>> getMediaList({
@@ -116,7 +130,7 @@ class _StubUploadDataSource extends MediaRemoteDataSource {
   final Object _result;
 
   @override
-  Future<Media> uploadFile({
+  Future<int> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
@@ -125,7 +139,7 @@ class _StubUploadDataSource extends MediaRemoteDataSource {
   }) async {
     if (_result is Exception) throw _result;
     if (_result is Error) throw _result;
-    return _result as Media;
+    return _result as int;
   }
 
   @override
@@ -136,6 +150,20 @@ class _StubUploadDataSource extends MediaRemoteDataSource {
   }) async {
     if (_result is Exception) throw _result;
     if (_result is Error) throw _result;
+  }
+
+  @override
+  Future<
+      ({
+        int id,
+        String status,
+        String? error,
+        Map<String, dynamic>? media,
+      })> getUploadJobStatus(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) async {
+    return (id: jobId, status: 'processing', error: null, media: null);
   }
 }
 
@@ -158,15 +186,7 @@ void main() {
             }) async {
         onProgress?.call(10, 100);
         onProgress?.call(20, 100);
-        return Right(
-          Media(
-            id: 1,
-            title: fileName,
-            year: 2024,
-            type: MediaType.video,
-            fileSize: 100,
-          ),
-        );
+        return const Right(UploadResult(jobId: 42));
       };
 
       final result = await uploadMedia(
@@ -181,6 +201,7 @@ void main() {
       );
 
       expect(result.isRight(), isTrue);
+      expect(result.getRight().toNullable()?.jobId, 42);
       expect(fakeRepo.lastFilePath, '/tmp/movie.mp4');
       expect(fakeRepo.lastMediaType, 'video');
       expect(fakeRepo.lastFileName, 'movie.mp4');
@@ -245,15 +266,8 @@ void main() {
       expect(failure?.message, 'Disk full');
     });
 
-    test('successful upload returns the media', () async {
-      const media = Media(
-        id: 1,
-        title: 'movie.mp4',
-        year: 2024,
-        type: MediaType.video,
-        fileSize: 100,
-      );
-      final repository = MediaRepositoryImpl(_StubUploadDataSource(media));
+    test('successful upload returns the job id', () async {
+      final repository = MediaRepositoryImpl(_StubUploadDataSource(42));
 
       final result = await repository.uploadFile(
         filePath: '/tmp/movie.mp4',
@@ -262,7 +276,20 @@ void main() {
       );
 
       expect(result.isRight(), isTrue);
-      expect(result.getRight().toNullable()?.id, 1);
+      expect(result.getRight().toNullable()?.jobId, 42);
+    });
+
+    test('getUploadStatus maps job data to UploadStatus', () async {
+      final repository = MediaRepositoryImpl(_StubUploadDataSource(0));
+
+      final result = await repository.getUploadStatus(7);
+
+      expect(result.isRight(), isTrue);
+      final status = result.getRight().toNullable();
+      expect(status?.id, 7);
+      expect(status?.status, 'processing');
+      expect(status?.isDone, isFalse);
+      expect(status?.media, isNull);
     });
 
     test('uploadCover also surfaces cancellation as UploadCancelledFailure',

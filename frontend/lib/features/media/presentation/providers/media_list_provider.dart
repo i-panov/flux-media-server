@@ -5,10 +5,12 @@ import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
+import 'package:flux_media_server/features/media/domain/usecases/cancel_upload.dart';
 import 'package:flux_media_server/features/media/domain/usecases/check_media_hash.dart';
 import 'package:flux_media_server/features/media/domain/usecases/delete_media.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_artists.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
+import 'package:flux_media_server/features/media/domain/usecases/get_upload_status.dart';
 import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
@@ -65,6 +67,14 @@ final checkMediaHashProvider = Provider<CheckMediaHash>((ref) {
 
 final uploadMediaProvider = Provider<UploadMedia>((ref) {
   return UploadMedia(ref.watch(mediaRepositoryProvider));
+});
+
+final getUploadStatusProvider = Provider<GetUploadStatus>((ref) {
+  return GetUploadStatus(ref.watch(mediaRepositoryProvider));
+});
+
+final cancelUploadProvider = Provider<CancelUpload>((ref) {
+  return CancelUpload(ref.watch(mediaRepositoryProvider));
 });
 
 final uploadCoverProvider = Provider<UploadCover>((ref) {

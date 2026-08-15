@@ -257,7 +257,6 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
                     onAddToQueue: () => addTrackToQueue(ref, track),
                     onAddToCollection: () => showAddToCollectionDialog(
                       context,
-                      ref,
                       track.id,
                       mediaType: 'audio',
                     ),
@@ -287,7 +286,6 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
                     onAddToQueue: () => addTrackToQueue(ref, track),
                     onAddToCollection: () => showAddToCollectionDialog(
                       context,
-                      ref,
                       track.id,
                       mediaType: 'audio',
                     ),

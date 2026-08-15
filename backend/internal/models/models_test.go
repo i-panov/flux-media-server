@@ -77,6 +77,33 @@ func TestSchemaMigrateAndCheckConstraints(t *testing.T) {
 	assert.True(t, indexExists(t, db, "idx_refresh_tokens_expires_at"), "refresh token expires_at index missing")
 	// Избыточный uniqueIndex поверх составного PK media_artists удалён.
 	assert.False(t, indexExists(t, db, "idx_media_artist_pair"), "redundant idx_media_artist_pair must not be created")
+
+	// FK на join-таблице media_artists создаются с каскадами (свежая БД);
+	// старые БД покрыты ручными каскадами в repository.Delete.
+	assertFKCascade(t, db, "media_artists", "media_id", "media")
+	assertFKCascade(t, db, "media_artists", "artist_id", "artists")
+}
+
+// assertFKCascade проверяет, что колонка table.from ссылается на
+// refTable.id с ON DELETE/UPDATE CASCADE.
+func assertFKCascade(t *testing.T, db *gorm.DB, table, from, refTable string) {
+	t.Helper()
+	var fks []struct {
+		Table    string
+		From     string
+		To       string
+		OnUpdate string
+		OnDelete string
+	}
+	require.NoError(t, db.Raw("PRAGMA foreign_key_list("+table+")").Scan(&fks).Error)
+	for _, fk := range fks {
+		if fk.Table == refTable && fk.From == from && fk.To == "id" {
+			assert.Equal(t, "CASCADE", fk.OnUpdate, "FK %s.%s -> %s must have ON UPDATE CASCADE", table, from, refTable)
+			assert.Equal(t, "CASCADE", fk.OnDelete, "FK %s.%s -> %s must have ON DELETE CASCADE", table, from, refTable)
+			return
+		}
+	}
+	t.Errorf("FK %s.%s -> %s not found", table, from, refTable)
 }
 
 // TestUniqueConstraints проверяет, что дубликаты отклоняются уникальными

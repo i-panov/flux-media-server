@@ -38,11 +38,14 @@ class SettingsState with _$SettingsState {
   }) = _SettingsState;
 }
 
-class SettingsNotifier extends StateNotifier<SettingsState> {
-  SettingsNotifier(this._repository)
-      : super(const SettingsState(settings: AppSettings()));
+class SettingsNotifier extends Notifier<SettingsState> {
+  late final SettingsRepository _repository;
 
-  final SettingsRepository _repository;
+  @override
+  SettingsState build() {
+    _repository = ref.watch(settingsRepositoryProvider);
+    return const SettingsState(settings: AppSettings());
+  }
 
   /// Loads settings from the repository. Called at app startup.
   Future<void> init() async {
@@ -105,7 +108,6 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 }
 
-final settingsProvider =
-    StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  return SettingsNotifier(ref.watch(settingsRepositoryProvider));
-});
+final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
+  SettingsNotifier.new,
+);

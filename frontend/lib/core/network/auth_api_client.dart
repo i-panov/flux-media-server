@@ -39,6 +39,11 @@ abstract class AuthApiClient extends ChopperService {
     );
   }
 
+  /// Привязывает сервис к существующему [ChopperClient] (общему для всех
+  /// сервисов приложения). В отличие от [create], не создаёт собственный
+  /// HTTP-клиент.
+  static AuthApiClient bind(ChopperClient client) => _$AuthApiClient(client);
+
   @Post(path: '/auth/request-code')
   Future<Response<Map<String, dynamic>>> requestCode(
     @Body() Map<String, dynamic> body,

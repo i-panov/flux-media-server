@@ -2,7 +2,6 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Префикс ключей хранилища: debug- и release-сборки не делят данные.
@@ -42,10 +41,9 @@ class SettingsLocalDataSource {
   String? getServerUrl() => _prefs.getString(_p(_keyServerUrl));
 
   Future<void> setServerUrl(String url) async {
-    // Нормализуем при сохранении, чтобы в хранилище всегда был
-    // единый формат (полный baseUrl API с сегментом /api).
-    final success =
-        await _prefs.setString(_p(_keyServerUrl), normalizeServerUrl(url));
+    // Нормализация (единый формат, сегмент /api) выполняется один раз
+    // в SettingsNotifier.setServerUrl — хранилище сохраняет как получил.
+    final success = await _prefs.setString(_p(_keyServerUrl), url);
     if (!success) {
       throw Exception('Failed to save server URL to SharedPreferences');
     }

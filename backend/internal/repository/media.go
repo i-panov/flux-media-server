@@ -18,31 +18,29 @@ func NewMediaRepository(db *gorm.DB) *MediaStore {
 	return &MediaStore{db: db}
 }
 
-func (r *MediaStore) FindAll(ctx context.Context, filters map[string]interface{}, limit, offset int) ([]models.Media, int64, error) {
+func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, offset int) ([]models.Media, int64, error) {
 	var media []models.Media
 	var total int64
 	query := r.db.WithContext(ctx).
 		Preload("Metadata")
 
-	if mediaType, ok := filters["type"]; ok {
-		query = query.Where("type = ?", mediaType)
+	if filters.Type != "" {
+		query = query.Where("type = ?", filters.Type)
 	}
-	if year, ok := filters["year"]; ok {
-		query = query.Where("year = ?", year)
+	if filters.Year != 0 {
+		query = query.Where("year = ?", filters.Year)
 	}
-	if q, ok := filters["q"]; ok {
-		if searchTerm, ok := q.(string); ok && searchTerm != "" {
-			// Экранируем спецсимволы LIKE из пользовательского ввода: иначе
-			// «%» и «_» трактуются как шаблон, а не как литеральные символы.
-			like := "%" + escapeLike(searchTerm) + "%"
-			query = query.Where(
-				`title LIKE ? ESCAPE '\' OR album LIKE ? ESCAPE '\' OR description LIKE ? ESCAPE '\'
-				 OR EXISTS (SELECT 1 FROM media_artists ma
-				             JOIN artists a ON a.id = ma.artist_id
-				             WHERE ma.media_id = media.id AND a.name LIKE ? ESCAPE '\')`,
-				like, like, like, like,
-			)
-		}
+	if filters.Q != "" {
+		// Экранируем спецсимволы LIKE из пользовательского ввода: иначе
+		// «%» и «_» трактуются как шаблон, а не как литеральные символы.
+		like := "%" + escapeLike(filters.Q) + "%"
+		query = query.Where(
+			`title LIKE ? ESCAPE '\' OR album LIKE ? ESCAPE '\' OR description LIKE ? ESCAPE '\'
+			 OR EXISTS (SELECT 1 FROM media_artists ma
+			             JOIN artists a ON a.id = ma.artist_id
+			             WHERE ma.media_id = media.id AND a.name LIKE ? ESCAPE '\')`,
+			like, like, like, like,
+		)
 	}
 
 	if err := query.Model(&models.Media{}).Count(&total).Error; err != nil {
@@ -115,6 +113,26 @@ func (r *MediaStore) FindByPathBasic(ctx context.Context, path string) (*models.
 	var media models.Media
 	err := r.db.WithContext(ctx).Where("file_path = ?", path).First(&media).Error
 	return &media, err
+}
+
+// FindByIDs возвращает медиа по списку ID (порядок не гарантируется —
+// сортировка по media.id ASC). Артисты грузятся пакетно, как в FindAll.
+func (r *MediaStore) FindByIDs(ctx context.Context, ids []uint) ([]models.Media, error) {
+	if len(ids) == 0 {
+		return []models.Media{}, nil
+	}
+	var media []models.Media
+	if err := r.db.WithContext(ctx).
+		Preload("Metadata").
+		Where("media.id IN ?", ids).
+		Order("media.id ASC").
+		Find(&media).Error; err != nil {
+		return nil, err
+	}
+	if err := LoadArtistsForMedia(r.db.WithContext(ctx), media); err != nil {
+		return nil, err
+	}
+	return media, nil
 }
 
 func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media, error) {

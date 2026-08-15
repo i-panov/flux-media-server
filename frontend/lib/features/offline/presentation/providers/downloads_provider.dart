@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -5,20 +7,22 @@ import 'package:flux_media_server/features/offline/data/offline_cache_service.da
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_invalidator_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
-class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
-  DownloadsNotifier(this._ref) : super(const AsyncValue.loading()) {
-    // Watch the invalidator counter — refresh whenever it changes.
-    _ref.listen<int>(downloadsInvalidatorProvider, (_, next) {
-      refresh();
-    });
-    refresh();
-  }
-
-  final Ref _ref;
-
+class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
   /// Защита от параллельных refresh (тики инвалидатора могут прийти
   /// подряд).
   bool _isRefreshing = false;
+
+  @override
+  AsyncValue<List<Media>> build() {
+    // Watch the invalidator counter — refresh whenever it changes.
+    ref.listen<int>(downloadsInvalidatorProvider, (_, next) {
+      refresh();
+    });
+    // Первый refresh откладываем: внутри refresh читается `state`,
+    // а до завершения build() обращение к нему запрещено.
+    Future.microtask(refresh);
+    return const AsyncValue.loading();
+  }
 
   /// Reloads the list of downloaded media.
   /// In offline mode reads locally stored JSON metadata (no API calls).
@@ -33,8 +37,8 @@ class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
       state = const AsyncValue.loading();
     }
     try {
-      final cacheService = _ref.read(offlineCacheServiceProvider);
-      final isOffline = _ref.read(isOfflineProvider);
+      final cacheService = ref.read(offlineCacheServiceProvider);
+      final isOffline = ref.read(isOfflineProvider);
 
       if (isOffline) {
         // Offline: read locally cached metadata only.
@@ -58,28 +62,43 @@ class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
       final missingIds =
           ids.where((id) => !cachedById.containsKey(id)).toList();
 
-      final mediaRepository = _ref.read(mediaRepositoryProvider);
-      // Пачками по 8, чтобы не создавать сотни параллельных запросов.
-      const batchSize = 8;
+      final mediaRepository = ref.read(mediaRepositoryProvider);
+      // Один bulk-запрос вместо N+1 (лимит сервера — 100 id на запрос,
+      // порции по 8 дольше не нужны). Поштучный фолбэк — только если
+      // bulk-запрос упал целиком.
+      const bulkLimit = 100;
       final fetchedById = <int, Media>{};
       var allFailed = missingIds.isNotEmpty;
-      for (var i = 0; i < missingIds.length; i += batchSize) {
-        final end = (i + batchSize < missingIds.length)
-            ? i + batchSize
+      for (var i = 0; i < missingIds.length; i += bulkLimit) {
+        final end = (i + bulkLimit < missingIds.length)
+            ? i + bulkLimit
             : missingIds.length;
-        final batch =
-            missingIds.sublist(i, end).map(mediaRepository.getMediaDetail);
-        final results = await Future.wait(batch);
-        for (final result in results) {
-          result.fold(
-            (failure) => null,
-            (media) {
-              fetchedById[media.id] = media;
-              allFailed = false;
-              // Persist metadata for offline access.
-              cacheService.saveMetadata(media);
-            },
-          );
+        final chunk = missingIds.sublist(i, end);
+
+        final bulkResult = await mediaRepository.getMediaBulk(chunk);
+        final bulkFailed = bulkResult.isLeft();
+        if (bulkFailed) {
+          // Bulk недоступен (старый сервер или сбой) — поштучно.
+          for (final id in chunk) {
+            final detail = await mediaRepository.getMediaDetail(id);
+            detail.fold(
+              (failure) => null,
+              (media) {
+                fetchedById[media.id] = media;
+                allFailed = false;
+                // Persist metadata for offline access.
+                cacheService.saveMetadata(media);
+              },
+            );
+          }
+          continue;
+        }
+        for (final media
+            in bulkResult.getRight().toNullable() ?? const <Media>[]) {
+          fetchedById[media.id] = media;
+          allFailed = false;
+          // Persist metadata for offline access.
+          unawaited(cacheService.saveMetadata(media));
         }
       }
 
@@ -101,7 +120,7 @@ class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
       if (hasData) return;
       // Last resort: try local metadata.
       try {
-        final cacheService = _ref.read(offlineCacheServiceProvider);
+        final cacheService = ref.read(offlineCacheServiceProvider);
         final localMedia = await cacheService.getCachedMedia();
         if (localMedia.isNotEmpty) {
           state = AsyncValue.data(localMedia);
@@ -116,6 +135,6 @@ class DownloadsNotifier extends StateNotifier<AsyncValue<List<Media>>> {
 }
 
 final downloadsProvider =
-    StateNotifierProvider<DownloadsNotifier, AsyncValue<List<Media>>>((ref) {
-  return DownloadsNotifier(ref);
-});
+    NotifierProvider<DownloadsNotifier, AsyncValue<List<Media>>>(
+  DownloadsNotifier.new,
+);

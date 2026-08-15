@@ -2,14 +2,10 @@ package services
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
-
 	"flux/internal/config"
-	"flux/internal/response"
 )
 
 type StreamerService struct {
@@ -54,39 +50,16 @@ func (s *StreamerService) IsPathAllowed(ctx context.Context, filePath string) (b
 	return false, nil
 }
 
-func (s *StreamerService) Stream(c *fiber.Ctx, filePath string) error {
-	ctx := c.UserContext()
-
-	// Resolve the path once and stream the RESOLVED path: this closes the
-	// TOCTOU window where the file could be swapped between the permission
-	// check and SendFile (e.g. via a symlink).
-	allowed, resolvedPath, err := s.resolveAllowedPath(ctx, filePath)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to validate file path")
-	}
-	if !allowed {
-		return response.Error(c, fiber.StatusForbidden, "Access denied")
-	}
-
-	ext := strings.ToLower(filepath.Ext(resolvedPath))
-	c.Set("Content-Type", mimeTypeByExt(ext))
-
-	// SendFile сам возвращает 404 (fiber.Error) для отсутствующего файла.
-	// Отдельный os.Stat не нужен — он давал бы лишний системный вызов,
-	// а fasthttp всё равно проверяет файл при отправке.
-	if err := c.SendFile(resolvedPath); err != nil {
-		var fiberErr *fiber.Error
-		if errors.As(err, &fiberErr) && fiberErr.Code == fiber.StatusNotFound {
-			// Не возвращаем текст ошибки SendFile — он содержит путь ФС.
-			return response.Error(c, fiber.StatusNotFound, "File not found")
-		}
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to stream file")
-	}
-	return nil
+// ResolveStreamPath проверяет filePath на принадлежность зарегистрированным
+// медиа-путям и возвращает резолвнутый (без символьных ссылок) путь, который
+// фактически был проверен. HTTP-слой отсутствует: вызовов c.ServeFile/SendFile
+// здесь нет — этим занимается хендлер, который и маппит ошибки на статусы.
+// Возвращает resolvedPath даже при allowed=false: он нужен только когда
+// allowed=true (безопасность: разрешено отдавать исключительно проверенный
+// путь, иначе клиент мог бы подменить файл в TOCTOU-окне).
+func (s *StreamerService) ResolveStreamPath(ctx context.Context, filePath string) (bool, string, error) {
+	return s.resolveAllowedPath(ctx, filePath)
 }
-
-// resolveAllowedPath checks filePath against the registered media paths and
-// returns the resolved (symlink-free) path that was actually validated.
 func (s *StreamerService) resolveAllowedPath(ctx context.Context, filePath string) (bool, string, error) {
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
@@ -121,8 +94,8 @@ func (s *StreamerService) resolveAllowedPath(ctx context.Context, filePath strin
 	return false, resolvedPath, nil
 }
 
-// mimeTypeByExt returns the MIME type for known media file extensions.
-func mimeTypeByExt(ext string) string {
+// MimeTypeByExt returns the MIME type for known media file extensions.
+func MimeTypeByExt(ext string) string {
 	switch ext {
 	case ".mp4", ".m4v":
 		return "video/mp4"

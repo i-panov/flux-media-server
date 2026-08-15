@@ -11,7 +11,6 @@ import 'package:flux_media_server/shared/models/collection.dart';
 /// Returns true if the item was added.
 Future<bool?> showAddToCollectionDialog(
   BuildContext context,
-  WidgetRef ref,
   int mediaId, {
   String mediaType = 'video',
 }) async {

@@ -17,9 +17,19 @@ type UserRepository interface {
 	Count(ctx context.Context) (int64, error)
 }
 
+// MediaFilters — типизированный набор фильтров списка медиа. Нулевые
+// значения полей (пустой Type, Year=0, пустой Q) означают «без фильтра».
+type MediaFilters struct {
+	Type models.MediaType
+	Year int
+	Q    string
+}
+
 // MediaRepository defines data access methods for Media entities.
 type MediaRepository interface {
-	FindAll(ctx context.Context, filters map[string]interface{}, limit, offset int) ([]models.Media, int64, error)
+	FindAll(ctx context.Context, filters MediaFilters, limit, offset int) ([]models.Media, int64, error)
+	// FindByIDs возвращает медиа по списку ID с Metadata и Artists.
+	FindByIDs(ctx context.Context, ids []uint) ([]models.Media, error)
 	FindByID(ctx context.Context, id uint) (*models.Media, error)
 	FindByPath(ctx context.Context, path string) (*models.Media, error)
 	// FindByPathBasic ищет по пути одним SELECT без Preload — для горячих

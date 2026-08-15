@@ -57,29 +57,111 @@ class MainScreen extends StatelessWidget {
               }
             }
           : null,
-      child: isWide ? _buildWide(l) : _buildNarrow(l),
+      child: _buildScaffold(l, isWide: isWide),
     );
   }
 
-  Widget _buildWide(AppLocalizations l) {
-    return _WideLayout(
-      tabs: tabs,
-      destinations: _destinations(l),
-      settingsLabel: l.settings,
-      settingsRoute: settingsRoute,
-      isOffline: isOffline,
-      onRetry: onRetry,
-      miniPlayer: miniPlayer,
+  /// Общий каркас вкладок: навигация и контент раскладываются в
+  /// зависимости от ширины. На широких экранах навигация — слева
+  /// ([NavigationRail]), мини-плеер — под контентом; на узких —
+  /// навигация и плеер снизу ([NavigationBar]).
+  Widget _buildScaffold(AppLocalizations l, {required bool isWide}) {
+    final destinations = _destinations(l);
+    return AutoTabsRouter(
+      routes: tabs,
+      builder: (context, child) {
+        final tabsRouter = AutoTabsRouter.of(context);
+        return Scaffold(
+          body: isWide
+              ? Row(
+                  children: [
+                    _buildNavigationRail(context, tabsRouter, destinations),
+                    const VerticalDivider(thickness: 1, width: 1),
+                    Expanded(
+                      child: _buildContent(context, child, isWide: true),
+                    ),
+                  ],
+                )
+              : _buildContent(context, child, isWide: false),
+          bottomNavigationBar: isWide
+              ? null
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    miniPlayer,
+                    _buildNavigationBar(tabsRouter, destinations),
+                  ],
+                ),
+        );
+      },
     );
   }
 
-  Widget _buildNarrow(AppLocalizations l) {
-    return _NarrowLayout(
-      tabs: tabs,
-      destinations: _destinations(l),
-      isOffline: isOffline,
-      onRetry: onRetry,
-      miniPlayer: miniPlayer,
+  Widget _buildContent(
+    BuildContext context,
+    Widget child, {
+    required bool isWide,
+  }) {
+    return Column(
+      children: [
+        if (isOffline) _OfflineBanner(onRetry: onRetry),
+        Expanded(child: child),
+        if (isWide) miniPlayer,
+      ],
+    );
+  }
+
+  Widget _buildNavigationRail(
+    BuildContext context,
+    TabsRouter tabsRouter,
+    List<({IconData icon, IconData selectedIcon, String label})> destinations,
+  ) {
+    final l = AppLocalizations.of(context)!;
+    return NavigationRail(
+      selectedIndex: tabsRouter.activeIndex,
+      onDestinationSelected: tabsRouter.setActiveIndex,
+      extended: MediaQuery.of(context).size.width >= 1200,
+      destinations: [
+        for (final d in destinations)
+          NavigationRailDestination(
+            icon: Icon(d.icon),
+            selectedIcon: Icon(d.selectedIcon),
+            label: Text(d.label),
+          ),
+      ],
+      trailing: Expanded(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                tooltip: l.settings,
+                onPressed: () => AutoRouter.of(context).push(settingsRoute),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationBar(
+    TabsRouter tabsRouter,
+    List<({IconData icon, IconData selectedIcon, String label})> destinations,
+  ) {
+    return NavigationBar(
+      selectedIndex: tabsRouter.activeIndex,
+      onDestinationSelected: tabsRouter.setActiveIndex,
+      destinations: [
+        for (final d in destinations)
+          NavigationDestination(
+            icon: Icon(d.icon),
+            selectedIcon: Icon(d.selectedIcon),
+            label: d.label,
+          ),
+      ],
     );
   }
 
@@ -99,83 +181,6 @@ class MainScreen extends StatelessWidget {
         label: l.audioTab
       ),
     ];
-  }
-}
-
-/// Desktop/tablet layout with NavigationRail on the left.
-class _WideLayout extends StatelessWidget {
-  const _WideLayout({
-    required this.tabs,
-    required this.destinations,
-    required this.settingsLabel,
-    required this.settingsRoute,
-    required this.isOffline,
-    required this.onRetry,
-    required this.miniPlayer,
-  });
-
-  final List<PageRouteInfo<dynamic>> tabs;
-  final List<({IconData icon, IconData selectedIcon, String label})>
-      destinations;
-  final String settingsLabel;
-  final PageRouteInfo<dynamic> settingsRoute;
-  final bool isOffline;
-  final VoidCallback onRetry;
-  final Widget miniPlayer;
-
-  @override
-  Widget build(BuildContext context) {
-    return AutoTabsRouter(
-      routes: tabs,
-      builder: (context, child) {
-        final tabsRouter = AutoTabsRouter.of(context);
-        return Scaffold(
-          body: Row(
-            children: [
-              NavigationRail(
-                selectedIndex: tabsRouter.activeIndex,
-                onDestinationSelected: tabsRouter.setActiveIndex,
-                extended: MediaQuery.of(context).size.width >= 1200,
-                destinations: [
-                  for (final d in destinations)
-                    NavigationRailDestination(
-                      icon: Icon(d.icon),
-                      selectedIcon: Icon(d.selectedIcon),
-                      label: Text(d.label),
-                    ),
-                ],
-                trailing: Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.settings_outlined),
-                          tooltip: settingsLabel,
-                          onPressed: () =>
-                              AutoRouter.of(context).push(settingsRoute),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const VerticalDivider(thickness: 1, width: 1),
-              Expanded(
-                child: Column(
-                  children: [
-                    if (isOffline) _OfflineBanner(onRetry: onRetry),
-                    Expanded(child: child),
-                    miniPlayer,
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 }
 
@@ -205,60 +210,6 @@ class _OfflineBanner extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Mobile layout with bottom NavigationBar.
-class _NarrowLayout extends StatelessWidget {
-  const _NarrowLayout({
-    required this.tabs,
-    required this.destinations,
-    required this.isOffline,
-    required this.onRetry,
-    required this.miniPlayer,
-  });
-
-  final List<PageRouteInfo<dynamic>> tabs;
-  final List<({IconData icon, IconData selectedIcon, String label})>
-      destinations;
-  final bool isOffline;
-  final VoidCallback onRetry;
-  final Widget miniPlayer;
-
-  @override
-  Widget build(BuildContext context) {
-    return AutoTabsRouter(
-      routes: tabs,
-      builder: (context, child) {
-        final tabsRouter = AutoTabsRouter.of(context);
-        return Scaffold(
-          body: Column(
-            children: [
-              if (isOffline) _OfflineBanner(onRetry: onRetry),
-              Expanded(child: child),
-            ],
-          ),
-          bottomNavigationBar: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              miniPlayer,
-              NavigationBar(
-                selectedIndex: tabsRouter.activeIndex,
-                onDestinationSelected: tabsRouter.setActiveIndex,
-                destinations: [
-                  for (final d in destinations)
-                    NavigationDestination(
-                      icon: Icon(d.icon),
-                      selectedIcon: Icon(d.selectedIcon),
-                      label: d.label,
-                    ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

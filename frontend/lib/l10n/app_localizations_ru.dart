@@ -352,6 +352,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get downloaded => 'Загружено';
 
   @override
+  String get downloadStarted => 'Скачивание началось';
+
+  @override
+  String get downloadCancelled => 'Скачивание отменено';
+
+  @override
+  String downloadFailed(String error) {
+    return 'Ошибка: $error';
+  }
+
+  @override
   String get errorLabel => 'Ошибка';
 
   @override
@@ -426,6 +437,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get changeCover => 'Заменить обложку';
 
   @override
+  String get uploadingCover => 'Загрузка обложки...';
+
+  @override
   String get editLyrics => 'Редактировать текст';
 
   @override
@@ -461,6 +475,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get checkingDuplicates => 'Проверка дубликатов...';
+
+  @override
+  String get serverProcessing => 'Обработка сервером...';
 
   @override
   String get offlineCopy => 'Офлайн-копия';

@@ -1,19 +1,15 @@
 package handlers
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 
 	"flux/internal/config"
-	"flux/internal/metadata"
 	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -23,8 +19,7 @@ import (
 // UploadHandler handles file uploads.
 type UploadHandler struct {
 	mediaRepo repository.MediaRepository
-	thumbSvc  *services.ThumbnailService
-	extractor *services.MetadataExtractor
+	queue     *services.UploadQueue
 	config    UploadConfig
 	mediaCfg  config.MediaConfig
 }
@@ -34,29 +29,27 @@ type UploadConfig struct {
 	MaxFileSize int64
 }
 
-// NewUploadHandler creates a new UploadHandler.
-// Параметр scanner устарел (загрузка больше не триггерит сканер), но
-// сохранён в сигнатуре — app.go передаёт его при конструировании.
+// NewUploadHandler creates a new UploadHandler. Файл валидируется и
+// сохраняется синхронно, обработка (хэш/ffprobe/превью) — в фоне через
+// queue; thumbSvc передаётся внутрь очереди, хендлеру он не нужен.
 func NewUploadHandler(
 	mediaRepo repository.MediaRepository,
-	_ services.ScannerInterface,
-	thumbSvc *services.ThumbnailService,
+	queue *services.UploadQueue,
 	mediaCfg config.MediaConfig,
 	config UploadConfig,
 ) *UploadHandler {
 	return &UploadHandler{
 		mediaRepo: mediaRepo,
-		thumbSvc:  thumbSvc,
-		extractor: services.NewMetadataExtractor(),
+		queue:     queue,
 		mediaCfg:  mediaCfg,
 		config:    config,
 	}
 }
 
-// Upload handles multipart file upload.
+// Upload handles multipart file upload. Файл валидируется и сохраняется
+// синхронно; хэш, ffprobe и превью выполняются воркером очереди в фоне.
+// Ответ — 202 с job_id; статус обработки — GET /api/media/uploads/:id.
 func (h *UploadHandler) Upload(c *fiber.Ctx) error {
-	ctx := c.UserContext()
-
 	// Тип определяем консистентно: заданный валидный media_type имеет
 	// приоритет (он и каталог выбирает, и в запись Type попадает);
 	// при отсутствии media_type — по расширению файла.
@@ -131,111 +124,78 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save file")
 	}
 
-	// Create media record using scanner logic (hash, metadata, thumbnail).
-	media, err := h.createMediaFromUpload(ctx, dstPath, filename, mediaType)
+	jobID, err := h.queue.Enqueue(services.UploadJobInput{
+		FilePath:  dstPath,
+		Filename:  filename,
+		MediaType: mediaType,
+	})
 	if err != nil {
-		log.Printf("upload: create media: %v", err)
-		// Remove the orphaned file so we don't leave untracked data on disk.
+		log.Printf("upload: enqueue: %v", err)
+		// Убираем осиротевший файл: задание в очередь не попало.
 		if rmErr := os.Remove(dstPath); rmErr != nil {
 			log.Printf("upload: remove orphaned file %s: %v", dstPath, rmErr)
 		}
-		var fiberErr *fiber.Error
-		if errors.As(err, &fiberErr) {
-			return response.Error(c, fiberErr.Code, fiberErr.Message)
+		if errors.Is(err, services.ErrUploadQueueFull) {
+			return response.Error(c, fiber.StatusTooManyRequests, "Upload queue is full")
 		}
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to process uploaded file")
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to queue file")
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(media)
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"job_id": jobID})
 }
 
-// createMediaFromUpload creates a media record from an uploaded file.
-func (h *UploadHandler) createMediaFromUpload(ctx context.Context, filePath, filename string, mediaType models.MediaType) (*models.Media, error) {
-	// Compute hashes.
-	hash, err := services.HashFile(filePath)
-	if err != nil {
-		return nil, err
+// UploadStatus returns the current status of an upload job.
+func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id < 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 
-	// Check for duplicates. FindByHash возвращает gorm.ErrRecordNotFound при
-	// отсутствии записи — любые прочие ошибки БД пробрасываем как сбой,
-	// а не как «не дубликат».
-	existing, err := h.mediaRepo.FindByHash(ctx, hash)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-	} else if existing != nil {
-		return nil, fiber.NewError(fiber.StatusConflict, "Duplicate file")
+	status, errMsg, mediaID, ok := h.queue.Get(uint64(id))
+	if !ok {
+		return response.Error(c, fiber.StatusNotFound, "Upload job not found")
 	}
 
-	// Parse filename for metadata
-	title, year := metadata.ParseFilename(filename)
-
-	info, _ := os.Stat(filePath)
-	fileSize := int64(0)
-	if info != nil {
-		fileSize = info.Size()
+	resp := fiber.Map{
+		"id":     id,
+		"status": status,
+		"error":  nil,
+		"media":  nil,
 	}
-
-	media := &models.Media{
-		Title:    title,
-		Filename: filename,
-		Year:     year,
-		Type:     mediaType,
-		FilePath: filePath,
-		FileSize: fileSize,
-		FileHash: hash,
+	if errMsg != "" {
+		resp["error"] = errMsg
 	}
-
-	if err := h.mediaRepo.Create(ctx, media); err != nil {
-		return nil, err
-	}
-
-	// Extract metadata from file.
-	if fileMeta := h.extractor.ExtractFromFile(filePath); fileMeta != nil {
-		if fileMeta.Duration > 0 {
-			media.Duration = fileMeta.Duration
-		}
-		if fileMeta.Artist != "" {
-			media.Artists = []models.Artist{{Name: fileMeta.Artist}}
-		}
-		if fileMeta.Album != "" {
-			media.Album = fileMeta.Album
-		}
-		if fileMeta.Genre != "" {
-			media.Genre = fileMeta.Genre
-		}
-		if fileMeta.Title != "" {
-			media.Title = fileMeta.Title
-		}
-		if err := h.mediaRepo.Update(ctx, media); err != nil {
-			log.Printf("upload: update media metadata: %v", err)
+	if status == services.UploadJobDone && mediaID != 0 {
+		media, err := h.mediaRepo.FindByID(c.UserContext(), mediaID)
+		if err != nil {
+			// Запись удалена отдельно (например, через DELETE /media/:id) —
+			// отдаём media:null, это не сбой API.
+			log.Printf("UploadStatus: FindByID %d: %v", mediaID, err)
+		} else {
+			resp["media"] = media
 		}
 	}
+	return c.JSON(resp)
+}
 
-	// Generate thumbnail. В JSON кладём относительный URL — фронтенд строит
-	// полный адрес сам ({baseUrl}/media/{id}/thumb), а абсолютные пути ФС
-	// наружу не утекают.
-	if thumbPath := h.thumbSvc.Generate(media.ID, filePath); thumbPath != "" {
-		media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
-		if err := h.mediaRepo.Update(ctx, media); err != nil {
-			log.Printf("upload: update media thumbnail: %v", err)
-		}
+// CancelUpload cancels a pending or in-flight upload job (204) and removes
+// the file and media record. Finished jobs cannot be cancelled (409).
+func (h *UploadHandler) CancelUpload(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id < 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 
-	// Extract embedded cover art — только для аудио (для видео обложка
-	// загружается вручную через UploadCover).
-	if mediaType == models.MediaTypeAudio {
-		if coverPath := h.thumbSvc.ExtractCover(media.ID, filePath); coverPath != "" {
-			media.CoverURL = fmt.Sprintf("/api/media/%d/cover", media.ID)
-			if err := h.mediaRepo.Update(ctx, media); err != nil {
-				log.Printf("upload: update media cover: %v", err)
-			}
-		}
+	switch err := h.queue.Cancel(uint64(id)); {
+	case errors.Is(err, services.ErrUploadJobNotFound):
+		return response.Error(c, fiber.StatusNotFound, "Upload job not found")
+	case errors.Is(err, services.ErrUploadJobDone):
+		return response.Error(c, fiber.StatusConflict, "Upload job already completed")
+	case err != nil:
+		log.Printf("CancelUpload: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to cancel upload job")
 	}
-
-	return media, nil
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 func (h *UploadHandler) isAllowedExtension(ext string) bool {

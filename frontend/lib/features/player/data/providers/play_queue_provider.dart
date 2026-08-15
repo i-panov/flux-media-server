@@ -14,10 +14,14 @@ abstract class PlaybackController {
 
 /// Manages a play queue: ordered list of media items with current index.
 /// Supports next/previous, add, remove, and reorder.
-class PlayQueueNotifier extends StateNotifier<PlayQueueState> {
-  PlayQueueNotifier(this._coordinator) : super(const PlayQueueState());
+class PlayQueueNotifier extends Notifier<PlayQueueState> {
+  late final PlaybackController _coordinator;
 
-  final PlaybackController _coordinator;
+  @override
+  PlayQueueState build() {
+    _coordinator = ref.watch(playbackControllerProvider);
+    return const PlayQueueState();
+  }
 
   /// Sets the queue to [items], starting playback from [startIndex].
   /// [startIndex] зажимается в допустимый диапазон.
@@ -171,8 +175,13 @@ class PlayQueueState {
   }
 }
 
-/// Provider for the play queue.
-final playQueueProvider =
-    StateNotifierProvider<PlayQueueNotifier, PlayQueueState>((ref) {
-  return PlayQueueNotifier(ref.read(playbackCoordinatorProvider.notifier));
+/// DI-точка контроллера воспроизведения для очереди: в проде — реальный
+/// координатор, в тестах — фейк (без media_kit).
+final playbackControllerProvider = Provider<PlaybackController>((ref) {
+  return ref.read(playbackCoordinatorProvider.notifier);
 });
+
+/// Provider for the play queue.
+final playQueueProvider = NotifierProvider<PlayQueueNotifier, PlayQueueState>(
+  PlayQueueNotifier.new,
+);

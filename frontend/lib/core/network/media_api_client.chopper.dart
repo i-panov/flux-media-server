@@ -54,6 +54,19 @@ final class _$MediaApiClient extends MediaApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> getMediaBulk(String ids) {
+    final Uri $url = Uri.parse('/media/bulk');
+    final Map<String, dynamic> $params = <String, dynamic>{'ids': ids};
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> deleteMedia(int id) {
     final Uri $url = Uri.parse('/media/${id}');
     final Request $request = Request(

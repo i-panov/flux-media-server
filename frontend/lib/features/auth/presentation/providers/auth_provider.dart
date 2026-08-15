@@ -39,22 +39,18 @@ class AuthState with _$AuthState {
   }) = AuthError;
 }
 
-class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier({
-    required Ref ref,
-    required RequestCode requestCode,
-    required VerifyCode verifyCode,
-    required GetCurrentUser getCurrentUser,
-  })  : _ref = ref,
-        _requestCode = requestCode,
-        _verifyCode = verifyCode,
-        _getCurrentUser = getCurrentUser,
-        super(const AuthState.initial());
+class AuthNotifier extends Notifier<AuthState> {
+  late final RequestCode _requestCode;
+  late final VerifyCode _verifyCode;
+  late final GetCurrentUser _getCurrentUser;
 
-  final Ref _ref;
-  final RequestCode _requestCode;
-  final VerifyCode _verifyCode;
-  final GetCurrentUser _getCurrentUser;
+  @override
+  AuthState build() {
+    _requestCode = ref.watch(requestCodeProvider);
+    _verifyCode = ref.watch(verifyCodeProvider);
+    _getCurrentUser = ref.watch(getCurrentUserProvider);
+    return const AuthState.initial();
+  }
 
   /// Guard от гонок: повторный requestCode, пока идёт запрос,
   /// возвращает false (запрос не выполнен).
@@ -112,7 +108,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       },
       (data) async {
-        await _ref
+        await ref
             .read(settingsProvider.notifier)
             .setTokens(data.token, data.refreshToken);
         _invalidateSessionProviders();
@@ -131,7 +127,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       (failure) async {
         if (failure is AuthFailure) {
           // Token is invalid — clear it to prevent infinite 401 loop
-          await _ref.read(settingsProvider.notifier).logout();
+          await ref.read(settingsProvider.notifier).logout();
           _invalidateSessionProviders();
           state = const AuthState.initial();
         } else {
@@ -158,8 +154,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _generation++;
     // Очищаем офлайн-кеш пользователя (файлы + метаданные) до сброса
     // сессии, чтобы id пользователя ещё был доступен из состояния auth.
-    await _ref.read(offlineCacheServiceProvider).clearUserCache();
-    await _ref.read(settingsProvider.notifier).logout();
+    await ref.read(offlineCacheServiceProvider).clearUserCache();
+    await ref.read(settingsProvider.notifier).logout();
     _invalidateSessionProviders();
     // Do NOT invalidate settingsProvider — it holds the serverUrl which is
     // needed for the login screen to know where to send credentials.
@@ -169,7 +165,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Инвалидирует кэшированные провайдеры сессии, чтобы они
   /// перечитали данные с новым токеном (или после logout).
   void _invalidateSessionProviders() {
-    _ref
+    ref
       ..invalidate(mediaListProvider('video'))
       ..invalidate(mediaListProvider('audio'))
       ..invalidate(favoritesProvider)
@@ -201,11 +197,6 @@ final getCurrentUserProvider = Provider<GetCurrentUser>((ref) {
   return GetCurrentUser(ref.watch(authRepositoryProvider));
 });
 
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(
-    ref: ref,
-    requestCode: ref.watch(requestCodeProvider),
-    verifyCode: ref.watch(verifyCodeProvider),
-    getCurrentUser: ref.watch(getCurrentUserProvider),
-  );
-});
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(
+  AuthNotifier.new,
+);

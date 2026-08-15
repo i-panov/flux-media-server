@@ -185,21 +185,21 @@ func TestMediaStore_FindAllLikeEscaping(t *testing.T) {
 	}
 
 	// q = "50%": без экранирования '%' — шаблон, нашлось бы и "50X Off".
-	list, total, err := store.FindAll(ctx, map[string]interface{}{"q": "50%"}, 10, 0)
+	list, total, err := store.FindAll(ctx, MediaFilters{Q: "50%"}, 10, 0)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), total, "%% must be literal")
 	require.Len(t, list, 1)
 	assert.Equal(t, "50% Off", list[0].Title)
 
 	// q = "a_b": без экранирования '_' — шаблон, нашлось бы и "axb".
-	list, total, err = store.FindAll(ctx, map[string]interface{}{"q": "a_b"}, 10, 0)
+	list, total, err = store.FindAll(ctx, MediaFilters{Q: "a_b"}, 10, 0)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), total, "_ must be literal")
 	require.Len(t, list, 1)
 	assert.Equal(t, "a_b", list[0].Title)
 
 	// Обычный поиск не сломан.
-	_, total, err = store.FindAll(ctx, map[string]interface{}{"q": "Off"}, 10, 0)
+	_, total, err = store.FindAll(ctx, MediaFilters{Q: "Off"}, 10, 0)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 }

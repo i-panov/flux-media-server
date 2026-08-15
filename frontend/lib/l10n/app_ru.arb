@@ -244,6 +244,18 @@
   "@downloading": {},
   "downloaded": "Загружено",
   "@downloaded": {},
+  "downloadStarted": "Скачивание началось",
+  "@downloadStarted": {},
+  "downloadCancelled": "Скачивание отменено",
+  "@downloadCancelled": {},
+  "downloadFailed": "Ошибка: {error}",
+  "@downloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "errorLabel": "Ошибка",
   "@errorLabel": {},
   "addToQueue": "В очередь",
@@ -298,6 +310,8 @@
   "@uploadSuccess": {},
   "changeCover": "Заменить обложку",
   "@changeCover": {},
+  "uploadingCover": "Загрузка обложки...",
+  "@uploadingCover": {},
   "editLyrics": "Редактировать текст",
   "@editLyrics": {},
   "editTranslation": "Редактировать перевод",
@@ -322,6 +336,8 @@
   "@hashingFile": {},
   "checkingDuplicates": "Проверка дубликатов...",
   "@checkingDuplicates": {},
+  "serverProcessing": "Обработка сервером...",
+  "@serverProcessing": {},
   "offlineCopy": "Офлайн-копия",
   "@offlineCopy": {},
   "audioPlayingInBackground": "Играет аудио-трек",

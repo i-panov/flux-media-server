@@ -89,6 +89,11 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
     ) = info;
     if (type != MediaType.audio) return const SizedBox.shrink();
 
+    // Пока ids избранного грузятся впервые (нет предыдущего значения),
+    // иконка нейтральная — без ложного «не избранное».
+    final favoriteState = ref.watch(favoriteToggleProvider(media.id));
+    final isFavorite = favoriteState.valueOrNull;
+
     final progress = (duration != null && duration > Duration.zero)
         ? position.inMicroseconds / duration.inMicroseconds
         : 0.0;
@@ -334,10 +339,17 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   // Favorite
                   IconButton(
                     icon: Icon(
-                      ref.watch(favoriteToggleProvider(media.id)).valueOrNull ??
-                              false
+                      (isFavorite ?? false)
                           ? Icons.favorite
                           : Icons.favorite_border,
+                      color: isFavorite == null
+                          // Первичная загрузка состояния: приглушённый
+                          // серый вместо мигания «не избранное».
+                          ? Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant
+                              .withValues(alpha: 0.4)
+                          : (isFavorite ? Colors.red : null),
                     ),
                     tooltip: l.favorites,
                     onPressed: () {

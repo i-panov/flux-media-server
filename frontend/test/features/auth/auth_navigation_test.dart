@@ -192,13 +192,8 @@ void main() {
           ),
         ),
         audioPlayerDatasourceProvider.overrideWithValue(FakeAudioSource()),
-        playbackCoordinatorProvider.overrideWith(
-          (ref) => PlaybackCoordinator(
-            ref.watch(audioPlayerDatasourceProvider),
-            'http://localhost:8080/api',
-            ref,
-          ),
-        ),
+        baseUrlProvider.overrideWithValue('http://localhost:8080/api'),
+        playbackCoordinatorProvider.overrideWith(PlaybackCoordinator.new),
       ],
     );
   });

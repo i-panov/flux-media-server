@@ -351,6 +351,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloaded => 'Downloaded';
 
   @override
+  String get downloadStarted => 'Download started';
+
+  @override
+  String get downloadCancelled => 'Download cancelled';
+
+  @override
+  String downloadFailed(String error) {
+    return 'Error: $error';
+  }
+
+  @override
   String get errorLabel => 'Error';
 
   @override
@@ -425,6 +436,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeCover => 'Change cover';
 
   @override
+  String get uploadingCover => 'Uploading cover...';
+
+  @override
   String get editLyrics => 'Edit lyrics';
 
   @override
@@ -460,6 +474,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkingDuplicates => 'Checking for duplicates...';
+
+  @override
+  String get serverProcessing => 'Processing on server...';
 
   @override
   String get offlineCopy => 'Offline copy';

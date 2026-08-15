@@ -31,6 +31,12 @@ abstract class LibraryApiClient extends ChopperService {
     );
   }
 
+  /// Привязывает сервис к существующему [ChopperClient] (общему для всех
+  /// сервисов приложения). В отличие от [create], не создаёт собственный
+  /// HTTP-клиент.
+  static LibraryApiClient bind(ChopperClient client) =>
+      _$LibraryApiClient(client);
+
   // Favorites
   @Post(path: '/media/{id}/favorite', optionalBody: true)
   Future<Response<Map<String, dynamic>>> addFavorite(@Path('id') int id);

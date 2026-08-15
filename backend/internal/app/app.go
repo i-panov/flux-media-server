@@ -67,6 +67,7 @@ type App struct {
 	Config      *config.Config
 	OTPStore    *services.OTPStore
 	Watcher     *services.WatcherService
+	UploadQueue *services.UploadQueue
 	Version     string
 	sqlDB       *sql.DB
 	cleanupStop chan struct{}
@@ -141,6 +142,11 @@ func New(cfg *config.Config, version string) (*App, error) {
 	streamer := services.NewStreamerService(cfg)
 	thumbSvc := services.NewThumbnailService(cfg.Media.ThumbnailPath)
 
+	// Фоновая очередь обработки загрузок: POST /upload сохраняет файл и
+	// отвечает 202, хэш/ffprobe/ffmpeg выполняют воркеры очереди.
+	uploadQueue := services.NewUploadQueue(context.Background(), mediaRepo, thumbSvc,
+		services.DefaultUploadQueueWorkers, services.DefaultUploadQueueLimit)
+
 	// File watcher for automatic library monitoring.
 	var watcherService *services.WatcherService
 	if cfg.Scanner.WatchEnabled {
@@ -151,7 +157,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer, thumbSvc)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
-	uploadHandler := handlers.NewUploadHandler(mediaRepo, scanner, thumbSvc, cfg.Media, handlers.UploadConfig{
+	uploadHandler := handlers.NewUploadHandler(mediaRepo, uploadQueue, cfg.Media, handlers.UploadConfig{
 		MaxFileSize: cfg.Server.MaxUploadSize,
 	})
 
@@ -279,7 +285,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 		},
 	})
 
-	// Upload limiter — upload-запросы тяжёлые (multipart, ffprobe), их
+	// Upload limiter — upload-запросы тяжёлые (multipart-тело), их
 	// нужно лимитировать отдельно от auth-роутов.
 	uploadRateLimiter := limiter.New(limiter.Config{
 		Max:        cfg.RateLimiter.Max,
@@ -311,10 +317,15 @@ func New(cfg *config.Config, version string) (*App, error) {
 	requireAdmin := middleware.RequireAdmin(userRepo)
 
 	media := api.Group("/media")
+	// /bulk регистрируем ДО /:id — статический путь имеет приоритет
+	// в fiber, но явный порядок исключает сюрпризы при рефакторинге.
+	media.Get("/bulk", mediaHandler.Bulk)
 	media.Get("", mediaHandler.List)
 	media.Get("/:id", mediaHandler.Get)
 	media.Post("", requireAdmin, mediaHandler.Create)
 	media.Post(uploadRouteSuffix, requireAdmin, uploadRateLimiter, uploadHandler.Upload)
+	media.Get("/uploads/:id", requireAdmin, uploadHandler.UploadStatus)
+	media.Delete("/uploads/:id", requireAdmin, uploadHandler.CancelUpload)
 	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Put("/:id", requireAdmin, mediaHandler.Update)
 	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
@@ -395,6 +406,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 		Config:      cfg,
 		OTPStore:    otpStore,
 		Watcher:     watcherService,
+		UploadQueue: uploadQueue,
 		Version:     version,
 		sqlDB:       sqlDB,
 		cleanupStop: cleanupStop,
@@ -445,6 +457,9 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 	})
 	if a.Watcher != nil {
 		a.Watcher.Stop()
+	}
+	if a.UploadQueue != nil {
+		a.UploadQueue.Stop()
 	}
 	a.OTPStore.Stop()
 

@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/app_settings.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/session/settings_repository.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
@@ -291,13 +294,25 @@ class _FakeMediaRepository implements MediaRepository {
       throw UnimplementedError();
 
   @override
-  Future<Either<Failure, Media>> uploadFile({
+  Future<Either<Failure, UploadResult>> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, void>> cancelUpload(int jobId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids) =>
       throw UnimplementedError();
 }
 
@@ -348,14 +363,12 @@ void main() {
     repo = _FakeMediaRepository();
     container = ProviderContainer(
       overrides: [
-        playbackCoordinatorProvider.overrideWith(
-          (ref) => PlaybackCoordinator(audio, 'http://test/api', ref),
-        ),
+        audioPlayerDatasourceProvider.overrideWithValue(audio),
+        baseUrlProvider.overrideWithValue('http://test/api'),
+        playbackCoordinatorProvider.overrideWith(PlaybackCoordinator.new),
         videoPlayerDatasourceProvider.overrideWithValue(video),
         mediaRepositoryProvider.overrideWithValue(repo),
-        settingsProvider.overrideWith(
-          (ref) => SettingsNotifier(_FakeSettingsRepository()),
-        ),
+        settingsRepositoryProvider.overrideWithValue(_FakeSettingsRepository()),
         offlineCacheServiceProvider.overrideWith(
           (ref) => _FakeOfflineCache(ref, 'http://test/api'),
         ),
@@ -406,13 +419,13 @@ void main() {
     test('error converts to PlaybackError state', () async {
       final errorContainer = ProviderContainer(
         overrides: [
-          playbackCoordinatorProvider.overrideWith(
-            (ref) => PlaybackCoordinator(audio, 'http://test/api', ref),
-          ),
+          audioPlayerDatasourceProvider.overrideWithValue(audio),
+          baseUrlProvider.overrideWithValue('http://test/api'),
+          playbackCoordinatorProvider.overrideWith(PlaybackCoordinator.new),
           videoPlayerDatasourceProvider.overrideWithValue(video),
           mediaRepositoryProvider.overrideWithValue(repo),
-          settingsProvider.overrideWith(
-            (ref) => SettingsNotifier(_FakeSettingsRepository()),
+          settingsRepositoryProvider.overrideWithValue(
+            _FakeSettingsRepository(),
           ),
           offlineCacheServiceProvider.overrideWith(
             (ref) => _ThrowingCache(ref, 'http://test/api', Exception('boom')),

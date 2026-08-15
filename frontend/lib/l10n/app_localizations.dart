@@ -728,6 +728,24 @@ abstract class AppLocalizations {
   /// **'Downloaded'**
   String get downloaded;
 
+  /// No description provided for @downloadStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Download started'**
+  String get downloadStarted;
+
+  /// No description provided for @downloadCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Download cancelled'**
+  String get downloadCancelled;
+
+  /// No description provided for @downloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String downloadFailed(String error);
+
   /// No description provided for @errorLabel.
   ///
   /// In en, this message translates to:
@@ -872,6 +890,12 @@ abstract class AppLocalizations {
   /// **'Change cover'**
   String get changeCover;
 
+  /// No description provided for @uploadingCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading cover...'**
+  String get uploadingCover;
+
   /// No description provided for @editLyrics.
   ///
   /// In en, this message translates to:
@@ -943,6 +967,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Checking for duplicates...'**
   String get checkingDuplicates;
+
+  /// No description provided for @serverProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing on server...'**
+  String get serverProcessing;
 
   /// No description provided for @offlineCopy.
   ///

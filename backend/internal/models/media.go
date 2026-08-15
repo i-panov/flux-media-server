@@ -13,10 +13,14 @@ type Media struct {
 	Year        int       `gorm:"index" json:"year"`
 	Description string    `json:"description"`
 	Type        MediaType `gorm:"index;type:text" json:"type"` // video, audio
-	Artists     []Artist  `gorm:"many2many:media_artists;" json:"artists"`
-	Album       string    `json:"album"`
-	Genre       string    `json:"genre"`
-	Duration    int       `json:"duration"` // seconds
+	// constraint на many2many создаёт FK на join-таблице media_artists
+	// (media_id → media.id, artist_id → artists.id) с каскадами — но только
+	// на свежих БД; старые БД не пересоздаются (ручные каскады в
+	// repository.MediaStore.Delete покрывают их).
+	Artists  []Artist `gorm:"many2many:media_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists"`
+	Album    string   `json:"album"`
+	Genre    string   `json:"genre"`
+	Duration int      `json:"duration"` // seconds
 	// FilePath is indexed (not unique): a unique index conflicts with soft
 	// delete — a file re-appearing after its record was soft-deleted would
 	// fail with a UNIQUE error and the media would be lost. Duplicate

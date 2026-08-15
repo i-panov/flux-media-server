@@ -33,6 +33,11 @@ abstract class MediaApiClient extends ChopperService {
     );
   }
 
+  /// Привязывает сервис к существующему [ChopperClient] (общему для всех
+  /// сервисов приложения). В отличие от [create], не создаёт собственный
+  /// HTTP-клиент.
+  static MediaApiClient bind(ChopperClient client) => _$MediaApiClient(client);
+
   @Get(path: '/media')
   Future<Response<Map<String, dynamic>>> getMediaList({
     @Query('type') String? type,
@@ -44,6 +49,12 @@ abstract class MediaApiClient extends ChopperService {
 
   @Get(path: '/media/{id}')
   Future<Response<Map<String, dynamic>>> getMedia(@Path('id') int id);
+
+  /// Пакетная загрузка медиа по id: `GET /media/bulk?ids=1,2,3`.
+  @Get(path: '/media/bulk')
+  Future<Response<Map<String, dynamic>>> getMediaBulk(
+    @Query('ids') String ids,
+  );
 
   @Delete(path: '/media/{id}')
   Future<Response<Map<String, dynamic>>> deleteMedia(@Path('id') int id);

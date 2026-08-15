@@ -122,7 +122,7 @@ func TestScannerSweepDeletedKeysetNoSkips(t *testing.T) {
 
 	require.NoError(t, scanner.ScanPath(ctx, tempDir, models.MediaTypeVideo))
 
-	_, total, err := mediaRepo.FindAll(ctx, nil, 0, 0)
+	_, total, err := mediaRepo.FindAll(ctx, repository.MediaFilters{}, 0, 0)
 	require.NoError(t, err)
 	assert.Zero(t, total, "sweep должен удалить все записи без файлов, без пропусков")
 }

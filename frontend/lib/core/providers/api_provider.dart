@@ -1,4 +1,6 @@
+import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/network/api_service_factory.dart';
 import 'package:flux_media_server/core/network/auth_api_client.dart';
 import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/core/network/interceptors/auth_interceptor.dart';
@@ -74,54 +76,47 @@ final baseUrlProvider = Provider<String>((ref) {
   return normalizeServerUrl(serverUrl ?? defaultServerAddress);
 });
 
-/// Chopper-сервис аутентификации. Пересоздаётся при смене baseUrl,
-/// закрывает свой HttpClient через onDispose.
+/// Общий низкоуровневый HTTP-клиент для всех Chopper-сервисов: один
+/// connection-pool и один набор таймаутов вместо трёх изолированных.
+/// Живёт столько же, сколько приложение; при смене baseUrl не закрывается.
+final httpClientProvider = Provider<TimeoutHttpClient>((ref) {
+  final client = TimeoutHttpClient();
+  ref.onDispose(client.close);
+  return client;
+});
+
+/// Единый [ChopperClient] со всеми API-сервисами. Пересоздаётся только
+/// при смене baseUrl; HTTP-клиент при этом остаётся общим (см.
+/// [httpClientProvider]), ChopperClient закрывает его не будет —
+/// он ему не принадлежит.
+final _apiChopperClientProvider = Provider<ChopperClient>((ref) {
+  final baseUrl = ref.watch(baseUrlProvider);
+  final authInterceptor = ref.watch(authInterceptorProvider);
+  final tokenRefreshInterceptor = ref.watch(tokenRefreshInterceptorProvider);
+  return createChopperClient(
+    baseUrl: baseUrl,
+    services: const [],
+    interceptors: [
+      authInterceptor,
+      tokenRefreshInterceptor,
+      SafeLoggingInterceptor(),
+    ],
+    httpClient: ref.watch(httpClientProvider),
+  ).client;
+});
+
+/// Chopper-сервис аутентификации на общем [ChopperClient].
 final authApiClientProvider = Provider<AuthApiClient>((ref) {
-  final baseUrl = ref.watch(baseUrlProvider);
-  final authInterceptor = ref.watch(authInterceptorProvider);
-  final tokenRefreshInterceptor = ref.watch(tokenRefreshInterceptorProvider);
-  final bundle = AuthApiClient.create(
-    baseUrl: baseUrl,
-    authInterceptor: authInterceptor,
-    tokenRefreshInterceptor: tokenRefreshInterceptor,
-  );
-  ref.onDispose(bundle.httpClient.close);
-  return bundle.apiClient;
+  return AuthApiClient.bind(ref.watch(_apiChopperClientProvider));
 });
 
-/// Chopper-сервис медиа. Пересоздаётся при смене baseUrl,
-/// закрывает свой HttpClient через onDispose.
+/// Chopper-сервис медиа на общем [ChopperClient].
 final mediaApiClientProvider = Provider<MediaApiClient>((ref) {
-  final baseUrl = ref.watch(baseUrlProvider);
-  final authInterceptor = ref.watch(authInterceptorProvider);
-  final tokenRefreshInterceptor = ref.watch(tokenRefreshInterceptorProvider);
-  final bundle = MediaApiClient.create(
-    baseUrl: baseUrl,
-    interceptors: [
-      authInterceptor,
-      tokenRefreshInterceptor,
-      SafeLoggingInterceptor(),
-    ],
-  );
-  ref.onDispose(bundle.httpClient.close);
-  return bundle.apiClient;
+  return MediaApiClient.bind(ref.watch(_apiChopperClientProvider));
 });
 
-/// Chopper-сервис библиотеки (избранное, артисты, коллекции).
-/// Пересоздаётся при смене baseUrl, закрывает свой HttpClient
-/// через onDispose.
+/// Chopper-сервис библиотеки (избранное, артисты, коллекции)
+/// на общем [ChopperClient].
 final libraryApiClientProvider = Provider<LibraryApiClient>((ref) {
-  final baseUrl = ref.watch(baseUrlProvider);
-  final authInterceptor = ref.watch(authInterceptorProvider);
-  final tokenRefreshInterceptor = ref.watch(tokenRefreshInterceptorProvider);
-  final bundle = LibraryApiClient.create(
-    baseUrl: baseUrl,
-    interceptors: [
-      authInterceptor,
-      tokenRefreshInterceptor,
-      SafeLoggingInterceptor(),
-    ],
-  );
-  ref.onDispose(bundle.httpClient.close);
-  return bundle.apiClient;
+  return LibraryApiClient.bind(ref.watch(_apiChopperClientProvider));
 });

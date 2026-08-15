@@ -102,15 +102,11 @@ void main() {
           authToken: 'token-1',
         ),
       );
-      final notifier = SettingsNotifier(repo);
-      await notifier.init();
-
-      final container = ProviderContainer(
-        overrides: [
-          settingsProvider.overrideWith((ref) => notifier),
-        ],
-      );
+      final container = ProviderContainer(overrides: [
+        settingsRepositoryProvider.overrideWithValue(repo),
+      ],);
       addTearDown(container.dispose);
+      await container.read(settingsProvider.notifier).init();
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -130,7 +126,9 @@ void main() {
       final keyBefore = keyOf();
 
       // Смена токена (refresh) обязана пересоздать загрузку.
-      await notifier.setTokens('token-2', 'refresh-2');
+      await container
+          .read(settingsProvider.notifier)
+          .setTokens('token-2', 'refresh-2');
       await tester.pump();
 
       expect(keyOf(), isNot(keyBefore));

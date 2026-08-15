@@ -112,6 +112,15 @@ class MediaRemoteDataSource {
     return response.body!;
   }
 
+  /// Fetches media items by [ids] in one request (server limit: 100 ids).
+  Future<List<Map<String, dynamic>>> getMediaBulk(List<int> ids) async {
+    final response = await apiClient.getMediaBulk(ids.join(','));
+    checkResponse(response, 'Failed to fetch media');
+    final body = response.body!;
+    final items = body['items'] as List<dynamic>;
+    return items.cast<Map<String, dynamic>>();
+  }
+
   /// Deletes a media item by [id] (file + database record).
   Future<void> deleteMedia(int id) async {
     final response = await apiClient.deleteMedia(id);
@@ -156,7 +165,11 @@ class MediaRemoteDataSource {
   /// Реализовано напрямую через `http.MultipartRequest`, чтобы получать
   /// прогресс отправки ([onProgress]) и уметь отменять загрузку
   /// ([isCancelled]) — Chopper этого не поддерживает.
-  Future<Media> uploadFile({
+  ///
+  /// Асинхронный контракт: сервер принимает файл и отвечает 202
+  /// `{"job_id": N}`; обработка (ffprobe, thumbnails) идёт в фоне,
+  /// статус опрашивается через [getUploadJobStatus].
+  Future<int> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
@@ -190,7 +203,43 @@ class MediaRemoteDataSource {
       isCancelled: isCancelled,
       onRetry: () => sent = 0,
     );
-    return Media.fromJson(body);
+    return body['job_id'] as int;
+  }
+
+  /// Опрашивает статус асинхронного upload-джоба.
+  ///
+  /// `status`: queued | processing | done | error; при done в поле `media`
+  /// приходит готовый объект медиа.
+  Future<({int id, String status, String? error, Map<String, dynamic>? media})>
+      getUploadJobStatus(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) async {
+    final body = await _sendJsonRequest(
+      'GET',
+      '/media/uploads/$jobId',
+      isCancelled: isCancelled,
+    );
+    return (
+      id: body!['id'] as int,
+      status: body['status'] as String,
+      error: body['error'] as String?,
+      media: body['media'] as Map<String, dynamic>?,
+    );
+  }
+
+  /// Отменяет upload-джоб (204). 409 = джоб уже завершён — не ошибка,
+  /// отменять нечего.
+  Future<void> cancelUploadJob(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) async {
+    await _sendJsonRequest(
+      'DELETE',
+      '/media/uploads/$jobId',
+      isCancelled: isCancelled,
+      acceptedStatuses: const {204, 409},
+    );
   }
 
   /// Uploads a cover image for a media item.
@@ -297,7 +346,9 @@ class MediaRemoteDataSource {
           );
         }
 
-        if (streamed.statusCode != 200 && streamed.statusCode != 201) {
+        if (streamed.statusCode != 200 &&
+            streamed.statusCode != 201 &&
+            streamed.statusCode != 202) {
           final error = body['error'];
           throw ServerException(
             message: error is String ? error : 'Failed to upload file',
@@ -309,6 +360,90 @@ class MediaRemoteDataSource {
       }
     }
     throw const ServerException(message: 'Failed to upload file');
+  }
+
+  /// GET/DELETE с тем же контрактом auth/refresh, что и [_postMultipart]:
+  /// Bearer-токен из настроек, один refresh при 401, повторная попытка
+  /// только если пользователь не отменил операцию.
+  Future<Map<String, dynamic>?> _sendJsonRequest(
+    String method,
+    String path, {
+    bool Function()? isCancelled,
+    Set<int> acceptedStatuses = const {200},
+  }) async {
+    final baseUrl = _uploadBaseUrl ??
+        apiClient.client.baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
+    var token = _authToken?.call();
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (isCancelled?.call() ?? false) {
+        throw const UploadCancelledException();
+      }
+      final client = _clientFactory();
+      try {
+        final request = http.Request(method, Uri.parse('$baseUrl$path'));
+        if (token != null) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
+
+        final streamed = await client.send(request);
+        if (isCancelled?.call() ?? false) {
+          throw const UploadCancelledException();
+        }
+
+        if (streamed.statusCode == 401) {
+          if (attempt == 0) {
+            final refreshed = await _refreshAuth?.call();
+            if (isCancelled?.call() ?? false) {
+              throw const UploadCancelledException();
+            }
+            if (refreshed != null) {
+              token = refreshed;
+              continue;
+            }
+          }
+          throw const AuthException(message: 'Session expired');
+        }
+
+        final responseBody = await streamed.stream.bytesToString().timeout(
+              const Duration(minutes: 10),
+              onTimeout: () => throw const NetworkException(
+                message: 'Upload response timed out',
+              ),
+            );
+        if (isCancelled?.call() ?? false) {
+          throw const UploadCancelledException();
+        }
+
+        // Пустое тело (204) — успех без данных.
+        if (responseBody.trim().isEmpty) {
+          if (!acceptedStatuses.contains(streamed.statusCode)) {
+            throw const ServerException(message: 'Failed to execute request');
+          }
+          return null;
+        }
+
+        final Map<String, dynamic> body;
+        try {
+          body = jsonDecode(responseBody) as Map<String, dynamic>;
+        } on FormatException {
+          throw const ServerException(
+            message: 'Unexpected server response',
+          );
+        }
+
+        if (!acceptedStatuses.contains(streamed.statusCode)) {
+          final error = body['error'];
+          throw ServerException(
+            message: error is String ? error : 'Failed to execute request',
+          );
+        }
+        return body;
+      } finally {
+        client.close();
+      }
+    }
+    throw const ServerException(message: 'Failed to execute request');
   }
 
   /// Fetches watch progress for all media.

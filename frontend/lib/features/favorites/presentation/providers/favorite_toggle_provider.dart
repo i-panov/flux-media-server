@@ -12,23 +12,32 @@ import 'package:flux_media_server/features/favorites/presentation/providers/favo
 ///
 /// autoDispose: нотифаер — дешёвая производная от keepAlive-провайдера,
 /// поэтому для каждого трека мини-плеера не копятся вечные экземпляры.
-class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
-  FavoriteToggleNotifier(this._ref, this._mediaId)
-      : super(const AsyncValue.loading()) {
-    _syncFromProvider();
-    _ref.listen<AsyncValue<Set<int>>>(
-      favoriteMediaIdsProvider,
-      (_, next) => _applyIdsState(next),
+class FavoriteToggleNotifier
+    extends AutoDisposeFamilyNotifier<AsyncValue<bool>, int> {
+  bool _isToggling = false;
+  bool _disposed = false;
+
+  @override
+  AsyncValue<bool> build(int mediaId) {
+    ref
+      ..onDispose(() => _disposed = true)
+      ..listen<AsyncValue<Set<int>>>(
+        favoriteMediaIdsProvider,
+        (_, next) => _applyIdsState(next),
+      );
+    return ref.read(favoriteMediaIdsProvider).when(
+      data: (ids) => AsyncValue<bool>.data(ids.contains(mediaId)),
+      loading: () => const AsyncValue<bool>.loading(),
+      error: (e, st) {
+        AppLogger.error('Failed to load favorite ids', e);
+        return const AsyncValue<bool>.data(false);
+      },
     );
   }
 
-  final Ref _ref;
-  final int _mediaId;
-  bool _isToggling = false;
-
   void _applyIdsState(AsyncValue<Set<int>> ids) {
     state = ids.when(
-      data: (ids) => AsyncValue<bool>.data(ids.contains(_mediaId)),
+      data: (ids) => AsyncValue<bool>.data(ids.contains(arg)),
       // Пересчёт списка не должен «мигать» иконкой: пока новое множество
       // вычисляется, сохраняем предыдущее значение.
       loading: () => state,
@@ -40,16 +49,16 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
   }
 
   void _syncFromProvider() {
-    _applyIdsState(_ref.read(favoriteMediaIdsProvider));
+    _applyIdsState(ref.read(favoriteMediaIdsProvider));
   }
 
-  /// Toggles favorite status for [_mediaId].
+  /// Toggles favorite status for this media item.
   Future<void> toggle() async {
     if (_isToggling) return;
     _isToggling = true;
 
     try {
-      final isOffline = _ref.read(isOfflineProvider);
+      final isOffline = ref.read(isOfflineProvider);
       // Офлайн: локальный кеш и есть источник истины — показываем
       // текущее состояние, ничего не меняем на сервере.
       if (isOffline) {
@@ -59,35 +68,35 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
 
       // Не-autoDispose зависимости захватываются до await: даже если
       // нотифаер будет автоутилизирован, источник истины обновится.
-      final favorites = _ref.read(favoritesProvider.notifier);
-      final addFavorite = _ref.read(addFavoriteProvider);
-      final removeFavorite = _ref.read(removeFavoriteProvider);
+      final favorites = ref.read(favoritesProvider.notifier);
+      final addFavorite = ref.read(addFavoriteProvider);
+      final removeFavorite = ref.read(removeFavoriteProvider);
 
       final currentState = await _isFavorited();
-      if (mounted) state = AsyncValue.data(!currentState);
+      if (!_disposed) state = AsyncValue.data(!currentState);
 
       if (currentState) {
-        final result = await removeFavorite(_mediaId);
+        final result = await removeFavorite(arg);
         result.fold(
           (failure) {
-            AppLogger.error('Failed to remove favorite $_mediaId', failure);
-            if (mounted) _syncFromProvider();
+            AppLogger.error('Failed to remove favorite $arg', failure);
+            if (!_disposed) _syncFromProvider();
           },
-          (_) => favorites.removeLocal(_mediaId),
+          (_) => favorites.removeLocal(arg),
         );
       } else {
-        final result = await addFavorite(_mediaId);
+        final result = await addFavorite(arg);
         result.fold(
           (failure) {
-            AppLogger.error('Failed to add favorite $_mediaId', failure);
-            if (mounted) _syncFromProvider();
+            AppLogger.error('Failed to add favorite $arg', failure);
+            if (!_disposed) _syncFromProvider();
           },
           favorites.addLocal,
         );
       }
     } catch (e) {
-      AppLogger.error('Failed to toggle favorite $_mediaId', e);
-      if (mounted) _syncFromProvider();
+      AppLogger.error('Failed to toggle favorite $arg', e);
+      if (!_disposed) _syncFromProvider();
     } finally {
       _isToggling = false;
     }
@@ -95,15 +104,15 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
 
   /// Возвращает фактическое состояние избранного из кеша.
   Future<bool> _isFavorited() async {
-    final favorites = _ref.read(favoritesProvider).valueOrNull;
+    final favorites = ref.read(favoritesProvider).valueOrNull;
     if (favorites != null) {
-      return favorites.any((f) => f.mediaId == _mediaId);
+      return favorites.any((f) => f.mediaId == arg);
     }
     try {
-      final ids = await _ref.read(favoriteMediaIdsProvider.future);
-      return ids.contains(_mediaId);
+      final ids = await ref.read(favoriteMediaIdsProvider.future);
+      return ids.contains(arg);
     } catch (e) {
-      AppLogger.error('Failed to read favorite state $_mediaId', e);
+      AppLogger.error('Failed to read favorite state $arg', e);
       return false;
     }
   }
@@ -113,7 +122,7 @@ class FavoriteToggleNotifier extends StateNotifier<AsyncValue<bool>> {
 ///
 /// autoDispose: состояние выводится из keepAlive [favoriteMediaIdsProvider],
 /// поэтому пересоздание нотифаера дешёво и не утекает на каждый трек.
-final favoriteToggleProvider = StateNotifierProvider.autoDispose
+final favoriteToggleProvider = NotifierProvider.autoDispose
     .family<FavoriteToggleNotifier, AsyncValue<bool>, int>(
   FavoriteToggleNotifier.new,
 );

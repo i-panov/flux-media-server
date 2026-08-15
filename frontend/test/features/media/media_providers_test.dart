@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
@@ -96,14 +98,26 @@ class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, List<Artist>>> getArtists() async => const Right([]);
 
   @override
-  Future<Either<Failure, Media>> uploadFile({
+  Future<Either<Failure, UploadResult>> uploadFile({
     required String filePath,
     required String mediaType,
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) async =>
-      Right(_fakeMedia(0, fileName));
+      const Right(UploadResult(jobId: 0));
+
+  @override
+  Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) async =>
+      const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, void>> cancelUpload(int jobId) async =>
+      const Left(ServerFailure(message: 'not used'));
+
+  @override
+  Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids) async =>
+      const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, List<WatchProgress>>> getProgress() async =>
@@ -362,12 +376,30 @@ void main() {
 
     tearDown(() => container.dispose());
 
+    /// Ждёт достижения целевого состояния детального провайдера.
+    /// Первичная загрузка запускается самим провайдером из build()
+    /// (Future.microtask) — ручной load() больше не используется.
+    Future<void> waitForDetailState(
+      int id,
+      bool Function(MediaDetailState) done,
+    ) async {
+      final completer = Completer<void>();
+      final sub = container.listen<MediaDetailState>(
+        mediaDetailProvider(id),
+        (_, next) {
+          if (done(next) && !completer.isCompleted) completer.complete();
+        },
+      );
+      await completer.future;
+      sub.close();
+    }
+
     test('load emits loaded with media', () async {
       final media = _fakeMedia(1, 'The Matrix');
       fakeRepo.onGetMediaDetail = (_) async => Right(media);
 
-      final notifier = container.read(mediaDetailProvider(1).notifier);
-      await notifier.load(1);
+      container.read(mediaDetailProvider(1).notifier);
+      await waitForDetailState(1, (s) => s is MediaDetailLoaded);
 
       final state = container.read(mediaDetailProvider(1));
       expect(state, isA<MediaDetailLoaded>());
@@ -381,8 +413,8 @@ void main() {
       fakeRepo.onGetMediaDetail =
           (_) async => const Left(ServerFailure(message: 'Not found'));
 
-      final notifier = container.read(mediaDetailProvider(999).notifier);
-      await notifier.load(999);
+      container.read(mediaDetailProvider(999).notifier);
+      await waitForDetailState(999, (s) => s is MediaDetailError);
 
       final state = container.read(mediaDetailProvider(999));
       expect(state, isA<MediaDetailError>());
@@ -395,8 +427,8 @@ void main() {
       fakeRepo.onGetMediaDetail =
           (_) async => const Left(NetworkFailure(message: 'Offline'));
 
-      final notifier = container.read(mediaDetailProvider(1).notifier);
-      await notifier.load(1);
+      container.read(mediaDetailProvider(1).notifier);
+      await waitForDetailState(1, (s) => s is MediaDetailLoaded);
 
       final state = container.read(mediaDetailProvider(1));
       expect(state, isA<MediaDetailLoaded>());
@@ -444,7 +476,19 @@ void main() {
       fakeRepo.onGetMediaDetail = (_) async => Right(media);
 
       final notifier = container.read(mediaDetailProvider(1).notifier);
-      await notifier.load(1);
+      // Первичная загрузка запускается самим провайдером из build()
+      // (Future.microtask) — ждём её завершения, а не вызываем load() вручную.
+      final loaded = Completer<void>();
+      final sub = container.listen<MediaDetailState>(
+        mediaDetailProvider(1),
+        (_, next) {
+          if (next is MediaDetailLoaded && !loaded.isCompleted) {
+            loaded.complete();
+          }
+        },
+      );
+      await loaded.future;
+      sub.close();
 
       final updated = _fakeMedia(1, 'New').copyWith(
         updatedAt: DateTime.utc(2025),

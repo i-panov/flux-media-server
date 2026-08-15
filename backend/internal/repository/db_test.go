@@ -78,7 +78,7 @@ func TestMediaStore_PreloadArtistsWithJoinOrder(t *testing.T) {
 		media.ID, a2.ID, media.ID, a1.ID).Error)
 
 	// FindAll must succeed (no "no such column: media_artists.position").
-	list, _, err := store.FindAll(ctx, map[string]interface{}{"type": string(models.MediaTypeAudio)}, 10, 0)
+	list, _, err := store.FindAll(ctx, MediaFilters{Type: models.MediaTypeAudio}, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.Len(t, list[0].Artists, 2, "both artists must be loaded")
@@ -122,7 +122,7 @@ func TestMediaStore_ArtistsNotDuplicatedAcrossMedia(t *testing.T) {
 		m1.ID, shared.ID, m1.ID, other.ID, m2.ID, shared.ID,
 	).Error)
 
-	list, _, err := store.FindAll(ctx, nil, 10, 0)
+	list, _, err := store.FindAll(ctx, MediaFilters{}, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 

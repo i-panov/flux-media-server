@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/session/app_settings.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
@@ -55,11 +56,17 @@ void main() {
   group('SettingsNotifier.setTokens atomicity', () {
     late _FlakySettingsRepository repo;
     late SettingsNotifier notifier;
+    late ProviderContainer container;
 
     setUp(() {
       repo = _FlakySettingsRepository();
-      notifier = SettingsNotifier(repo);
+      container = ProviderContainer(overrides: [
+        settingsRepositoryProvider.overrideWithValue(repo),
+      ],);
+      notifier = container.read(settingsProvider.notifier);
     });
+
+    tearDown(() => container.dispose());
 
     test('rolls back access token when refresh write fails', () async {
       await notifier.init();

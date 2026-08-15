@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -26,14 +27,21 @@ class _FakePlaybackController implements PlaybackController {
   }
 }
 
+
 void main() {
   late _FakePlaybackController fakeController;
   late PlayQueueNotifier notifier;
+  late ProviderContainer container;
 
   setUp(() {
     fakeController = _FakePlaybackController();
-    notifier = PlayQueueNotifier(fakeController);
+    container = ProviderContainer(overrides: [
+      playbackControllerProvider.overrideWithValue(fakeController),
+    ],);
+    notifier = container.read(playQueueProvider.notifier);
   });
+
+  tearDown(() => container.dispose());
 
   group('PlayQueueState', () {
     test('initial state is empty', () {

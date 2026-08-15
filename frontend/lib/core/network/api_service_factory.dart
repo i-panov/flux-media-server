@@ -99,18 +99,22 @@ typedef CreatedChopperClient = ({
 
 /// Общая инфраструктура создания Chopper-клиентов: базовый
 /// [ChopperClient] с [JsonConverter] и переданными интерцепторами.
+///
+/// Если [httpClient] передан, он используется как есть (общий на несколько
+/// клиентов) и закрытием не владеет; иначе создаётся новый [TimeoutHttpClient].
 CreatedChopperClient createChopperClient({
   required String baseUrl,
   required List<ChopperService> services,
   Iterable<dynamic>? interceptors,
+  TimeoutHttpClient? httpClient,
 }) {
-  final httpClient = TimeoutHttpClient();
+  final resolvedClient = httpClient ?? TimeoutHttpClient();
   final client = ChopperClient(
     baseUrl: Uri.parse(baseUrl),
     services: services,
-    client: httpClient,
+    client: resolvedClient,
     converter: const JsonConverter(),
     interceptors: interceptors ?? const [],
   );
-  return (client: client, httpClient: httpClient);
+  return (client: client, httpClient: resolvedClient);
 }

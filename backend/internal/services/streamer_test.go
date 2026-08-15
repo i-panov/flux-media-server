@@ -2,13 +2,10 @@ package services
 
 import (
 	"context"
-	"io"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -64,16 +61,16 @@ func TestIsPathAllowed(t *testing.T) {
 }
 
 func TestMimeTypeByExt(t *testing.T) {
-	assert.Equal(t, "video/mp4", mimeTypeByExt(".mp4"))
-	assert.Equal(t, "video/x-matroska", mimeTypeByExt(".mkv"))
-	assert.Equal(t, "audio/mpeg", mimeTypeByExt(".mp3"))
-	assert.Equal(t, "audio/flac", mimeTypeByExt(".flac"))
-	assert.Equal(t, "audio/ogg", mimeTypeByExt(".ogg"))
-	assert.Equal(t, "audio/wav", mimeTypeByExt(".wav"))
-	assert.Equal(t, "application/octet-stream", mimeTypeByExt(".xyz"))
+	assert.Equal(t, "video/mp4", MimeTypeByExt(".mp4"))
+	assert.Equal(t, "video/x-matroska", MimeTypeByExt(".mkv"))
+	assert.Equal(t, "audio/mpeg", MimeTypeByExt(".mp3"))
+	assert.Equal(t, "audio/flac", MimeTypeByExt(".flac"))
+	assert.Equal(t, "audio/ogg", MimeTypeByExt(".ogg"))
+	assert.Equal(t, "audio/wav", MimeTypeByExt(".wav"))
+	assert.Equal(t, "application/octet-stream", MimeTypeByExt(".xyz"))
 }
 
-func TestStream(t *testing.T) {
+func TestResolveStreamPath(t *testing.T) {
 	dir := t.TempDir()
 	libDir := filepath.Join(dir, "library")
 	require.NoError(t, os.MkdirAll(libDir, 0755))
@@ -82,37 +79,45 @@ func TestStream(t *testing.T) {
 	content := []byte("fake mp4 content")
 	require.NoError(t, os.WriteFile(filePath, content, 0644))
 
-	app := fiber.New()
+	outsideFile := filepath.Join(dir, "secret.txt")
+	require.NoError(t, os.WriteFile(outsideFile, []byte("x"), 0644))
+
 	s := setupStreamer(t, libDir)
+	ctx := context.Background()
 
-	app.Get("/stream", func(c *fiber.Ctx) error {
-		return s.Stream(c, filePath)
-	})
-
-	req := httptest.NewRequest("GET", "/stream", nil)
-	resp, err := app.Test(req)
+	// Файл внутри библиотеки: разрешён, резолвнутый путь совпадает.
+	allowed, resolved, err := s.ResolveStreamPath(ctx, filePath)
 	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.True(t, allowed)
+	assert.Equal(t, filePath, resolved)
 
-	body, err := io.ReadAll(resp.Body)
+	// Файл вне библиотеки: запрещён.
+	allowed, _, err = s.ResolveStreamPath(ctx, outsideFile)
 	require.NoError(t, err)
-	assert.Equal(t, content, body)
+	assert.False(t, allowed)
+
+	// Симлинк из библиотеки наружу: запрещён.
+	link := filepath.Join(libDir, "evil.mp4")
+	if err := os.Symlink(outsideFile, link); err == nil {
+		allowed, _, err = s.ResolveStreamPath(ctx, link)
+		require.NoError(t, err)
+		assert.False(t, allowed, "symlink escaping the media path must be rejected")
+	}
 }
 
-func TestStreamNotFound(t *testing.T) {
+func TestResolveStreamPathMissingFile(t *testing.T) {
 	dir := t.TempDir()
 	libDir := filepath.Join(dir, "library")
 	require.NoError(t, os.MkdirAll(libDir, 0755))
 
-	app := fiber.New()
 	s := setupStreamer(t, libDir)
+	ctx := context.Background()
 
-	app.Get("/stream", func(c *fiber.Ctx) error {
-		return s.Stream(c, filepath.Join(libDir, "nonexistent.mp4"))
-	})
-
-	req := httptest.NewRequest("GET", "/stream", nil)
-	resp, err := app.Test(req)
+	// Несуществующий файл в библиотеке: EvalSymlinks падает, путь остаётся
+	// валидным (файл может появиться до отправки) — решение об ответе
+	// принимает хендлер по результату SendFile.
+	allowed, resolved, err := s.ResolveStreamPath(ctx, filepath.Join(libDir, "nonexistent.mp4"))
 	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+	assert.True(t, allowed)
+	assert.Equal(t, filepath.Join(libDir, "nonexistent.mp4"), resolved)
 }
