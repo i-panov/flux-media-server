@@ -14,6 +14,7 @@ import 'package:flux_media_server/features/auth/presentation/providers/is_offlin
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
@@ -200,8 +201,15 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                     ),
                   onAddToQueue: () =>
                       addTrackToQueue(ref, downloadedAudio[index]),
-                  onDetails: () => context.router.push(
-                    MediaDetailRoute(mediaId: downloadedAudio[index].id),
+                  onChangeCover: () => changeMediaCover(
+                    context,
+                    ref,
+                    downloadedAudio[index].id,
+                  ),
+                  onDelete: () => deleteMediaWithConfirm(
+                    context,
+                    ref,
+                    downloadedAudio[index].id,
                   ),
                 ),
                 childCount: downloadedAudio.length,
@@ -351,8 +359,13 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                   ),
                   onEditMetadata: () =>
                       showEditMetadataDialog(context, ref, likedToShow[index]),
-                  onDetails: () => context.router
-                      .push(MediaDetailRoute(mediaId: likedToShow[index].id)),
+                  onChangeCover: () =>
+                      changeMediaCover(context, ref, likedToShow[index].id),
+                  onDelete: () => deleteMediaWithConfirm(
+                    context,
+                    ref,
+                    likedToShow[index].id,
+                  ),
                 ),
                 childCount: likedToShow.length,
               ),
@@ -410,8 +423,15 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                     ref,
                     downloadedAudio[index],
                   ),
-                  onDetails: () => context.router.push(
-                    MediaDetailRoute(mediaId: downloadedAudio[index].id),
+                  onChangeCover: () => changeMediaCover(
+                    context,
+                    ref,
+                    downloadedAudio[index].id,
+                  ),
+                  onDelete: () => deleteMediaWithConfirm(
+                    context,
+                    ref,
+                    downloadedAudio[index].id,
                   ),
                 ),
                 childCount: downloadedAudio.length,
@@ -438,8 +458,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                 ),
                 onEditMetadata: () =>
                     showEditMetadataDialog(context, ref, allTracks[index]),
-                onDetails: () => context.router
-                    .push(MediaDetailRoute(mediaId: allTracks[index].id)),
+                onChangeCover: () =>
+                    changeMediaCover(context, ref, allTracks[index].id),
+                onDelete: () =>
+                    deleteMediaWithConfirm(context, ref, allTracks[index].id),
               ),
               childCount: allTracks.length,
             ),

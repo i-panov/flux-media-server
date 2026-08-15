@@ -21,7 +21,8 @@ class AudioTrackRow extends ConsumerWidget {
     this.onAddToQueue,
     this.onAddToCollection,
     this.onEditMetadata,
-    this.onDetails,
+    this.onChangeCover,
+    this.onDelete,
   });
 
   final Media media;
@@ -32,7 +33,8 @@ class AudioTrackRow extends ConsumerWidget {
   final VoidCallback? onAddToQueue;
   final VoidCallback? onAddToCollection;
   final VoidCallback? onEditMetadata;
-  final VoidCallback? onDetails;
+  final VoidCallback? onChangeCover;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,7 +77,6 @@ class AudioTrackRow extends ConsumerWidget {
 
     return InkWell(
       onTap: onPlay,
-      onLongPress: onDetails,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         color: isCurrentlyPlaying
@@ -145,36 +146,33 @@ class AudioTrackRow extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Title + artist — tap navigates to detail
+            // Title + artist
             Expanded(
-              child: GestureDetector(
-                onTap: onDetails,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    media.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color:
+                              isCurrentlyPlaying ? colorScheme.primary : null,
+                          fontWeight:
+                              isCurrentlyPlaying ? FontWeight.bold : null,
+                        ),
+                  ),
+                  if (media.artists.isNotEmpty)
                     Text(
-                      media.title,
+                      media.artists.map((a) => a.name).join(', '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color:
-                                isCurrentlyPlaying ? colorScheme.primary : null,
-                            fontWeight:
-                                isCurrentlyPlaying ? FontWeight.bold : null,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                     ),
-                    if (media.artists.isNotEmpty)
-                      Text(
-                        media.artists.map((a) => a.name).join(', '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
             // Actions
@@ -224,8 +222,10 @@ class AudioTrackRow extends ConsumerWidget {
                     onAddToCollection?.call();
                   case 'edit_metadata':
                     onEditMetadata?.call();
-                  case 'details':
-                    onDetails?.call();
+                  case 'change_cover':
+                    onChangeCover?.call();
+                  case 'delete':
+                    onDelete?.call();
                 }
               },
               // Мёртвые пункты меню: показываем только те, для которых
@@ -248,8 +248,13 @@ class AudioTrackRow extends ConsumerWidget {
                     value: 'edit_metadata',
                     child: Text(l.editMetadata),
                   ),
-                if (onDetails != null)
-                  PopupMenuItem(value: 'details', child: Text(l.details)),
+                if (onChangeCover != null)
+                  PopupMenuItem(
+                    value: 'change_cover',
+                    child: Text(l.changeCover),
+                  ),
+                if (onDelete != null)
+                  PopupMenuItem(value: 'delete', child: Text(l.delete)),
               ],
             ),
           ],

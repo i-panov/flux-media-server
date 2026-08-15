@@ -2,7 +2,6 @@ import 'package:auto_route/auto_route.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/audio/presentation/utils/download_batch.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
@@ -11,6 +10,7 @@ import 'package:flux_media_server/features/audio/presentation/widgets/track_acti
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
@@ -262,9 +262,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
                     ),
                     onEditMetadata: () =>
                         showEditMetadataDialog(context, ref, track),
-                    onDetails: () => context.router.push(
-                      MediaDetailRoute(mediaId: track.id),
-                    ),
+                    onChangeCover: () =>
+                        changeMediaCover(context, ref, track.id),
+                    onDelete: () =>
+                        deleteMediaWithConfirm(context, ref, track.id),
                   );
                 },
                 childCount: likedTracks.length,
@@ -291,9 +292,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
                     ),
                     onEditMetadata: () =>
                         showEditMetadataDialog(context, ref, track),
-                    onDetails: () => context.router.push(
-                      MediaDetailRoute(mediaId: track.id),
-                    ),
+                    onChangeCover: () =>
+                        changeMediaCover(context, ref, track.id),
+                    onDelete: () =>
+                        deleteMediaWithConfirm(context, ref, track.id),
                   );
                 },
                 childCount: otherTracks.length,

@@ -101,9 +101,14 @@ class _CollectionDetailScreenState
                 children: [
                   MediaCard(
                     media: media,
-                    onTap: () => context.router.push(
-                      MediaDetailRoute(mediaId: media.id),
-                    ),
+                    onTap: () {
+                      if (media.type == MediaType.audio) {
+                        context.router.push(AudioPlayerRoute(media: media));
+                      } else {
+                        context.router
+                            .push(MediaDetailRoute(mediaId: media.id));
+                      }
+                    },
                   ),
                   // Кнопка удаления элемента из коллекции (зона тапа 48dp).
                   Positioned(

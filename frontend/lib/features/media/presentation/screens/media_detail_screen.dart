@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
@@ -12,9 +10,8 @@ import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
-import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
@@ -107,75 +104,34 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   }
 
   Future<void> _changeCover() async {
-    final l = AppLocalizations.of(context)!;
     // Повторный тап во время загрузки отменяет её.
     if (_isUploadingCover) {
       setState(() => _coverUploadCancelled = true);
       return;
     }
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+    await changeMediaCover(
+      context,
+      ref,
+      widget.mediaId,
+      isCancelled: () => _coverUploadCancelled,
+      onUploadStarted: () {
+        if (mounted) {
+          setState(() {
+            _isUploadingCover = true;
+            _coverUploadCancelled = false;
+          });
+        }
+      },
+      onUploadFinished: () {
+        if (mounted) {
+          setState(() {
+            _isUploadingCover = false;
+            _coverUploadCancelled = false;
+          });
+        }
+      },
     );
-
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    if (file.path == null) return;
-
-    final uploadCover = ref.read(uploadCoverProvider);
-
-    setState(() {
-      _isUploadingCover = true;
-      _coverUploadCancelled = false;
-    });
-
-    try {
-      final r = await uploadCover(
-        UploadCoverParams(
-          mediaId: widget.mediaId,
-          filePath: file.path!,
-          isCancelled: () => _coverUploadCancelled,
-        ),
-      );
-
-      if (!mounted) return;
-
-      r.fold(
-        (failure) {
-          if (failure is UploadCancelledFailure) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l.failedToAdd(failure.message)),
-              backgroundColor: Colors.red,
-            ),
-          );
-        },
-        (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l.uploadSuccess),
-              backgroundColor: Colors.green,
-            ),
-          );
-          // Обновляем детали с сервера: серверный updatedAt даёт честный
-          // cache-buster для обложки (клиентское время врало бы его).
-          // Тихий перезапрос — без мигания спиннером.
-          unawaited(
-            ref.read(mediaDetailProvider(widget.mediaId).notifier).refresh(),
-          );
-          // Refresh media lists so cards show the new cover.
-          refreshMediaLists(ref);
-        },
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploadingCover = false;
-          _coverUploadCancelled = false;
-        });
-      }
-    }
   }
 
   Future<void> _download() async {
@@ -213,45 +169,11 @@ class _MediaDetailScreenState extends ConsumerState<MediaDetailScreen> {
   }
 
   Future<void> _delete() async {
-    final l = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.delete),
-        content: Text(l.deleteMediaConfirmation),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l.delete),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    final deleteMedia = ref.read(deleteMediaProvider);
-    final result = await deleteMedia(widget.mediaId);
-
-    if (!mounted) return;
-
-    result.fold(
-      (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l.errorLabel}: ${failure.message}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      },
-      (_) {
-        refreshMediaLists(ref);
-        context.maybePop();
-      },
+    await deleteMediaWithConfirm(
+      context,
+      ref,
+      widget.mediaId,
+      popOnSuccess: true,
     );
   }
 
