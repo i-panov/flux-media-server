@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
@@ -9,7 +11,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// Flat track row for audio listings with cover, title, artist, and actions.
-/// Tap on cover starts/pauses playback; long-press opens the detail page.
+/// Tap on the row toggles play/pause for the current track or starts it.
 class AudioTrackRow extends ConsumerWidget {
   const AudioTrackRow({
     required this.media,
@@ -35,6 +37,24 @@ class AudioTrackRow extends ConsumerWidget {
   final VoidCallback? onEditMetadata;
   final VoidCallback? onChangeCover;
   final VoidCallback? onDelete;
+
+  /// Клик по треку: текущий — пауза/продолжение (а не перезапуск
+  /// с нуля), любой другой — запуск.
+  void _handleTap(
+    WidgetRef ref,
+    ({int mediaId, bool isPaused})? playback,
+  ) {
+    if (playback != null && playback.mediaId == media.id) {
+      final coordinator = ref.read(playbackCoordinatorProvider.notifier);
+      if (playback.isPaused) {
+        unawaited(coordinator.resume());
+      } else {
+        unawaited(coordinator.pause());
+      }
+    } else {
+      onPlay?.call();
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,7 +96,7 @@ class AudioTrackRow extends ConsumerWidget {
         (playback?.isPaused ?? false) && isCurrentlyPlaying;
 
     return InkWell(
-      onTap: onPlay,
+      onTap: () => _handleTap(ref, playback),
       borderRadius: BorderRadius.circular(8),
       child: Container(
         color: isCurrentlyPlaying
@@ -87,61 +107,57 @@ class AudioTrackRow extends ConsumerWidget {
           children: [
             // Cover — tap toggles play/pause
             GestureDetector(
-              onTap: () {
-                final p = playback;
-                if (p != null && p.mediaId == media.id) {
-                  if (p.isPaused) {
-                    ref.read(playbackCoordinatorProvider.notifier).resume();
-                  } else {
-                    ref.read(playbackCoordinatorProvider.notifier).pause();
-                  }
-                } else {
-                  onPlay?.call();
-                }
-              },
+              onTap: () => _handleTap(ref, playback),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
                   width: 48,
                   height: 48,
-                  child: isCurrentlyPlaying
-                      ? ColoredBox(
-                          color: colorScheme.primaryContainer,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (hasCover)
+                        AuthNetworkImage(
+                          imageUrl: imageUrl,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => ColoredBox(
+                            color: colorScheme.primaryContainer,
+                            child: Icon(
+                              Icons.music_note,
+                              color: colorScheme.primary,
+                              size: 24,
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => ColoredBox(
+                            color: colorScheme.primaryContainer,
+                            child: Icon(
+                              Icons.music_note,
+                              color: colorScheme.primary,
+                              size: 24,
+                            ),
+                          ),
+                        )
+                      else
+                        const Center(
+                          child: AudioPlaceholder(size: 36),
+                        ),
+                      // Индикатор поверх обложки: сам фон не заменяем,
+                      // чтобы обложка не пропадала при воспроизведении.
+                      if (isCurrentlyPlaying)
+                        ColoredBox(
+                          color: Colors.black45,
                           child: Icon(
-                            // Индикатор паузы на обложке текущего трека.
                             isCurrentlyPaused
                                 ? Icons.pause
                                 : Icons.equalizer,
-                            color: colorScheme.primary,
+                            color: Colors.white,
                             size: 24,
                           ),
-                        )
-                      : hasCover
-                          ? AuthNetworkImage(
-                              imageUrl: imageUrl,
-                              width: 48,
-                              height: 48,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => ColoredBox(
-                                color: colorScheme.primaryContainer,
-                                child: Icon(
-                                  Icons.music_note,
-                                  color: colorScheme.primary,
-                                  size: 24,
-                                ),
-                              ),
-                              errorWidget: (_, __, ___) => ColoredBox(
-                                color: colorScheme.primaryContainer,
-                                child: Icon(
-                                  Icons.music_note,
-                                  color: colorScheme.primary,
-                                  size: 24,
-                                ),
-                              ),
-                            )
-                          : const Center(
-                              child: AudioPlaceholder(size: 36),
-                            ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
