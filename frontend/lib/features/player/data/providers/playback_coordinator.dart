@@ -132,17 +132,19 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   Future<void> _playInternal(Media media) async {
     final generation = ++_playGeneration;
     _lastType = media.type;
-    // Save progress of the current playback before switching.
+    // Save progress of the current playback before switching (video only).
     // Не сохраняется при автопродвижении: _onCompleted уже отправил
     // completed:true и перевёл состояние в loading (иначе гонка
     // completed:true vs completed:false).
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      await _saveProgress(
-        current.media.id,
-        current.position,
-        current.duration ?? Duration.zero,
-      );
+      if (current.media.type == MediaType.video) {
+        await _saveProgress(
+          current.media.id,
+          current.position,
+          current.duration ?? Duration.zero,
+        );
+      }
     }
 
     _cancelSubscriptions();
@@ -263,12 +265,13 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   Future<void> _onCompleted(bool completed) async {
     if (!completed) return;
     final current = state;
-    if (current is PlaybackPlaying) {
-      // НЕ ждём сохранение: сетевой запрос (особенно в фоне/при слабой
-      // связи) блокировал бы автопродвижение, и музыка «застревала» на
-      // конце трека. Гонки completed:true vs completed:false нет:
-      // следующий трек стартует из состояния loading, и _playInternal
-      // не сохраняет предыдущий трек повторно.
+    if (current is PlaybackPlaying && current.media.type == MediaType.video) {
+      // Прогресс храним только для видео. НЕ ждём сохранение: сетевой
+      // запрос (особенно в фоне/при слабой связи) блокировал бы
+      // автопродвижение, и музыка «застревала» на конце трека. Гонки
+      // completed:true vs completed:false нет: следующий трек стартует
+      // из состояния loading, и _playInternal не сохраняет предыдущий
+      // трек повторно.
       unawaited(
         _saveProgress(
           current.media.id,
@@ -377,7 +380,10 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     _progressTimer =
         Timer.periodic(_progressSaveInterval, (_) {
       final current = state;
-      if (current is PlaybackPlaying && !current.isPaused) {
+      // Периодическое сохранение — только для видео.
+      if (current is PlaybackPlaying &&
+          !current.isPaused &&
+          current.media.type == MediaType.video) {
         unawaited(
           _saveProgress(
             current.media.id,
@@ -398,11 +404,13 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
         await _videoPlayer.pause();
       }
       state = current.copyWith(isPaused: true);
-      await _saveProgress(
-        current.media.id,
-        current.position,
-        current.duration ?? Duration.zero,
-      );
+      if (current.media.type == MediaType.video) {
+        await _saveProgress(
+          current.media.id,
+          current.position,
+          current.duration ?? Duration.zero,
+        );
+      }
     }
   }
 
@@ -475,11 +483,13 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     _cancelProgressTimer();
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
-      await _saveProgress(
-        current.media.id,
-        current.position,
-        current.duration ?? Duration.zero,
-      );
+      if (current.media.type == MediaType.video) {
+        await _saveProgress(
+          current.media.id,
+          current.position,
+          current.duration ?? Duration.zero,
+        );
+      }
     }
     // Останавливаем физический плеер независимо от состояния (в т.ч.
     // loading/completed): при loading видео уже может играть после open(),

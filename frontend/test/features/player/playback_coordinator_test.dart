@@ -500,16 +500,17 @@ void main() {
       expect(readState(), isA<PlaybackCompleted>());
     });
 
-    test('completion progress is saved before the next track starts', () async {
+    test('completion progress is saved for video before the next track starts',
+        () async {
       await queue.setQueue([
-        _media(1, MediaType.audio),
-        _media(2, MediaType.audio),
+        _media(1, MediaType.video),
+        _media(2, MediaType.video),
       ]);
-      audio.durationCtl.add(const Duration(seconds: 100));
-      audio.positionCtl.add(const Duration(seconds: 100));
+      video.durationCtl.add(const Duration(seconds: 100));
+      video.positionCtl.add(const Duration(seconds: 100));
       await _settle();
 
-      audio.emitCompleted();
+      video.completedCtl.add(true);
       await _settle();
 
       expect((readState() as PlaybackPlaying).media.id, 2);
@@ -518,6 +519,24 @@ void main() {
       // Последний save для завершённого трека — именно completed:true,
       // и после него не было save с completed:false.
       expect(callsFor1.last.completed, isTrue);
+    });
+
+    test('audio completion does not save progress', () async {
+      await queue.setQueue([
+        _media(1, MediaType.audio),
+        _media(2, MediaType.audio),
+      ]);
+      audio.durationCtl.add(const Duration(seconds: 100));
+      audio.positionCtl.add(const Duration(seconds: 100));
+      await _settle();
+      expect(repo.updates, isEmpty);
+
+      audio.emitCompleted();
+      await _settle();
+
+      expect((readState() as PlaybackPlaying).media.id, 2);
+      // Для аудио прогресс не сохраняется вовсе.
+      expect(repo.updates, isEmpty);
     });
 
     test('does not auto-advance while loading another track', () async {
