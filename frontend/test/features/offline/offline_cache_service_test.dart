@@ -567,6 +567,47 @@ void main() {
         isFalse,
       );
     });
+
+    test('rejects size mismatch detected after rename and cleans up', () async {
+      Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+        // Полный корректный ответ: 5 байт и contentLength 5 — проверка
+        // до rename проходит, но пост-rename чтение размера «врёт».
+        return http.StreamedResponse(
+          Stream.fromIterable([
+            [1, 2, 3, 4, 5],
+          ]),
+          200,
+          contentLength: 5,
+        );
+      }
+
+      final svc = OfflineCacheService(
+        container.read(_refProvider),
+        'http://localhost:8080/api',
+        // Имитация расхождения размера на диске после rename.
+        fileSizeReader: (_) async => 4,
+      );
+
+      await expectLater(
+        HttpOverrides.runZoned(
+          () => svc.download(_media(7)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
+        ),
+        throwsA(
+          predicate((e) => e.toString().contains('Download incomplete')),
+        ),
+      );
+
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_7').existsSync(),
+        isFalse,
+      );
+      expect(
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_7.part')
+            .existsSync(),
+        isFalse,
+      );
+    });
   });
 
   group('download 401 retry', () {

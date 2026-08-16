@@ -30,10 +30,20 @@ class DownloadCancelledException implements Exception {
 /// Files are stored in the app's documents directory, с префиксом
 /// `user_{id}_`, чтобы кеши разных пользователей не пересекались.
 class OfflineCacheService {
-  OfflineCacheService(this._ref, this._baseUrl);
+  OfflineCacheService(
+    this._ref,
+    this._baseUrl, {
+    Future<int> Function(File)? fileSizeReader,
+  }) : _fileSizeReader = fileSizeReader ?? _defaultFileSizeReader;
 
   final Ref _ref;
   final String _baseUrl;
+
+  /// Читатель размера файла на диске. Инжектируется в тестах, чтобы
+  /// сымитировать расхождение размера после rename без подмены ФС.
+  final Future<int> Function(File) _fileSizeReader;
+
+  static Future<int> _defaultFileSizeReader(File file) => file.length();
 
   /// Prefix for file names so debug and release builds don't share
   /// cached files.
@@ -267,6 +277,28 @@ class OfflineCacheService {
           await localFile.delete();
         }
         await partFile.rename(localFile.path);
+
+        // Пост-rename проверка целостности: файл на диске должен совпадать
+        // с ожидаемым размером. Обрыв/повреждение между записью и rename
+        // (или глючная ФС) не должны попасть в кеш.
+        if (total != null) {
+          final onDisk = await _fileSizeReader(localFile);
+          if (onDisk != total) {
+            AppLogger.error(
+              'Download size mismatch after rename: $onDisk of $total bytes',
+            );
+            if (await localFile.exists()) {
+              try {
+                await localFile.delete();
+              } on Exception {
+                // Best-effort cleanup.
+              }
+            }
+            throw Exception(
+              'Download incomplete: $onDisk of $total bytes on disk',
+            );
+          }
+        }
 
         // Save media metadata for offline access.
         await saveMetadata(media);

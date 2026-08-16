@@ -109,6 +109,30 @@ auth:
 	assert.Equal(t, 300, cfg.Auth.CodeExpiry)
 	assert.Equal(t, 1, cfg.Auth.JWTExpiry)
 	assert.Equal(t, 10000, cfg.Auth.MaxOTPEntries)
+	assert.True(t, cfg.Auth.SMTP.RequireTLS != nil && *cfg.Auth.SMTP.RequireTLS,
+		"require_tls по умолчанию должен быть true (защита от plaintext)")
+}
+
+func TestLoadConfigExplicitInsecureSMTPAllowed(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Явное require_tls: false (например, локальный SMTP в dev) сохраняется.
+	yamlContent := `
+database:
+  path: "./test.db"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+  smtp:
+    require_tls: false
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := Load(configPath)
+	require.NoError(t, err)
+	assert.NotNil(t, cfg.Auth.SMTP.RequireTLS)
+	assert.False(t, *cfg.Auth.SMTP.RequireTLS)
 }
 
 func TestLoadConfigShortSecret(t *testing.T) {

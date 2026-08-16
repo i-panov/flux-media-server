@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
+import 'package:flux_media_server/core/network/library_api_client.dart';
 import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:http/http.dart' as http;
@@ -24,9 +25,11 @@ MediaRemoteDataSource _dataSource({
   required http.Client client,
   String? Function()? authToken,
   Future<String?> Function()? refreshAuth,
+  LibraryApiClient? libraryClient,
 }) {
   return MediaRemoteDataSource(
     MediaApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
+    libraryApiClient: libraryClient,
     uploadBaseUrl: 'http://localhost:8080/api',
     authToken: authToken ?? () => 'token',
     refreshAuth: refreshAuth,
@@ -187,25 +190,29 @@ void main() {
   });
 
   group('MediaRemoteDataSource artist actions', () {
-    test('updateArtistName sends PUT with the new name', () async {
+    test('updateArtistName sends PUT via Chopper with the new name', () async {
       late http.Request captured;
       final client = MockClient((request) async {
         captured = request;
         return http.Response(
           '{"id": 3, "name": "New Name", "has_cover": false}',
           200,
+          headers: {'content-type': 'application/json'},
         );
       });
 
+      final libraryClient = LibraryApiClient.create(
+        baseUrl: 'http://localhost:8080/api',
+        httpClient: client,
+      ).apiClient;
       final dataSource = _dataSource(
         client: client,
-        authToken: () => 'artist-token',
+        libraryClient: libraryClient,
       );
       final body = await dataSource.updateArtistName(3, 'New Name');
 
       expect(captured.method, 'PUT');
       expect(captured.url.path, '/api/artists/3');
-      expect(captured.headers['Authorization'], 'Bearer artist-token');
       expect(captured.headers['Content-Type'], contains('application/json'));
       expect(jsonDecode(captured.body), {'name': 'New Name'});
       expect(body['name'], 'New Name');

@@ -275,12 +275,13 @@ class MediaRemoteDataSource {
     int artistId,
     String name,
   ) async {
-    final body = await _sendJsonRequest(
-      'PUT',
-      '/artists/$artistId',
-      jsonBody: {'name': name},
-    );
-    return body!;
+    final client = _libraryApiClient;
+    if (client == null) {
+      throw StateError('libraryApiClient is not configured');
+    }
+    final response = await client.updateArtist(artistId, {'name': name});
+    checkResponse(response, 'Failed to update artist');
+    return response.body!;
   }
 
   /// Загружает обложку артиста (jpg/jpeg/png/webp).

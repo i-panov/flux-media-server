@@ -134,7 +134,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 		Username:    cfg.Auth.SMTP.Username,
 		Password:    cfg.Auth.SMTP.Password,
 		From:        cfg.Auth.SMTP.From,
-		RequireTLS:  cfg.Auth.SMTP.RequireTLS,
+		RequireTLS:  cfg.Auth.SMTP.RequireTLS != nil && *cfg.Auth.SMTP.RequireTLS,
 		ImplicitTLS: cfg.Auth.SMTP.ImplicitTLS,
 	})
 
@@ -369,7 +369,7 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	// Lyrics
 	api.Get("/media/:id/lyrics", lyricsHandler.GetLyrics)
-	api.Put("/media/:id/lyrics", lyricsHandler.UpsertLyrics)
+	api.Put("/media/:id/lyrics", requireAdmin, lyricsHandler.UpsertLyrics)
 
 	// Start file watcher if enabled.
 	if watcherService != nil {

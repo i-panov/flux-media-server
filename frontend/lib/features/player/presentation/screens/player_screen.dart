@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/features/player/presentation/screens/player_view.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -174,66 +175,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     // Не следим за position: панель управления не должна пересоздаваться
     // на каждый тик таймера позиции (media_kit рисует прогресс сам).
     final view = ref.watch(
-      playbackCoordinatorProvider.select((state) => switch (state) {
-        PlaybackInitial() => const _View(
-            kind: _ViewKind.initial,
-            media: null,
-            type: null,
-            isPaused: false,
-            savedPosition: null,
-            errorMessage: null,
-          ),
-        PlaybackLoading() => const _View(
-            kind: _ViewKind.loading,
-            media: null,
-            type: null,
-            isPaused: false,
-            savedPosition: null,
-            errorMessage: null,
-          ),
-        PlaybackError(:final message) => _View(
-            kind: _ViewKind.error,
-            media: null,
-            type: null,
-            isPaused: false,
-            savedPosition: null,
-            errorMessage: message,
-          ),
-        PlaybackCompleted() => const _View(
-            kind: _ViewKind.completed,
-            media: null,
-            type: null,
-            isPaused: false,
-            savedPosition: null,
-            errorMessage: null,
-          ),
-        PlaybackPlaying(
-          :final media,
-          :final type,
-          :final isPaused,
-          :final savedPosition,
-        ) => _View(
-            kind: _ViewKind.playing,
-            media: media,
-            type: type,
-            isPaused: isPaused,
-            savedPosition: savedPosition,
-            errorMessage: null,
-          ),
-        _ => const _View(
-            kind: _ViewKind.initial,
-            media: null,
-            type: null,
-            isPaused: false,
-            savedPosition: null,
-            errorMessage: null,
-          ),
-      },
-    ),
-  );
+      playbackCoordinatorProvider.select(playerViewFromPlaybackState),
+    );
 
     // Show resume button once when savedPosition is set.
-    if (view.kind == _ViewKind.playing &&
+    if (view.kind == PlayerViewKind.playing &&
         view.type == MediaType.video &&
         view.savedPosition != null &&
         !_showResumeButton &&
@@ -246,18 +192,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       body: switch (view.kind) {
-        _ViewKind.initial => const Center(
+        PlayerViewKind.initial => const Center(
             child: CircularProgressIndicator(color: Colors.white),
           ),
-        _ViewKind.loading => const Center(
+        PlayerViewKind.loading => const Center(
             child: CircularProgressIndicator(color: Colors.white),
           ),
-        _ViewKind.error => _ErrorView(
+        PlayerViewKind.error => _ErrorView(
             message: view.errorMessage ?? '',
             media: widget.media,
           ),
-        _ViewKind.completed => _CompletedView(media: widget.media),
-        _ViewKind.playing => _buildPlaying(
+        PlayerViewKind.completed => _CompletedView(media: widget.media),
+        PlayerViewKind.playing => _buildPlaying(
             l,
             view.media!,
             view.type!,
@@ -432,28 +378,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       ],
     );
   }
-}
-
-/// Минимальный снимок состояния для build: без position, чтобы панель
-/// управления не пересоздавалась на каждый тик позиции.
-enum _ViewKind { initial, loading, error, completed, playing }
-
-class _View {
-  const _View({
-    required this.kind,
-    required this.media,
-    required this.type,
-    required this.isPaused,
-    required this.savedPosition,
-    required this.errorMessage,
-  });
-
-  final _ViewKind kind;
-  final Media? media;
-  final MediaType? type;
-  final bool isPaused;
-  final Duration? savedPosition;
-  final String? errorMessage;
 }
 
 /// Назад: паузим видео и закрываем экран.

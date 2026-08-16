@@ -94,7 +94,7 @@ class TimeoutHttpClient extends http.BaseClient {
 /// становится не нужен (например, при смене baseUrl).
 typedef CreatedChopperClient = ({
   ChopperClient client,
-  TimeoutHttpClient httpClient,
+  http.Client httpClient,
 });
 
 /// Общая инфраструктура создания Chopper-клиентов: базовый
@@ -102,11 +102,12 @@ typedef CreatedChopperClient = ({
 ///
 /// Если [httpClient] передан, он используется как есть (общий на несколько
 /// клиентов) и закрытием не владеет; иначе создаётся новый [TimeoutHttpClient].
+/// Тип — [http.Client], чтобы в тестах можно было инжектировать `MockClient`.
 CreatedChopperClient createChopperClient({
   required String baseUrl,
   required List<ChopperService> services,
   Iterable<dynamic>? interceptors,
-  TimeoutHttpClient? httpClient,
+  http.Client? httpClient,
 }) {
   final resolvedClient = httpClient ?? TimeoutHttpClient();
   final client = ChopperClient(

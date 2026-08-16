@@ -1,5 +1,6 @@
 import 'package:chopper/chopper.dart';
 import 'package:flux_media_server/core/network/api_service_factory.dart';
+import 'package:http/http.dart' as http;
 import 'package:http/http.dart' show MultipartFile;
 
 part 'media_api_client.chopper.dart';
@@ -8,7 +9,7 @@ part 'media_api_client.chopper.dart';
 /// HTTP-клиент, который нужно закрыть через `ref.onDispose`.
 typedef MediaApiClientBundle = ({
   MediaApiClient apiClient,
-  TimeoutHttpClient httpClient,
+  http.Client httpClient,
 });
 
 /// Chopper-сервис медиа: CRUD, загрузка, hash, прогресс,

@@ -173,8 +173,9 @@ class _CollectionDetailScreenState
     if (!mounted) return;
     result.fold(
       (failure) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove: ${failure.message}')),
+          SnackBar(content: Text(l.failedToRemove(failure.message))),
         );
       },
       (_) {

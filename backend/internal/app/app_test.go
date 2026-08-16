@@ -357,6 +357,7 @@ func TestMetadataRoutesRequireAdmin(t *testing.T) {
 	}{
 		{"POST", "/api/metadata/1/refresh"},
 		{"PUT", "/api/metadata/1"},
+		{"PUT", "/api/media/1/lyrics"},
 	} {
 		resp, err := application.Fiber.Test(authReq(tc.method, tc.uri, token))
 		require.NoError(t, err)

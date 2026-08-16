@@ -3,6 +3,7 @@ import 'package:flux_media_server/core/network/api_service_factory.dart';
 import 'package:flux_media_server/core/network/interceptors/auth_interceptor.dart';
 import 'package:flux_media_server/core/network/interceptors/safe_logging_interceptor.dart';
 import 'package:flux_media_server/core/network/interceptors/token_refresh_interceptor.dart';
+import 'package:http/http.dart' as http;
 
 part 'auth_api_client.chopper.dart';
 
@@ -10,7 +11,7 @@ part 'auth_api_client.chopper.dart';
 /// HTTP-клиент, который нужно закрыть через `ref.onDispose`.
 typedef AuthApiClientBundle = ({
   AuthApiClient apiClient,
-  TimeoutHttpClient httpClient,
+  http.Client httpClient,
 });
 
 /// Chopper-сервис аутентификации.

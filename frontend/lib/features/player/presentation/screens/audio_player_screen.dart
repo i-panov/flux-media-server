@@ -69,8 +69,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _LyricsTab(media: currentMedia),
-          _TranslationTab(media: currentMedia),
+          _EditableTextTab(
+            media: currentMedia,
+            kind: _EditableTextKind.lyrics,
+          ),
+          _EditableTextTab(
+            media: currentMedia,
+            kind: _EditableTextKind.translation,
+          ),
           const _QueueTab(),
         ],
       ),
@@ -79,15 +85,18 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   }
 }
 
-class _LyricsTab extends ConsumerStatefulWidget {
-  const _LyricsTab({required this.media});
+class _EditableTextTab extends ConsumerStatefulWidget {
+  const _EditableTextTab({required this.media, required this.kind});
   final Media media;
+  final _EditableTextKind kind;
 
   @override
-  ConsumerState<_LyricsTab> createState() => _LyricsTabState();
+  ConsumerState<_EditableTextTab> createState() => _EditableTextTabState();
 }
 
-class _LyricsTabState extends ConsumerState<_LyricsTab> {
+enum _EditableTextKind { lyrics, translation }
+
+class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
   bool _isEditing = false;
   final _controller = TextEditingController();
   bool _isSaving = false;
@@ -96,6 +105,14 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
   /// а не на каждый тик позиции.
   String? _parsedSyncKey;
   List<({Duration time, String text})> _parsedSync = [];
+
+  bool get _isLyrics => widget.kind == _EditableTextKind.lyrics;
+
+  /// Редактируемое поле документа лирики.
+  String _valueOf(Lyrics? lyrics) => switch (widget.kind) {
+        _EditableTextKind.lyrics => lyrics?.lyricsText ?? '',
+        _EditableTextKind.translation => lyrics?.translation ?? '',
+      };
 
   @override
   void dispose() {
@@ -122,7 +139,11 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
       if (!mounted) return;
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.errorLoadingLyrics)),
+        SnackBar(
+          content: Text(
+            _isLyrics ? l.errorLoadingLyrics : l.errorLoadingTranslation,
+          ),
+        ),
       );
       return;
     }
@@ -130,10 +151,13 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
     final result = await upsert(
       UpsertLyricsParams(
         mediaId: widget.media.id,
-        lyricsText: _controller.text,
-        translation: existing?.translation,
-        syncData: existing?.syncData,
-        // Сохраняем source существующего документа (как во вкладке перевода).
+        lyricsText: _isLyrics
+            ? _controller.text
+            : (existing?.lyricsText ?? ''),
+        translation: _isLyrics
+            ? (existing?.translation ?? '')
+            : _controller.text,
+        syncData: existing?.syncData ?? '',
         source: existing?.source ?? 'user',
       ),
     );
@@ -152,7 +176,9 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
           ref.invalidate(lyricsProvider(widget.media.id));
           setState(() => _isEditing = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.lyricsSaved)),
+            SnackBar(
+              content: Text(_isLyrics ? l.lyricsSaved : l.translationSaved),
+            ),
           );
         }
       },
@@ -178,7 +204,7 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
                 textAlignVertical: TextAlignVertical.top,
                 style: Theme.of(context).textTheme.bodyLarge,
                 decoration: InputDecoration(
-                  hintText: l.addLyricsHere,
+                  hintText: _isLyrics ? l.addLyricsHere : l.addTranslationHere,
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -209,13 +235,15 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
       );
     }
 
-    // Сетевая ошибка — различимое состояние, не «нет лирики».
+    // Сетевая ошибка — различимое состояние, не «нет лирики/перевода».
     if (lyricsState.hasError) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(l.errorLoadingLyrics),
+            Text(
+              _isLyrics ? l.errorLoadingLyrics : l.errorLoadingTranslation,
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => ref.invalidate(lyricsProvider(widget.media.id)),
@@ -231,40 +259,49 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
       return const Center(child: CircularProgressIndicator());
     }
     final lyrics = result.lyrics;
-    final text = lyrics?.lyricsText ?? '';
+    final text = _valueOf(lyrics);
     final syncData = lyrics?.syncData ?? '';
 
-    if (text.isEmpty && syncData.isEmpty) {
+    final hasContent =
+        _isLyrics ? text.isNotEmpty || syncData.isNotEmpty : text.isNotEmpty;
+    if (!hasContent) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(l.noLyricsAvailable),
+            Text(
+              _isLyrics ? l.noLyricsAvailable : l.noTranslationAvailable,
+            ),
             const SizedBox(height: 16),
             FilledButton.tonal(
               onPressed: () => _startEditing(''),
-              child: Text(l.editLyrics),
+              child: Text(_isLyrics ? l.editLyrics : l.editTranslation),
             ),
           ],
         ),
       );
     }
 
-    final syncLines = _parseLyricsSync(syncData);
+    final editTooltip = _isLyrics ? l.editLyrics : l.editTranslation;
+
+    // Только у лирики есть LRC-синхронизация.
+    final syncLines = _isLyrics ? _parseLyricsSync(syncData) : null;
 
     return Stack(
       children: [
-        if (syncLines.isEmpty)
+        if (_isLyrics && syncLines!.isNotEmpty)
+          _SyncedLyricsView(syncLines: syncLines)
+        else
           SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Text(
               text,
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
+              style: _isLyrics
+                  ? Theme.of(context).textTheme.headlineSmall
+                  : Theme.of(context).textTheme.bodyLarge,
+              textAlign: _isLyrics ? TextAlign.center : TextAlign.start,
             ),
-          )
-        else
-          _SyncedLyricsView(syncLines: syncLines),
+          ),
         if (result.fromCache)
           Positioned(
             top: 8,
@@ -282,7 +319,7 @@ class _LyricsTabState extends ConsumerState<_LyricsTab> {
           right: 8,
           child: IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: l.editLyrics,
+            tooltip: editTooltip,
             onPressed: () => _startEditing(text),
           ),
         ),
@@ -395,196 +432,7 @@ class _SyncedLyricsViewState extends ConsumerState<_SyncedLyricsView> {
   }
 }
 
-class _TranslationTab extends ConsumerStatefulWidget {
-  const _TranslationTab({required this.media});
-  final Media media;
 
-  @override
-  ConsumerState<_TranslationTab> createState() => _TranslationTabState();
-}
-
-class _TranslationTabState extends ConsumerState<_TranslationTab> {
-  bool _isEditing = false;
-  final _controller = TextEditingController();
-  bool _isSaving = false;
-
-  void _startEditing(String currentText) {
-    _controller.text = currentText;
-    setState(() => _isEditing = true);
-  }
-
-  Future<void> _save() async {
-    setState(() => _isSaving = true);
-    // CRITICAL #12: при ошибке загрузки существующего документа прерываем
-    // сохранение — иначе lyricsText/sync_data затираются пустыми значениями.
-    Lyrics? existing;
-    try {
-      final loaded = await ref.read(lyricsProvider(widget.media.id).future);
-      existing = loaded.lyrics;
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.errorLoadingTranslation)),
-      );
-      return;
-    }
-    final upsert = ref.read(upsertLyricsProvider);
-    final result = await upsert(
-      UpsertLyricsParams(
-        mediaId: widget.media.id,
-        lyricsText: existing?.lyricsText ?? '',
-        translation: _controller.text,
-        syncData: existing?.syncData ?? '',
-        source: existing?.source ?? 'user',
-      ),
-    );
-    if (!mounted) return;
-    setState(() => _isSaving = false);
-    result.fold(
-      (failure) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l.errorLabel}: ${failure.message}')),
-          );
-        }
-      },
-      (_) {
-        if (mounted) {
-          ref.invalidate(lyricsProvider(widget.media.id));
-          setState(() => _isEditing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.translationSaved)),
-          );
-        }
-      },
-    );
-  }
-
-  late final l = AppLocalizations.of(context)!;
-
-  @override
-  Widget build(BuildContext context) {
-    final lyricsState = ref.watch(lyricsProvider(widget.media.id));
-
-    if (_isEditing) {
-      return Column(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                style: Theme.of(context).textTheme.bodyLarge,
-                decoration: InputDecoration(
-                  hintText: l.addTranslationHere,
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => setState(() => _isEditing = false),
-                    child: Text(l.cancel),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _isSaving ? null : _save,
-                    child: Text(_isSaving ? l.saving : l.save),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Сетевая ошибка — различимое состояние, не «нет перевода».
-    if (lyricsState.hasError) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l.errorLoadingTranslation),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.invalidate(lyricsProvider(widget.media.id)),
-              child: Text(l.retry),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final result = lyricsState.valueOrNull;
-    if (result == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final lyrics = result.lyrics;
-    final text = lyrics?.translation ?? '';
-
-    if (text.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l.noTranslationAvailable),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: () => _startEditing(''),
-              child: Text(l.editTranslation),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Stack(
-      children: [
-        SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-        ),
-        if (result.fromCache)
-          Positioned(
-            top: 8,
-            left: 8,
-            child: Chip(
-              label: Text(
-                l.offlineCopy,
-                style: const TextStyle(fontSize: 12),
-              ),
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-        Positioned(
-          top: 8,
-          right: 8,
-          child: IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: l.editTranslation,
-            onPressed: () => _startEditing(text),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _QueueTab extends ConsumerWidget {
   const _QueueTab();

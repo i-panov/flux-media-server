@@ -52,7 +52,9 @@ type SMTPConfig struct {
 	Username    string `yaml:"username"`
 	Password    string `yaml:"password"`
 	From        string `yaml:"from"`
-	RequireTLS  bool   `yaml:"require_tls"`
+	// RequireTLS — *bool, чтобы отличать «не задано» от явного false:
+	// по умолчанию (nil) TLS обязателен, require_tls: false отключает.
+	RequireTLS  *bool  `yaml:"require_tls"`
 	ImplicitTLS bool   `yaml:"implicit_tls"`
 }
 
@@ -141,6 +143,13 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.RateLimiter.Expiration == 0 {
 		cfg.RateLimiter.Expiration = 60
+	}
+	// По умолчанию TLS обязателен: без явного require_tls:false OTP-письма
+	// не должны уходить по plaintext (см. smtp.go — при отсутствии STARTTLS
+	// и ImplicitTLS отправка блокируется ошибкой).
+	if cfg.Auth.SMTP.RequireTLS == nil {
+		def := !cfg.Auth.SMTP.ImplicitTLS
+		cfg.Auth.SMTP.RequireTLS = &def
 	}
 
 	// Validation

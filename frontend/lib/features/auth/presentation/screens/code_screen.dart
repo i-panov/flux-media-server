@@ -178,6 +178,11 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                     border: const OutlineInputBorder(),
                     hintText: '000000',
                     counterText: '',
+                    // Крупная тач-зона: целевой размер 48dp, не сжимаем.
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 16,
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {

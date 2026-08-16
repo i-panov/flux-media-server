@@ -3,6 +3,7 @@ package services_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -200,4 +201,48 @@ func TestScannerUpdateKeepsManualEdits(t *testing.T) {
 	assert.Equal(t, "Ручной заголовок", after.Title, "ручная правка Title не должна затираться")
 	assert.Equal(t, 1999, after.Year, "ручная правка Year не должна затираться")
 	assert.NotEqual(t, oldQuickHash, after.QuickHash, "quick hash изменившегося файла должен обновиться")
+}
+
+// errorHashRepo — обёртка над MediaStore, которая проваливает FindByHash
+// любой ошибкой, не являющейся gorm.ErrRecordNotFound.
+type errorHashRepo struct {
+	*repository.MediaStore
+	findByHashErr error
+}
+
+func (r *errorHashRepo) FindByHash(ctx context.Context, hash string) (*models.Media, error) {
+	return nil, r.findByHashErr
+}
+
+// TestScannerFindByHashDBError: реальная ошибка БД при проверке дубликатов
+// не должна трактоваться как «дубликата нет» — файл не должен создаваться
+// (раньше err проглатывался и Create мог создать дубликат).
+func TestScannerFindByHashDBError(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	repo := &errorHashRepo{MediaStore: mediaRepo, findByHashErr: errors.New("db is down")}
+
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "test.mp4")
+	err := os.WriteFile(testFile, []byte("fake mp4 content"), 0644)
+	require.NoError(t, err)
+
+	cfg := &config.Config{
+		Media: config.MediaConfig{
+			ThumbnailPath: t.TempDir(),
+			VideoPath:     tempDir,
+		},
+	}
+	scanner := services.NewScannerService(repo, cfg)
+
+	ctx := context.Background()
+	err = scanner.ScanPath(ctx, tempDir, models.MediaTypeVideo)
+	require.NoError(t, err, "скан должен завершиться без паники, файл просто пропускается")
+
+	// Никаких записей создано быть не должно — реальная ошибка БД.
+	_, total, err := repo.FindAll(ctx, repository.MediaFilters{}, 0, 0)
+	require.NoError(t, err)
+	assert.Zero(t, total, "файл не должен создаваться при сбое FindByHash")
+
+	_, err = repo.FindByPath(ctx, testFile)
+	assert.Error(t, err, "медиа для файла не должно существовать")
 }

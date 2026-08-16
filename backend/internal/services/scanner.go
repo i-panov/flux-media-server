@@ -339,7 +339,13 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 
 		// Check if file with same hash already exists
 		duplicate, err := s.mediaRepo.FindByHash(ctx, hash)
-		if err == nil && duplicate != nil {
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			// A database error is NOT "no duplicate" — treat it as a scan
+			// failure rather than creating a duplicate record.
+			log.Printf("FindByHash error for %s: %v", path, err)
+			return nil
+		}
+		if duplicate != nil && duplicate.ID != 0 {
 			log.Printf("Skipping duplicate: %s (same hash as %s)", path, duplicate.FilePath)
 			return nil
 		}
