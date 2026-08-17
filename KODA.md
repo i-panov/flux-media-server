@@ -17,13 +17,12 @@ flux-media-server/
 │   │   ├── app/app.go        — сборка DI, маршруты, lifecycle
 │   │   ├── config/           — YAML-конфигурация
 │   │   ├── email/            — SMTP-клиент для отправки OTP-кодов
-│   │   ├── handlers/         — HTTP-обработчики (auth, media, library, upload, progress, metadata, thumb)
+│   │   ├── handlers/         — HTTP-обработчики (auth, media, library, upload, progress, metadata, thumb, artist, collection, favorite, lyrics)
 │   │   ├── metadata/         — парсинг имён файлов, извлечение метаданных
-│   │   ├── middleware/       — JWT auth middleware
-│   │   ├── models/           — GORM-модели: Media, Metadata, User, WatchProgress, MediaLibrary
+│   │   ├── middleware/       — JWT auth middleware, security headers, admin
+│   │   ├── models/           — GORM-модели: Media, Metadata, User, WatchProgress, MediaLibrary, Artist, Collection, CollectionItem, Favorite, Lyrics, RefreshToken, MediaType
 │   │   ├── repository/       — интерфейсы и реализации репозиториев (SQLite через GORM)
-│   │   ├── response/         — хелперы для JSON-ответов и ошибок
-│   │   └── services/         — бизнес-логика: scanner, watcher, streamer, thumbnail, auth (JWT, OTP)
+│   │   └── services/         — бизнес-логика: scanner, watcher, streamer, thumbnail, auth (JWT, OTP), upload_queue
 │   ├── Dockerfile            — multi-stage build (golang:1.22-alpine → alpine:3.19 + ffmpeg)
 │   └── docker-compose.yml    — проброс порта 8080, volume для data и media
 │
@@ -36,13 +35,21 @@ flux-media-server/
 │   │   │   ├── router/       — auto_route роутер, AuthGuard
 │   │   │   ├── error/        — обработка ошибок
 │   │   │   ├── usecases/     — use cases
-│   │   │   └── utils/        — утилиты
+│   │   │   ├── utils/        — утилиты
+│   │   │   ├── session/      — управление сессией
+│   │   │   └── widgets/      — переиспользуемые виджеты
 │   │   ├── features/         — feature-based архитектура
 │   │   │   ├── auth/         — аутентификация (data/domain/presentation)
 │   │   │   ├── library/      — библиотеки (data/domain/presentation)
 │   │   │   ├── media/        — медиа (data/domain/presentation)
 │   │   │   ├── player/       — плеер на media_kit (data/domain/presentation)
-│   │   │   └── settings/     — настройки (data/domain/presentation)
+│   │   │   ├── settings/     — настройки (data/domain/presentation)
+│   │   │   ├── audio/        — аудио-плеер и интерфейс
+│   │   │   ├── video/        — видео-плеер и интерфейс
+│   │   │   ├── collections/  — пользовательские коллекции/плейлисты
+│   │   │   ├── favorites/    — избранное (медиа и артисты)
+│   │   │   ├── lyrics/       — текст песен с синхронизацией
+│   │   │   └── offline/      — офлайн-контент
 │   │   └── shared/models/    — общие модели
 │   ├── pubspec.yaml
 │   └── analysis_options.yaml — very_good_analysis
@@ -56,14 +63,14 @@ flux-media-server/
 - **Язык:** Go 1.23
 - **Веб-фреймворк:** Fiber v2
 - **ORM:** GORM + SQLite (WAL mode, busy_timeout=5000)
-- **Аутентификация:** JWT + OTP через email (SMTP)
+- **Аутентификация:** JWT + Refresh Tokens + OTP через email (SMTP)
 - **Медиа:** ffprobe (через go-ffprobe), ffmpeg (для миниатюр), dhowden/tag (аудио-теги)
 - **Файловый мониторинг:** fsnotify
 - **Контейнер:** Docker (Alpine + ffmpeg)
 
 ### Модули Go
 - `module flux`
-- Ключевые зависимости: gofiber/fiber/v2, gorm.io/gorm, gorm.io/driver/sqlite, golang-jwt/jwt/v5, fsnotify/fsnotify, vansante/go-ffprobe.v2, dhowden/tag
+- Ключевые зависимости: gofiber/fiber/v2, gorm.io/gorm, gorm.io/driver/sqlite, golang-jwt/jwt/v5, fsnotify/fsnotify, vansane/go-ffprobe.v2, dhowden/tag
 
 ### Стиль кода (Go)
 - Пакеты: `internal/` с чётким разделением (handlers, services, repository, models, config, middleware)
@@ -73,62 +80,99 @@ flux-media-server/
 - Контекст: `c.UserContext()` передаётся в репозитории
 - Конфигурация: YAML, загружается через `config.Load(path)`, дефолты в `config.Load()`
 - Модели GORM с JSON-тегами, `gorm:"uniqueIndex"` / `gorm:"index"` аннотациями
+- Soft delete через `gorm.DeletedAt`
+- FK-ассоциации с каскадными удалениями (`constraint:OnUpdate:CASCADE,OnDelete:CASCADE`)
 
 ### API эндпоинты
 
-| Метод | Путь | Описание | Auth |
-|-------|------|----------|------|
-| GET | `/health` | Health check | — |
-| POST | `/api/auth/request-code` | Запрос OTP-кода | — |
-| POST | `/api/auth/verify-code` | Проверка OTP, выдача JWT | — |
-| GET | `/api/auth/me` | Текущий пользователь | JWT |
-| GET | `/api/media` | Список медиа (фильтры: type, year, q, limit, offset) | JWT |
-| GET | `/api/media/:id` | Получить медиа по ID | JWT |
-| POST | `/api/media` | Создать запись медиа | JWT |
-| POST | `/api/media/upload` | Загрузка файла (multipart, library_id + file, лимит 2GB) | JWT |
-| POST | `/api/media/check-hash` | Проверка хэша файла | JWT |
-| PUT | `/api/media/:id` | Обновить медиа | JWT |
-| DELETE | `/api/media/:id` | Удалить медиа | JWT |
-| GET | `/api/media/:id/stream` | Стриминг файла (Range support) | JWT |
-| GET | `/api/media/:id/thumb` | Миниатюра | JWT |
-| GET | `/api/libraries` | Список библиотек | JWT |
-| POST | `/api/libraries` | Создать библиотеку | JWT |
-| PUT | `/api/libraries/:id` | Обновить библиотеку | JWT |
-| DELETE | `/api/libraries/:id` | Удалить библиотеку | JWT |
-| POST | `/api/libraries/:id/scan` | Запуск сканирования | JWT |
-| GET | `/api/libraries/:id/scan-status` | Статус сканирования | JWT |
-| GET | `/api/progress` | Прогресс просмотра пользователя | JWT |
-| PUT | `/api/progress/:mediaId` | Обновить прогресс | JWT |
-| DELETE | `/api/progress/:mediaId` | Удалить прогресс | JWT |
-| GET | `/api/metadata/search` | Поиск метаданных | JWT |
-| POST | `/api/metadata/:mediaId/refresh` | Обновить метаданные | JWT |
-| PUT | `/api/metadata/:mediaId` | Изменить метаданные | JWT |
+| Метод | Путь | Описание | Auth | Admin |
+|-------|------|----------|------|-------|
+| GET | `/api/health` | Health check | — | — |
+| POST | `/api/auth/request-code` | Запрос OTP-кода | — | — |
+| POST | `/api/auth/verify-code` | Проверка OTP, выдача JWT | — | — |
+| POST | `/api/auth/refresh` | Обновление JWT через refresh token | — | — |
+| GET | `/api/auth/me` | Текущий пользователь | JWT | — |
+| POST | `/api/auth/logout` | Выход (инвалидация refresh token) | JWT | — |
+| GET | `/api/media` | Список медиа (фильтры: type, year, q, limit, offset) | JWT | — |
+| GET | `/api/media/bulk` | Bulk-загрузка списка медиа | JWT | — |
+| GET | `/api/media/:id` | Получить медиа по ID | JWT | — |
+| POST | `/api/media` | Создать запись медиа | JWT | ✓ |
+| POST | `/api/media/upload` | Загрузка файла (multipart, library_id + file, лимит 2GB) | JWT | ✓ |
+| GET | `/api/media/uploads/:id` | Статус асинхронной загрузки | JWT | ✓ |
+| DELETE | `/api/media/uploads/:id` | Отмена асинхронной загрузки | JWT | ✓ |
+| POST | `/api/media/check-hash` | Проверка хэша файла | JWT | — |
+| PUT | `/api/media/:id` | Обновить медиа | JWT | ✓ |
+| DELETE | `/api/media/:id` | Удалить медиа (soft delete) | JWT | ✓ |
+| GET | `/api/media/:id/stream` | Стриминг файла (Range support) | JWT | — |
+| GET | `/api/media/:id/thumb` | Миниатюра | JWT | — |
+| GET | `/api/media/:id/cover` | Обложка (для аудио) | JWT | — |
+| PUT | `/api/media/:id/cover` | Загрузка обложки (multipart) | JWT | ✓ |
+| GET | `/api/libraries` | Список библиотек | JWT | — |
+| POST | `/api/libraries` | Создать библиотеку | JWT | — |
+| PUT | `/api/libraries/:id` | Обновить библиотеку | JWT | — |
+| DELETE | `/api/libraries/:id` | Удалить библиотеку | JWT | — |
+| POST | `/api/libraries/:id/scan` | Запуск сканирования | JWT | — |
+| GET | `/api/libraries/:id/scan-status` | Статус сканирования | JWT | — |
+| GET | `/api/progress` | Прогресс просмотра пользователя | JWT | — |
+| PUT | `/api/progress/:mediaId` | Обновить прогресс | JWT | — |
+| DELETE | `/api/progress/:mediaId` | Удалить прогресс | JWT | — |
+| GET | `/api/metadata/search` | Поиск метаданных | JWT | — |
+| POST | `/api/metadata/:mediaId/refresh` | Обновить метаданные | JWT | ✓ |
+| PUT | `/api/metadata/:mediaId` | Изменить метаданные | JWT | ✓ |
+| GET | `/api/favorites` | Список избранного | JWT | — |
+| POST | `/api/media/:id/favorite` | Добавить в избранное (медиа) | JWT | — |
+| DELETE | `/api/media/:id/favorite` | Удалить из избранного (медиа) | JWT | — |
+| POST | `/api/favorites/artist` | Добавить в избранное (артист) | JWT | — |
+| DELETE | `/api/favorites/artist` | Удалить из избранного (артист) | JWT | — |
+| GET | `/api/artists` | Список артистов | JWT | — |
+| PUT | `/api/artists/:id` | Обновить артиста | JWT | ✓ |
+| POST | `/api/artists/:id/cover` | Загрузка обложки артиста | JWT | ✓ |
+| GET | `/api/artists/:id/cover` | Обложка артиста | JWT | — |
+| POST | `/api/collections` | Создать коллекцию | JWT | — |
+| GET | `/api/collections` | Список коллекций | JWT | — |
+| PUT | `/api/collections/:id` | Обновить коллекцию | JWT | — |
+| DELETE | `/api/collections/:id` | Удалить коллекцию | JWT | — |
+| POST | `/api/collections/:id/items` | Добавить элемент в коллекцию | JWT | — |
+| DELETE | `/api/collections/:id/items/:mediaId` | Удалить элемент из коллекции | JWT | — |
+| GET | `/api/collections/:id/items` | Список элементов коллекции | JWT | — |
+| GET | `/api/media/:id/lyrics` | Получить текст песни | JWT | — |
+| PUT | `/api/media/:id/lyrics` | Сохранить/обновить текст песни | JWT | ✓ |
 
 ### Модели данных
 
 - **User** — id, email, timestamps
-- **Media** — id, title, year, description, type (video/audio), artist, album, genre, duration, filePath, fileSize, fileHash (SHA-256), quickHash, thumbnailURL, metadataID, timestamps
-- **Metadata** — id, externalID, source (tmdb/tvdb), title, year, description, posterURL, backdropURL, rating, genres, cast, timestamps
+- **Media** — id, title, filename, year, description, type (video/audio), artists (many2many), album, genre, duration, filePath, fileSize, fileHash (SHA-256), quickHash, thumbnailURL, coverURL, metadataID, timestamps, soft delete
+- **Metadata** — id, externalID, source (tmdb/tvdb), title, year, description, posterURL, backdropURL, rating, genres (JSON), cast (JSON), timestamps
 - **MediaLibrary** — id, name, path, type (video/audio), enabled, scanInterval, timestamps
 - **WatchProgress** — id, userID, mediaID, position, duration, completed, updatedAt
+- **Artist** — id, name (unique), hasCover, timestamps
+- **MediaArtist** — join-таблица Media ↔ Artist с позицией (many2many)
+- **Collection** — id, userID, name, type (video/audio), timestamps
+- **CollectionItem** — id, collectionID, mediaID, position (unique composite), addedAt
+- **Favorite** — id, userID, mediaID (nullable), artistID (nullable), check constraint на одиночную цель, timestamps
+- **Lyrics** — id, mediaID (unique), lyricsText, translation, syncData (JSON), source, timestamps
+- **RefreshToken** — id, userID, token (unique), expiresAt (indexed), createdAt
+- **MediaType** — enum: "video", "audio"
 
 ### Сервисы
 
-- **ScannerService** — сканирование библиотек: walk по директории, хэширование (SHA-256 полный + quick hash 1MB head/tail), извлечение метаданных через ffprobe и теги, генерация миниатюр
+- **ScannerService** — сканирование библиотек: walk по директории, хэширование (SHA-256 полный + quick hash 1MB head + 1MB tail), извлечение метаданных через ffprobe и теги, генерация миниатюр
 - **WatcherService** — fsnotify мониторинг папок, debounce 2с, автосканирование при появлении новых файлов
 - **StreamerService** — стриминг файлов с поддержкой HTTP Range
 - **ThumbnailService** — генерация миниатюр через ffmpeg
-- **JWTService** — выпуск и валидация JWT-токенов
+- **JWTService** — выпуск и валидация JWT-токенов + refresh tokens
 - **OTPStore** — генерация и хранение OTP-кодов с TTL
+- **UploadQueue** — асинхронная очередь обработки загрузок (воркеры: хэширование, ffprobe, ffmpeg)
 
 ### Конфигурация (config.yaml)
 
 ```yaml
-server:       host, port (8080), debug, cors_origins
+server:       host, port (8080), debug, cors_origins, max_upload_size
 database:     path (./data/flux.db)
-auth:         jwt_secret (≥32 chars), jwt_expiry (hours), code_length, code_expiry, max_otp_entries, allowed_emails, allow_unknown_email, smtp (host, port, username, password, from)
+auth:         jwt_secret (≥32 chars), jwt_expiry (hours), refresh_expiry (hours), code_length, code_expiry, max_otp_entries, allowed_emails, allow_unknown_email, smtp (host, port, username, password, from, require_tls, implicit_tls)
 scanner:      enabled, interval (min), watch_enabled
 media:        thumbnail_path, video_path, audio_path
+rate_limiter: max (requests), expiration (seconds)
 ```
 
 ### Запуск бэкенда
@@ -163,6 +207,7 @@ docker-compose up -d
 - Riverpod для DI и стейт-менеджмента
 - Chopper-генерация API-клиента из аннотаций
 - auto_route с AuthGuard для защищённых маршрутов
+- `fpdart` `Either<Failure, T>` для error handling в репозиториях
 - Отключённые линты: public_member_api_docs, lines_longer_than_80_chars, require_trailing_commas, avoid_print, comment_references
 
 ### Запуск фронтенда
@@ -170,8 +215,10 @@ docker-compose up -d
 ```bash
 cd frontend
 flutter pub get
-flutter pub run build_runner build --delete-conflicting-outputs
-flutter run
+flutter pub run build_runner build --delete-conflicting-outputs  # codegen обязателен
+flutter analyze    # lint (very_good_analysis)
+flutter test       # run tests
+flutter run        # run app
 ```
 
 ## Планы разработки
@@ -187,6 +234,9 @@ flutter run
 - JWT secret должен быть не короче 32 символов
 - Docker-образ включает ffmpeg и ca-certificates
 - Volume для данных: `/app/data`, для медиа: `/media` (read-only)
+- Refresh tokens: фоновая очистка истёкших токенов каждые 24 часа
+- Soft delete для Media (gorm.DeletedAt)
+- Upload-запросы обрабатываются асинхронно через очередь (202 Accepted)
 
 ## Обязательные правила
 

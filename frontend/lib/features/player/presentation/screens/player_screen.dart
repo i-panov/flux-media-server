@@ -32,17 +32,56 @@ final videoControllerProvider = Provider<VideoController>((ref) {
   );
 });
 
-/// Seek bar theme shared by mobile and fullscreen.
-const _seekBarTheme = MaterialVideoControlsThemeData(
+/// База стилей seek bar (цвета и размеры). Тему контролов целиком строит
+/// [_buildMobileControlsTheme]: в media_kit_video 1.3.1 `copyWith` не умеет
+/// переопределять `padding` (параметр отсутствует в сигнатуре), поэтому
+/// динамический padding от системных баров можно задать только через
+/// конструктор.
+const _seekBarBaseTheme = MaterialVideoControlsThemeData(
   seekBarHeight: 5,
   seekBarThumbSize: 20,
   seekBarMargin: EdgeInsets.only(left: 12, right: 12),
-  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 24),
   seekBarPositionColor: Colors.deepPurple,
   seekBarThumbColor: Colors.deepPurple,
   seekBarBufferColor: Color(0x66FFFFFF),
   seekBarColor: Color(0x33FFFFFF),
 );
+
+/// Строит тему мобильных контролов с динамическим padding от системных
+/// баров. На Android 15+ (edge-to-edge) приложение рендерится под nav bar:
+/// `MediaQuery.padding.bottom` = 0 в immersiveSticky (бары скрыты), но
+/// становится > 0 при их появлении. Фиксированный padding работал на одних
+/// устройствах и ломался на других — поэтому проблема возвращалась.
+/// Динамический padding адаптируется к любому состоянию системных баров.
+MaterialVideoControlsThemeData _buildMobileControlsTheme(
+  MediaQueryData mq, {
+  required List<Widget> topButtonBar,
+  required List<Widget> bottomButtonBar,
+}) {
+  const base = _seekBarBaseTheme;
+  return MaterialVideoControlsThemeData(
+    seekBarHeight: base.seekBarHeight,
+    seekBarThumbSize: base.seekBarThumbSize,
+    seekBarMargin: base.seekBarMargin,
+    seekBarPositionColor: base.seekBarPositionColor,
+    seekBarThumbColor: base.seekBarThumbColor,
+    seekBarBufferColor: base.seekBarBufferColor,
+    seekBarColor: base.seekBarColor,
+    topButtonBar: topButtonBar,
+    bottomButtonBar: bottomButtonBar,
+    padding: EdgeInsets.only(
+      left: 12,
+      right: 12,
+      top: mq.padding.top > 0 ? mq.padding.top + 8 : 12,
+      bottom: 24 + mq.padding.bottom,
+    ),
+    bottomButtonBarMargin: EdgeInsets.only(
+      left: 16,
+      right: 8,
+      bottom: mq.padding.bottom,
+    ),
+  );
+}
 
 /// Скорости воспроизведения: от [_minSpeed] до [_maxSpeed] шагом [_speedStep].
 const _minSpeed = .5;
@@ -267,20 +306,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     // for the built-in play/pause button.
     final isMobile = Platform.isAndroid || Platform.isIOS;
 
-    final mobileTheme = _seekBarTheme.copyWith(
-      // Back button stays in the top bar.
-      topButtonBar: [const _BackButton()],
-      // ±10s + speed in the bottom bar, centered via Spacers so they
-      // don't stick to the left edge and cover the seek bar.
-      bottomButtonBar: [
-        const Spacer(),
-        const _SeekButton(direction: -1),
-        const _SeekButton(direction: 1),
-        const _SpeedButton(),
-        const SizedBox(width: 16),
-        const Spacer(),
-        const MaterialPositionIndicator(),
-        const MaterialFullscreenButton(),
+    final mobileTheme = _buildMobileControlsTheme(
+      MediaQuery.of(context),
+      topButtonBar: const [_BackButton()],
+      bottomButtonBar: const [
+        Spacer(),
+        _SeekButton(direction: -1),
+        _SeekButton(direction: 1),
+        _SpeedButton(),
+        SizedBox(width: 16),
+        Spacer(),
+        MaterialPositionIndicator(),
+        MaterialFullscreenButton(),
       ],
     );
 
