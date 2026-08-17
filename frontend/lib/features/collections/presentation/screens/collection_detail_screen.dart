@@ -106,7 +106,7 @@ class _CollectionDetailScreenState
                         context.router.push(AudioPlayerRoute(media: media));
                       } else {
                         context.router
-                            .push(MediaDetailRoute(mediaId: media.id));
+                            .push(VideoDetailRoute(mediaId: media.id));
                       }
                     },
                   ),

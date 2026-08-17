@@ -9,13 +9,12 @@ import 'package:flux_media_server/features/auth/presentation/providers/is_offlin
 import 'package:flux_media_server/features/auth/presentation/screens/code_screen.dart';
 import 'package:flux_media_server/features/auth/presentation/screens/login_screen.dart';
 import 'package:flux_media_server/features/collections/presentation/screens/collection_detail_screen.dart';
-import 'package:flux_media_server/features/media/presentation/screens/media_detail_screen.dart';
 import 'package:flux_media_server/features/media/presentation/screens/upload_screen.dart';
 import 'package:flux_media_server/features/player/presentation/screens/audio_player_screen.dart';
-import 'package:flux_media_server/features/player/presentation/screens/player_screen.dart';
 import 'package:flux_media_server/features/player/presentation/widgets/audio_mini_player.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/server_setup_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/settings_screen.dart';
+import 'package:flux_media_server/features/video/presentation/screens/video_detail_screen.dart';
 import 'package:flux_media_server/features/video/presentation/screens/video_screen.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -41,8 +40,7 @@ class AppRouter extends _$AppRouter {
             AutoRoute(page: AudioRoute.page, keepHistory: false),
           ],
         ),
-        AutoRoute(page: MediaDetailRoute.page, guards: [authGuard]),
-        AutoRoute(page: PlayerRoute.page, guards: [authGuard]),
+        AutoRoute(page: VideoDetailRoute.page, guards: [authGuard]),
         AutoRoute(page: AudioPlayerRoute.page, guards: [authGuard]),
         AutoRoute(page: UploadRoute.page, guards: [authGuard]),
         AutoRoute(page: SettingsRoute.page, guards: [authGuard]),

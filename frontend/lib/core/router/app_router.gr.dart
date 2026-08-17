@@ -74,26 +74,6 @@ abstract class _$AppRouter extends RootStackRouter {
         child: const MainRoutePage(),
       );
     },
-    MediaDetailRoute.name: (routeData) {
-      final args = routeData.argsAs<MediaDetailRouteArgs>();
-      return AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: MediaDetailScreen(
-          mediaId: args.mediaId,
-          key: args.key,
-        ),
-      );
-    },
-    PlayerRoute.name: (routeData) {
-      final args = routeData.argsAs<PlayerRouteArgs>();
-      return AutoRoutePage<dynamic>(
-        routeData: routeData,
-        child: PlayerScreen(
-          media: args.media,
-          key: args.key,
-        ),
-      );
-    },
     ServerSetupRoute.name: (routeData) {
       return AutoRoutePage<dynamic>(
         routeData: routeData,
@@ -112,6 +92,16 @@ abstract class _$AppRouter extends RootStackRouter {
         routeData: routeData,
         child: UploadScreen(
           mediaType: args.mediaType,
+          key: args.key,
+        ),
+      );
+    },
+    VideoDetailRoute.name: (routeData) {
+      final args = routeData.argsAs<VideoDetailRouteArgs>();
+      return AutoRoutePage<dynamic>(
+        routeData: routeData,
+        child: VideoDetailScreen(
+          mediaId: args.mediaId,
           key: args.key,
         ),
       );
@@ -323,81 +313,6 @@ class MainRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
-/// [MediaDetailScreen]
-class MediaDetailRoute extends PageRouteInfo<MediaDetailRouteArgs> {
-  MediaDetailRoute({
-    required int mediaId,
-    Key? key,
-    List<PageRouteInfo>? children,
-  }) : super(
-          MediaDetailRoute.name,
-          args: MediaDetailRouteArgs(
-            mediaId: mediaId,
-            key: key,
-          ),
-          initialChildren: children,
-        );
-
-  static const String name = 'MediaDetailRoute';
-
-  static const PageInfo<MediaDetailRouteArgs> page =
-      PageInfo<MediaDetailRouteArgs>(name);
-}
-
-class MediaDetailRouteArgs {
-  const MediaDetailRouteArgs({
-    required this.mediaId,
-    this.key,
-  });
-
-  final int mediaId;
-
-  final Key? key;
-
-  @override
-  String toString() {
-    return 'MediaDetailRouteArgs{mediaId: $mediaId, key: $key}';
-  }
-}
-
-/// generated route for
-/// [PlayerScreen]
-class PlayerRoute extends PageRouteInfo<PlayerRouteArgs> {
-  PlayerRoute({
-    required Media media,
-    Key? key,
-    List<PageRouteInfo>? children,
-  }) : super(
-          PlayerRoute.name,
-          args: PlayerRouteArgs(
-            media: media,
-            key: key,
-          ),
-          initialChildren: children,
-        );
-
-  static const String name = 'PlayerRoute';
-
-  static const PageInfo<PlayerRouteArgs> page = PageInfo<PlayerRouteArgs>(name);
-}
-
-class PlayerRouteArgs {
-  const PlayerRouteArgs({
-    required this.media,
-    this.key,
-  });
-
-  final Media media;
-
-  final Key? key;
-
-  @override
-  String toString() {
-    return 'PlayerRouteArgs{media: $media, key: $key}';
-  }
-}
-
-/// generated route for
 /// [ServerSetupScreen]
 class ServerSetupRoute extends PageRouteInfo<void> {
   const ServerSetupRoute({List<PageRouteInfo>? children})
@@ -459,6 +374,44 @@ class UploadRouteArgs {
   @override
   String toString() {
     return 'UploadRouteArgs{mediaType: $mediaType, key: $key}';
+  }
+}
+
+/// generated route for
+/// [VideoDetailScreen]
+class VideoDetailRoute extends PageRouteInfo<VideoDetailRouteArgs> {
+  VideoDetailRoute({
+    required int mediaId,
+    Key? key,
+    List<PageRouteInfo>? children,
+  }) : super(
+          VideoDetailRoute.name,
+          args: VideoDetailRouteArgs(
+            mediaId: mediaId,
+            key: key,
+          ),
+          initialChildren: children,
+        );
+
+  static const String name = 'VideoDetailRoute';
+
+  static const PageInfo<VideoDetailRouteArgs> page =
+      PageInfo<VideoDetailRouteArgs>(name);
+}
+
+class VideoDetailRouteArgs {
+  const VideoDetailRouteArgs({
+    required this.mediaId,
+    this.key,
+  });
+
+  final int mediaId;
+
+  final Key? key;
+
+  @override
+  String toString() {
+    return 'VideoDetailRouteArgs{mediaId: $mediaId, key: $key}';
   }
 }
 

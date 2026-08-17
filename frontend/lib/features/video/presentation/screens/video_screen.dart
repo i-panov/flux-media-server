@@ -415,7 +415,7 @@ class _ContinueWatchingSectionState
         isDownloadedMap: {for (final id in downloadedIds) id: true},
         onDownloadToggled: widget.onDownloadToggled,
         onItemTapped: (id) =>
-            context.router.push(MediaDetailRoute(mediaId: id)),
+            context.router.push(VideoDetailRoute(mediaId: id)),
         trailing: continueWatching.length > 10 && !_showAll
             ? TextButton(
                 onPressed: () => setState(() => _showAll = true),
@@ -501,7 +501,7 @@ class _RecentlyAddedSectionState extends ConsumerState<_RecentlyAddedSection> {
         isDownloadedMap: {for (final id in downloadedIds) id: true},
         onDownloadToggled: widget.onDownloadToggled,
         onItemTapped: (id) =>
-            context.router.push(MediaDetailRoute(mediaId: id)),
+            context.router.push(VideoDetailRoute(mediaId: id)),
         trailing: allItems.length > 10 && !_showAll
             ? TextButton(
                 onPressed: () => setState(() => _showAll = true),
@@ -596,7 +596,7 @@ class _FavoritesSectionState extends ConsumerState<_FavoritesSection> {
         isDownloadedMap: {for (final id in downloadedIds) id: true},
         onDownloadToggled: widget.onDownloadToggled,
         onItemTapped: (id) =>
-            context.router.push(MediaDetailRoute(mediaId: id)),
+            context.router.push(VideoDetailRoute(mediaId: id)),
         trailing: allItems.length > 10 && !_showAll
             ? TextButton(
                 onPressed: () => setState(() => _showAll = true),
@@ -677,7 +677,7 @@ class _DownloadsSection extends ConsumerWidget {
                 return MediaCard(
                   media: media,
                   onTap: () => context.router
-                      .push(MediaDetailRoute(mediaId: media.id)),
+                      .push(VideoDetailRoute(mediaId: media.id)),
                   isFavorite: favoriteIds.contains(media.id),
                   onFavorite: isOffline
                       ? null
@@ -768,7 +768,7 @@ class _AllVideosGrid extends ConsumerWidget {
             return MediaCard(
               media: media,
               onTap: () => context.router
-                  .push(MediaDetailRoute(mediaId: media.id)),
+                  .push(VideoDetailRoute(mediaId: media.id)),
               isFavorite: favoriteIds.contains(media.id),
               // В офлайне избранное недоступно везде, не только в Downloads.
               onFavorite:
