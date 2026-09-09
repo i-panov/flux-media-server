@@ -7,7 +7,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/mattn/go-sqlite3 v1.14.49
+	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/stretchr/testify v1.11.1
 	github.com/valyala/fasthttp v1.73.0
 	gopkg.in/vansante/go-ffprobe.v2 v2.3.0
