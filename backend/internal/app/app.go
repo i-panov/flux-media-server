@@ -72,10 +72,40 @@ type App struct {
 	sqlDB       *sql.DB
 	cleanupStop chan struct{}
 	cleanupOnce sync.Once
+	scanner     *services.ScannerService
+	// scanCancelFn отменяет фоновый первичный скан при Shutdown.
+	// nil, если фоновый скан не был запущен.
+	scanCancelFn context.CancelFunc
+	// scanWG дожидается завершения фонового скана до закрытия БД.
+	scanWG *sync.WaitGroup
+}
+
+// Scanner возвращает сервис сканирования для консольного режима (-scan).
+func (a *App) Scanner() *services.ScannerService {
+	return a.scanner
+}
+
+// Option модифицирует поведение New.
+type Option func(*options)
+
+type options struct {
+	// backgroundWorkers — запускать ли фоновых работников при старте:
+	// первичный скан и файловый watcher.
+	backgroundWorkers bool
+}
+
+// ConsoleMode отключает фоновых работников при старте (первичный скан и
+// файловый watcher). Используется консольным режимом (-scan): фоновый скан
+// гонялся бы с консольным за одну БД (консольный мог получить
+// ErrScanInProgress), а watcher дублировал бы события консольного скана.
+func ConsoleMode() Option {
+	return func(o *options) {
+		o.backgroundWorkers = false
+	}
 }
 
 // New creates a new App with all dependencies wired up.
-func New(cfg *config.Config, version string) (*App, error) {
+func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	db, err := repository.InitDB(cfg.Database.Path, cfg.Server.Debug)
 	if err != nil {
 		return nil, fmt.Errorf("init database: %w", err)
@@ -372,7 +402,11 @@ func New(cfg *config.Config, version string) (*App, error) {
 	api.Put("/media/:id/lyrics", requireAdmin, lyricsHandler.UpsertLyrics)
 
 	// Start file watcher if enabled.
-	if watcherService != nil {
+	opt := options{backgroundWorkers: true}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+	if watcherService != nil && opt.backgroundWorkers {
 		var paths []string
 		for _, mp := range cfg.Media.MediaPaths() {
 			if mp.Path != "" {
@@ -384,6 +418,27 @@ func New(cfg *config.Config, version string) (*App, error) {
 				log.Printf("Warning: failed to start file watcher: %v", err)
 			}
 		}
+	}
+
+	// Initial library scan at startup: fsnotify не знает о файлах,
+	// существовавших до запуска. ScanAll в фоне (не блокирует старт);
+	// контекст отменяется в Shutdown, чтобы скан не пережил сервер.
+	// Shutdown дожидается скана через scanWG до закрытия БД.
+	var scanCancelFn context.CancelFunc
+	scanWG := new(sync.WaitGroup)
+	if cfg.Scanner.Enabled && opt.backgroundWorkers {
+		scanCtx, scanCancel := context.WithCancel(context.Background())
+		scanCancelFn = scanCancel
+		scanWG.Add(1)
+		goSafe(func() {
+			defer scanWG.Done()
+			log.Printf("initial library scan started")
+			if err := scanner.ScanAll(scanCtx); err != nil {
+				log.Printf("initial library scan: %v", err)
+			} else {
+				log.Printf("initial library scan finished")
+			}
+		})
 	}
 
 	// Periodically purge expired refresh tokens so the table does not grow
@@ -406,14 +461,17 @@ func New(cfg *config.Config, version string) (*App, error) {
 
 	ok = true
 	return &App{
-		Fiber:       fiberApp,
-		Config:      cfg,
-		OTPStore:    otpStore,
-		Watcher:     watcherService,
-		UploadQueue: uploadQueue,
-		Version:     version,
-		sqlDB:       sqlDB,
-		cleanupStop: cleanupStop,
+		Fiber:        fiberApp,
+		Config:       cfg,
+		OTPStore:     otpStore,
+		Watcher:      watcherService,
+		UploadQueue:  uploadQueue,
+		Version:      version,
+		sqlDB:        sqlDB,
+		cleanupStop:  cleanupStop,
+		scanner:      scanner,
+		scanCancelFn: scanCancelFn,
+		scanWG:       scanWG,
 	}, nil
 }
 
@@ -459,6 +517,9 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 	a.cleanupOnce.Do(func() {
 		close(a.cleanupStop)
 	})
+	if a.scanCancelFn != nil {
+		a.scanCancelFn()
+	}
 	if a.Watcher != nil {
 		a.Watcher.Stop()
 	}
@@ -468,6 +529,23 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 	a.OTPStore.Stop()
 
 	err := a.Fiber.ShutdownWithContext(shutdownCtx)
+	// Фоновый скан обязан завершиться до закрытия БД: его контекст уже
+	// отменён выше (scanCancelFn), все операции сканера ctx-aware, так
+	// что Wait завершается быстро. Патологический случай (застрявший
+	// внешний процесс сверх его таймаута) не должен блокировать Shutdown
+	// дольше бюджета shutdownCtx — ждём с дедлайном.
+	if a.scanWG != nil {
+		scanDone := make(chan struct{})
+		go func() {
+			a.scanWG.Wait()
+			close(scanDone)
+		}()
+		select {
+		case <-scanDone:
+		case <-shutdownCtx.Done():
+			log.Printf("shutdown: timed out waiting for background scan; closing database anyway")
+		}
+	}
 	if a.sqlDB != nil {
 		if dbErr := a.sqlDB.Close(); dbErr != nil && err == nil {
 			err = dbErr

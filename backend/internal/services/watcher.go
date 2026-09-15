@@ -12,12 +12,18 @@ import (
 )
 
 // WatcherService monitors library directories for new files using fsnotify.
+//
+// События обрабатываются инкрементально: watcher накапливает события за
+// debounce-окно в map (путь → последняя операция) и по истечении окна
+// передаёт пачку сканеру через HandleFSEvents. Полный ScanAll вызывается
+// только вручную (первичный скан при старте, консольный режим).
 type WatcherService struct {
 	scanner     ScannerInterface
 	watcher     *fsnotify.Watcher
 	debounce    *time.Timer
 	debounceDur time.Duration
 	mu          sync.Mutex
+	pending     map[string]fsnotify.Op
 	ctx         context.Context
 	cancel      context.CancelFunc
 	isRunning   bool
@@ -29,6 +35,7 @@ func NewWatcherService(scanner ScannerInterface) *WatcherService {
 	return &WatcherService{
 		scanner:     scanner,
 		debounceDur: 2 * time.Second,
+		pending:     make(map[string]fsnotify.Op),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -59,6 +66,7 @@ func (w *WatcherService) StartWithPaths(paths []string) error {
 	w.ctx = ctx
 	w.cancel = cancel
 	w.watcher = watcher
+	w.pending = make(map[string]fsnotify.Op)
 	w.isRunning = true
 	w.mu.Unlock()
 
@@ -117,6 +125,10 @@ func (w *WatcherService) Stop() {
 	}
 	w.isRunning = false
 	w.cancel()
+	if w.debounce != nil {
+		w.debounce.Stop()
+		w.debounce = nil
+	}
 	watcher := w.watcher
 	w.mu.Unlock()
 	if watcher != nil {
@@ -137,12 +149,7 @@ func (w *WatcherService) loop(ctx context.Context, watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			// Only care about file creation and writes.
-			if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
-				continue
-			}
-
-			w.scheduleScan(ctx)
+			w.handleEvent(ctx, watcher, event)
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
@@ -152,10 +159,33 @@ func (w *WatcherService) loop(ctx context.Context, watcher *fsnotify.Watcher) {
 	}
 }
 
-// scheduleScan resets a single global debounce timer: any burst of fs events
-// results in exactly one ScanAll after the burst settles (instead of one full
-// scan per event, which is O(events × library size)).
-func (w *WatcherService) scheduleScan(ctx context.Context) {
+// handleEvent обрабатывает одно событие fsnotify: новые директории
+// добавляются в watch, файловые события накапливаются в pending до
+// истечения debounce-окна.
+func (w *WatcherService) handleEvent(ctx context.Context, watcher *fsnotify.Watcher, event fsnotify.Event) {
+	info, err := os.Stat(event.Name)
+	if err == nil && info.IsDir() {
+		// fsnotify не следит за новыми поддиректориями сам: Create
+		// директории требует явного AddPath (рекурсивно, на случай
+		// вложенных папок).
+		if event.Op&fsnotify.Create != 0 {
+			go w.AddPath(event.Name)
+		}
+		// Директории не участвуют в обработке медиа-записей.
+		return
+	}
+
+	w.mu.Lock()
+	w.pending[event.Name] = event.Op
+	w.mu.Unlock()
+
+	w.scheduleFlush(ctx)
+}
+
+// scheduleFlush сбрасывает debounce-таймер: пачка событий уходит сканеру
+// через debounceDur после ПОСЛЕДНЕГО события (burst копирования файла
+// шлёт десятки Write — все сворачиваются в одну обработку).
+func (w *WatcherService) scheduleFlush(ctx context.Context) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -164,9 +194,23 @@ func (w *WatcherService) scheduleScan(ctx context.Context) {
 	}
 
 	w.debounce = time.AfterFunc(w.debounceDur, func() {
-		log.Printf("watcher: file changes settled, triggering scan")
-		if err := w.scanner.ScanAll(ctx); err != nil {
-			log.Printf("watcher: scan error: %v", err)
+		events := w.takePending()
+		if len(events) == 0 {
+			return
 		}
+		w.scanner.HandleFSEvents(ctx, events)
 	})
+}
+
+// takePending снимает снапшот накопленных событий и очищивает буфер.
+func (w *WatcherService) takePending() []FSEvent {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	events := make([]FSEvent, 0, len(w.pending))
+	for path, op := range w.pending {
+		events = append(events, FSEvent{Path: path, Op: op})
+	}
+	w.pending = make(map[string]fsnotify.Op)
+	return events
 }

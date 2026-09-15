@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"gopkg.in/vansante/go-ffprobe.v2"
 	"gorm.io/gorm"
 
@@ -74,7 +75,7 @@ func (s *ScannerService) ScanAll(ctx context.Context) error {
 	paths := s.config.Media.MediaPaths()
 	var firstErr error
 	for _, mp := range paths {
-		if err := s.ScanPath(ctx, mp.Path, mp.Type); err != nil {
+		if err := s.ScanPath(ctx, mp.Path); err != nil {
 			log.Printf("Error scanning %s: %v", mp.Path, err)
 			if firstErr == nil {
 				firstErr = err
@@ -98,7 +99,7 @@ func (s *ScannerService) GetScanStatus(key string) *ScanStatus {
 // завершении сканов, чтобы при длительной работе не расти бесконечно.
 const maxScanStatuses = 64
 
-func (s *ScannerService) ScanPath(ctx context.Context, path string, mediaType models.MediaType) error {
+func (s *ScannerService) ScanPath(ctx context.Context, path string) error {
 	// Reject concurrent scans of the same path.
 	s.mu.Lock()
 	if st, ok := s.statuses[path]; ok && st.Running {
@@ -113,7 +114,7 @@ func (s *ScannerService) ScanPath(ctx context.Context, path string, mediaType mo
 	s.mu.Unlock()
 
 	var scanErr error
-	seen, err := s.scanPathWalk(ctx, path, mediaType)
+	seen, err := s.scanPathWalk(ctx, path)
 	if err != nil {
 		scanErr = err
 	} else {
@@ -196,7 +197,7 @@ func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen
 	}
 }
 
-func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, mediaType models.MediaType) (map[string]struct{}, error) {
+func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string) (map[string]struct{}, error) {
 	seen := make(map[string]struct{})
 
 	err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
@@ -235,200 +236,327 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string, medi
 
 		seen[path] = struct{}{}
 
-		// Горячий цикл: дешёвый SELECT без Preload (Metadata/Artists тут
-		// не нужны). Полный объект с артистами грузится только для
-		// изменившихся файлов — это редкий путь.
-		existing, err := s.mediaRepo.FindByPathBasic(ctx, path)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			// A database error is NOT "file is new" — treat it as a scan
-			// failure rather than creating a duplicate/malformed record.
-			log.Printf("FindByPath error for %s: %v", path, err)
-			return nil
-		}
-		if err == nil && existing != nil {
-			// File exists — check if it changed using quick hash
-			qh, err := quickHashFile(ctx, path)
-			if err != nil {
-				log.Printf("Error quick-hashing file %s: %v", path, err)
-				return nil
-			}
-
-			if existing.QuickHash == qh {
-				return nil // unchanged
-			}
-
-			// File changed — recompute full hash and update
-			fullHash, err := HashFileContext(ctx, path)
-			if err != nil {
-				log.Printf("Error hashing changed file %s: %v", path, err)
-				return nil
-			}
-
-			// Загружаем полный объект (включая Artists), чтобы не затереть
-			// ручные правки: пользовательские поля (Title/Year/Artists/
-			// Album/Genre) обновляются только если они пустые, технические
-			// (хеши, размер, Duration) — всегда. Контракт Update «только
-			// непустые поля» делает то же самое на уровне записи.
-			changed, loadErr := s.mediaRepo.FindByPath(ctx, path)
-			if loadErr == nil && changed != nil {
-				existing = changed
-			} else if loadErr != nil {
-				log.Printf("FindByPath (changed) error for %s: %v", path, loadErr)
-			}
-
-			title, year := metadata.ParseFilename(filepath.Base(path))
-			existing.Filename = filepath.Base(path)
-			existing.FileSize = info.Size()
-			existing.FileHash = fullHash
-			existing.QuickHash = qh
-			if existing.Title == "" {
-				existing.Title = title
-			}
-			if existing.Year == 0 {
-				existing.Year = year
-			}
-
-			// Re-extract metadata from changed file. Не затираем ручные
-			// правки: поля заполняются только при пустых текущих значениях.
-			if fileMeta := s.metaExtractor.ExtractFromFileContext(ctx, path); fileMeta != nil {
-				if fileMeta.Duration > 0 {
-					existing.Duration = fileMeta.Duration
-				}
-				if len(existing.Artists) == 0 && fileMeta.Artist != "" {
-					existing.Artists = []models.Artist{{Name: fileMeta.Artist}}
-				}
-				if existing.Album == "" && fileMeta.Album != "" {
-					existing.Album = fileMeta.Album
-				}
-				if existing.Genre == "" && fileMeta.Genre != "" {
-					existing.Genre = fileMeta.Genre
-				}
-			}
-
-			// Regenerate thumbnail for changed file. В БД сохраняем
-			// относительный URL — фронтенд строит полный адрес сам.
-			if thumbPath := s.thumbService.GenerateWithContext(ctx, existing.ID, path); thumbPath != "" {
-				existing.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", existing.ID)
-			}
-
-			// Extract embedded cover art (if file has one).
-			if coverPath := s.thumbService.ExtractCoverContext(ctx, existing.ID, path); coverPath != "" {
-				existing.CoverURL = fmt.Sprintf("/api/media/%d/cover", existing.ID)
-			}
-
-			if err := s.mediaRepo.Update(ctx, existing); err != nil {
-				log.Printf("Error updating changed file %s: %v", path, err)
-			} else {
-				log.Printf("Updated changed file: %s", path)
-			}
-			return nil
-		}
-
-		// New file — compute both hashes
-		qh, err := quickHashFile(ctx, path)
-		if err != nil {
-			log.Printf("Error quick-hashing file %s: %v", path, err)
-			return nil
-		}
-
-		hash, err := HashFileContext(ctx, path)
-		if err != nil {
-			log.Printf("Error hashing file %s: %v", path, err)
-			return nil
-		}
-
-		// Check if file with same hash already exists
-		duplicate, err := s.mediaRepo.FindByHash(ctx, hash)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			// A database error is NOT "no duplicate" — treat it as a scan
-			// failure rather than creating a duplicate record.
-			log.Printf("FindByHash error for %s: %v", path, err)
-			return nil
-		}
-		if duplicate != nil && duplicate.ID != 0 {
-			log.Printf("Skipping duplicate: %s (same hash as %s)", path, duplicate.FilePath)
-			return nil
-		}
-
-		// Parse filename for metadata
-		title, year := metadata.ParseFilename(filepath.Base(path))
-
-		// Probe once for both media type and video metadata. Inherit from the
-		// scan context so a cancelled scan also cancels the ffprobe call.
-		probeCtx, probeCancel := context.WithTimeout(ctx, 10*time.Second)
-		probeData, probeErr := ffprobe.ProbeURL(probeCtx, path)
-		probeCancel()
-
-		// Use a local `detectedType` to avoid shadowing the `mediaType`
-		// parameter — the parameter is the user-provided hint, while this
-		// variable holds the actual detected type from probing.
-		detectedType := models.MediaTypeVideo
-		if probeErr == nil {
-			detectedType = DetermineMediaTypeFromProbe(probeData)
-		} else {
-			log.Printf("Probe failed for %s: %v, using extension fallback", path, probeErr)
-			detectedType = determineMediaTypeByExt(path)
-		}
-
-		media := &models.Media{
-			Title:     title,
-			Filename:  filepath.Base(path),
-			Year:      year,
-			Type:      detectedType,
-			FilePath:  path,
-			FileSize:  info.Size(),
-			FileHash:  hash,
-			QuickHash: qh,
-		}
-
-		if err := s.mediaRepo.Create(ctx, media); err != nil {
-			log.Printf("Error creating media record for %s: %v", path, err)
-			return nil
-		}
-
-		// Extract metadata from file (duration, tags, etc.)
-		// Reuse probe data when available to avoid a second ffprobe call.
-		if fileMeta := s.metaExtractor.ExtractFromFileContext(ctx, path, probeData); fileMeta != nil {
-			if media.Duration == 0 && fileMeta.Duration > 0 {
-				media.Duration = fileMeta.Duration
-			}
-			if len(media.Artists) == 0 && fileMeta.Artist != "" {
-				media.Artists = []models.Artist{{Name: fileMeta.Artist}}
-			}
-			if media.Album == "" && fileMeta.Album != "" {
-				media.Album = fileMeta.Album
-			}
-			if media.Genre == "" && fileMeta.Genre != "" {
-				media.Genre = fileMeta.Genre
-			}
-			if fileMeta.Title != "" {
-				media.Title = fileMeta.Title
-			}
-			if detectedType.IsAudio() && len(media.Artists) > 0 {
-				desc := media.Artists[0].Name
-				if media.Album != "" {
-					desc += " — " + media.Album
-				}
-				media.Description = desc
-			}
-			if err := s.mediaRepo.Update(ctx, media); err != nil {
-				log.Printf("Error updating media metadata for %s: %v", path, err)
-			}
-		}
-
-		// Generate thumbnail. В БД сохраняем относительный URL — фронтенд
-		// строит полный адрес сам.
-		if thumbPath := s.thumbService.GenerateWithContext(ctx, media.ID, path); thumbPath != "" {
-			media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
-			if err := s.mediaRepo.Update(ctx, media); err != nil {
-				log.Printf("Error updating media thumbnail for %s: %v", path, err)
-			}
-		}
-
+		s.scanFile(ctx, path)
 		return nil
 	})
 
 	return seen, err
+}
+
+// FSEvent — событие файловой системы для инкрементальной обработки watcher'ом.
+type FSEvent struct {
+	Path string
+	Op   fsnotify.Op
+}
+
+// HandleFSEvents обрабатывает пачку событий файловой системы, накопленных
+// watcher'ом за debounce-окно. Create/Write → обработка одного файла
+// (создание или обновление записи), Remove/Rename → удаление записи
+// (файл исчез). Ошибки отдельных файлов логируются и не прерывают пачку.
+func (s *ScannerService) HandleFSEvents(ctx context.Context, events []FSEvent) {
+	for _, ev := range events {
+		if err := ctx.Err(); err != nil {
+			return
+		}
+		if ev.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
+			s.removeMediaForPath(ctx, ev.Path)
+			continue
+		}
+		// Файл мог быть ещё не дописан на момент последнего события —
+		// ждём стабилизации размера перед обработкой.
+		if !s.waitForFileStable(ctx, ev.Path) {
+			continue
+		}
+		s.scanFile(ctx, ev.Path)
+	}
+}
+
+// waitForFileStable ждёт, пока размер и mtime файла перестанут меняться
+// (файл дописывается копированием/загрузкой). Возвращает false, если файл
+// исчез, контекст отменён или стабильность не достигнута за отведённое
+// число попыток.
+func (s *ScannerService) waitForFileStable(ctx context.Context, path string) bool {
+	return waitUntilFileStable(ctx, path, 3, 300*time.Millisecond)
+}
+
+// waitUntilFileStable — waitForFileStable с настраиваемыми параметрами
+// (вынесено для детерминированного тестирования с малыми интервалами).
+func waitUntilFileStable(ctx context.Context, path string, attempts int, interval time.Duration) bool {
+	var prevSize int64 = -1
+	var prevMod time.Time
+	for i := 0; i < attempts; i++ {
+		if err := ctx.Err(); err != nil {
+			return false
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				log.Printf("watch scan: stat %s: %v", path, err)
+			}
+			return false
+		}
+		if info.Size() == prevSize && info.ModTime().Equal(prevMod) {
+			return true
+		}
+		prevSize = info.Size()
+		prevMod = info.ModTime()
+		time.Sleep(interval)
+	}
+	log.Printf("watch scan: file %s did not stabilize, skipping", path)
+	return false
+}
+
+// removeMediaForPath удаляет запись Media (и миниатюру/обложки) для файла,
+// исчезнувшего с диска. Идемпотентно: отсутствующая запись — не ошибка.
+func (s *ScannerService) removeMediaForPath(ctx context.Context, path string) {
+	existing, err := s.mediaRepo.FindByPathBasic(ctx, path)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("watch scan: FindByPath %s: %v", path, err)
+		}
+		return
+	}
+	if existing == nil || existing.ID == 0 {
+		return
+	}
+
+	if err := s.mediaRepo.Delete(ctx, existing.ID); err != nil {
+		log.Printf("watch scan: delete media %d (%s): %v", existing.ID, path, err)
+		return
+	}
+	log.Printf("watch scan: removed missing file: %s", path)
+
+	if s.thumbService != nil {
+		if err := os.Remove(s.thumbService.GetPath(existing.ID)); err != nil && !os.IsNotExist(err) {
+			log.Printf("watch scan: remove thumbnail %d: %v", existing.ID, err)
+		}
+		s.thumbService.RemoveCovers(existing.ID)
+	}
+}
+
+// scanFile обрабатывает один файл: создаёт запись для нового файла или
+// обновляет запись изменившегося. Используется и полным сканом (из
+// scanPathWalk), и инкрементальной обработкой событий watcher'а.
+// Ошибки логируются и не возвращаются: сбой одного файла не должен
+// прерывать ни скан, ни пачку событий.
+func (s *ScannerService) scanFile(ctx context.Context, path string) {
+	info, err := os.Stat(path)
+	if err != nil {
+		// Файл исчез между событием и обработкой — не ошибка.
+		return
+	}
+
+	// Пустой файл — ещё пишется или битый: запись не трогаем ни в какую
+	// сторону (консервативно, как и полный скан).
+	if info.Size() == 0 {
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(path))
+	if !IsAllowedExtension(ext) {
+		return
+	}
+
+	// Горячий цикл: дешёвый SELECT без Preload (Metadata/Artists тут
+	// не нужны). Полный объект с артистами грузится только для
+	// изменившихся файлов — это редкий путь.
+	existing, err := s.mediaRepo.FindByPathBasic(ctx, path)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		// A database error is NOT "file is new" — treat it as a scan
+		// failure rather than creating a duplicate/malformed record.
+		log.Printf("FindByPath error for %s: %v", path, err)
+		return
+	}
+	if err == nil && existing != nil {
+		s.updateChangedFile(ctx, path, info, existing)
+		return
+	}
+
+	s.createNewMedia(ctx, path, info)
+}
+
+// updateChangedFile обновляет запись изменившегося файла (quick hash
+// не совпал).
+func (s *ScannerService) updateChangedFile(ctx context.Context, path string, info os.FileInfo, existing *models.Media) {
+	// File exists — check if it changed using quick hash
+	qh, err := quickHashFile(ctx, path)
+	if err != nil {
+		log.Printf("Error quick-hashing file %s: %v", path, err)
+		return
+	}
+
+	if existing.QuickHash == qh {
+		return // unchanged
+	}
+
+	// File changed — recompute full hash and update
+	fullHash, err := HashFileContext(ctx, path)
+	if err != nil {
+		log.Printf("Error hashing changed file %s: %v", path, err)
+		return
+	}
+
+	// Загружаем полный объект (включая Artists), чтобы не затереть
+	// ручные правки: пользовательские поля (Title/Year/Artists/
+	// Album/Genre) обновляются только если они пустые, технические
+	// (хеши, размер, Duration) — всегда. Контракт Update «только
+	// непустые поля» делает то же самое на уровне записи.
+	changed, loadErr := s.mediaRepo.FindByPath(ctx, path)
+	if loadErr == nil && changed != nil {
+		existing = changed
+	} else if loadErr != nil {
+		log.Printf("FindByPath (changed) error for %s: %v", path, loadErr)
+	}
+
+	title, year := metadata.ParseFilename(filepath.Base(path))
+	existing.Filename = filepath.Base(path)
+	existing.FileSize = info.Size()
+	existing.FileHash = fullHash
+	existing.QuickHash = qh
+	if existing.Title == "" {
+		existing.Title = title
+	}
+	if existing.Year == 0 {
+		existing.Year = year
+	}
+
+	// Re-extract metadata from changed file. Не затираем ручные
+	// правки: поля заполняются только при пустых текущих значениях.
+	if fileMeta := s.metaExtractor.ExtractFromFileContext(ctx, path); fileMeta != nil {
+		if fileMeta.Duration > 0 {
+			existing.Duration = fileMeta.Duration
+		}
+		if len(existing.Artists) == 0 && fileMeta.Artist != "" {
+			existing.Artists = []models.Artist{{Name: fileMeta.Artist}}
+		}
+		if existing.Album == "" && fileMeta.Album != "" {
+			existing.Album = fileMeta.Album
+		}
+		if existing.Genre == "" && fileMeta.Genre != "" {
+			existing.Genre = fileMeta.Genre
+		}
+	}
+
+	// Regenerate thumbnail for changed file. В БД сохраняем
+	// относительный URL — фронтенд строит полный адрес сам.
+	if thumbPath := s.thumbService.GenerateWithContext(ctx, existing.ID, path); thumbPath != "" {
+		existing.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", existing.ID)
+	}
+
+	// Extract embedded cover art (if file has one).
+	if coverPath := s.thumbService.ExtractCoverContext(ctx, existing.ID, path); coverPath != "" {
+		existing.CoverURL = fmt.Sprintf("/api/media/%d/cover", existing.ID)
+	}
+
+	if err := s.mediaRepo.Update(ctx, existing); err != nil {
+		log.Printf("Error updating changed file %s: %v", path, err)
+	} else {
+		log.Printf("Updated changed file: %s", path)
+	}
+}
+
+// createNewMedia создаёт запись для нового файла (полный хэш, проверка
+// дубликатов, ffprobe, метаданные, миниатюра).
+func (s *ScannerService) createNewMedia(ctx context.Context, path string, info os.FileInfo) {
+	// New file — compute both hashes
+	qh, err := quickHashFile(ctx, path)
+	if err != nil {
+		log.Printf("Error quick-hashing file %s: %v", path, err)
+		return
+	}
+
+	hash, err := HashFileContext(ctx, path)
+	if err != nil {
+		log.Printf("Error hashing file %s: %v", path, err)
+		return
+	}
+
+	// Check if file with same hash already exists
+	duplicate, err := s.mediaRepo.FindByHash(ctx, hash)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		// A database error is NOT "no duplicate" — treat it as a scan
+		// failure rather than creating a duplicate record.
+		log.Printf("FindByHash error for %s: %v", path, err)
+		return
+	}
+	if duplicate != nil && duplicate.ID != 0 {
+		log.Printf("Skipping duplicate: %s (same hash as %s)", path, duplicate.FilePath)
+		return
+	}
+
+	// Parse filename for metadata
+	title, year := metadata.ParseFilename(filepath.Base(path))
+
+	// Probe once for both media type and video metadata. Inherit from the
+	// scan context so a cancelled scan also cancels the ffprobe call.
+	probeCtx, probeCancel := context.WithTimeout(ctx, 10*time.Second)
+	probeData, probeErr := ffprobe.ProbeURL(probeCtx, path)
+	probeCancel()
+
+	// Тип записи определяется по факту: через ffprobe, при сбое — по
+	// расширению. Пользовательский хинт типа не используется.
+	detectedType := models.MediaTypeVideo
+	if probeErr == nil {
+		detectedType = DetermineMediaTypeFromProbe(probeData)
+	} else {
+		log.Printf("Probe failed for %s: %v, using extension fallback", path, probeErr)
+		detectedType = determineMediaTypeByExt(path)
+	}
+
+	media := &models.Media{
+		Title:     title,
+		Filename:  filepath.Base(path),
+		Year:      year,
+		Type:      detectedType,
+		FilePath:  path,
+		FileSize:  info.Size(),
+		FileHash:  hash,
+		QuickHash: qh,
+	}
+
+	if err := s.mediaRepo.Create(ctx, media); err != nil {
+		log.Printf("Error creating media record for %s: %v", path, err)
+		return
+	}
+
+	// Extract metadata from file (duration, tags, etc.)
+	// Reuse probe data when available to avoid a second ffprobe call.
+	if fileMeta := s.metaExtractor.ExtractFromFileContext(ctx, path, probeData); fileMeta != nil {
+		if media.Duration == 0 && fileMeta.Duration > 0 {
+			media.Duration = fileMeta.Duration
+		}
+		if len(media.Artists) == 0 && fileMeta.Artist != "" {
+			media.Artists = []models.Artist{{Name: fileMeta.Artist}}
+		}
+		if media.Album == "" && fileMeta.Album != "" {
+			media.Album = fileMeta.Album
+		}
+		if media.Genre == "" && fileMeta.Genre != "" {
+			media.Genre = fileMeta.Genre
+		}
+		if fileMeta.Title != "" {
+			media.Title = fileMeta.Title
+		}
+		if detectedType.IsAudio() && len(media.Artists) > 0 {
+			desc := media.Artists[0].Name
+			if media.Album != "" {
+				desc += " — " + media.Album
+			}
+			media.Description = desc
+		}
+		if err := s.mediaRepo.Update(ctx, media); err != nil {
+			log.Printf("Error updating media metadata for %s: %v", path, err)
+		}
+	}
+
+	// Generate thumbnail. В БД сохраняем относительный URL — фронтенд
+	// строит полный адрес сам.
+	if thumbPath := s.thumbService.GenerateWithContext(ctx, media.ID, path); thumbPath != "" {
+		media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
+		if err := s.mediaRepo.Update(ctx, media); err != nil {
+			log.Printf("Error updating media thumbnail for %s: %v", path, err)
+		}
+	}
 }
 
 // HashFile computes full SHA-256 of a file (без контекста — для внешних

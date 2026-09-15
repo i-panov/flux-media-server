@@ -8,49 +8,66 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"flux/internal/models"
 	"flux/internal/services"
 )
 
 // MockScanner is a mock for the ScannerInterface
 type MockScanner struct {
 	mock.Mock
-	scanCalled chan bool
+	scanCalled chan []services.FSEvent
 	mu         sync.Mutex
 	lastCtx    context.Context
+	lastEvents []services.FSEvent
 }
 
-func (m *MockScanner) ScanPath(ctx context.Context, path string, mediaType models.MediaType) error {
-	args := m.Called(ctx, path, mediaType)
+func (m *MockScanner) ScanPath(ctx context.Context, path string) error {
+	args := m.Called(ctx, path)
 	return args.Error(0)
 }
 
-// LastCtx возвращает контекст последнего вызова ScanAll.
+// LastCtx возвращает контекст последнего вызова HandleFSEvents.
 func (m *MockScanner) LastCtx() context.Context {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.lastCtx
 }
 
+// LastEvents возвращает события последнего вызова HandleFSEvents.
+func (m *MockScanner) LastEvents() []services.FSEvent {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastEvents
+}
+
+func (m *MockScanner) HandleFSEvents(ctx context.Context, events []services.FSEvent) {
+	m.Called(ctx, events)
+
+	m.mu.Lock()
+	m.lastCtx = ctx
+	m.lastEvents = events
+	m.mu.Unlock()
+
+	// Signal that HandleFSEvents was called
+	if m.scanCalled != nil {
+		select {
+		case m.scanCalled <- events:
+		default:
+		}
+	}
+}
+
 func (m *MockScanner) ScanAll(ctx context.Context) error {
-	m.Called(ctx)
+	args := m.Called(ctx)
 
 	m.mu.Lock()
 	m.lastCtx = ctx
 	m.mu.Unlock()
 
-	// Signal that ScanAll was called
-	if m.scanCalled != nil {
-		select {
-		case m.scanCalled <- true:
-		default:
-		}
-	}
-
-	return nil
+	return args.Error(0)
 }
 
 func (m *MockScanner) GetScanStatus(key string) *services.ScanStatus {
@@ -59,26 +76,18 @@ func (m *MockScanner) GetScanStatus(key string) *services.ScanStatus {
 }
 
 func TestWatcherDebounce(t *testing.T) {
-	// This test verifies the debounce functionality (B4 watcher fix)
-	// It should trigger exactly one ScanAll after a burst of events
+	// Burst событий должен свернуться в ОДИН вызов HandleFSEvents,
+	// содержащий все уникальные пути (а не по скану на каждое событие).
 
-	// Create mock scanner
 	mockScanner := &MockScanner{
-		scanCalled: make(chan bool, 10), // Buffer to avoid blocking
+		scanCalled: make(chan []services.FSEvent, 10), // Buffer to avoid blocking
 	}
+	mockScanner.On("HandleFSEvents", mock.Anything, mock.Anything).Return()
 
-	// Set up expectations - ScanAll should be called exactly once
-	mockScanner.On("ScanAll", mock.Anything).Return(nil)
-
-	// Create watcher service
 	watcher := services.NewWatcherService(mockScanner)
 
-	// Create test directory
 	tempDir := t.TempDir()
-
-	// Start watching
-	err := watcher.StartWithPaths([]string{tempDir})
-	require.NoError(t, err)
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
 
 	// Trigger multiple events rapidly (burst)
 	for i := 0; i < 5; i++ {
@@ -94,38 +103,37 @@ func TestWatcherDebounce(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	var events []services.FSEvent
 	select {
-	case <-mockScanner.scanCalled:
-		// ScanAll was called, which is expected
+	case events = <-mockScanner.scanCalled:
 	case <-ctx.Done():
-		t.Fatal("ScanAll was not called within expected time")
+		t.Fatal("HandleFSEvents was not called within expected time")
 	}
 
-	// Give some time for the mock expectation to be satisfied
+	// Give some time to ensure no second call happens
 	time.Sleep(100 * time.Millisecond)
 
-	// Stop the watcher
 	watcher.Stop()
 
-	// Assert that ScanAll was called exactly once
-	mockScanner.AssertNumberOfCalls(t, "ScanAll", 1)
+	// All 5 unique paths must be in the single batch.
+	require.Len(t, events, 5, "burst из 5 файлов должен уйти одной пачкой")
+	for _, ev := range events {
+		require.Equal(t, filepath.Dir(ev.Path), tempDir)
+	}
+
+	mockScanner.AssertNumberOfCalls(t, "HandleFSEvents", 1)
 }
 
 func TestWatcherDisabled(t *testing.T) {
 	// This test verifies that changes are ignored if watcher is not started
 
-	// Create mock scanner
 	mockScanner := &MockScanner{}
-
-	// Create watcher service
 	watcher := services.NewWatcherService(mockScanner)
 
 	// Note: NOT starting the watcher with StartWithPaths
 
-	// Create test directory
 	tempDir := t.TempDir()
 
-	// Create a file (should be ignored since watcher is not started)
 	testFile := filepath.Join(tempDir, "test.txt")
 	err := os.WriteFile(testFile, []byte("test content"), 0644)
 	require.NoError(t, err)
@@ -133,21 +141,20 @@ func TestWatcherDisabled(t *testing.T) {
 	// Wait a bit to ensure no scan happens
 	time.Sleep(100 * time.Millisecond)
 
-	// Stop the watcher (even though it wasn't started)
 	watcher.Stop()
 
-	// Assert that ScanAll was never called
-	mockScanner.AssertNotCalled(t, "ScanAll")
+	// Assert that HandleFSEvents was never called
+	mockScanner.AssertNotCalled(t, "HandleFSEvents", mock.Anything, mock.Anything)
 }
 
 // TestWatcherRestartRecreatesContext: повторный StartWithPaths после Stop
-// обязан создать НОВЫЙ контекст — иначе loop мгновенно выходит и автоскан
-// мёртв навсегда (регрессия: старый cancel без пересоздания ctx).
+// обязан создать НОВЫЙ контекст — иначе loop мгновенно выходит и обработка
+// событий мертва навсегда (регрессия: старый cancel без пересоздания ctx).
 func TestWatcherRestartRecreatesContext(t *testing.T) {
 	mockScanner := &MockScanner{
-		scanCalled: make(chan bool, 10),
+		scanCalled: make(chan []services.FSEvent, 10),
 	}
-	mockScanner.On("ScanAll", mock.Anything).Return(nil)
+	mockScanner.On("HandleFSEvents", mock.Anything, mock.Anything).Return()
 
 	watcher := services.NewWatcherService(mockScanner)
 	tempDir := t.TempDir()
@@ -164,25 +171,25 @@ func TestWatcherRestartRecreatesContext(t *testing.T) {
 	select {
 	case <-mockScanner.scanCalled:
 	case <-ctx.Done():
-		t.Fatal("ScanAll was not called after restart: watcher is dead")
+		t.Fatal("HandleFSEvents was not called after restart: watcher is dead")
 	}
 
-	// Скан обязан пройти с ЖИВЫМ контекстом нового запуска, а не со
+	// Обработка обязана пройти с ЖИВЫМ контекстом нового запуска, а не со
 	// старым отменённым.
 	lastCtx := mockScanner.LastCtx()
-	require.NotNil(t, lastCtx, "ScanAll должен получить контекст")
-	require.NoError(t, lastCtx.Err(), "ScanAll получил отменённый контекст после рестарта")
+	require.NotNil(t, lastCtx, "HandleFSEvents должен получить контекст")
+	require.NoError(t, lastCtx.Err(), "HandleFSEvents получил отменённый контекст после рестарта")
 
-	mockScanner.AssertNumberOfCalls(t, "ScanAll", 1)
+	mockScanner.AssertNumberOfCalls(t, "HandleFSEvents", 1)
 	watcher.Stop()
 }
 
 // TestWatcherRestartTwice: два рестарта подряд тоже не убивают watcher.
 func TestWatcherRestartTwice(t *testing.T) {
 	mockScanner := &MockScanner{
-		scanCalled: make(chan bool, 10),
+		scanCalled: make(chan []services.FSEvent, 10),
 	}
-	mockScanner.On("ScanAll", mock.Anything).Return(nil)
+	mockScanner.On("HandleFSEvents", mock.Anything, mock.Anything).Return()
 
 	watcher := services.NewWatcherService(mockScanner)
 	tempDir := t.TempDir()
@@ -201,12 +208,92 @@ func TestWatcherRestartTwice(t *testing.T) {
 	select {
 	case <-mockScanner.scanCalled:
 	case <-ctx.Done():
-		t.Fatal("ScanAll was not called after second restart")
+		t.Fatal("HandleFSEvents was not called after second restart")
 	}
 
 	lastCtx := mockScanner.LastCtx()
 	require.NotNil(t, lastCtx)
-	require.NoError(t, lastCtx.Err(), "ScanAll получил отменённый контекст после второго рестарта")
+	require.NoError(t, lastCtx.Err(), "HandleFSEvents получил отменённый контекст после второго рестарта")
+}
 
-	watcher.Stop()
+// TestWatcherWatchesNewSubdirectory: директория, созданная ПОСЛЕ старта
+// watcher'а, тоже отслеживается (fsnotify не делает этого сам).
+// AddPath для новой директории асинхронен, поэтому создание файла
+// повторяется с ретраями: событие может быть потеряно, если файл
+// записан до применения watcher.Add.
+func TestWatcherWatchesNewSubdirectory(t *testing.T) {
+	mockScanner := &MockScanner{
+		scanCalled: make(chan []services.FSEvent, 10),
+	}
+	mockScanner.On("HandleFSEvents", mock.Anything, mock.Anything).Return()
+
+	watcher := services.NewWatcherService(mockScanner)
+	tempDir := t.TempDir()
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
+	defer watcher.Stop()
+
+	subDir := filepath.Join(tempDir, "season1")
+	require.NoError(t, os.Mkdir(subDir, 0755))
+
+	testFile := filepath.Join(subDir, "episode.mp4")
+
+	// Ретраи компенсируют асинхронность AddPath: событие на файл,
+	// созданный до применения Add, теряется — пробуем снова. Ожидание
+	// в попытке покрывает debounce-окно (2с) + запас.
+	var got []services.FSEvent
+	for attempt := 0; attempt < 5; attempt++ {
+		require.NoError(t, os.WriteFile(testFile, []byte("x"), 0644))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		select {
+		case ev := <-mockScanner.scanCalled:
+			got = ev
+			cancel()
+			require.NotEmpty(t, got)
+			require.Equal(t, testFile, got[0].Path)
+			return // успех: файл в новой подпапке отслежен
+		case <-ctx.Done():
+		}
+		cancel()
+
+		// Событие потеряно — удаляем файл и пробуем после паузы.
+		_ = os.Remove(testFile)
+		time.Sleep(300 * time.Millisecond)
+	}
+	t.Fatal("file in new subdirectory was not detected: fsnotify does not watch it")
+}
+
+// TestWatcherRemoveEvent: события Remove/Rename передаются сканеру как есть
+// (он удаляет запись); операция в FSEvent обязана сохраниться.
+func TestWatcherRemoveEvent(t *testing.T) {
+	mockScanner := &MockScanner{
+		scanCalled: make(chan []services.FSEvent, 10),
+	}
+	mockScanner.On("HandleFSEvents", mock.Anything, mock.Anything).Return()
+
+	watcher := services.NewWatcherService(mockScanner)
+	tempDir := t.TempDir()
+	require.NoError(t, watcher.StartWithPaths([]string{tempDir}))
+	defer watcher.Stop()
+
+	testFile := filepath.Join(tempDir, "gone.mp4")
+	require.NoError(t, os.WriteFile(testFile, []byte("x"), 0644))
+	time.Sleep(100 * time.Millisecond)
+	require.NoError(t, os.Remove(testFile))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	select {
+	case events := <-mockScanner.scanCalled:
+		found := false
+		for _, ev := range events {
+			if ev.Path == testFile {
+				found = true
+				require.True(t, ev.Op&fsnotify.Remove != 0, "операция Remove должна сохраниться в FSEvent")
+			}
+		}
+		require.True(t, found, "событие удаления должно попасть в пачку")
+	case <-ctx.Done():
+		t.Fatal("HandleFSEvents was not called after file removal")
+	}
 }

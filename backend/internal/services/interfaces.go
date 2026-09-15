@@ -3,8 +3,6 @@ package services
 import (
 	"context"
 	"time"
-
-	"flux/internal/models"
 )
 
 // JWTService defines the interface for JWT token operations.
@@ -26,8 +24,12 @@ type OTPStoreInterface interface {
 
 // ScannerInterface defines the interface for scanning operations.
 type ScannerInterface interface {
-	ScanPath(ctx context.Context, path string, mediaType models.MediaType) error
+	ScanPath(ctx context.Context, path string) error
 	ScanAll(ctx context.Context) error
+	// HandleFSEvents обрабатывает пачку событий файловой системы
+	// (инкрементальная обработка: создание/изменение/удаление отдельных
+	// файлов без полного прохода по библиотеке).
+	HandleFSEvents(ctx context.Context, events []FSEvent)
 	GetScanStatus(key string) *ScanStatus
 }
 
