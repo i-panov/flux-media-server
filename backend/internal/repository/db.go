@@ -1,11 +1,13 @@
 package repository
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
 	"runtime"
 	"strings"
+	"sync"
 
 	"flux/internal/models"
 
@@ -15,6 +17,32 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// fluxDriverName — имя зарегистрированного sql-драйвера с ConnectHook,
+// применяющим PRAGMA, которые НЕ поддержаны DSN-ключами mattn/go-sqlite3
+// (см. parseDSNParams в драйвере): temp_store и mmap_size.
+const fluxDriverName = "flux_sqlite3"
+
+// registerFluxDriverOnce защищает sql.Register от повторной регистрации
+// (InitDB зовётся многократно — тесты, консольный режим).
+var registerFluxDriverOnce sync.Once
+
+// registerFluxDriver регистрирует драйвер с хуком: PRAGMA temp_store и
+// mmap_size выполняются на КАЖДОМ новом соединении пула (db.Exec в InitDB
+// затронул бы только один коннект).
+func registerFluxDriver() {
+	registerFluxDriverOnce.Do(func() {
+		sql.Register(fluxDriverName, &sqlite3.SQLiteDriver{
+			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+				if _, err := conn.Exec("PRAGMA temp_store = MEMORY;", nil); err != nil {
+					return err
+				}
+				_, err := conn.Exec("PRAGMA mmap_size = 268435456;", nil)
+				return err
+			},
+		})
+	})
+}
+
 // InitDB opens the SQLite database. In debug mode all SQL statements are
 // logged (including parameter values!); otherwise only warnings/errors are.
 func InitDB(path string, debug ...bool) (*gorm.DB, error) {
@@ -23,12 +51,19 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 		logMode = logger.Info
 	}
 
-	// DSN parameters ensure PRAGMAs are applied to EVERY connection in the
-	// pool, not just the first one (db.Exec only affects one connection).
+	// DSN-параметры обеспечивают PRAGMAs на EVERY connection in the pool,
+	// not just the first one (db.Exec only affects one connection).
+	// Поддержанные драйвером ключи (см. parseDSNParams): _journal, _busy_timeout,
+	// _foreign_keys, _synchronous, _cache_size, _txlock. temp_store и mmap_size
+	// драйвером НЕ поддержаны — применяются через ConnectHook (см. выше).
 	// _txlock=immediate makes every BEGIN a BEGIN IMMEDIATE: SQLite write
 	// transactions are serialized at BEGIN instead of failing with
 	// SQLITE_BUSY_SNAPSHOT mid-transaction (read-then-write races in WAL).
-	db, err := gorm.Open(sqlite.Open(path+"?_journal=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL&_cache_size=-8000&_temp_store=MEMORY&_mmap_size=268435456&_txlock=immediate"), &gorm.Config{
+	registerFluxDriver()
+	db, err := gorm.Open(sqlite.New(sqlite.Config{
+		DriverName: fluxDriverName,
+		DSN:        path + "?_journal=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL&_cache_size=-8000&_txlock=immediate",
+	}), &gorm.Config{
 		Logger: logger.Default.LogMode(logMode),
 	})
 	if err != nil {
@@ -46,17 +81,6 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 		maxConns = 4
 	}
 	sqlDB.SetMaxOpenConns(maxConns)
-
-	// Enable foreign keys — required for SQLite FK constraints.
-	db.Exec("PRAGMA foreign_keys = ON")
-
-	// Performance tuning for SQLite in server mode.
-	db.Exec("PRAGMA journal_mode = WAL")
-	db.Exec("PRAGMA synchronous = NORMAL")
-	db.Exec("PRAGMA cache_size = -8000")
-	db.Exec("PRAGMA busy_timeout = 5000")
-	db.Exec("PRAGMA temp_store = MEMORY")
-	db.Exec("PRAGMA mmap_size = 268435456")
 
 	return db, nil
 }

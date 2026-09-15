@@ -49,6 +49,22 @@ func TestMetadataHandler_SearchQueryTooLong(t *testing.T) {
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 }
 
+// Лимит считается по символам, а не байтам: 257 кириллических символов —
+// это 514 байт, но визуально строка длиннее лимита и должна отклоняться,
+// а 256 — проходить (при байтовом подсчёте ложно отклонялась бы вдвое
+// короче).
+func TestMetadataHandler_SearchLimitByRunes(t *testing.T) {
+	app := setupMetadataTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/metadata/search?q="+strings.Repeat("ф", 257), nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+	resp, err = app.Test(httptest.NewRequest("GET", "/api/metadata/search?q="+strings.Repeat("ф", 256), nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
 func TestMetadataHandler_SearchValid(t *testing.T) {
 	app := setupMetadataTestApp(t)
 

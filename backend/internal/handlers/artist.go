@@ -80,16 +80,39 @@ func (h *ArtistHandler) List(c *fiber.Ctx) error {
 		artists = []models.Artist{}
 	}
 	// Обложка артиста — файл на диске; признак считаем здесь, чтобы
-	// клиент знал, грузить ли картинку.
+	// клиент знал, грузить ли картинку. Один glob на весь запрос вместо
+	// glob'а на каждого артиста (каждый glob — readdir всей папки).
+	hasCover, err := h.artistCoverIndex()
+	if err != nil {
+		log.Printf("ArtistHandler.List cover index: %v", err)
+		hasCover = map[uint]bool{}
+	}
 	for i := range artists {
-		has, err := h.artistHasCover(artists[i].ID)
-		if err != nil {
-			log.Printf("ArtistHandler.List cover stat: %v", err)
-			continue
-		}
-		artists[i].HasCover = has
+		artists[i].HasCover = hasCover[artists[i].ID]
 	}
 	return c.JSON(fiber.Map{"items": artists})
+}
+
+// artistCoverIndex за один проход по папке обложек строит множество ID
+// артистов, у которых есть файл обложки.
+func (h *ArtistHandler) artistCoverIndex() (map[uint]bool, error) {
+	matches, err := filepath.Glob(filepath.Join(h.coverDir, "artist_*.*"))
+	if err != nil {
+		return nil, err
+	}
+	index := make(map[uint]bool, len(matches))
+	for _, m := range matches {
+		ext := strings.ToLower(filepath.Ext(m))
+		if !artistCoverExts[ext] {
+			continue
+		}
+		var id uint
+		if _, err := fmt.Sscanf(filepath.Base(m), "artist_%d."+strings.TrimPrefix(ext, "."), &id); err != nil {
+			continue
+		}
+		index[id] = true
+	}
+	return index, nil
 }
 
 // Update переименовывает артиста (имя меняется у всех его треков).
@@ -205,5 +228,8 @@ func (h *ArtistHandler) GetCover(c *fiber.Ctx) error {
 
 	ext := strings.ToLower(filepath.Ext(path))
 	c.Set("Content-Type", mimeTypeByExtForCover(ext))
+	// Кеширование как у media-обложек: замена файла инвалидируется
+	// cache-buster'ом ?v=updated_at в URL (Touch при UploadCover).
+	c.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", coverCacheMaxAge))
 	return c.SendFile(path)
 }

@@ -177,6 +177,7 @@ func isUniqueViolation(err error) bool {
 }
 
 // RemoveArtistFavorite removes an artist from the user's favorites.
+// artist_id передаётся в query-параметре (см. асимметрию в AddArtistFavorite).
 func (h *FavoriteHandler) RemoveArtistFavorite(c *fiber.Ctx) error {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {

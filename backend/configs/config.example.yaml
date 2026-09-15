@@ -11,7 +11,13 @@ server:
   # logging (including secrets). NEVER enable outside local development.
   debug: false
   cors_origins: "*"  # Set to your frontend origin in production
-  max_upload_size: 2147483648  # 2GB in bytes. Applies to /api/media/upload and cover endpoints; the rest of the API is capped at 4 MB.
+  # IMPORTANT (memory): the HTTP engine (fasthttp) buffers the ENTIRE request
+  # body of an upload in RAM before the handler runs. One upload consumes up
+  # to max_upload_size of memory; budget RAM for (limit × concurrent uploads)
+  # — concurrency is capped at 256 connections and the upload rate limiter
+  # (rate_limiter.max) throttles request frequency. Applies to
+  # /api/media/upload and cover endpoints; the rest of the API is capped at 4 MB.
+  max_upload_size: 2147483648  # 2GB in bytes
 
 database:
   path: "./data/flux.db"

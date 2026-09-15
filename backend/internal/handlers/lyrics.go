@@ -23,13 +23,13 @@ func NewLyricsHandler(lyricsRepo repository.LyricsRepository, mediaRepo reposito
 
 // GetLyrics returns lyrics for a media item.
 func (h *LyricsHandler) GetLyrics(c *fiber.Ctx) error {
-	mediaID, err := c.ParamsInt("id")
+	mediaID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
 	ctx := c.UserContext()
-	lyrics, err := h.lyricsRepo.FindByMediaID(ctx, uint(mediaID))
+	lyrics, err := h.lyricsRepo.FindByMediaID(ctx, mediaID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.Error(c, fiber.StatusNotFound, "Lyrics not found")
@@ -53,7 +53,7 @@ type UpsertLyricsRequest struct {
 // prevents the client from accidentally erasing translation/sync_data when
 // it only wants to update the lyrics text.
 func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
-	mediaID, err := c.ParamsInt("id")
+	mediaID, err := parseIDParam(c, "id")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
@@ -66,12 +66,12 @@ func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Проверяем существование медиа до создания/обновления текста.
-	if _, err := h.mediaRepo.FindByID(ctx, uint(mediaID)); err != nil {
+	if _, err := h.mediaRepo.FindByID(ctx, mediaID); err != nil {
 		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	lyrics := &models.Lyrics{
-		MediaID:     uint(mediaID),
+		MediaID:     mediaID,
 		LyricsText:  req.LyricsText,
 		Translation: req.Translation,
 		SyncData:    req.SyncData,
@@ -81,7 +81,7 @@ func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
 	// If a record already exists, preserve fields that the client did not
 	// send (empty string in the request). This prevents PUT from erasing
 	// translation/sync_data when only lyrics_text is being saved.
-	existing, findErr := h.lyricsRepo.FindByMediaID(ctx, uint(mediaID))
+	existing, findErr := h.lyricsRepo.FindByMediaID(ctx, mediaID)
 	if findErr == nil && existing != nil {
 		if req.LyricsText == "" {
 			lyrics.LyricsText = existing.LyricsText

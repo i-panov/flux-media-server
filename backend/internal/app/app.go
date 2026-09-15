@@ -246,13 +246,14 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	fiberApp.Use(middleware.SecurityHeaders())
 	fiberApp.Use(logger.New())
 
-	// Per-route лимиты тела: fasthttp буферизует тело целиком ДО вызова
-	// хендлеров, но HeaderReceived позволяет выбрать лимит по одним лишь
-	// заголовкам — до начала чтения тела. Обычные роуты ограничены
-	// maxAPIBodySize (защита от DoS), upload/cover получают настоящий
-	// MaxUploadSize. Остаточный риск (атакующий шлёт большие тела на
-	// upload-роут до проверки auth) ограничен Concurrency и upload rate
-	// limiter'ом — это плата за поддержку больших загрузок.
+	// Per-route лимиты тела: fasthttp буферизует тело запроса целиком ДО
+	// вызова хендлеров (в памяти, O(size) на соединение — см. комментарий
+	// к max_upload_size в config.example.yaml), но HeaderReceived позволяет
+	// выбрать лимит по одним лишь заголовкам — до начала чтения тела.
+	// Обычные роуты ограничены maxAPIBodySize (защита от DoS), upload/cover
+	// получают настоящий MaxUploadSize. Остаточный риск (атакующий шлёт
+	// большие тела на upload-роут до проверки auth) ограничен Concurrency
+	// и upload rate limiter'ом — это плата за поддержку больших загрузок.
 	fiberApp.Server().HeaderReceived = func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		var u fasthttp.URI
 		_ = u.Parse(nil, h.RequestURI()) // при ошибке path пуст → лимит 4 МБ (безопасный дефолт)

@@ -53,6 +53,24 @@ func TestLyricsHandler_GetLyrics_NotFound(t *testing.T) {
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 }
 
+// TestLyricsHandler_NegativeIDRejected: отрицательный ID отклоняется
+// parseIDParam'ом (uint(-1) превратился бы в ~4.29 млрд).
+func TestLyricsHandler_NegativeIDRejected(t *testing.T) {
+	app := setupLyricsTestApp(t)
+
+	req := httptest.NewRequest("GET", "/api/media/-1/lyrics", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+	body, _ := json.Marshal(map[string]string{"lyrics_text": "La la la"})
+	req = httptest.NewRequest("PUT", "/api/media/-1/lyrics", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}
+
 func TestLyricsHandler_UpsertMediaNotFound(t *testing.T) {
 	app := setupLyricsTestApp(t)
 

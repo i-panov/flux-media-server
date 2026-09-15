@@ -4,6 +4,7 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -34,7 +35,9 @@ func (h *MetadataHandler) Search(c *fiber.Ctx) error {
 	if query == "" {
 		return response.Error(c, fiber.StatusBadRequest, "Query parameter 'q' is required")
 	}
-	if len(query) > maxSearchQueryLen {
+	// Лимит считаем по символам, а не байтам: len() отсчитывал бы по 2 байта
+	// на кириллицу и ложно отклонял запросы вдвое короче визуального лимита.
+	if utf8.RuneCountInString(query) > maxSearchQueryLen {
 		return response.Error(c, fiber.StatusBadRequest, "Query parameter 'q' is too long")
 	}
 

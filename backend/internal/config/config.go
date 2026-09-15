@@ -120,6 +120,16 @@ func Load(path string) (*Config, error) {
 	if cfg.Server.Env == "" {
 		cfg.Server.Env = "production"
 	}
+	// Нормализуем регистр и пробелы: "Production" не должен молча ломать
+	// проверку whitelist ниже. Опечатки («prod») отсекает whitelist.
+	cfg.Server.Env = strings.ToLower(strings.TrimSpace(cfg.Server.Env))
+	// Whitelist вместо свободной строки: опечатка («prod») молча
+	// превращала бы конфиг в production и ломала проверку debug ниже.
+	switch cfg.Server.Env {
+		case "dev", "production":
+		default:
+			return nil, fmt.Errorf("server.env must be \"dev\" or \"production\", got %q", cfg.Server.Env)
+	}
 	if cfg.Server.MaxUploadSize == 0 {
 		cfg.Server.MaxUploadSize = 100 * 1024 * 1024 // 100MB
 	}

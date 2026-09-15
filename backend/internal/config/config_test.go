@@ -378,3 +378,42 @@ auth:
 		assert.NoError(t, err)
 	})
 }
+
+// TestLoadConfigEnvWhitelist: server.env принимает только dev/production —
+// опечатка («prod») не должна молча превращаться в production.
+func TestLoadConfigEnvWhitelist(t *testing.T) {
+	write := func(t *testing.T, env string) string {
+		t.Helper()
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config.yaml")
+		content := "server:\n  env: \"" + env + "\"\n  debug: false\n" + `
+database:
+  path: "./test.db"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+`
+		require.NoError(t, os.WriteFile(configPath, []byte(content), 0644))
+		return configPath
+	}
+
+	t.Run("typo rejected", func(t *testing.T) {
+		_, err := Load(write(t, "prod"))
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "server.env")
+	})
+
+	t.Run("production allowed", func(t *testing.T) {
+		_, err := Load(write(t, "production"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("dev without debug allowed", func(t *testing.T) {
+		_, err := Load(write(t, "dev"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("case insensitive", func(t *testing.T) {
+		_, err := Load(write(t, "Production"))
+		assert.NoError(t, err, "регистр не имеет значения")
+	})
+}

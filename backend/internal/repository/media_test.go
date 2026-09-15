@@ -204,6 +204,40 @@ func TestMediaStore_FindAllLikeEscaping(t *testing.T) {
 	assert.Equal(t, int64(2), total)
 }
 
+// FindByPathPrefix обязан экранировать спецсимволы LIKE в префиксе:
+// неэкранированное «_» матчит любой символ, и sweep при скане одной
+// библиотеки (/data/my_media) захватывал записи соседней с похожим путём
+// (/data/my-media) и удалял их как «отсутствующие» (регрессия).
+func TestMediaStore_FindByPathPrefixLikeEscaping(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, &models.Media{
+		Title: "Mine", Type: models.MediaTypeVideo, FilePath: "/data/my_media/a.mkv",
+	}))
+	require.NoError(t, store.Create(ctx, &models.Media{
+		Title: "Neighbour", Type: models.MediaTypeVideo, FilePath: "/data/my-media/b.mkv",
+	}))
+
+	// Префикс первой библиотеки не должен захватывать вторую.
+	list, total, err := store.FindByPathPrefix(ctx, "/data/my_media", 10, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total, "underscore in prefix must be literal")
+	require.Len(t, list, 1)
+	assert.Equal(t, "/data/my_media/a.mkv", list[0].FilePath)
+
+	// Обычный префикс без спецсимволов не сломан.
+	list, total, err = store.FindByPathPrefix(ctx, "/data/my-media", 10, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, list, 1)
+	assert.Equal(t, "/data/my-media/b.mkv", list[0].FilePath)
+}
+
 // Update с Metadata должен сохранять ассоциацию (upsert) и проставлять
 // metadata_id — контракт сохранён от старого Save(media).
 func TestMediaStore_UpdateMetadataAssociation(t *testing.T) {

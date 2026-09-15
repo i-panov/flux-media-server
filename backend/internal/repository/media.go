@@ -144,7 +144,10 @@ func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media
 func (r *MediaStore) FindByPathPrefix(ctx context.Context, prefix string, limit, offset int) ([]models.Media, int64, error) {
 	var media []models.Media
 	var total int64
-	query := r.db.WithContext(ctx).Where("file_path LIKE ?", prefix+"%").Model(&models.Media{})
+	// Экранируем спецсимволы LIKE в префиксе: неэкранированное «_» матчит
+	// любой символ, и sweep при скане одной библиотеки мог удалить записи
+	// соседней с похожим путём (например, /data/my_media vs /data/my-media).
+	query := r.db.WithContext(ctx).Where("file_path LIKE ? ESCAPE '\\'", escapeLike(prefix)+"%").Model(&models.Media{})
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err

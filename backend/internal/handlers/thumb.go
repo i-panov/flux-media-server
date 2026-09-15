@@ -196,7 +196,9 @@ func (h *ThumbHandler) UploadCover(c *fiber.Ctx) error {
 		log.Printf("UploadCover: save file: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
 	}
-	for _, oldExt := range []string{".jpg", ".png", ".webp"} {
+	// .gif включён: extractEmbeddedArt может создать gif-обложку (загрузить
+	// gif через API нельзя, но унаследованный файл с диска надо убрать).
+	for _, oldExt := range []string{".jpg", ".png", ".webp", ".gif"} {
 		if oldExt == actualExt {
 			continue
 		}
