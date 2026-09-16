@@ -16,20 +16,19 @@ class AuthRepositoryImpl implements AuthRepository {
   String? get lastDebugCode => _lastDebugCode;
 
   @override
-  Future<Either<Failure, Unit>> requestCode(String email) async {
-    final result = await safeRepositoryCall(
-      () => remoteDataSource.requestCode(email),
-    );
-    return result.fold(
-      (failure) {
-        // Не оставляем debug-код от предыдущего успешного запроса.
-        _lastDebugCode = null;
-        return Left(failure);
-      },
-      (debugCode) {
-        _lastDebugCode = debugCode;
-        return const Right(unit);
-      },
+  Future<Either<Failure, Unit>> requestCode(String email) {
+    return safeRepositoryCall(() => remoteDataSource.requestCode(email)).then(
+      (result) => result.fold(
+        (failure) {
+          // Не оставляем debug-код от предыдущего успешного запроса.
+          _lastDebugCode = null;
+          return Left(failure);
+        },
+        (debugCode) {
+          _lastDebugCode = debugCode;
+          return const Right(unit);
+        },
+      ),
     );
   }
 

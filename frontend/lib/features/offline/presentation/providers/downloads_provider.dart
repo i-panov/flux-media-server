@@ -16,11 +16,11 @@ class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
   AsyncValue<List<Media>> build() {
     // Watch the invalidator counter — refresh whenever it changes.
     ref.listen<int>(downloadsInvalidatorProvider, (_, next) {
-      refresh();
+      unawaited(refresh());
     });
     // Первый refresh откладываем: внутри refresh читается `state`,
     // а до завершения build() обращение к нему запрещено.
-    Future.microtask(refresh);
+    unawaited(Future.microtask(refresh));
     return const AsyncValue.loading();
   }
 
@@ -86,7 +86,7 @@ class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
               fetchedById[media.id] = media;
               allFailed = false;
               // Persist metadata for offline access.
-              cacheService.saveMetadata(media);
+              unawaited(cacheService.saveMetadata(media));
             });
           }
           continue;

@@ -75,7 +75,7 @@ class AuthNotifier extends Notifier<AuthState> {
     } finally {
       _requestInFlight = false;
     }
-    return result.fold(
+    return await result.fold(
       (failure) {
         state = AuthState.error(
           message: failure.message,

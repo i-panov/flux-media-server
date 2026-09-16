@@ -53,7 +53,7 @@ final FutureProvider<List<Collection>> collectionsProvider =
     FutureProvider.autoDispose<List<Collection>>((ref) async {
       final getCollections = ref.watch(getCollectionsProvider);
       final result = await getCollections(const NoParams());
-      return result.fold(
+      return await result.fold(
         // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
         // ignore: only_throw_errors
         (failure) => throw failure,
@@ -76,7 +76,7 @@ class CollectionItemsNotifier extends AsyncNotifier<List<Media>> {
   Future<List<Media>> build() async {
     final getItemsFull = ref.watch(getCollectionItemsFullProvider);
     final result = await getItemsFull(collectionId);
-    return result.fold(
+    return await result.fold(
       // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
       // ignore: only_throw_errors
       (failure) => throw failure,

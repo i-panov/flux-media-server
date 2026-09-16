@@ -70,9 +70,11 @@ void main() async {
     ..onToggleFavorite = () {
       final state = container.read(playbackCoordinatorProvider);
       if (state is PlaybackPlaying) {
-        container
-            .read(favoriteToggleProvider(state.media.id).notifier)
-            .toggle();
+        unawaited(
+          container
+              .read(favoriteToggleProvider(state.media.id).notifier)
+              .toggle(),
+        );
       }
     };
 
@@ -143,7 +145,7 @@ class _FluxAppState extends ConsumerState<FluxApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (next is AuthAuthenticated) {
-        widget.router.replaceAll([const MainRoute()]);
+        unawaited(widget.router.replaceAll([const MainRoute()]));
       } else if (next is AuthError && _hasServerUrl) {
         // Редирект — только для стартовой проверки сессии и перехода
         // из авторизованного состояния; ошибки форм (verifyCode,
@@ -155,10 +157,10 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         if (!shouldRedirect) return;
         if (next.isOffline) {
           // Server unreachable — enter offline mode.
-          widget.router.replaceAll([const MainRoute()]);
+          unawaited(widget.router.replaceAll([const MainRoute()]));
         } else if (previous is AuthAuthenticated) {
           // Session expired — back to login.
-          widget.router.replaceAll([const LoginRoute()]);
+          unawaited(widget.router.replaceAll([const LoginRoute()]));
         }
       } else if (next is AuthInitial && _hasServerUrl) {
         // Выход из офлайн-режима (AuthError → AuthInitial) тоже ведёт
@@ -169,7 +171,7 @@ class _FluxAppState extends ConsumerState<FluxApp> {
             previous is AuthLoading ||
             previous is AuthError;
         if (shouldRedirect) {
-          widget.router.replace(const LoginRoute());
+          unawaited(widget.router.replace(const LoginRoute()));
         }
       }
     });

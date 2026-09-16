@@ -109,23 +109,29 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
   }
 
   void _enterFullscreenChrome() {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    unawaited(
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+    );
+    unawaited(
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]),
+    );
   }
 
   void _exitFullscreenChrome() {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    unawaited(
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]),
+    );
   }
 
   @override
@@ -386,8 +392,10 @@ class _SeekButton extends ConsumerWidget {
       iconSize: 24,
       onPressed: () {
         final position = ref.read(videoPlayerDatasourceProvider).position;
-        coordinator.seek(
-          position + Duration(seconds: _seekStep.inSeconds * direction),
+        unawaited(
+          coordinator.seek(
+            position + Duration(seconds: _seekStep.inSeconds * direction),
+          ),
         );
       },
     );
@@ -417,7 +425,7 @@ class _SpeedButtonState extends ConsumerState<_SpeedButton> {
 
   @override
   void dispose() {
-    _rateSub?.cancel();
+    unawaited(_rateSub?.cancel());
     super.dispose();
   }
 
@@ -431,7 +439,9 @@ class _SpeedButtonState extends ConsumerState<_SpeedButton> {
       ),
       onPressed: () {
         final next = _rate >= _maxSpeed ? _minSpeed : _rate + _speedStep;
-        ref.read(playbackCoordinatorProvider.notifier).setSpeed(next);
+        unawaited(
+          ref.read(playbackCoordinatorProvider.notifier).setSpeed(next),
+        );
       },
     );
   }

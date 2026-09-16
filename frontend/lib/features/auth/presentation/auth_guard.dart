@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
@@ -19,7 +21,7 @@ class AuthGuard extends AutoRouteGuard {
       resolver.next();
     } else {
       resolver.next(false);
-      router.replace(const LoginRoute());
+      unawaited(router.replace(const LoginRoute()));
     }
   }
 }

@@ -94,7 +94,7 @@ class _FakeAudioSource implements AudioPlaybackSource {
       bufferingCtl,
       volumeCtl,
     ]) {
-      c.close();
+      unawaited(c.close());
     }
   }
 }
@@ -166,7 +166,7 @@ class _FakeVideoSource implements VideoPlaybackSource {
       bufferingCtl,
       rateCtl,
     ]) {
-      c.close();
+      unawaited(c.close());
     }
   }
 }

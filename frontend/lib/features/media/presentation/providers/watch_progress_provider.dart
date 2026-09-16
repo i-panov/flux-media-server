@@ -14,7 +14,7 @@ final FutureProvider<List<WatchProgress>> watchProgressProvider =
     FutureProvider.autoDispose<List<WatchProgress>>((ref) async {
       final getProgress = ref.watch(getWatchProgressProvider);
       final result = await getProgress(const NoParams());
-      return result.fold(
+      return await result.fold(
         (failure) => throw Exception(failure.message),
         (progress) => progress,
       );

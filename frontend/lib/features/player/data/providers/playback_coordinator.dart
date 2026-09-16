@@ -92,7 +92,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
 
   void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
-      sub.cancel();
+      unawaited(sub.cancel());
     }
     _subscriptions.clear();
   }
@@ -319,7 +319,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   /// none (or the media was already completed).
   Future<Duration?> _loadSavedPosition(int mediaId) async {
     final result = await ref.read(mediaRepositoryProvider).getProgress();
-    return result.fold((_) => null, (progressList) {
+    return await result.fold((_) async => null, (progressList) async {
       for (final p in progressList) {
         if (p.mediaId == mediaId && p.position > 0) {
           return Duration(seconds: p.position);

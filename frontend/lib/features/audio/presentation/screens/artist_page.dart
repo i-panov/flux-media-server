@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:file_picker/file_picker.dart';
@@ -104,11 +106,13 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
   }
 
   void _playTrack(List<Media> queue, int index) {
-    ref.read(playQueueProvider.notifier).setQueue(queue, startIndex: index);
+    unawaited(
+      ref.read(playQueueProvider.notifier).setQueue(queue, startIndex: index),
+    );
   }
 
   void _loadMore() {
-    ref.read(mediaListProvider(_mediaType).notifier).loadMore();
+    unawaited(ref.read(mediaListProvider(_mediaType).notifier).loadMore());
   }
 
   @override

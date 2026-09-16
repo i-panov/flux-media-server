@@ -20,23 +20,23 @@ class VideoPlayerDatasource implements VideoPlaybackSource {
 
   /// Starts or resumes playback.
   @override
-  Future<void> play() async => player.play();
+  Future<void> play() => player.play();
 
   /// Pauses playback.
   @override
-  Future<void> pause() async => player.pause();
+  Future<void> pause() => player.pause();
 
   /// Stops playback.
   @override
-  Future<void> stop() async => player.stop();
+  Future<void> stop() => player.stop();
 
   /// Seeks to the given [position].
   @override
-  Future<void> seek(Duration position) async => player.seek(position);
+  Future<void> seek(Duration position) => player.seek(position);
 
   /// Sets playback rate.
   @override
-  Future<void> setRate(double rate) async => player.setRate(rate);
+  Future<void> setRate(double rate) => player.setRate(rate);
 
   /// Current playback position.
   @override
@@ -75,5 +75,5 @@ class VideoPlayerDatasource implements VideoPlaybackSource {
   Stream<bool> get bufferingStream => player.stream.buffering;
 
   /// Disposes the player and frees resources.
-  Future<void> dispose() async => player.dispose();
+  Future<void> dispose() => player.dispose();
 }

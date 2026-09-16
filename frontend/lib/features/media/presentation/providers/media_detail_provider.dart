@@ -37,7 +37,7 @@ class MediaDetailNotifier extends Notifier<MediaDetailState> {
     // модификацию состояния, если провайдер создан и изменён в фазе
     // построения виджета (вызов load() из initState экрана падал бы с
     // "Tried to modify a provider while the widget tree was building").
-    Future.microtask(() => load(mediaId));
+    unawaited(Future.microtask(() => load(mediaId)));
     return const MediaDetailState.loading();
   }
 

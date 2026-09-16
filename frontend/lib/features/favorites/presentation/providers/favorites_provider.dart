@@ -41,7 +41,7 @@ class FavoritesNotifier extends AsyncNotifier<List<Favorite>> {
   Future<List<Favorite>> build() async {
     final getFavorites = ref.watch(getFavoritesProvider);
     final result = await getFavorites(const GetFavoritesParams());
-    return result.fold(
+    return await result.fold(
       (failure) => throw Exception(failure.message),
       (favorites) => favorites,
     );

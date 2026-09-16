@@ -42,7 +42,7 @@ class FakeAuthRepository implements AuthRepository {
   set lastDebugCode(String? value) => _lastDebugCode = value;
 
   @override
-  Future<Either<Failure, Unit>> requestCode(String email) async {
+  Future<Either<Failure, Unit>> requestCode(String email) {
     return onRequestCode!(email);
   }
 

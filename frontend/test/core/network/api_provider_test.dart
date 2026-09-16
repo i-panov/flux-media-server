@@ -123,7 +123,7 @@ void main() {
   });
 
   group('shared http client', () {
-    Future<ProviderContainer> makeContainer() async {
+    Future<ProviderContainer> makeContainer() {
       return makeContainerWithSettings(
         const AppSettings(serverUrl: 'http://host:8080/api'),
       );

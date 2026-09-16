@@ -249,12 +249,10 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
       onToggleFavorite?.call();
       return null;
     }
-    return super.customAction(name, extras);
+    return await super.customAction(name, extras);
   }
 
-  Future<void> setVolume(double volume) async {
-    await player.setVolume(volume);
-  }
+  Future<void> setVolume(double volume) => player.setVolume(volume);
 
   Stream<double> get volumeStream => player.stream.volume;
   Stream<Duration> get positionStream => player.stream.position;

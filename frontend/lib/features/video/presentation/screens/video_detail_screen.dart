@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -124,7 +126,7 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
         .read(mediaDetailProvider(widget.mediaId))
         .maybeWhen(loaded: (m) => m, orElse: () => null);
     if (media == null) return;
-    ref.read(playQueueProvider.notifier).setQueue([media]);
+    unawaited(ref.read(playQueueProvider.notifier).setQueue([media]));
     await ref.read(playbackCoordinatorProvider.notifier).play(media);
   }
 

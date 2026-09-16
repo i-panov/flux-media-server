@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
@@ -10,7 +12,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// избранное, скачивание и добавление в очередь (раньше — три копии).
 mixin TrackActionsMixin<T extends StatefulWidget> on State<T> {
   void toggleFavoriteTrack(WidgetRef ref, int mediaId) {
-    ref.read(favoriteToggleProvider(mediaId).notifier).toggle();
+    unawaited(ref.read(favoriteToggleProvider(mediaId).notifier).toggle());
   }
 
   Future<void> toggleDownloadTrack(

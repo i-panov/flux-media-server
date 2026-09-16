@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -54,7 +56,7 @@ class MainScreen extends StatelessWidget {
           ? (didPop, _) {
               if (!didPop) {
                 // Exit the app instead of navigating back to ServerSetup.
-                SystemNavigator.pop();
+                unawaited(SystemNavigator.pop());
               }
             }
           : null,

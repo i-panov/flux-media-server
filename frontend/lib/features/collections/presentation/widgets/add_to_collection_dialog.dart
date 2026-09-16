@@ -13,7 +13,7 @@ Future<bool?> showAddToCollectionDialog(
   BuildContext context,
   int mediaId, {
   String mediaType = 'video',
-}) async {
+}) {
   return showDialog<bool>(
     context: context,
     builder: (ctx) =>

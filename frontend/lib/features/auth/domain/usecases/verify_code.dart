@@ -30,19 +30,20 @@ class VerifyCode
   final AuthRepository repository;
 
   @override
-  Future<Either<Failure, VerifyCodeResult>> call(
-    VerifyCodeParams params,
-  ) async {
-    final result = await repository.verifyCode(params.email, params.code);
-    return result.fold(
-      Left.new,
-      (data) => Right(
-        VerifyCodeResult(
-          token: data.token,
-          refreshToken: data.refreshToken,
-          user: data.user,
-        ),
-      ),
-    );
+  Future<Either<Failure, VerifyCodeResult>> call(VerifyCodeParams params) {
+    return repository
+        .verifyCode(params.email, params.code)
+        .then(
+          (result) => result.fold(
+            Left.new,
+            (data) => Right(
+              VerifyCodeResult(
+                token: data.token,
+                refreshToken: data.refreshToken,
+                user: data.user,
+              ),
+            ),
+          ),
+        );
   }
 }

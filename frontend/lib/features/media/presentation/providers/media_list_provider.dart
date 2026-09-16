@@ -171,7 +171,7 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
         type: type,
       ),
     );
-    return result.fold(
+    return await result.fold(
       (failure) {
         // Сеть пропала после запуска: включаем офлайн-режим, чтобы
         // экраны показали скачанные треки, а не ошибку. Сброс — при

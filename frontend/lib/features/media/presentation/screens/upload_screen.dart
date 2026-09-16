@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -119,7 +120,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       // хэширование в UI-изоляте замораживало интерфейс.
       final filePath = file.path;
       final hash = await Isolate.run(
-        () async => sha256.bind(File(filePath).openRead()).first,
+        () => sha256.bind(File(filePath).openRead()).first,
       );
       if (_cancelled) throw const _UploadCancelled();
 
@@ -261,7 +262,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 backgroundColor: Colors.green,
               ),
             );
-            context.router.maybePop();
+            unawaited(context.router.maybePop());
             return true;
           }
           // queued/processing — продолжаем опрос.

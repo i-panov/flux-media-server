@@ -67,7 +67,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
     final position = _scrollController.position;
     if (position.maxScrollExtent > 0 &&
         position.pixels >= position.maxScrollExtent * 0.8) {
-      ref.read(mediaListProvider(_mediaType).notifier).loadMore();
+      unawaited(ref.read(mediaListProvider(_mediaType).notifier).loadMore());
     }
   }
 
@@ -84,9 +84,11 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
       fallbackQueue: fallbackQueue,
       fullQueue: fullQueue,
     );
-    ref
-        .read(playQueueProvider.notifier)
-        .setQueue(queue.queue, startIndex: queue.startIndex);
+    unawaited(
+      ref
+          .read(playQueueProvider.notifier)
+          .setQueue(queue.queue, startIndex: queue.startIndex),
+    );
   }
 
   /// Live-поиск с debounce 300 мс (как на видео-экране).

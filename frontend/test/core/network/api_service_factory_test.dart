@@ -9,19 +9,21 @@ import 'package:http/http.dart' as http;
 /// фиксирует момент, когда клиент закрывает сокет (abort после таймаута).
 class _SilentServer {
   new() : _future = ServerSocket.bind(InternetAddress.loopbackIPv4, 0) {
-    _future.then((server) {
-      server.listen((socket) {
-        socket.listen(
-          (_) {},
-          onDone: () {
-            if (!closedByClient.isCompleted) closedByClient.complete();
-          },
-          onError: (_) {
-            if (!closedByClient.isCompleted) closedByClient.complete();
-          },
-        );
-      });
-    });
+    unawaited(
+      _future.then((server) {
+        server.listen((socket) {
+          socket.listen(
+            (_) {},
+            onDone: () {
+              if (!closedByClient.isCompleted) closedByClient.complete();
+            },
+            onError: (_) {
+              if (!closedByClient.isCompleted) closedByClient.complete();
+            },
+          );
+        });
+      }),
+    );
   }
 
   final Future<ServerSocket> _future;
@@ -62,10 +64,11 @@ void main() {
     test('multipart uploads use the longer timeout', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => server.close(force: true));
-      server.listen((request) {
+      final serverSub = server.listen((request) {
         request.response.statusCode = 200;
-        request.response.close();
+        unawaited(request.response.close());
       });
+      addTearDown(serverSub.cancel);
 
       final client = TimeoutHttpClient(
         uploadTimeout: const Duration(seconds: 5),
@@ -89,11 +92,12 @@ void main() {
 
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => server.close(force: true));
-      server.listen((request) {
+      final serverSub = server.listen((request) {
         request.response.statusCode = 200;
         request.response.write('ok');
-        request.response.close();
+        unawaited(request.response.close());
       });
+      addTearDown(serverSub.cancel);
 
       final client = TimeoutHttpClient(
         requestTimeout: const Duration(milliseconds: 150),

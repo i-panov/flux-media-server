@@ -12,7 +12,7 @@ class GetWatchProgress
   final MediaRepository _repository;
 
   @override
-  Future<Either<Failure, List<WatchProgress>>> call(NoParams params) async {
+  Future<Either<Failure, List<WatchProgress>>> call(NoParams params) {
     return _repository.getProgress();
   }
 }

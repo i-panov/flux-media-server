@@ -64,7 +64,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
     final position = _scrollController.position;
     if (position.maxScrollExtent > 0 &&
         position.pixels >= position.maxScrollExtent * 0.8) {
-      ref.read(mediaListProvider(_mediaType).notifier).loadMore();
+      unawaited(ref.read(mediaListProvider(_mediaType).notifier).loadMore());
     }
   }
 
@@ -633,7 +633,9 @@ class _CollectionsSection extends ConsumerWidget {
           // firstWhere мог бросить StateError — идём циклом.
           for (final c in collections) {
             if (c.id == id) {
-              context.router.push(CollectionDetailRoute(collection: c));
+              unawaited(
+                context.router.push(CollectionDetailRoute(collection: c)),
+              );
               return;
             }
           }

@@ -48,7 +48,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _cacheSizeFuture = ref.read(offlineCacheServiceProvider).getCacheSize();
-    _loadAppVersion();
+    unawaited(_loadAppVersion());
   }
 
   Future<void> _loadAppVersion() async {
@@ -171,27 +171,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () {
-                        showDialog<void>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text(l.serverUrl),
-                            content: TextField(
-                              controller: _serverUrlController,
-                              decoration: const InputDecoration(
-                                hintText: 'https://example.com',
-                                border: OutlineInputBorder(),
+                        unawaited(
+                          showDialog<void>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text(l.serverUrl),
+                              content: TextField(
+                                controller: _serverUrlController,
+                                decoration: const InputDecoration(
+                                  hintText: 'https://example.com',
+                                  border: OutlineInputBorder(),
+                                ),
                               ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text(l.cancel),
+                                ),
+                                FilledButton(
+                                  onPressed: _saveServerUrl,
+                                  child: Text(l.save),
+                                ),
+                              ],
                             ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: Text(l.cancel),
-                              ),
-                              FilledButton(
-                                onPressed: _saveServerUrl,
-                                child: Text(l.save),
-                              ),
-                            ],
                           ),
                         );
                       },
@@ -270,9 +272,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ],
                       selected: {settingsState.settings.locale},
                       onSelectionChanged: (selection) {
-                        ref
-                            .read(settingsProvider.notifier)
-                            .setLocale(selection.first);
+                        unawaited(
+                          ref
+                              .read(settingsProvider.notifier)
+                              .setLocale(selection.first),
+                        );
                       },
                     ),
                   ),

@@ -15,21 +15,21 @@ class AudioPlayerDatasource implements AudioPlaybackSource {
   /// The underlying media_kit player (for direct stream access).
   Player get player => _handler.player;
 
-  Future<void> open(String url, {Map<String, String>? httpHeaders}) async =>
+  Future<void> open(String url, {Map<String, String>? httpHeaders}) =>
       _handler.player.open(Media(url, httpHeaders: httpHeaders));
   // Идём в обход FluxAudioHandler.play(): тот делегирует play из
   // системного уведомления через onPlay в координатор, а вызов отсюда
   // идёт уже из самого координатора (иначе — рекурсия).
   @override
-  Future<void> play() async => _handler.player.play();
+  Future<void> play() => _handler.player.play();
   @override
-  Future<void> pause() async => _handler.pause();
+  Future<void> pause() => _handler.pause();
   @override
-  Future<void> stop() async => _handler.stop();
+  Future<void> stop() => _handler.stop();
   @override
-  Future<void> seek(Duration position) async => _handler.seek(position);
+  Future<void> seek(Duration position) => _handler.seek(position);
   @override
-  Future<void> setVolume(double volume) async => _handler.setVolume(volume);
+  Future<void> setVolume(double volume) => _handler.setVolume(volume);
   @override
   Stream<Duration> get positionStream => _handler.positionStream;
   @override
@@ -46,7 +46,7 @@ class AudioPlayerDatasource implements AudioPlaybackSource {
   Stream<bool> get bufferingStream => _handler.bufferingStream;
   @override
   double get volume => _handler.player.state.volume;
-  Future<void> dispose() async => _handler.dispose();
+  Future<void> dispose() => _handler.dispose();
 
   /// Loads a media source with metadata for the system notification.
   @override

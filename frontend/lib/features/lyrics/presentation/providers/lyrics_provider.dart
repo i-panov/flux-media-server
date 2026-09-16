@@ -51,7 +51,7 @@ final lyricsProvider = FutureProvider.autoDispose.family<LyricsLoadResult, int>(
 
     final getLyrics = ref.watch(getLyricsProvider);
     final result = await getLyrics(mediaId);
-    return result.fold(
+    return await result.fold(
       (failure) async {
         // API failed — try local cache (offline mode).
         final cache = ref.read(lyricsCacheRepositoryProvider);

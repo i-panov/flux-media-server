@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -105,10 +107,14 @@ class _CollectionDetailScreenState
                     media: media,
                     onTap: () {
                       if (media.type == MediaType.audio) {
-                        context.router.push(AudioPlayerRoute(media: media));
+                        unawaited(
+                          context.router.push(AudioPlayerRoute(media: media)),
+                        );
                       } else {
-                        context.router.push(
-                          VideoDetailRoute(mediaId: media.id),
+                        unawaited(
+                          context.router.push(
+                            VideoDetailRoute(mediaId: media.id),
+                          ),
                         );
                       }
                     },
@@ -248,40 +254,42 @@ class _CollectionDetailScreenState
 
   void _confirmDelete(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.deleteCollection),
-        content: Text(l.deleteCollectionConfirm(widget.collection.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l.cancel),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final deleteCollection = ref.read(deleteCollectionProvider);
-              final result = await deleteCollection(widget.collection.id);
-              if (context.mounted) {
-                result.fold(
-                  (failure) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l.failedToRemove(failure.message)),
-                      ),
-                    );
-                  },
-                  (_) {
-                    ref.invalidate(collectionsProvider);
-                    context.router.maybePop();
-                  },
-                );
-              }
-            },
-            child: Text(l.delete, style: const TextStyle(color: Colors.red)),
-          ),
-        ],
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l.deleteCollection),
+          content: Text(l.deleteCollectionConfirm(widget.collection.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l.cancel),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final deleteCollection = ref.read(deleteCollectionProvider);
+                final result = await deleteCollection(widget.collection.id);
+                if (context.mounted) {
+                  result.fold(
+                    (failure) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l.failedToRemove(failure.message)),
+                        ),
+                      );
+                    },
+                    (_) {
+                      ref.invalidate(collectionsProvider);
+                      unawaited(context.router.maybePop());
+                    },
+                  );
+                }
+              },
+              child: Text(l.delete, style: const TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
@@ -116,9 +118,8 @@ void main() {
   group('PlayQueueNotifier.enqueue', () {
     test('enqueue adds item to end', () {
       final items = [_fakeMedia()];
-      notifier
-        ..setQueue(items)
-        ..enqueue(_fakeMedia(2));
+      unawaited(notifier.setQueue(items));
+      notifier.enqueue(_fakeMedia(2));
 
       expect(notifier.state.items, hasLength(2));
       expect(notifier.state.items[1].id, 2);
@@ -133,9 +134,8 @@ void main() {
     });
 
     test('enqueueAll adds multiple items', () {
-      notifier
-        ..setQueue([_fakeMedia()])
-        ..enqueueAll([_fakeMedia(2), _fakeMedia(3)]);
+      unawaited(notifier.setQueue([_fakeMedia()]));
+      notifier.enqueueAll([_fakeMedia(2), _fakeMedia(3)]);
 
       expect(notifier.state.items, hasLength(3));
     });
@@ -274,18 +274,24 @@ void main() {
 
   group('PlayQueueNotifier.removeAt', () {
     test('remove non-current item keeps currentIndex', () {
-      notifier
-        ..setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)])
-        ..removeAt(2); // Remove last (not current)
+      unawaited(
+        notifier.setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)]),
+      );
+      notifier.removeAt(2); // Remove last (not current)
 
       expect(notifier.state.items, hasLength(2));
       expect(notifier.state.currentIndex, 0);
     });
 
     test('remove item before current shifts currentIndex down', () {
-      notifier
-        ..setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)], startIndex: 2)
-        ..removeAt(0); // Remove first, current is at index 2
+      unawaited(
+        notifier.setQueue([
+          _fakeMedia(),
+          _fakeMedia(2),
+          _fakeMedia(3),
+        ], startIndex: 2),
+      );
+      notifier.removeAt(0); // Remove first, current is at index 2
 
       expect(notifier.state.items, hasLength(2));
       expect(notifier.state.currentIndex, 1);
@@ -293,9 +299,8 @@ void main() {
     });
 
     test('remove only item stops playback', () {
-      notifier
-        ..setQueue([_fakeMedia()])
-        ..removeAt(0);
+      unawaited(notifier.setQueue([_fakeMedia()]));
+      notifier.removeAt(0);
 
       expect(notifier.state.items, isEmpty);
       expect(notifier.state.currentIndex, -1);
@@ -303,9 +308,8 @@ void main() {
     });
 
     test('remove at invalid index is no-op', () {
-      notifier
-        ..setQueue([_fakeMedia()])
-        ..removeAt(5);
+      unawaited(notifier.setQueue([_fakeMedia()]));
+      notifier.removeAt(5);
 
       expect(notifier.state.items, hasLength(1));
     });
@@ -313,9 +317,8 @@ void main() {
 
   group('PlayQueueNotifier.clear', () {
     test('clear empties the queue', () {
-      notifier
-        ..setQueue([_fakeMedia(), _fakeMedia(2)])
-        ..clear();
+      unawaited(notifier.setQueue([_fakeMedia(), _fakeMedia(2)]));
+      notifier.clear();
 
       expect(notifier.state.items, isEmpty);
       expect(notifier.state.currentIndex, -1);

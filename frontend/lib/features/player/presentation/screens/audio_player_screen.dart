@@ -37,7 +37,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       if (!alreadyPlaying) {
         // Use setQueue so the queue is in sync with what's playing.
         // Without this, _onCompleted would jump to a stale queue item.
-        ref.read(playQueueProvider.notifier).setQueue([widget.media]);
+        unawaited(
+          ref.read(playQueueProvider.notifier).setQueue([widget.media]),
+        );
       }
     });
   }
@@ -476,9 +478,11 @@ class _QueueTab extends ConsumerWidget {
                 ref.read(playQueueProvider.notifier).removeAt(index),
           ),
           onTap: () {
-            ref
-                .read(playQueueProvider.notifier)
-                .setQueue(queueState.items, startIndex: index);
+            unawaited(
+              ref
+                  .read(playQueueProvider.notifier)
+                  .setQueue(queueState.items, startIndex: index),
+            );
           },
         );
       },

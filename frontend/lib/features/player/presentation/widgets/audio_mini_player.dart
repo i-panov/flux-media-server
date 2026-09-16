@@ -51,7 +51,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
 
   @override
   void dispose() {
-    _volumeSub?.cancel();
+    unawaited(_volumeSub?.cancel());
     super.dispose();
   }
 
@@ -133,9 +133,11 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                           microseconds: (value * duration.inMicroseconds)
                               .toInt(),
                         );
-                        ref
-                            .read(playbackCoordinatorProvider.notifier)
-                            .seek(newPos);
+                        unawaited(
+                          ref
+                              .read(playbackCoordinatorProvider.notifier)
+                              .seek(newPos),
+                        );
                       }
                     },
                   ),
@@ -169,9 +171,17 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   GestureDetector(
                     onTap: () {
                       if (isPaused) {
-                        ref.read(playbackCoordinatorProvider.notifier).resume();
+                        unawaited(
+                          ref
+                              .read(playbackCoordinatorProvider.notifier)
+                              .resume(),
+                        );
                       } else {
-                        ref.read(playbackCoordinatorProvider.notifier).pause();
+                        unawaited(
+                          ref
+                              .read(playbackCoordinatorProvider.notifier)
+                              .pause(),
+                        );
                       }
                     },
                     child: ClipRRect(
@@ -249,7 +259,9 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     icon: const Icon(Icons.skip_previous),
                     tooltip: l.previous,
                     onPressed: () {
-                      ref.read(playQueueProvider.notifier).previous();
+                      unawaited(
+                        ref.read(playQueueProvider.notifier).previous(),
+                      );
                     },
                     iconSize: 24,
                   ),
@@ -259,9 +271,17 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     tooltip: isPaused ? l.play : l.pause,
                     onPressed: () {
                       if (isPaused) {
-                        ref.read(playbackCoordinatorProvider.notifier).resume();
+                        unawaited(
+                          ref
+                              .read(playbackCoordinatorProvider.notifier)
+                              .resume(),
+                        );
                       } else {
-                        ref.read(playbackCoordinatorProvider.notifier).pause();
+                        unawaited(
+                          ref
+                              .read(playbackCoordinatorProvider.notifier)
+                              .pause(),
+                        );
                       }
                     },
                     iconSize: 28,
@@ -329,11 +349,13 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                                 value: _volume,
                                 max: 100,
                                 onChanged: (value) {
-                                  ref
-                                      .read(
-                                        playbackCoordinatorProvider.notifier,
-                                      )
-                                      .setVolume(value);
+                                  unawaited(
+                                    ref
+                                        .read(
+                                          playbackCoordinatorProvider.notifier,
+                                        )
+                                        .setVolume(value),
+                                  );
                                 },
                               ),
                             ),
@@ -357,9 +379,11 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     ),
                     tooltip: l.favorites,
                     onPressed: () {
-                      ref
-                          .read(favoriteToggleProvider(media.id).notifier)
-                          .toggle();
+                      unawaited(
+                        ref
+                            .read(favoriteToggleProvider(media.id).notifier)
+                            .toggle(),
+                      );
                     },
                     iconSize: 20,
                   ),
@@ -367,7 +391,9 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     icon: const Icon(Icons.close, size: 20),
                     tooltip: l.close,
                     onPressed: () {
-                      ref.read(playbackCoordinatorProvider.notifier).stop();
+                      unawaited(
+                        ref.read(playbackCoordinatorProvider.notifier).stop(),
+                      );
                       if (widget.disableTap) {
                         Navigator.of(context).maybePop();
                       }

@@ -12,7 +12,7 @@ import 'package:flux_media_server/shared/models/artist.dart';
 final artistsProvider = FutureProvider<List<Artist>>((ref) async {
   final getArtists = ref.watch(getArtistsProvider);
   final result = await getArtists(const NoParams());
-  return result.fold(
+  return await result.fold(
     (failure) => throw Exception(failure.message),
     (artists) => artists,
   );

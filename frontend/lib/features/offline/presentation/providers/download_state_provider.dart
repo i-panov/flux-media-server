@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,7 +45,7 @@ class DownloadNotifier extends Notifier<DownloadState> {
 
   @override
   DownloadState build() {
-    checkStatus(mediaId);
+    unawaited(checkStatus(mediaId));
     return const DownloadState.idle();
   }
 
