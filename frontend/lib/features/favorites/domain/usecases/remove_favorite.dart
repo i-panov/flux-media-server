@@ -4,7 +4,7 @@ import 'package:flux_media_server/features/favorites/domain/repositories/favorit
 import 'package:fpdart/fpdart.dart';
 
 class RemoveFavorite extends UseCase<Either<Failure, void>, int> {
-  RemoveFavorite(this.repository);
+  new(this.repository);
   final FavoritesRepository repository;
 
   @override

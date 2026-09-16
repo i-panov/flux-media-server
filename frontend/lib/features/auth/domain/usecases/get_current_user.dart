@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/user.dart';
 import 'package:fpdart/fpdart.dart';
 
 class GetCurrentUser extends UseCase<Either<Failure, User>, NoParams> {
-  GetCurrentUser(this.repository);
+  new(this.repository);
 
   final AuthRepository repository;
 

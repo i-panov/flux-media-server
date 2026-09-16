@@ -15,7 +15,7 @@ import 'package:http/http.dart' as http;
 /// Прогресс недоступен через Chopper, поэтому загрузка выполняется
 /// напрямую через `http.MultipartRequest`.
 class _CountingMultipartFile extends http.MultipartFile {
-  _CountingMultipartFile(
+  new(
     File file, {
     required String field,
     required String filename,
@@ -23,11 +23,11 @@ class _CountingMultipartFile extends http.MultipartFile {
     void Function(int sent)? onProgress,
     bool Function()? isCancelled,
   }) : super(
-          field,
-          _buildStream(file, onProgress, isCancelled),
-          length,
-          filename: filename,
-        );
+         field,
+         _buildStream(file, onProgress, isCancelled),
+         length,
+         filename: filename,
+       );
 
   static Stream<List<int>> _buildStream(
     File file,
@@ -35,17 +35,17 @@ class _CountingMultipartFile extends http.MultipartFile {
     bool Function()? isCancelled,
   ) {
     return file.openRead().transform(
-          StreamTransformer<List<int>, List<int>>.fromHandlers(
-            handleData: (chunk, sink) {
-              if (isCancelled?.call() ?? false) {
-                sink.addError(const UploadCancelledException());
-                return;
-              }
-              onProgress?.call(chunk.length);
-              sink.add(chunk);
-            },
-          ),
-        );
+      StreamTransformer<List<int>, List<int>>.fromHandlers(
+        handleData: (chunk, sink) {
+          if (isCancelled?.call() ?? false) {
+            sink.addError(const UploadCancelledException());
+            return;
+          }
+          onProgress?.call(chunk.length);
+          sink.add(chunk);
+        },
+      ),
+    );
   }
 }
 
@@ -53,25 +53,21 @@ class _CountingMultipartFile extends http.MultipartFile {
 class MediaRemoteDataSource {
   /// Creates a [MediaRemoteDataSource] with the given [apiClient].
   ///
-  /// [libraryApiClient] нужен для `getArtists` (артисты живут в library API).
-  /// [uploadBaseUrl], [authToken] и [refreshAuth] используются для
+  /// [_libraryApiClient] нужен для `getArtists` (артисты живут в library API).
+  /// [_uploadBaseUrl], [_authToken] и [_refreshAuth] используются для
   /// прямой загрузки файлов через http (Chopper не даёт прогресс/отмену).
   /// Провайдеры токенов берутся те же, что у Chopper-перехватчиков
   /// (settingsProvider + authTokenRefresherProvider), чтобы не плодить
   /// второй путь аутентификации.
   /// [clientFactory] инъектируется в тестах.
-  MediaRemoteDataSource(
+  new(
     this.apiClient, {
-    LibraryApiClient? libraryApiClient,
-    String? uploadBaseUrl,
-    String? Function()? authToken,
-    Future<String?> Function()? refreshAuth,
+    this._libraryApiClient,
+    this._uploadBaseUrl,
+    this._authToken,
+    this._refreshAuth,
     http.Client Function()? clientFactory,
-  })  : _libraryApiClient = libraryApiClient,
-        _uploadBaseUrl = uploadBaseUrl,
-        _authToken = authToken,
-        _refreshAuth = refreshAuth,
-        _clientFactory = clientFactory ?? http.Client.new;
+  }) : _clientFactory = clientFactory ?? http.Client.new;
 
   /// The API client used for HTTP requests.
   final MediaApiClient apiClient;
@@ -211,10 +207,7 @@ class MediaRemoteDataSource {
   /// `status`: queued | processing | done | error; при done в поле `media`
   /// приходит готовый объект медиа.
   Future<({int id, String status, String? error, Map<String, dynamic>? media})>
-      getUploadJobStatus(
-    int jobId, {
-    bool Function()? isCancelled,
-  }) async {
+  getUploadJobStatus(int jobId, {bool Function()? isCancelled}) async {
     final body = await _sendJsonRequest(
       'GET',
       '/media/uploads/$jobId',
@@ -320,7 +313,8 @@ class MediaRemoteDataSource {
     bool Function()? isCancelled,
     void Function()? onRetry,
   }) async {
-    final baseUrl = _uploadBaseUrl ??
+    final baseUrl =
+        _uploadBaseUrl ??
         apiClient.client.baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
     var token = _authToken?.call();
 
@@ -362,13 +356,12 @@ class MediaRemoteDataSource {
           throw const AuthException(message: 'Session expired');
         }
 
-        final responseBody =
-            await streamed.stream.bytesToString().timeout(
-                  const Duration(minutes: 10),
-                  onTimeout: () => throw const NetworkException(
-                    message: 'Upload response timed out',
-                  ),
-                );
+        final responseBody = await streamed.stream.bytesToString().timeout(
+          const Duration(minutes: 10),
+          onTimeout: () => throw const NetworkException(
+            message: 'Upload response timed out',
+          ),
+        );
         if (isCancelled?.call() ?? false) {
           throw const UploadCancelledException();
         }
@@ -410,7 +403,8 @@ class MediaRemoteDataSource {
     bool Function()? isCancelled,
     Set<int> acceptedStatuses = const {200},
   }) async {
-    final baseUrl = _uploadBaseUrl ??
+    final baseUrl =
+        _uploadBaseUrl ??
         apiClient.client.baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
     var token = _authToken?.call();
 
@@ -449,11 +443,11 @@ class MediaRemoteDataSource {
         }
 
         final responseBody = await streamed.stream.bytesToString().timeout(
-              const Duration(minutes: 10),
-              onTimeout: () => throw const NetworkException(
-                message: 'Upload response timed out',
-              ),
-            );
+          const Duration(minutes: 10),
+          onTimeout: () => throw const NetworkException(
+            message: 'Upload response timed out',
+          ),
+        );
         if (isCancelled?.call() ?? false) {
           throw const UploadCancelledException();
         }
@@ -470,9 +464,7 @@ class MediaRemoteDataSource {
         try {
           body = jsonDecode(responseBody) as Map<String, dynamic>;
         } on FormatException {
-          throw const ServerException(
-            message: 'Unexpected server response',
-          );
+          throw const ServerException(message: 'Unexpected server response');
         }
 
         if (!acceptedStatuses.contains(streamed.statusCode)) {
@@ -514,14 +506,11 @@ class MediaRemoteDataSource {
     int? duration,
     bool? completed,
   }) async {
-    final response = await apiClient.updateProgress(
-      mediaId,
-      {
-        'position': position,
-        'duration': duration,
-        'completed': completed,
-      },
-    );
+    final response = await apiClient.updateProgress(mediaId, {
+      'position': position,
+      'duration': duration,
+      'completed': completed,
+    });
     checkResponse(response, 'Failed to update progress');
     return WatchProgress.fromJson(response.body!);
   }

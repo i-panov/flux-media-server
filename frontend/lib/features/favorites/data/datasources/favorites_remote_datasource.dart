@@ -5,7 +5,7 @@ import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
 
 class FavoritesRemoteDataSource {
-  FavoritesRemoteDataSource(this.apiClient);
+  new(this.apiClient);
 
   final LibraryApiClient apiClient;
 

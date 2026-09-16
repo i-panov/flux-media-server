@@ -3,9 +3,13 @@ import 'package:flux_media_server/core/usecases/usecase.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:fpdart/fpdart.dart';
 
-class CheckMediaHash extends UseCase<
-    Either<Failure, ({bool exists, int? mediaId, String? title})>, String> {
-  CheckMediaHash(this.repository);
+class CheckMediaHash
+    extends
+        UseCase<
+          Either<Failure, ({bool exists, int? mediaId, String? title})>,
+          String
+        > {
+  new(this.repository);
 
   final MediaRepository repository;
 

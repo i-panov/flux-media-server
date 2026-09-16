@@ -1,4 +1,5 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format width=80
 
 part of 'media_api_client.dart';
 
@@ -45,11 +46,7 @@ final class _$MediaApiClient extends MediaApiClient {
   @override
   Future<Response<Map<String, dynamic>>> getMedia(int id) {
     final Uri $url = Uri.parse('/media/${id}');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -69,11 +66,7 @@ final class _$MediaApiClient extends MediaApiClient {
   @override
   Future<Response<Map<String, dynamic>>> deleteMedia(int id) {
     final Uri $url = Uri.parse('/media/${id}');
-    final Request $request = Request(
-      'DELETE',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('DELETE', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -81,12 +74,7 @@ final class _$MediaApiClient extends MediaApiClient {
   Future<Response<Map<String, dynamic>>> checkHash(Map<String, dynamic> body) {
     final Uri $url = Uri.parse('/media/check-hash');
     final $body = body;
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -97,14 +85,8 @@ final class _$MediaApiClient extends MediaApiClient {
   ) {
     final Uri $url = Uri.parse('/media/upload');
     final List<PartValue> $parts = <PartValue>[
-      PartValue<String>(
-        'media_type',
-        mediaType,
-      ),
-      PartValueFile<MultipartFile>(
-        'file',
-        file,
-      ),
+      PartValue<String>('media_type', mediaType),
+      PartValueFile<MultipartFile>('file', file),
     ];
     final Request $request = Request(
       'POST',
@@ -123,10 +105,7 @@ final class _$MediaApiClient extends MediaApiClient {
   ) {
     final Uri $url = Uri.parse('/media/${id}/cover');
     final List<PartValue> $parts = <PartValue>[
-      PartValueFile<MultipartFile>(
-        'cover',
-        cover,
-      )
+      PartValueFile<MultipartFile>('cover', cover),
     ];
     final Request $request = Request(
       'PUT',
@@ -141,11 +120,7 @@ final class _$MediaApiClient extends MediaApiClient {
   @override
   Future<Response<Map<String, dynamic>>> getProgress() {
     final Uri $url = Uri.parse('/progress');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -156,23 +131,14 @@ final class _$MediaApiClient extends MediaApiClient {
   ) {
     final Uri $url = Uri.parse('/progress/${mediaId}');
     final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('PUT', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<Map<String, dynamic>>> getLyrics(int id) {
     final Uri $url = Uri.parse('/media/${id}/lyrics');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -183,12 +149,7 @@ final class _$MediaApiClient extends MediaApiClient {
   ) {
     final Uri $url = Uri.parse('/media/${id}/lyrics');
     final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('PUT', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -199,12 +160,7 @@ final class _$MediaApiClient extends MediaApiClient {
   ) {
     final Uri $url = Uri.parse('/metadata/${mediaId}');
     final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('PUT', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 }

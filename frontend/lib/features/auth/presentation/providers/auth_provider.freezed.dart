@@ -1,6 +1,6 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
+// coverage:ignore-file
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'auth_provider.dart';
@@ -9,853 +9,502 @@ part of 'auth_provider.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
 /// @nodoc
-mixin _$AuthState {
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function() initial,
-    required TResult Function() loading,
-    required TResult Function(String email, String? debugCode) codeSent,
-    required TResult Function(User user) authenticated,
-    required TResult Function(String message, bool isOffline) error,
-  }) =>
-      throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? initial,
-    TResult? Function()? loading,
-    TResult? Function(String email, String? debugCode)? codeSent,
-    TResult? Function(User user)? authenticated,
-    TResult? Function(String message, bool isOffline)? error,
-  }) =>
-      throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? initial,
-    TResult Function()? loading,
-    TResult Function(String email, String? debugCode)? codeSent,
-    TResult Function(User user)? authenticated,
-    TResult Function(String message, bool isOffline)? error,
-    required TResult orElse(),
-  }) =>
-      throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(AuthInitial value) initial,
-    required TResult Function(AuthLoading value) loading,
-    required TResult Function(AuthCodeSent value) codeSent,
-    required TResult Function(AuthAuthenticated value) authenticated,
-    required TResult Function(AuthError value) error,
-  }) =>
-      throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(AuthInitial value)? initial,
-    TResult? Function(AuthLoading value)? loading,
-    TResult? Function(AuthCodeSent value)? codeSent,
-    TResult? Function(AuthAuthenticated value)? authenticated,
-    TResult? Function(AuthError value)? error,
-  }) =>
-      throw _privateConstructorUsedError;
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(AuthInitial value)? initial,
-    TResult Function(AuthLoading value)? loading,
-    TResult Function(AuthCodeSent value)? codeSent,
-    TResult Function(AuthAuthenticated value)? authenticated,
-    TResult Function(AuthError value)? error,
-    required TResult orElse(),
-  }) =>
-      throw _privateConstructorUsedError;
+mixin _$AuthState implements DiagnosticableTreeMixin {
+
+
+
+
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties
+    ..add(DiagnosticsProperty('type', 'AuthState'))
+    ;
+}
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthState);
+}
+
+
+@override
+int get hashCode => runtimeType.hashCode;
+
+@override
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
+    return 'AuthState()';
+}
+
+
 }
 
 /// @nodoc
-abstract class $AuthStateCopyWith<$Res> {
-  factory $AuthStateCopyWith(AuthState value, $Res Function(AuthState) then) =
-      _$AuthStateCopyWithImpl<$Res, AuthState>;
+class $AuthStateCopyWith<$Res>  {
+$AuthStateCopyWith(AuthState _, $Res Function(AuthState) __);
+}
+
+
+/// Adds pattern-matching-related methods to [AuthState].
+extension AuthStatePatterns on AuthState {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( AuthInitial value)?  initial,TResult Function( AuthLoading value)?  loading,TResult Function( AuthCodeSent value)?  codeSent,TResult Function( AuthAuthenticated value)?  authenticated,TResult Function( AuthError value)?  error,required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case AuthInitial() when initial != null:
+return initial(_that);case AuthLoading() when loading != null:
+return loading(_that);case AuthCodeSent() when codeSent != null:
+return codeSent(_that);case AuthAuthenticated() when authenticated != null:
+return authenticated(_that);case AuthError() when error != null:
+return error(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( AuthInitial value)  initial,required TResult Function( AuthLoading value)  loading,required TResult Function( AuthCodeSent value)  codeSent,required TResult Function( AuthAuthenticated value)  authenticated,required TResult Function( AuthError value)  error,}){
+final _that = this;
+switch (_that) {
+case AuthInitial():
+return initial(_that);case AuthLoading():
+return loading(_that);case AuthCodeSent():
+return codeSent(_that);case AuthAuthenticated():
+return authenticated(_that);case AuthError():
+return error(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( AuthInitial value)?  initial,TResult? Function( AuthLoading value)?  loading,TResult? Function( AuthCodeSent value)?  codeSent,TResult? Function( AuthAuthenticated value)?  authenticated,TResult? Function( AuthError value)?  error,}){
+final _that = this;
+switch (_that) {
+case AuthInitial() when initial != null:
+return initial(_that);case AuthLoading() when loading != null:
+return loading(_that);case AuthCodeSent() when codeSent != null:
+return codeSent(_that);case AuthAuthenticated() when authenticated != null:
+return authenticated(_that);case AuthError() when error != null:
+return error(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function()?  loading,TResult Function( String email,  String? debugCode)?  codeSent,TResult Function( User user)?  authenticated,TResult Function( String message,  bool isOffline)?  error,required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case AuthInitial() when initial != null:
+return initial();case AuthLoading() when loading != null:
+return loading();case AuthCodeSent() when codeSent != null:
+return codeSent(_that.email,_that.debugCode);case AuthAuthenticated() when authenticated != null:
+return authenticated(_that.user);case AuthError() when error != null:
+return error(_that.message,_that.isOffline);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function()  loading,required TResult Function( String email,  String? debugCode)  codeSent,required TResult Function( User user)  authenticated,required TResult Function( String message,  bool isOffline)  error,}) {final _that = this;
+switch (_that) {
+case AuthInitial():
+return initial();case AuthLoading():
+return loading();case AuthCodeSent():
+return codeSent(_that.email,_that.debugCode);case AuthAuthenticated():
+return authenticated(_that.user);case AuthError():
+return error(_that.message,_that.isOffline);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function()?  loading,TResult? Function( String email,  String? debugCode)?  codeSent,TResult? Function( User user)?  authenticated,TResult? Function( String message,  bool isOffline)?  error,}) {final _that = this;
+switch (_that) {
+case AuthInitial() when initial != null:
+return initial();case AuthLoading() when loading != null:
+return loading();case AuthCodeSent() when codeSent != null:
+return codeSent(_that.email,_that.debugCode);case AuthAuthenticated() when authenticated != null:
+return authenticated(_that.user);case AuthError() when error != null:
+return error(_that.message,_that.isOffline);case _:
+  return null;
+
+}
+}
+
 }
 
 /// @nodoc
-class _$AuthStateCopyWithImpl<$Res, $Val extends AuthState>
-    implements $AuthStateCopyWith<$Res> {
-  _$AuthStateCopyWithImpl(this._value, this._then);
 
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
+
+class AuthInitial with DiagnosticableTreeMixin implements AuthState {
+  const AuthInitial();
+  
+
+
+
+
+
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties
+    ..add(DiagnosticsProperty('type', 'AuthState.initial'))
+    ;
 }
 
-/// @nodoc
-abstract class _$$AuthInitialImplCopyWith<$Res> {
-  factory _$$AuthInitialImplCopyWith(
-          _$AuthInitialImpl value, $Res Function(_$AuthInitialImpl) then) =
-      __$$AuthInitialImplCopyWithImpl<$Res>;
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthInitial);
 }
 
-/// @nodoc
-class __$$AuthInitialImplCopyWithImpl<$Res>
-    extends _$AuthStateCopyWithImpl<$Res, _$AuthInitialImpl>
-    implements _$$AuthInitialImplCopyWith<$Res> {
-  __$$AuthInitialImplCopyWithImpl(
-      _$AuthInitialImpl _value, $Res Function(_$AuthInitialImpl) _then)
-      : super(_value, _then);
-}
 
-/// @nodoc
+@override
+int get hashCode => runtimeType.hashCode;
 
-class _$AuthInitialImpl with DiagnosticableTreeMixin implements AuthInitial {
-  const _$AuthInitialImpl();
-
-  @override
-  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
+@override
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
     return 'AuthState.initial()';
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty('type', 'AuthState.initial'));
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType && other is _$AuthInitialImpl);
-  }
-
-  @override
-  int get hashCode => runtimeType.hashCode;
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function() initial,
-    required TResult Function() loading,
-    required TResult Function(String email, String? debugCode) codeSent,
-    required TResult Function(User user) authenticated,
-    required TResult Function(String message, bool isOffline) error,
-  }) {
-    return initial();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? initial,
-    TResult? Function()? loading,
-    TResult? Function(String email, String? debugCode)? codeSent,
-    TResult? Function(User user)? authenticated,
-    TResult? Function(String message, bool isOffline)? error,
-  }) {
-    return initial?.call();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? initial,
-    TResult Function()? loading,
-    TResult Function(String email, String? debugCode)? codeSent,
-    TResult Function(User user)? authenticated,
-    TResult Function(String message, bool isOffline)? error,
-    required TResult orElse(),
-  }) {
-    if (initial != null) {
-      return initial();
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(AuthInitial value) initial,
-    required TResult Function(AuthLoading value) loading,
-    required TResult Function(AuthCodeSent value) codeSent,
-    required TResult Function(AuthAuthenticated value) authenticated,
-    required TResult Function(AuthError value) error,
-  }) {
-    return initial(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(AuthInitial value)? initial,
-    TResult? Function(AuthLoading value)? loading,
-    TResult? Function(AuthCodeSent value)? codeSent,
-    TResult? Function(AuthAuthenticated value)? authenticated,
-    TResult? Function(AuthError value)? error,
-  }) {
-    return initial?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(AuthInitial value)? initial,
-    TResult Function(AuthLoading value)? loading,
-    TResult Function(AuthCodeSent value)? codeSent,
-    TResult Function(AuthAuthenticated value)? authenticated,
-    TResult Function(AuthError value)? error,
-    required TResult orElse(),
-  }) {
-    if (initial != null) {
-      return initial(this);
-    }
-    return orElse();
-  }
 }
 
-abstract class AuthInitial implements AuthState {
-  const factory AuthInitial() = _$AuthInitialImpl;
+
 }
 
-/// @nodoc
-abstract class _$$AuthLoadingImplCopyWith<$Res> {
-  factory _$$AuthLoadingImplCopyWith(
-          _$AuthLoadingImpl value, $Res Function(_$AuthLoadingImpl) then) =
-      __$$AuthLoadingImplCopyWithImpl<$Res>;
-}
 
-/// @nodoc
-class __$$AuthLoadingImplCopyWithImpl<$Res>
-    extends _$AuthStateCopyWithImpl<$Res, _$AuthLoadingImpl>
-    implements _$$AuthLoadingImplCopyWith<$Res> {
-  __$$AuthLoadingImplCopyWithImpl(
-      _$AuthLoadingImpl _value, $Res Function(_$AuthLoadingImpl) _then)
-      : super(_value, _then);
-}
+
 
 /// @nodoc
 
-class _$AuthLoadingImpl with DiagnosticableTreeMixin implements AuthLoading {
-  const _$AuthLoadingImpl();
 
-  @override
-  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
+class AuthLoading with DiagnosticableTreeMixin implements AuthState {
+  const AuthLoading();
+  
+
+
+
+
+
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties
+    ..add(DiagnosticsProperty('type', 'AuthState.loading'))
+    ;
+}
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthLoading);
+}
+
+
+@override
+int get hashCode => runtimeType.hashCode;
+
+@override
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
     return 'AuthState.loading()';
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty('type', 'AuthState.loading'));
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType && other is _$AuthLoadingImpl);
-  }
-
-  @override
-  int get hashCode => runtimeType.hashCode;
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function() initial,
-    required TResult Function() loading,
-    required TResult Function(String email, String? debugCode) codeSent,
-    required TResult Function(User user) authenticated,
-    required TResult Function(String message, bool isOffline) error,
-  }) {
-    return loading();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? initial,
-    TResult? Function()? loading,
-    TResult? Function(String email, String? debugCode)? codeSent,
-    TResult? Function(User user)? authenticated,
-    TResult? Function(String message, bool isOffline)? error,
-  }) {
-    return loading?.call();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? initial,
-    TResult Function()? loading,
-    TResult Function(String email, String? debugCode)? codeSent,
-    TResult Function(User user)? authenticated,
-    TResult Function(String message, bool isOffline)? error,
-    required TResult orElse(),
-  }) {
-    if (loading != null) {
-      return loading();
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(AuthInitial value) initial,
-    required TResult Function(AuthLoading value) loading,
-    required TResult Function(AuthCodeSent value) codeSent,
-    required TResult Function(AuthAuthenticated value) authenticated,
-    required TResult Function(AuthError value) error,
-  }) {
-    return loading(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(AuthInitial value)? initial,
-    TResult? Function(AuthLoading value)? loading,
-    TResult? Function(AuthCodeSent value)? codeSent,
-    TResult? Function(AuthAuthenticated value)? authenticated,
-    TResult? Function(AuthError value)? error,
-  }) {
-    return loading?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(AuthInitial value)? initial,
-    TResult Function(AuthLoading value)? loading,
-    TResult Function(AuthCodeSent value)? codeSent,
-    TResult Function(AuthAuthenticated value)? authenticated,
-    TResult Function(AuthError value)? error,
-    required TResult orElse(),
-  }) {
-    if (loading != null) {
-      return loading(this);
-    }
-    return orElse();
-  }
 }
 
-abstract class AuthLoading implements AuthState {
-  const factory AuthLoading() = _$AuthLoadingImpl;
+
 }
 
-/// @nodoc
-abstract class _$$AuthCodeSentImplCopyWith<$Res> {
-  factory _$$AuthCodeSentImplCopyWith(
-          _$AuthCodeSentImpl value, $Res Function(_$AuthCodeSentImpl) then) =
-      __$$AuthCodeSentImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String email, String? debugCode});
-}
 
-/// @nodoc
-class __$$AuthCodeSentImplCopyWithImpl<$Res>
-    extends _$AuthStateCopyWithImpl<$Res, _$AuthCodeSentImpl>
-    implements _$$AuthCodeSentImplCopyWith<$Res> {
-  __$$AuthCodeSentImplCopyWithImpl(
-      _$AuthCodeSentImpl _value, $Res Function(_$AuthCodeSentImpl) _then)
-      : super(_value, _then);
 
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? email = null,
-    Object? debugCode = freezed,
-  }) {
-    return _then(_$AuthCodeSentImpl(
-      email: null == email
-          ? _value.email
-          : email // ignore: cast_nullable_to_non_nullable
-              as String,
-      debugCode: freezed == debugCode
-          ? _value.debugCode
-          : debugCode // ignore: cast_nullable_to_non_nullable
-              as String?,
-    ));
-  }
-}
 
 /// @nodoc
 
-class _$AuthCodeSentImpl with DiagnosticableTreeMixin implements AuthCodeSent {
-  const _$AuthCodeSentImpl({required this.email, this.debugCode});
 
-  @override
-  final String email;
-  @override
-  final String? debugCode;
+class AuthCodeSent with DiagnosticableTreeMixin implements AuthState {
+  const AuthCodeSent({required this.email, this.debugCode});
+  
 
-  @override
-  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
+ final  String email;
+ final  String? debugCode;
+
+/// Create a copy of AuthState
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$AuthCodeSentCopyWith<AuthCodeSent> get copyWith => _$AuthCodeSentCopyWithImpl<AuthCodeSent>(this, _$identity);
+
+
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties
+    ..add(DiagnosticsProperty('type', 'AuthState.codeSent'))
+    ..add(DiagnosticsProperty('email', email))..add(DiagnosticsProperty('debugCode', debugCode));
+}
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthCodeSent&&(identical(other.email, email) || other.email == email)&&(identical(other.debugCode, debugCode) || other.debugCode == debugCode));
+}
+
+
+@override
+int get hashCode {
+    return Object.hash(runtimeType,email,debugCode);
+}
+
+@override
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
     return 'AuthState.codeSent(email: $email, debugCode: $debugCode)';
-  }
+}
 
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
+
+}
+
+/// @nodoc
+abstract mixin class $AuthCodeSentCopyWith<$Res> implements $AuthStateCopyWith<$Res> {
+  factory $AuthCodeSentCopyWith(AuthCodeSent value, $Res Function(AuthCodeSent) _then) = _$AuthCodeSentCopyWithImpl;
+@useResult
+$Res call({
+ String email, String? debugCode
+});
+
+
+
+
+}
+/// @nodoc
+class _$AuthCodeSentCopyWithImpl<$Res>
+    implements $AuthCodeSentCopyWith<$Res> {
+  _$AuthCodeSentCopyWithImpl(this._self, this._then);
+
+  final AuthCodeSent _self;
+  final $Res Function(AuthCodeSent) _then;
+
+/// Create a copy of AuthState
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? email = null,Object? debugCode = freezed,}) {
+  return _then(AuthCodeSent(
+email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
+as String,debugCode: freezed == debugCode ? _self.debugCode : debugCode // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+
+}
+
+/// @nodoc
+
+
+class AuthAuthenticated with DiagnosticableTreeMixin implements AuthState {
+  const AuthAuthenticated({required this.user});
+  
+
+ final  User user;
+
+/// Create a copy of AuthState
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$AuthAuthenticatedCopyWith<AuthAuthenticated> get copyWith => _$AuthAuthenticatedCopyWithImpl<AuthAuthenticated>(this, _$identity);
+
+
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     properties
-      ..add(DiagnosticsProperty('type', 'AuthState.codeSent'))
-      ..add(DiagnosticsProperty('email', email))
-      ..add(DiagnosticsProperty('debugCode', debugCode));
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AuthCodeSentImpl &&
-            (identical(other.email, email) || other.email == email) &&
-            (identical(other.debugCode, debugCode) ||
-                other.debugCode == debugCode));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, email, debugCode);
-
-  @JsonKey(ignore: true)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AuthCodeSentImplCopyWith<_$AuthCodeSentImpl> get copyWith =>
-      __$$AuthCodeSentImplCopyWithImpl<_$AuthCodeSentImpl>(this, _$identity);
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function() initial,
-    required TResult Function() loading,
-    required TResult Function(String email, String? debugCode) codeSent,
-    required TResult Function(User user) authenticated,
-    required TResult Function(String message, bool isOffline) error,
-  }) {
-    return codeSent(email, debugCode);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? initial,
-    TResult? Function()? loading,
-    TResult? Function(String email, String? debugCode)? codeSent,
-    TResult? Function(User user)? authenticated,
-    TResult? Function(String message, bool isOffline)? error,
-  }) {
-    return codeSent?.call(email, debugCode);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? initial,
-    TResult Function()? loading,
-    TResult Function(String email, String? debugCode)? codeSent,
-    TResult Function(User user)? authenticated,
-    TResult Function(String message, bool isOffline)? error,
-    required TResult orElse(),
-  }) {
-    if (codeSent != null) {
-      return codeSent(email, debugCode);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(AuthInitial value) initial,
-    required TResult Function(AuthLoading value) loading,
-    required TResult Function(AuthCodeSent value) codeSent,
-    required TResult Function(AuthAuthenticated value) authenticated,
-    required TResult Function(AuthError value) error,
-  }) {
-    return codeSent(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(AuthInitial value)? initial,
-    TResult? Function(AuthLoading value)? loading,
-    TResult? Function(AuthCodeSent value)? codeSent,
-    TResult? Function(AuthAuthenticated value)? authenticated,
-    TResult? Function(AuthError value)? error,
-  }) {
-    return codeSent?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(AuthInitial value)? initial,
-    TResult Function(AuthLoading value)? loading,
-    TResult Function(AuthCodeSent value)? codeSent,
-    TResult Function(AuthAuthenticated value)? authenticated,
-    TResult Function(AuthError value)? error,
-    required TResult orElse(),
-  }) {
-    if (codeSent != null) {
-      return codeSent(this);
-    }
-    return orElse();
-  }
+    ..add(DiagnosticsProperty('type', 'AuthState.authenticated'))
+    ..add(DiagnosticsProperty('user', user));
 }
 
-abstract class AuthCodeSent implements AuthState {
-  const factory AuthCodeSent(
-      {required final String email,
-      final String? debugCode}) = _$AuthCodeSentImpl;
-
-  String get email;
-  String? get debugCode;
-  @JsonKey(ignore: true)
-  _$$AuthCodeSentImplCopyWith<_$AuthCodeSentImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthAuthenticated&&(identical(other.user, user) || other.user == user));
 }
 
-/// @nodoc
-abstract class _$$AuthAuthenticatedImplCopyWith<$Res> {
-  factory _$$AuthAuthenticatedImplCopyWith(_$AuthAuthenticatedImpl value,
-          $Res Function(_$AuthAuthenticatedImpl) then) =
-      __$$AuthAuthenticatedImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({User user});
 
-  $UserCopyWith<$Res> get user;
+@override
+int get hashCode {
+    return Object.hash(runtimeType,user);
 }
 
-/// @nodoc
-class __$$AuthAuthenticatedImplCopyWithImpl<$Res>
-    extends _$AuthStateCopyWithImpl<$Res, _$AuthAuthenticatedImpl>
-    implements _$$AuthAuthenticatedImplCopyWith<$Res> {
-  __$$AuthAuthenticatedImplCopyWithImpl(_$AuthAuthenticatedImpl _value,
-      $Res Function(_$AuthAuthenticatedImpl) _then)
-      : super(_value, _then);
-
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? user = null,
-  }) {
-    return _then(_$AuthAuthenticatedImpl(
-      user: null == user
-          ? _value.user
-          : user // ignore: cast_nullable_to_non_nullable
-              as User,
-    ));
-  }
-
-  @override
-  @pragma('vm:prefer-inline')
-  $UserCopyWith<$Res> get user {
-    return $UserCopyWith<$Res>(_value.user, (value) {
-      return _then(_value.copyWith(user: value));
-    });
-  }
-}
-
-/// @nodoc
-
-class _$AuthAuthenticatedImpl
-    with DiagnosticableTreeMixin
-    implements AuthAuthenticated {
-  const _$AuthAuthenticatedImpl({required this.user});
-
-  @override
-  final User user;
-
-  @override
-  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
+@override
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
     return 'AuthState.authenticated(user: $user)';
-  }
+}
 
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
+
+}
+
+/// @nodoc
+abstract mixin class $AuthAuthenticatedCopyWith<$Res> implements $AuthStateCopyWith<$Res> {
+  factory $AuthAuthenticatedCopyWith(AuthAuthenticated value, $Res Function(AuthAuthenticated) _then) = _$AuthAuthenticatedCopyWithImpl;
+@useResult
+$Res call({
+ User user
+});
+
+
+$UserCopyWith<$Res> get user;
+
+}
+/// @nodoc
+class _$AuthAuthenticatedCopyWithImpl<$Res>
+    implements $AuthAuthenticatedCopyWith<$Res> {
+  _$AuthAuthenticatedCopyWithImpl(this._self, this._then);
+
+  final AuthAuthenticated _self;
+  final $Res Function(AuthAuthenticated) _then;
+
+/// Create a copy of AuthState
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? user = null,}) {
+  return _then(AuthAuthenticated(
+user: null == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
+as User,
+  ));
+}
+
+/// Create a copy of AuthState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$UserCopyWith<$Res> get user {
+  
+  return $UserCopyWith<$Res>(_self.user, (value) {
+    return _then(_self.copyWith(user: value));
+  });
+}
+}
+
+/// @nodoc
+
+
+class AuthError with DiagnosticableTreeMixin implements AuthState {
+  const AuthError({required this.message, this.isOffline = false});
+  
+
+ final  String message;
+@JsonKey() final  bool isOffline;
+
+/// Create a copy of AuthState
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$AuthErrorCopyWith<AuthError> get copyWith => _$AuthErrorCopyWithImpl<AuthError>(this, _$identity);
+
+
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     properties
-      ..add(DiagnosticsProperty('type', 'AuthState.authenticated'))
-      ..add(DiagnosticsProperty('user', user));
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AuthAuthenticatedImpl &&
-            (identical(other.user, user) || other.user == user));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, user);
-
-  @JsonKey(ignore: true)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AuthAuthenticatedImplCopyWith<_$AuthAuthenticatedImpl> get copyWith =>
-      __$$AuthAuthenticatedImplCopyWithImpl<_$AuthAuthenticatedImpl>(
-          this, _$identity);
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function() initial,
-    required TResult Function() loading,
-    required TResult Function(String email, String? debugCode) codeSent,
-    required TResult Function(User user) authenticated,
-    required TResult Function(String message, bool isOffline) error,
-  }) {
-    return authenticated(user);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? initial,
-    TResult? Function()? loading,
-    TResult? Function(String email, String? debugCode)? codeSent,
-    TResult? Function(User user)? authenticated,
-    TResult? Function(String message, bool isOffline)? error,
-  }) {
-    return authenticated?.call(user);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? initial,
-    TResult Function()? loading,
-    TResult Function(String email, String? debugCode)? codeSent,
-    TResult Function(User user)? authenticated,
-    TResult Function(String message, bool isOffline)? error,
-    required TResult orElse(),
-  }) {
-    if (authenticated != null) {
-      return authenticated(user);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(AuthInitial value) initial,
-    required TResult Function(AuthLoading value) loading,
-    required TResult Function(AuthCodeSent value) codeSent,
-    required TResult Function(AuthAuthenticated value) authenticated,
-    required TResult Function(AuthError value) error,
-  }) {
-    return authenticated(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(AuthInitial value)? initial,
-    TResult? Function(AuthLoading value)? loading,
-    TResult? Function(AuthCodeSent value)? codeSent,
-    TResult? Function(AuthAuthenticated value)? authenticated,
-    TResult? Function(AuthError value)? error,
-  }) {
-    return authenticated?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(AuthInitial value)? initial,
-    TResult Function(AuthLoading value)? loading,
-    TResult Function(AuthCodeSent value)? codeSent,
-    TResult Function(AuthAuthenticated value)? authenticated,
-    TResult Function(AuthError value)? error,
-    required TResult orElse(),
-  }) {
-    if (authenticated != null) {
-      return authenticated(this);
-    }
-    return orElse();
-  }
+    ..add(DiagnosticsProperty('type', 'AuthState.error'))
+    ..add(DiagnosticsProperty('message', message))..add(DiagnosticsProperty('isOffline', isOffline));
 }
 
-abstract class AuthAuthenticated implements AuthState {
-  const factory AuthAuthenticated({required final User user}) =
-      _$AuthAuthenticatedImpl;
-
-  User get user;
-  @JsonKey(ignore: true)
-  _$$AuthAuthenticatedImplCopyWith<_$AuthAuthenticatedImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthError&&(identical(other.message, message) || other.message == message)&&(identical(other.isOffline, isOffline) || other.isOffline == isOffline));
 }
 
-/// @nodoc
-abstract class _$$AuthErrorImplCopyWith<$Res> {
-  factory _$$AuthErrorImplCopyWith(
-          _$AuthErrorImpl value, $Res Function(_$AuthErrorImpl) then) =
-      __$$AuthErrorImplCopyWithImpl<$Res>;
-  @useResult
-  $Res call({String message, bool isOffline});
+
+@override
+int get hashCode {
+    return Object.hash(runtimeType,message,isOffline);
 }
 
-/// @nodoc
-class __$$AuthErrorImplCopyWithImpl<$Res>
-    extends _$AuthStateCopyWithImpl<$Res, _$AuthErrorImpl>
-    implements _$$AuthErrorImplCopyWith<$Res> {
-  __$$AuthErrorImplCopyWithImpl(
-      _$AuthErrorImpl _value, $Res Function(_$AuthErrorImpl) _then)
-      : super(_value, _then);
-
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? message = null,
-    Object? isOffline = null,
-  }) {
-    return _then(_$AuthErrorImpl(
-      message: null == message
-          ? _value.message
-          : message // ignore: cast_nullable_to_non_nullable
-              as String,
-      isOffline: null == isOffline
-          ? _value.isOffline
-          : isOffline // ignore: cast_nullable_to_non_nullable
-              as bool,
-    ));
-  }
-}
-
-/// @nodoc
-
-class _$AuthErrorImpl with DiagnosticableTreeMixin implements AuthError {
-  const _$AuthErrorImpl({required this.message, this.isOffline = false});
-
-  @override
-  final String message;
-  @override
-  @JsonKey()
-  final bool isOffline;
-
-  @override
-  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
+@override
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
     return 'AuthState.error(message: $message, isOffline: $isOffline)';
-  }
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties
-      ..add(DiagnosticsProperty('type', 'AuthState.error'))
-      ..add(DiagnosticsProperty('message', message))
-      ..add(DiagnosticsProperty('isOffline', isOffline));
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AuthErrorImpl &&
-            (identical(other.message, message) || other.message == message) &&
-            (identical(other.isOffline, isOffline) ||
-                other.isOffline == isOffline));
-  }
-
-  @override
-  int get hashCode => Object.hash(runtimeType, message, isOffline);
-
-  @JsonKey(ignore: true)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AuthErrorImplCopyWith<_$AuthErrorImpl> get copyWith =>
-      __$$AuthErrorImplCopyWithImpl<_$AuthErrorImpl>(this, _$identity);
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function() initial,
-    required TResult Function() loading,
-    required TResult Function(String email, String? debugCode) codeSent,
-    required TResult Function(User user) authenticated,
-    required TResult Function(String message, bool isOffline) error,
-  }) {
-    return error(message, isOffline);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function()? initial,
-    TResult? Function()? loading,
-    TResult? Function(String email, String? debugCode)? codeSent,
-    TResult? Function(User user)? authenticated,
-    TResult? Function(String message, bool isOffline)? error,
-  }) {
-    return error?.call(message, isOffline);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function()? initial,
-    TResult Function()? loading,
-    TResult Function(String email, String? debugCode)? codeSent,
-    TResult Function(User user)? authenticated,
-    TResult Function(String message, bool isOffline)? error,
-    required TResult orElse(),
-  }) {
-    if (error != null) {
-      return error(message, isOffline);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(AuthInitial value) initial,
-    required TResult Function(AuthLoading value) loading,
-    required TResult Function(AuthCodeSent value) codeSent,
-    required TResult Function(AuthAuthenticated value) authenticated,
-    required TResult Function(AuthError value) error,
-  }) {
-    return error(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(AuthInitial value)? initial,
-    TResult? Function(AuthLoading value)? loading,
-    TResult? Function(AuthCodeSent value)? codeSent,
-    TResult? Function(AuthAuthenticated value)? authenticated,
-    TResult? Function(AuthError value)? error,
-  }) {
-    return error?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(AuthInitial value)? initial,
-    TResult Function(AuthLoading value)? loading,
-    TResult Function(AuthCodeSent value)? codeSent,
-    TResult Function(AuthAuthenticated value)? authenticated,
-    TResult Function(AuthError value)? error,
-    required TResult orElse(),
-  }) {
-    if (error != null) {
-      return error(this);
-    }
-    return orElse();
-  }
 }
 
-abstract class AuthError implements AuthState {
-  const factory AuthError(
-      {required final String message, final bool isOffline}) = _$AuthErrorImpl;
 
-  String get message;
-  bool get isOffline;
-  @JsonKey(ignore: true)
-  _$$AuthErrorImplCopyWith<_$AuthErrorImpl> get copyWith =>
-      throw _privateConstructorUsedError;
 }
+
+/// @nodoc
+abstract mixin class $AuthErrorCopyWith<$Res> implements $AuthStateCopyWith<$Res> {
+  factory $AuthErrorCopyWith(AuthError value, $Res Function(AuthError) _then) = _$AuthErrorCopyWithImpl;
+@useResult
+$Res call({
+ String message, bool isOffline
+});
+
+
+
+
+}
+/// @nodoc
+class _$AuthErrorCopyWithImpl<$Res>
+    implements $AuthErrorCopyWith<$Res> {
+  _$AuthErrorCopyWithImpl(this._self, this._then);
+
+  final AuthError _self;
+  final $Res Function(AuthError) _then;
+
+/// Create a copy of AuthState
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? message = null,Object? isOffline = null,}) {
+  return _then(AuthError(
+message: null == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
+as String,isOffline: null == isOffline ? _self.isOffline : isOffline // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+
+}
+
+// dart format on

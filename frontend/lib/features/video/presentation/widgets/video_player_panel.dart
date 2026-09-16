@@ -72,7 +72,7 @@ MaterialVideoControlsThemeData _buildMobileControlsTheme(
 }
 
 class VideoPlayerPanel extends ConsumerStatefulWidget {
-  const VideoPlayerPanel({
+  const new({
     required this.media,
     this.isFullscreen = false,
     this.onToggleFullscreen,
@@ -86,8 +86,7 @@ class VideoPlayerPanel extends ConsumerStatefulWidget {
   final VoidCallback? onClose;
 
   @override
-  ConsumerState<VideoPlayerPanel> createState() =>
-      _VideoPlayerPanelState();
+  ConsumerState<VideoPlayerPanel> createState() => _VideoPlayerPanelState();
 }
 
 class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
@@ -146,9 +145,7 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     if (playback is PlaybackPlaying &&
         playback.type == MediaType.video &&
         !playback.isPaused) {
-      unawaited(
-        ref.read(playbackCoordinatorProvider.notifier).pause(),
-      );
+      unawaited(ref.read(playbackCoordinatorProvider.notifier).pause());
     }
   }
 
@@ -202,9 +199,7 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     final isMobile = Platform.isAndroid || Platform.isIOS;
     final mobileTheme = _buildMobileControlsTheme(
       MediaQuery.of(context),
-      topButtonBar: [
-        _BackButton(onClose: widget.onClose),
-      ],
+      topButtonBar: [_BackButton(onClose: widget.onClose)],
       bottomButtonBar: [
         const Spacer(),
         const _SeekButton(direction: -1),
@@ -218,8 +213,7 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
       ],
     );
 
-    final desktopTheme =
-        const MaterialDesktopVideoControlsThemeData().copyWith(
+    final desktopTheme = const MaterialDesktopVideoControlsThemeData().copyWith(
       topButtonBar: [_BackButton(onClose: widget.onClose)],
       bottomButtonBar: [
         const MaterialDesktopSkipPreviousButton(),
@@ -245,8 +239,9 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
         fullscreen: desktopTheme,
         child: Video(
           controller: ref.watch(videoControllerProvider),
-          controls:
-              isMobile ? MaterialVideoControls : MaterialDesktopVideoControls,
+          controls: isMobile
+              ? MaterialVideoControls
+              : MaterialDesktopVideoControls,
         ),
       ),
     );
@@ -290,9 +285,7 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            l.continueFrom(
-                              view.savedPosition!.formatted,
-                            ),
+                            l.continueFrom(view.savedPosition!.formatted),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -310,24 +303,18 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     );
 
     if (widget.isFullscreen) {
-      return ColoredBox(
-        color: Colors.black,
-        child: posterOrBody,
-      );
+      return ColoredBox(color: Colors.black, child: posterOrBody);
     }
     // Embedded: 16:9 until video dimensions are known.
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: ColoredBox(
-        color: Colors.black,
-        child: posterOrBody,
-      ),
+      child: ColoredBox(color: Colors.black, child: posterOrBody),
     );
   }
 }
 
 class _Poster extends ConsumerWidget {
-  const _Poster({required this.media});
+  const new({required this.media});
   final Media media;
 
   @override
@@ -343,15 +330,15 @@ class _Poster extends ConsumerWidget {
       child: AuthNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,
-        placeholder: (_, __) => const SizedBox.shrink(),
-        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        placeholder: (_, _) => const SizedBox.shrink(),
+        errorWidget: (_, _, _) => const SizedBox.shrink(),
       ),
     );
   }
 }
 
 class _BackButton extends ConsumerWidget {
-  const _BackButton({this.onClose});
+  const new({this.onClose});
   final VoidCallback? onClose;
 
   @override
@@ -373,7 +360,7 @@ class _BackButton extends ConsumerWidget {
 }
 
 class _FullscreenButton extends StatelessWidget {
-  const _FullscreenButton({this.onTap});
+  const new({this.onTap});
   final VoidCallback? onTap;
 
   @override
@@ -387,23 +374,20 @@ class _FullscreenButton extends StatelessWidget {
 }
 
 class _SeekButton extends ConsumerWidget {
-  const _SeekButton({required this.direction});
+  const new({required this.direction});
   final int direction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final coordinator =
-        ref.read(playbackCoordinatorProvider.notifier);
+    final coordinator = ref.read(playbackCoordinatorProvider.notifier);
     return IconButton(
       color: Colors.white,
       icon: Icon(direction < 0 ? Icons.replay_10 : Icons.forward_10),
       iconSize: 24,
       onPressed: () {
-        final position =
-            ref.read(videoPlayerDatasourceProvider).position;
+        final position = ref.read(videoPlayerDatasourceProvider).position;
         coordinator.seek(
-          position +
-              Duration(seconds: _seekStep.inSeconds * direction),
+          position + Duration(seconds: _seekStep.inSeconds * direction),
         );
       },
     );
@@ -411,7 +395,7 @@ class _SeekButton extends ConsumerWidget {
 }
 
 class _SpeedButton extends ConsumerStatefulWidget {
-  const _SpeedButton();
+  const new();
 
   @override
   ConsumerState<_SpeedButton> createState() => _SpeedButtonState();

@@ -29,7 +29,7 @@ void refreshMediaLists(WidgetRef ref) {
 }
 
 class MediaListResult {
-  const MediaListResult({required this.items, required this.total});
+  const new({required this.items, required this.total});
 
   final IList<Media> items;
   final int total;
@@ -44,11 +44,10 @@ final mediaRemoteDataSourceProvider = Provider<MediaRemoteDataSource>((ref) {
     refreshAuth: () async {
       final refreshToken = ref.read(settingsProvider).settings.refreshToken;
       if (refreshToken == null) return null;
-      final refreshed =
-          await ref.read(authTokenRefresherProvider).refresh(refreshToken);
-      return refreshed
-          ? ref.read(settingsProvider).settings.authToken
-          : null;
+      final refreshed = await ref
+          .read(authTokenRefresherProvider)
+          .refresh(refreshToken);
+      return refreshed ? ref.read(settingsProvider).settings.authToken : null;
     },
   );
 });
@@ -103,9 +102,15 @@ final updateMetadataProvider = Provider<UpdateMetadata>((ref) {
 
 /// Текущий поисковый запрос, ограниченный типом медиа ('video'/'audio').
 /// Family не даёт состоянию «протекать» между вкладками.
-class SearchQueryNotifier extends FamilyNotifier<String, String> {
+class SearchQueryNotifier extends Notifier<String> {
+  // Riverpod 3: family-аргумент приходит через конструктор (create-функция
+  // провайдера — tear-off конструктора с параметром), build() без аргументов.
+  new(this.type);
+
+  final String type;
+
   @override
-  String build(String type) => '';
+  String build() => '';
 
   /// Текущий поисковый запрос для типа медиа.
   String get query => state;
@@ -116,24 +121,30 @@ class SearchQueryNotifier extends FamilyNotifier<String, String> {
 
 final searchQueryProvider =
     NotifierProvider.family<SearchQueryNotifier, String, String>(
-  SearchQueryNotifier.new,
-);
+      SearchQueryNotifier.new,
+    );
 
 /// Media list scoped to a media type ('video' or 'audio').
 /// Using a family avoids state leakage between audio/video tabs that
 /// previously shared a single global [mediaListProvider].
 final mediaListProvider =
     AsyncNotifierProvider.family<MediaListNotifier, MediaListResult, String>(
-  MediaListNotifier.new,
-);
+      MediaListNotifier.new,
+    );
 
-class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
+class MediaListNotifier extends AsyncNotifier<MediaListResult> {
+  // Riverpod 3: family-аргумент приходит через конструктор (create-функция
+  // провайдера — tear-off конструктора с параметром), build() без аргументов.
+  new(this.type);
+
+  final String type;
+
   static const _pageSize = 20;
 
   bool _isLoadingMore = false;
 
   @override
-  Future<MediaListResult> build(String type) async {
+  Future<MediaListResult> build() async {
     // Смена query (или тип) пересоздаёт список: сбрасываем флаг,
     // иначе незавершённый loadMore заблокирует подгрузку нового списка.
     _isLoadingMore = false;
@@ -160,10 +171,7 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
       },
       (data) {
         ref.read(networkStatusProvider.notifier).markOnline();
-        return MediaListResult(
-          items: data.items.toIList(),
-          total: data.total,
-        );
+        return MediaListResult(items: data.items.toIList(), total: data.total);
       },
     );
   }
@@ -181,7 +189,7 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
     if (_isLoadingMore) return;
 
     // Capture the query at call time.
-    final qAtCall = ref.read(searchQueryProvider(arg));
+    final qAtCall = ref.read(searchQueryProvider(type));
     _isLoadingMore = true;
 
     final getMediaList = ref.read(getMediaListProvider);
@@ -190,14 +198,14 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
         limit: _pageSize,
         offset: current.items.length,
         q: qAtCall.isEmpty ? null : qAtCall,
-        type: arg,
+        type: type,
       ),
     );
 
     _isLoadingMore = false;
 
     // If the query changed during the async request, discard the result.
-    final qNow = ref.read(searchQueryProvider(arg));
+    final qNow = ref.read(searchQueryProvider(type));
     if (qNow != qAtCall) return;
 
     result.fold(
@@ -205,12 +213,13 @@ class MediaListNotifier extends FamilyAsyncNotifier<MediaListResult, String> {
         if (failure is NetworkFailure) {
           ref.read(networkStatusProvider.notifier).markOffline();
         }
-        // Данные сохраняем, но ошибку показываем: без `AsyncValue.error`
-        // copyWithPrevious — no-op, и пользователь не узнал бы о провале.
+        // Данные сохраняем, но ошибку показываем: Riverpod 3 при
+        // присвоении AsyncError сам сохраняет предыдущее значение
+        // (copyWithPrevious теперь internal и вызывается фреймворком).
         state = AsyncValue<MediaListResult>.error(
           Exception(failure.message),
           StackTrace.current,
-        ).copyWithPrevious(state);
+        );
       },
       (data) {
         ref.read(networkStatusProvider.notifier).markOnline();

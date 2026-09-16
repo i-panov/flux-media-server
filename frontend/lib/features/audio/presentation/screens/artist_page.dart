@@ -24,11 +24,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class ArtistPage extends ConsumerStatefulWidget {
-  const ArtistPage({
-    required this.artistId,
-    required this.artistName,
-    super.key,
-  });
+  const new({required this.artistId, required this.artistName, super.key});
 
   final int artistId;
   final String artistName;
@@ -99,11 +95,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
         final l = AppLocalizations.of(context)!;
         final message = failed > 0
             ? '${l.downloadedOfTotalTracks(downloaded, _downloadTotal)}, '
-                '${l.errorLabel}: $failed'
+                  '${l.errorLabel}: $failed'
             : l.downloadedOfTotalTracks(downloaded, _downloadTotal);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -121,12 +116,14 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
     final l = AppLocalizations.of(context)!;
 
     final mediaListState = ref.watch(mediaListProvider(_mediaType));
-    final favoritesHasError =
-        ref.watch(favoritesProvider.select((s) => s.hasError));
-    final favoritesLoading =
-        ref.watch(favoritesProvider.select((s) => s.isLoading));
+    final favoritesHasError = ref.watch(
+      favoritesProvider.select((s) => s.hasError),
+    );
+    final favoritesLoading = ref.watch(
+      favoritesProvider.select((s) => s.isLoading),
+    );
     final favoriteIds =
-        ref.watch(favoriteMediaIdsProvider).valueOrNull ?? const <int>{};
+        ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -145,9 +142,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
           if (_downloadingAll)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: Text('$_downloadedCount/$_downloadTotal'),
-              ),
+              child: Center(child: Text('$_downloadedCount/$_downloadTotal')),
             )
           else
             IconButton(
@@ -201,10 +196,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
     }
 
     final result = await ref.read(updateArtistNameProvider)(
-      UpdateArtistNameParams(
-        artistId: widget.artistId,
-        name: newName,
-      ),
+      UpdateArtistNameParams(artistId: widget.artistId, name: newName),
     );
     if (!mounted) return;
 
@@ -228,19 +220,16 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
   /// Замена обложки артиста.
   Future<void> _changeArtistCover() async {
     final l = AppLocalizations.of(context)!;
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
+    if (result.isEmpty) return;
+    final file = result.first;
     if (file.path == null) return;
 
     final uploadResult = await ref.read(uploadArtistCoverProvider)(
-      UploadArtistCoverParams(
-        artistId: widget.artistId,
-        filePath: file.path!,
-      ),
+      UploadArtistCoverParams(artistId: widget.artistId, filePath: file.path!),
     );
     if (!mounted) return;
 
@@ -275,8 +264,8 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
   }
 
   VoidCallback? _buildDownloadAll(AsyncValue<MediaListResult> mediaListState) {
-    if (mediaListState.valueOrNull == null) return null;
-    final mediaList = mediaListState.valueOrNull!;
+    if (mediaListState.value == null) return null;
+    final mediaList = mediaListState.value!;
     final tracks = mediaList.items
         .where(
           (m) =>
@@ -313,12 +302,13 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
       );
     }
 
-    final mediaList = mediaListState.valueOrNull ??
+    final mediaList =
+        mediaListState.value ??
         MediaListResult(items: <Media>[].toIList(), total: 0);
 
     final allTracks = mediaList.items
         .where(
-          (Media m) =>
+          (m) =>
               m.type == MediaType.audio &&
               m.artists.any((a) => a.id == widget.artistId),
         )
@@ -333,9 +323,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
             const SizedBox(height: 16),
             Text(
               l.noTracksFoundForArtist(widget.artistName),
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
+              style: Theme.of(context).textTheme.titleMedium
                   ?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
@@ -344,10 +332,12 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
       );
     }
 
-    final likedTracks =
-        allTracks.where((Media t) => favoriteIds.contains(t.id)).toList();
-    final otherTracks =
-        allTracks.where((Media t) => !favoriteIds.contains(t.id)).toList();
+    final likedTracks = allTracks
+        .where((t) => favoriteIds.contains(t.id))
+        .toList();
+    final otherTracks = allTracks
+        .where((t) => !favoriteIds.contains(t.id))
+        .toList();
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -364,62 +354,54 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
           if (likedTracks.isNotEmpty) ...[
             SliverSectionHeader(icon: Icons.favorite, title: l.likedTracks),
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final track = likedTracks[index];
-                  return AudioTrackRow(
-                    media: track,
-                    isFavorite: true,
-                    onPlay: () => _playTrack(likedTracks, index),
-                    onFavorite: () => toggleFavoriteTrack(ref, track.id),
-                    onDownload: () =>
-                        toggleDownloadTrack(ref, _mediaType, track.id),
-                    onAddToQueue: () => addTrackToQueue(ref, track),
-                    onAddToCollection: () => showAddToCollectionDialog(
-                      context,
-                      track.id,
-                      mediaType: 'audio',
-                    ),
-                    onEditMetadata: () =>
-                        showEditMetadataDialog(context, ref, track),
-                    onChangeCover: () =>
-                        changeMediaCover(context, ref, track.id),
-                    onDelete: () =>
-                        deleteMediaWithConfirm(context, ref, track.id),
-                  );
-                },
-                childCount: likedTracks.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final track = likedTracks[index];
+                return AudioTrackRow(
+                  media: track,
+                  isFavorite: true,
+                  onPlay: () => _playTrack(likedTracks, index),
+                  onFavorite: () => toggleFavoriteTrack(ref, track.id),
+                  onDownload: () =>
+                      toggleDownloadTrack(ref, _mediaType, track.id),
+                  onAddToQueue: () => addTrackToQueue(ref, track),
+                  onAddToCollection: () => showAddToCollectionDialog(
+                    context,
+                    track.id,
+                    mediaType: 'audio',
+                  ),
+                  onEditMetadata: () =>
+                      showEditMetadataDialog(context, ref, track),
+                  onChangeCover: () => changeMediaCover(context, ref, track.id),
+                  onDelete: () =>
+                      deleteMediaWithConfirm(context, ref, track.id),
+                );
+              }, childCount: likedTracks.length),
             ),
           ],
           if (otherTracks.isNotEmpty) ...[
             SliverSectionHeader(icon: Icons.music_note, title: l.allTracks),
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final track = otherTracks[index];
-                  return AudioTrackRow(
-                    media: track,
-                    onPlay: () => _playTrack(otherTracks, index),
-                    onFavorite: () => toggleFavoriteTrack(ref, track.id),
-                    onDownload: () =>
-                        toggleDownloadTrack(ref, _mediaType, track.id),
-                    onAddToQueue: () => addTrackToQueue(ref, track),
-                    onAddToCollection: () => showAddToCollectionDialog(
-                      context,
-                      track.id,
-                      mediaType: 'audio',
-                    ),
-                    onEditMetadata: () =>
-                        showEditMetadataDialog(context, ref, track),
-                    onChangeCover: () =>
-                        changeMediaCover(context, ref, track.id),
-                    onDelete: () =>
-                        deleteMediaWithConfirm(context, ref, track.id),
-                  );
-                },
-                childCount: otherTracks.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final track = otherTracks[index];
+                return AudioTrackRow(
+                  media: track,
+                  onPlay: () => _playTrack(otherTracks, index),
+                  onFavorite: () => toggleFavoriteTrack(ref, track.id),
+                  onDownload: () =>
+                      toggleDownloadTrack(ref, _mediaType, track.id),
+                  onAddToQueue: () => addTrackToQueue(ref, track),
+                  onAddToCollection: () => showAddToCollectionDialog(
+                    context,
+                    track.id,
+                    mediaType: 'audio',
+                  ),
+                  onEditMetadata: () =>
+                      showEditMetadataDialog(context, ref, track),
+                  onChangeCover: () => changeMediaCover(context, ref, track.id),
+                  onDelete: () =>
+                      deleteMediaWithConfirm(context, ref, track.id),
+                );
+              }, childCount: otherTracks.length),
             ),
           ],
           // Вместо бесконечного скролла (который догружал весь аудио-список

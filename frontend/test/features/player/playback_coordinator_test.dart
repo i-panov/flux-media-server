@@ -22,13 +22,8 @@ import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:media_kit/media_kit.dart' hide Media;
 
-Media _media(int id, MediaType type) => Media(
-      id: id,
-      title: 'Media $id',
-      year: 2024,
-      type: type,
-      fileSize: 1024,
-    );
+Media _media(int id, MediaType type) =>
+    Media(id: id, title: 'Media $id', year: 2024, type: type, fileSize: 1024);
 
 /// Settles all pending microtasks and short futures.
 Future<void> _settle() async {
@@ -220,7 +215,7 @@ class _FakeMediaRepository implements MediaRepository {
 
   /// (mediaId, position, duration, completed) в порядке вызовов.
   final List<({int mediaId, int position, int duration, bool? completed})>
-      updates = [];
+  updates = [];
 
   @override
   Future<Either<Failure, List<WatchProgress>>> getProgress() async =>
@@ -233,14 +228,12 @@ class _FakeMediaRepository implements MediaRepository {
     int? duration,
     bool? completed,
   }) async {
-    updates.add(
-      (
-        mediaId: mediaId,
-        position: position ?? 0,
-        duration: duration ?? 0,
-        completed: completed,
-      ),
-    );
+    updates.add((
+      mediaId: mediaId,
+      position: position ?? 0,
+      duration: duration ?? 0,
+      completed: completed,
+    ));
     return Right(
       WatchProgress(
         userId: 1,
@@ -254,7 +247,7 @@ class _FakeMediaRepository implements MediaRepository {
 
   @override
   Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
-      checkHash(String hash) => throw UnimplementedError();
+  checkHash(String hash) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, void>> deleteMedia(int id) =>
@@ -275,38 +268,33 @@ class _FakeMediaRepository implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
     MetadataEdit edit,
-  ) =>
-      throw UnimplementedError();
+  ) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, void>> uploadCover(
     int mediaId,
     String filePath, {
     bool Function()? isCancelled,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, Artist>> updateArtistName(
     int artistId,
     String name,
-  ) async =>
-      const Left(ServerFailure());
+  ) async => const Left(ServerFailure());
 
   @override
   Future<Either<Failure, void>> uploadArtistCover(
     int artistId,
     String filePath, {
     bool Function()? isCancelled,
-  }) async =>
-      const Left(ServerFailure());
+  }) async => const Left(ServerFailure());
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
@@ -315,8 +303,7 @@ class _FakeMediaRepository implements MediaRepository {
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) =>
@@ -358,7 +345,7 @@ class _FakeSettingsRepository implements SettingsRepository {
 }
 
 class _FakeOfflineCache extends OfflineCacheService {
-  _FakeOfflineCache(super.ref, super.baseUrl);
+  new(super.ref, super.baseUrl);
 
   @override
   Future<String?> getLocalPath(int mediaId) async => null;
@@ -448,8 +435,9 @@ void main() {
         ],
       );
       addTearDown(errorContainer.dispose);
-      final failingCoordinator =
-          errorContainer.read(playbackCoordinatorProvider.notifier);
+      final failingCoordinator = errorContainer.read(
+        playbackCoordinatorProvider.notifier,
+      );
 
       await expectLater(
         failingCoordinator.play(_media(1, MediaType.audio)),
@@ -515,26 +503,28 @@ void main() {
       expect(readState(), isA<PlaybackCompleted>());
     });
 
-    test('completion progress is saved for video before the next track starts',
-        () async {
-      await queue.setQueue([
-        _media(1, MediaType.video),
-        _media(2, MediaType.video),
-      ]);
-      video.durationCtl.add(const Duration(seconds: 100));
-      video.positionCtl.add(const Duration(seconds: 100));
-      await _settle();
+    test(
+      'completion progress is saved for video before the next track starts',
+      () async {
+        await queue.setQueue([
+          _media(1, MediaType.video),
+          _media(2, MediaType.video),
+        ]);
+        video.durationCtl.add(const Duration(seconds: 100));
+        video.positionCtl.add(const Duration(seconds: 100));
+        await _settle();
 
-      video.completedCtl.add(true);
-      await _settle();
+        video.completedCtl.add(true);
+        await _settle();
 
-      expect((readState() as PlaybackPlaying).media.id, 2);
-      final callsFor1 = repo.updates.where((u) => u.mediaId == 1).toList();
-      expect(callsFor1, isNotEmpty);
-      // Последний save для завершённого трека — именно completed:true,
-      // и после него не было save с completed:false.
-      expect(callsFor1.last.completed, isTrue);
-    });
+        expect((readState() as PlaybackPlaying).media.id, 2);
+        final callsFor1 = repo.updates.where((u) => u.mediaId == 1).toList();
+        expect(callsFor1, isNotEmpty);
+        // Последний save для завершённого трека — именно completed:true,
+        // и после него не было save с completed:false.
+        expect(callsFor1.last.completed, isTrue);
+      },
+    );
 
     test('audio completion does not save progress', () async {
       await queue.setQueue([
@@ -580,9 +570,7 @@ void main() {
 
   group('PlaybackCoordinator resume logic', () {
     test('resumes immediately when saved position <= 5s', () async {
-      repo.progress = [
-        const WatchProgress(userId: 1, mediaId: 9, position: 4),
-      ];
+      repo.progress = [const WatchProgress(userId: 1, mediaId: 9, position: 4)];
 
       await coordinator.play(_media(9, MediaType.video));
 
@@ -678,7 +666,7 @@ void main() {
 }
 
 class _ThrowingCache extends OfflineCacheService {
-  _ThrowingCache(super.ref, super.baseUrl, this._error);
+  new(super.ref, super.baseUrl, this._error);
 
   final Exception _error;
 

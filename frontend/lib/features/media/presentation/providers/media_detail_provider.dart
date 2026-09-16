@@ -10,16 +10,19 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'media_detail_provider.freezed.dart';
 
 @freezed
-class MediaDetailState with _$MediaDetailState {
-  const factory MediaDetailState.loading() = MediaDetailLoading;
-  const factory MediaDetailState.loaded({required Media media}) =
-      MediaDetailLoaded;
-  const factory MediaDetailState.error({required String message}) =
-      MediaDetailError;
+sealed class MediaDetailState with _$MediaDetailState {
+  const factory loading() = MediaDetailLoading;
+  const factory loaded({required Media media}) = MediaDetailLoaded;
+  const factory error({required String message}) = MediaDetailError;
 }
 
-class MediaDetailNotifier
-    extends AutoDisposeFamilyNotifier<MediaDetailState, int> {
+class MediaDetailNotifier extends Notifier<MediaDetailState> {
+  // Riverpod 3: family-аргумент приходит через конструктор (create-функция
+  // провайдера — tear-off конструктора с параметром), build() без аргументов.
+  new(this.mediaId);
+
+  final int mediaId;
+
   late final GetMediaDetail _getMediaDetail;
 
   /// Замена `mounted` из StateNotifier: нотифаер может быть автоутилизирован
@@ -27,7 +30,7 @@ class MediaDetailNotifier
   bool _disposed = false;
 
   @override
-  MediaDetailState build(int mediaId) {
+  MediaDetailState build() {
     _getMediaDetail = ref.watch(getMediaDetailUseCaseProvider);
     ref.onDispose(() => _disposed = true);
     // Первичную загрузку запускаем из build(): Notifier запрещает
@@ -64,9 +67,7 @@ class MediaDetailNotifier
       },
       (media) async {
         // Persist metadata for offline access.
-        unawaited(
-          ref.read(offlineCacheServiceProvider).saveMetadata(media),
-        );
+        unawaited(ref.read(offlineCacheServiceProvider).saveMetadata(media));
         if (_disposed || generation != _generation) return;
         state = MediaDetailState.loaded(media: media);
       },
@@ -93,9 +94,7 @@ class MediaDetailNotifier
         // Молча: обложка уже загружена, старое состояние тоже валидно.
       },
       (media) {
-        unawaited(
-          ref.read(offlineCacheServiceProvider).saveMetadata(media),
-        );
+        unawaited(ref.read(offlineCacheServiceProvider).saveMetadata(media));
         if (_disposed || generation != _generation) return;
         state = MediaDetailState.loaded(media: media);
       },
@@ -109,5 +108,5 @@ final getMediaDetailUseCaseProvider = Provider<GetMediaDetail>((ref) {
 
 final mediaDetailProvider = NotifierProvider.autoDispose
     .family<MediaDetailNotifier, MediaDetailState, int>(
-  MediaDetailNotifier.new,
-);
+      MediaDetailNotifier.new,
+    );

@@ -9,28 +9,27 @@ import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Media _fakeMedia(int id, {int? duration}) => Media(
-      id: id,
-      title: 'Video $id',
-      year: 2024,
-      type: MediaType.video,
-      fileSize: 1024,
-      duration: duration,
-    );
+  id: id,
+  title: 'Video $id',
+  year: 2024,
+  type: MediaType.video,
+  fileSize: 1024,
+  duration: duration,
+);
 
 WatchProgress _progress({
   required int mediaId,
   required int position,
   required int duration,
   bool completed = false,
-}) =>
-    WatchProgress(
-      id: mediaId,
-      userId: 0,
-      mediaId: mediaId,
-      position: position,
-      duration: duration,
-      completed: completed,
-    );
+}) => WatchProgress(
+  id: mediaId,
+  userId: 0,
+  mediaId: mediaId,
+  position: position,
+  duration: duration,
+  completed: completed,
+);
 
 void main() {
   late SharedPreferences prefs;
@@ -40,9 +39,7 @@ void main() {
     Map<int, WatchProgress> progress = const {},
   }) {
     return ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
       child: MaterialApp(
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -68,8 +65,9 @@ void main() {
     prefs = await SharedPreferences.getInstance();
   });
 
-  testWidgets('прогресс >= 90% — бейдж «готово», позиция < 90% — остаток',
-      (tester) async {
+  testWidgets('прогресс >= 90% — бейдж «готово», позиция < 90% — остаток', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       buildRow(
         items: [_fakeMedia(1), _fakeMedia(2)],
@@ -87,8 +85,9 @@ void main() {
     expect(find.text('-11:40'), findsOneWidget);
   });
 
-  testWidgets('порог ровно 0.9 — завершён (без плавающей погрешности)',
-      (tester) async {
+  testWidgets('порог ровно 0.9 — завершён (без плавающей погрешности)', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       buildRow(
         items: [_fakeMedia(1)],
@@ -115,9 +114,7 @@ void main() {
   });
 
   testWidgets('без прогресса — карточка без оверлеев', (tester) async {
-    await tester.pumpWidget(
-      buildRow(items: [_fakeMedia(1)]),
-    );
+    await tester.pumpWidget(buildRow(items: [_fakeMedia(1)]));
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Готово'), findsNothing);

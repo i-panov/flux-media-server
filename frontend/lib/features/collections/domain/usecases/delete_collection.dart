@@ -4,7 +4,7 @@ import 'package:flux_media_server/features/collections/domain/repositories/colle
 import 'package:fpdart/fpdart.dart';
 
 class DeleteCollection extends UseCase<Either<Failure, void>, int> {
-  DeleteCollection(this.repository);
+  new(this.repository);
   final CollectionsRepository repository;
 
   @override

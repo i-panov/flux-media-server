@@ -22,38 +22,38 @@ import 'package:flux_media_server/shared/models/media.dart';
 part 'app_router.gr.dart';
 
 @AutoRouterConfig()
-class AppRouter extends _$AppRouter {
-  AppRouter({required this.authGuard});
+class AppRouter extends RootStackRouter {
+  new({required this.authGuard});
 
   final AutoRouteGuard authGuard;
 
   @override
   List<AutoRoute> get routes => [
-        AutoRoute(page: ServerSetupRoute.page, initial: true),
-        AutoRoute(page: LoginRoute.page),
-        AutoRoute(page: CodeRoute.page),
-        AutoRoute(
-          page: MainRoute.page,
-          guards: [authGuard],
-          children: [
-            AutoRoute(page: VideoRoute.page, initial: true, keepHistory: false),
-            AutoRoute(page: AudioRoute.page, keepHistory: false),
-          ],
-        ),
-        AutoRoute(page: VideoDetailRoute.page, guards: [authGuard]),
-        AutoRoute(page: AudioPlayerRoute.page, guards: [authGuard]),
-        AutoRoute(page: UploadRoute.page, guards: [authGuard]),
-        AutoRoute(page: SettingsRoute.page, guards: [authGuard]),
-        AutoRoute(page: ArtistRoute.page, guards: [authGuard]),
-        AutoRoute(page: CollectionDetailRoute.page, guards: [authGuard]),
-      ];
+    AutoRoute(page: ServerSetupRoute.page, initial: true),
+    AutoRoute(page: LoginRoute.page),
+    AutoRoute(page: CodeRoute.page),
+    AutoRoute(
+      page: MainRoute.page,
+      guards: [authGuard],
+      children: [
+        AutoRoute(page: VideoRoute.page, initial: true, keepHistory: false),
+        AutoRoute(page: AudioRoute.page, keepHistory: false),
+      ],
+    ),
+    AutoRoute(page: VideoDetailRoute.page, guards: [authGuard]),
+    AutoRoute(page: AudioPlayerRoute.page, guards: [authGuard]),
+    AutoRoute(page: UploadRoute.page, guards: [authGuard]),
+    AutoRoute(page: SettingsRoute.page, guards: [authGuard]),
+    AutoRoute(page: ArtistRoute.page, guards: [authGuard]),
+    AutoRoute(page: CollectionDetailRoute.page, guards: [authGuard]),
+  ];
 }
 
 /// Тонкая обёртка над [MainScreen] из core/widgets: поставляет ему
 /// провайдеры и маршруты фич, чтобы core/widgets не импортировал features.
 @RoutePage(name: 'MainRoute')
 class MainRoutePage extends ConsumerWidget {
-  const MainRoutePage({super.key});
+  const new({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -6,7 +6,7 @@ import 'package:flux_media_server/shared/models/favorite.dart';
 import 'package:fpdart/fpdart.dart';
 
 class FavoritesRepositoryImpl implements FavoritesRepository {
-  FavoritesRepositoryImpl(this.remoteDataSource);
+  new(this.remoteDataSource);
 
   final FavoritesRemoteDataSource remoteDataSource;
 

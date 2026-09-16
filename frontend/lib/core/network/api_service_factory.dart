@@ -15,12 +15,12 @@ import 'package:http/io_client.dart' show IOClient;
 /// а не просто «бросается» [TimeoutException]: иначе соединение
 /// продолжало бы жить в фоне до конца ответа.
 class TimeoutHttpClient extends http.BaseClient {
-  TimeoutHttpClient({
+  new({
     this.requestTimeout = const Duration(seconds: 30),
     this.uploadTimeout = const Duration(seconds: 120),
   }) : _inner = IOClient(
-          HttpClient()..connectionTimeout = const Duration(seconds: 10),
-        );
+         HttpClient()..connectionTimeout = const Duration(seconds: 10),
+       );
 
   final http.Client _inner;
 
@@ -32,11 +32,14 @@ class TimeoutHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) {
-    final timeout =
-        request is http.MultipartRequest ? uploadTimeout : requestTimeout;
+    final timeout = request is http.MultipartRequest
+        ? uploadTimeout
+        : requestTimeout;
     final completer = Completer<void>();
     final abortable = _withAbortTrigger(request, completer.future);
-    return _inner.send(abortable).timeout(
+    return _inner
+        .send(abortable)
+        .timeout(
           timeout,
           onTimeout: () {
             // Завершаем триггер отмены: соединение закрывается.
@@ -54,10 +57,10 @@ class TimeoutHttpClient extends http.BaseClient {
   ) {
     if (request is http.MultipartRequest) {
       return http.AbortableMultipartRequest(
-        request.method,
-        request.url,
-        abortTrigger: trigger,
-      )
+          request.method,
+          request.url,
+          abortTrigger: trigger,
+        )
         ..headers.addAll(request.headers)
         ..fields.addAll(request.fields)
         ..files.addAll(request.files)
@@ -67,10 +70,10 @@ class TimeoutHttpClient extends http.BaseClient {
     }
     if (request is http.Request) {
       return http.AbortableRequest(
-        request.method,
-        request.url,
-        abortTrigger: trigger,
-      )
+          request.method,
+          request.url,
+          abortTrigger: trigger,
+        )
         ..headers.addAll(request.headers)
         ..bodyBytes = request.bodyBytes
         ..encoding = request.encoding
@@ -92,10 +95,7 @@ class TimeoutHttpClient extends http.BaseClient {
 ///
 /// httpClient нужно закрыть через `ref.onDispose`, когда клиент
 /// становится не нужен (например, при смене baseUrl).
-typedef CreatedChopperClient = ({
-  ChopperClient client,
-  http.Client httpClient,
-});
+typedef CreatedChopperClient = ({ChopperClient client, http.Client httpClient});
 
 /// Общая инфраструктура создания Chopper-клиентов: базовый
 /// [ChopperClient] с [JsonConverter] и переданными интерцепторами.
@@ -106,7 +106,7 @@ typedef CreatedChopperClient = ({
 CreatedChopperClient createChopperClient({
   required String baseUrl,
   required List<ChopperService> services,
-  Iterable<dynamic>? interceptors,
+  List<Interceptor>? interceptors,
   http.Client? httpClient,
 }) {
   final resolvedClient = httpClient ?? TimeoutHttpClient();

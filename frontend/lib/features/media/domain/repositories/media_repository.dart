@@ -23,9 +23,7 @@ abstract class MediaRepository {
   Future<Either<Failure, List<Artist>>> getArtists();
 
   Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
-      checkHash(
-    String hash,
-  );
+  checkHash(String hash);
 
   /// Асинхронный upload: POST возвращает id джоба, файл обрабатывается
   /// сервером в фоне. Статус — через [getUploadStatus], отмена — через
@@ -46,10 +44,7 @@ abstract class MediaRepository {
 
   Future<Either<Failure, List<WatchProgress>>> getProgress();
 
-  Future<Either<Failure, Media>> updateMetadata(
-    int mediaId,
-    MetadataEdit edit,
-  );
+  Future<Either<Failure, Media>> updateMetadata(int mediaId, MetadataEdit edit);
 
   Future<Either<Failure, WatchProgress>> updateProgress(
     int mediaId, {

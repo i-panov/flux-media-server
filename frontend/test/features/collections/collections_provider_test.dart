@@ -16,9 +16,10 @@ void main() {
   setUp(() {
     fakeRepo = FakeCollectionsRepository();
     container = ProviderContainer(
-      overrides: [
-        collectionsRepositoryProvider.overrideWithValue(fakeRepo),
-      ],
+      overrides: [collectionsRepositoryProvider.overrideWithValue(fakeRepo)],
+      // Riverpod 3 ретраит упавшие build-и по умолчанию: отключаем,
+      // чтобы «throws on failure»-тесты видели ошибку сразу.
+      retry: (_, _) => null,
     );
   });
 
@@ -26,8 +27,8 @@ void main() {
 
   group('collectionsProvider', () {
     test('loads the list of collections', () async {
-      fakeRepo.onGetCollections =
-          () async => Right([collection(1), collection(2, 'Second')]);
+      fakeRepo.onGetCollections = () async =>
+          Right([collection(1), collection(2, 'Second')]);
 
       final result = await container.read(collectionsProvider.future);
 
@@ -37,8 +38,8 @@ void main() {
     });
 
     test('throws on repository failure', () async {
-      fakeRepo.onGetCollections =
-          () async => const Left(ServerFailure(message: 'Boom'));
+      fakeRepo.onGetCollections = () async =>
+          const Left(ServerFailure(message: 'Boom'));
 
       // Тип Failure сохраняется — не заворачивается в Exception.
       await expectLater(
@@ -50,35 +51,35 @@ void main() {
 
   group('collectionItemsFullProvider', () {
     test('loads full media items for a collection', () async {
-      fakeRepo.onGetItemsFull = (collectionId) async => Right(
-            [media(1), media(2)],
-          );
+      fakeRepo.onGetItemsFull = (collectionId) async =>
+          Right([media(1), media(2)]);
 
-      final result =
-          await container.read(collectionItemsFullProvider(5).future);
+      final result = await container.read(
+        collectionItemsFullProvider(5).future,
+      );
 
       expect(result, hasLength(2));
       expect(result.first.title, 'Media 1');
     });
 
     test('throws on repository failure', () async {
-      fakeRepo.onGetItemsFull =
-          (_) async => const Left(ServerFailure(message: 'Not found'));
+      fakeRepo.onGetItemsFull = (_) async =>
+          const Left(ServerFailure(message: 'Not found'));
 
+      // Riverpod 3: без подписки autoDispose-провайдер диспоузится до
+      // завершения future — держим его живым на время проверки.
+      final sub = container.listen(collectionItemsFullProvider(5), (_, _) {});
       await expectLater(
         container.read(collectionItemsFullProvider(5).future),
         throwsA(isA<ServerFailure>()),
       );
+      sub.close();
     });
 
     test('removeLocal removes an item without a refetch', () async {
-      fakeRepo.onGetItemsFull = (collectionId) async => Right(
-            [media(1), media(2)],
-          );
-      final sub = container.listen(
-        collectionItemsFullProvider(5),
-        (_, __) {},
-      );
+      fakeRepo.onGetItemsFull = (collectionId) async =>
+          Right([media(1), media(2)]);
+      final sub = container.listen(collectionItemsFullProvider(5), (_, _) {});
       addTearDown(sub.close);
       await container.read(collectionItemsFullProvider(5).future);
 
@@ -90,13 +91,8 @@ void main() {
     });
 
     test('addLocal appends an item without a refetch', () async {
-      fakeRepo.onGetItemsFull = (collectionId) async => Right(
-            [media(1)],
-          );
-      final sub = container.listen(
-        collectionItemsFullProvider(5),
-        (_, __) {},
-      );
+      fakeRepo.onGetItemsFull = (collectionId) async => Right([media(1)]);
+      final sub = container.listen(collectionItemsFullProvider(5), (_, _) {});
       addTearDown(sub.close);
       await container.read(collectionItemsFullProvider(5).future);
 
@@ -110,13 +106,8 @@ void main() {
     });
 
     test('addLocal dedupes by media id', () async {
-      fakeRepo.onGetItemsFull = (collectionId) async => Right(
-            [media(1)],
-          );
-      final sub = container.listen(
-        collectionItemsFullProvider(5),
-        (_, __) {},
-      );
+      fakeRepo.onGetItemsFull = (collectionId) async => Right([media(1)]);
+      final sub = container.listen(collectionItemsFullProvider(5), (_, _) {});
       addTearDown(sub.close);
       await container.read(collectionItemsFullProvider(5).future);
 
@@ -129,13 +120,8 @@ void main() {
     });
 
     test('invalidate refetches the collection items', () async {
-      fakeRepo.onGetItemsFull = (collectionId) async => Right(
-            [media(1)],
-          );
-      final sub = container.listen(
-        collectionItemsFullProvider(5),
-        (_, __) {},
-      );
+      fakeRepo.onGetItemsFull = (collectionId) async => Right([media(1)]);
+      final sub = container.listen(collectionItemsFullProvider(5), (_, _) {});
       addTearDown(sub.close);
       await container.read(collectionItemsFullProvider(5).future);
 
@@ -149,12 +135,8 @@ void main() {
   group('AddCollectionItem', () {
     test('passes collectionId and mediaId to the repository', () async {
       fakeRepo.onAddItem = (collectionId, mediaId) async => Right(
-            CollectionItem(
-              id: 1,
-              collectionId: collectionId,
-              mediaId: mediaId,
-            ),
-          );
+        CollectionItem(id: 1, collectionId: collectionId, mediaId: mediaId),
+      );
 
       final useCase = AddCollectionItem(fakeRepo);
       final result = await useCase(
@@ -163,16 +145,14 @@ void main() {
 
       expect(fakeRepo.addItemCalls, [(3, 42)]);
       expect(result.isRight(), isTrue);
-      final item = result.getOrElse(
-        (_) => const CollectionItem(id: 0),
-      );
+      final item = result.getOrElse((_) => const CollectionItem(id: 0));
       expect(item.collectionId, 3);
       expect(item.mediaId, 42);
     });
 
     test('propagates repository failure', () async {
-      fakeRepo.onAddItem =
-          (_, __) async => const Left(ServerFailure(message: 'Conflict'));
+      fakeRepo.onAddItem = (_, _) async =>
+          const Left(ServerFailure(message: 'Conflict'));
 
       final useCase = AddCollectionItem(fakeRepo);
       final result = await useCase(
@@ -186,7 +166,7 @@ void main() {
 
   group('RemoveCollectionItem', () {
     test('passes collectionId and mediaId to the repository', () async {
-      fakeRepo.onRemoveItem = (_, __) async => const Right(null);
+      fakeRepo.onRemoveItem = (_, _) async => const Right(null);
 
       final useCase = RemoveCollectionItem(fakeRepo);
       final result = await useCase(
@@ -198,8 +178,8 @@ void main() {
     });
 
     test('propagates repository failure', () async {
-      fakeRepo.onRemoveItem =
-          (_, __) async => const Left(ServerFailure(message: 'Not found'));
+      fakeRepo.onRemoveItem = (_, _) async =>
+          const Left(ServerFailure(message: 'Not found'));
 
       final useCase = RemoveCollectionItem(fakeRepo);
       final result = await useCase(

@@ -15,25 +15,25 @@ void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-      final args = methodCall.arguments as Map<dynamic, dynamic>;
-      final key = args['key'] as String;
-      if (throwOnAllKeys) {
-        throw PlatformException(code: 'not_available');
-      }
-      switch (methodCall.method) {
-        case 'read':
-          return mockStorage[key];
-        case 'write':
-          mockStorage[key] = args['value'] as String;
-          return null;
-        case 'delete':
-          mockStorage.remove(key);
-          return null;
-        default:
-          return null;
-      }
-    });
+        .setMockMethodCallHandler(channel, (methodCall) async {
+          final args = methodCall.arguments as Map<dynamic, dynamic>;
+          final key = args['key'] as String;
+          if (throwOnAllKeys) {
+            throw PlatformException(code: 'not_available');
+          }
+          switch (methodCall.method) {
+            case 'read':
+              return mockStorage[key];
+            case 'write':
+              mockStorage[key] = args['value'] as String;
+              return null;
+            case 'delete':
+              mockStorage.remove(key);
+              return null;
+            default:
+              return null;
+          }
+        });
   });
 
   tearDownAll(() {
@@ -105,16 +105,18 @@ void main() {
       );
     });
 
-    test('setAuthToken rethrows instead of writing plaintext fallback',
-        () async {
-      throwOnAllKeys = true;
+    test(
+      'setAuthToken rethrows instead of writing plaintext fallback',
+      () async {
+        throwOnAllKeys = true;
 
-      await expectLater(
-        dataSource.setAuthToken('secret'),
-        throwsA(isA<PlatformException>()),
-      );
-      expect(prefs.getString('${keyPrefix}auth_token_insecure'), isNull);
-    });
+        await expectLater(
+          dataSource.setAuthToken('secret'),
+          throwsA(isA<PlatformException>()),
+        );
+        expect(prefs.getString('${keyPrefix}auth_token_insecure'), isNull);
+      },
+    );
 
     test('getAuthToken rethrows instead of reading fallback', () async {
       throwOnAllKeys = true;
@@ -135,16 +137,18 @@ void main() {
       );
     });
 
-    test('setRefreshToken rethrows instead of writing plaintext fallback',
-        () async {
-      throwOnAllKeys = true;
+    test(
+      'setRefreshToken rethrows instead of writing plaintext fallback',
+      () async {
+        throwOnAllKeys = true;
 
-      await expectLater(
-        dataSource.setRefreshToken('secret'),
-        throwsA(isA<PlatformException>()),
-      );
-      expect(prefs.getString('${keyPrefix}refresh_token_insecure'), isNull);
-    });
+        await expectLater(
+          dataSource.setRefreshToken('secret'),
+          throwsA(isA<PlatformException>()),
+        );
+        expect(prefs.getString('${keyPrefix}refresh_token_insecure'), isNull);
+      },
+    );
 
     test('getRefreshToken rethrows instead of reading fallback', () async {
       throwOnAllKeys = true;

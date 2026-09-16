@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/lyrics.dart';
 
 /// Реализация [LyricsCacheRepository] поверх [OfflineCacheService].
 class OfflineLyricsCacheRepository implements LyricsCacheRepository {
-  OfflineLyricsCacheRepository(this._cacheService);
+  new(this._cacheService);
 
   final OfflineCacheService _cacheService;
 

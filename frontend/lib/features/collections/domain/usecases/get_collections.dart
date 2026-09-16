@@ -6,7 +6,7 @@ import 'package:fpdart/fpdart.dart';
 
 class GetCollections
     extends UseCase<Either<Failure, List<Collection>>, NoParams> {
-  GetCollections(this.repository);
+  new(this.repository);
   final CollectionsRepository repository;
 
   @override

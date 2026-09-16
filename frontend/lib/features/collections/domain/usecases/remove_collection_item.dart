@@ -4,17 +4,14 @@ import 'package:flux_media_server/features/collections/domain/repositories/colle
 import 'package:fpdart/fpdart.dart';
 
 class RemoveCollectionItemParams {
-  const RemoveCollectionItemParams({
-    required this.collectionId,
-    required this.mediaId,
-  });
+  const new({required this.collectionId, required this.mediaId});
   final int collectionId;
   final int mediaId;
 }
 
 class RemoveCollectionItem
     extends UseCase<Either<Failure, void>, RemoveCollectionItemParams> {
-  RemoveCollectionItem(this.repository);
+  new(this.repository);
   final CollectionsRepository repository;
 
   @override

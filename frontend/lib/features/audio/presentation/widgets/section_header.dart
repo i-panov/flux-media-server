@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Заголовок секции: иконка + название + опциональное действие (trailing).
 /// Единая замена 6 дублирующих копий на экранах audio/video.
 class SectionHeader extends StatelessWidget {
-  const SectionHeader({
+  const new({
     required this.icon,
     required this.title,
     super.key,
@@ -25,7 +25,7 @@ class SectionHeader extends StatelessWidget {
           Expanded(
             child: Text(title, style: Theme.of(context).textTheme.titleMedium),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
@@ -34,7 +34,7 @@ class SectionHeader extends StatelessWidget {
 
 /// [SectionHeader] для sliver-списков (обёртка в [SliverToBoxAdapter]).
 class SliverSectionHeader extends StatelessWidget {
-  const SliverSectionHeader({
+  const new({
     required this.icon,
     required this.title,
     super.key,

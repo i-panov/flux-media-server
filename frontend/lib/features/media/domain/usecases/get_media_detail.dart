@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
 class GetMediaDetail extends UseCase<Either<Failure, Media>, int> {
-  GetMediaDetail(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

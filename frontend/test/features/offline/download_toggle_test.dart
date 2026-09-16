@@ -13,16 +13,16 @@ import 'package:fpdart/fpdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Media _media(int id) => Media(
-      id: id,
-      title: 'Media $id',
-      year: 2024,
-      type: MediaType.audio,
-      fileSize: 1024,
-    );
+  id: id,
+  title: 'Media $id',
+  year: 2024,
+  type: MediaType.audio,
+  fileSize: 1024,
+);
 
 /// Кеш-сервис, который фиксирует, какой Media передали в download.
 class _RecordingCache extends OfflineCacheService {
-  _RecordingCache(super.ref, super.baseUrl);
+  new(super.ref, super.baseUrl);
 
   Media? downloadedMedia;
 
@@ -72,7 +72,7 @@ class _FakeMediaRepository implements MediaRepository {
 
 /// Хост для вызова [toggleDownload] с настоящим [WidgetRef].
 class _ToggleHost extends ConsumerWidget {
-  const _ToggleHost({required this.mediaId, required this.mediaType});
+  const new({required this.mediaId, required this.mediaType});
 
   final int mediaId;
   final String mediaType;
@@ -132,22 +132,24 @@ void main() {
   }
 
   testWidgets(
-      'downloads via getMediaDetail when track is outside loaded pages',
-      (tester) async {
-    await pumpHost(tester);
-    await tester.tap(find.text('toggle'));
-    await tester.pumpAndSettle();
+    'downloads via getMediaDetail when track is outside loaded pages',
+    (tester) async {
+      await pumpHost(tester);
+      await tester.tap(find.text('toggle'));
+      await tester.pumpAndSettle();
 
-    expect(repository.detailCalls, 1);
-    expect(cache.downloadedMedia, isNotNull);
-    // В кеш попадают реальные метаданные, а не заглушка.
-    expect(cache.downloadedMedia!.id, 2);
-    expect(cache.downloadedMedia!.title, 'Media 2');
-    expect(cache.downloadedMedia!.fileSize, 1024);
-  });
+      expect(repository.detailCalls, 1);
+      expect(cache.downloadedMedia, isNotNull);
+      // В кеш попадают реальные метаданные, а не заглушка.
+      expect(cache.downloadedMedia!.id, 2);
+      expect(cache.downloadedMedia!.title, 'Media 2');
+      expect(cache.downloadedMedia!.fileSize, 1024);
+    },
+  );
 
-  testWidgets('uses media from loaded pages without an extra request',
-      (tester) async {
+  testWidgets('uses media from loaded pages without an extra request', (
+    tester,
+  ) async {
     await pumpHost(tester, mediaId: 1);
     await tester.tap(find.text('toggle'));
     await tester.pumpAndSettle();

@@ -47,9 +47,7 @@ void main() {
     });
 
     test('несколько строк — порядок сохраняется', () {
-      final result = parseSyncedLyrics(
-        '[00:01.00]первая\n[00:02.00]вторая\n',
-      );
+      final result = parseSyncedLyrics('[00:01.00]первая\n[00:02.00]вторая\n');
       expect(result.map((e) => e.text), ['первая', 'вторая']);
     });
 

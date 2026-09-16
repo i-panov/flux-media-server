@@ -6,7 +6,7 @@ enum MediaType {
   audio('audio'),
   unknown('');
 
-  const MediaType(this.value);
+  new(this.value);
   final String value;
 }
 
@@ -15,7 +15,7 @@ enum MediaType {
 /// Uses [Object?] so a missing or null `type` key is tolerated and
 /// mapped to [MediaType.unknown] instead of throwing a TypeError.
 class MediaTypeConverter implements JsonConverter<MediaType, Object?> {
-  const MediaTypeConverter();
+  const new();
 
   @override
   MediaType fromJson(Object? json) => _mediaTypeFromValue(json);

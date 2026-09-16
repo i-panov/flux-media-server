@@ -33,10 +33,7 @@ final upsertLyricsProvider = Provider<UpsertLyrics>((ref) {
 /// офлайн-копии возвращаем её с [fromCache] = true; если копии нет —
 /// пробрасываем ошибку (AsyncError в провайдере).
 class LyricsLoadResult {
-  const LyricsLoadResult({
-    required this.lyrics,
-    this.fromCache = false,
-  });
+  const new({required this.lyrics, this.fromCache = false});
 
   final Lyrics? lyrics;
   final bool fromCache;
@@ -47,8 +44,7 @@ class LyricsLoadResult {
 ///
 /// keepAlive: переключение вкладок (лирика/перевод) не должно вызывать
 /// повторный GET на каждое переключение.
-final lyricsProvider =
-    FutureProvider.autoDispose.family<LyricsLoadResult, int>(
+final lyricsProvider = FutureProvider.autoDispose.family<LyricsLoadResult, int>(
   (ref, mediaId) async {
     final keepAlive = ref.keepAlive();
     ref.onDispose(keepAlive.close);

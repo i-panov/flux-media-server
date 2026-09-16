@@ -15,9 +15,10 @@ void main() {
   setUp(() {
     fakeRepo = FakeFavoritesRepository();
     container = ProviderContainer(
-      overrides: [
-        favoritesRepositoryProvider.overrideWithValue(fakeRepo),
-      ],
+      overrides: [favoritesRepositoryProvider.overrideWithValue(fakeRepo)],
+      // Riverpod 3 ретраит упавшие build-и по умолчанию: отключаем,
+      // чтобы «throws on failure»-тесты видели ошибку сразу.
+      retry: (_, _) => null,
     );
   });
 
@@ -25,9 +26,8 @@ void main() {
 
   group('favoritesProvider', () {
     test('loads favorites', () async {
-      fakeRepo.onGetFavorites = () async => Right(
-            [favorite(mediaId: 1), favorite(id: 2, mediaId: 2)],
-          );
+      fakeRepo.onGetFavorites = () async =>
+          Right([favorite(mediaId: 1), favorite(id: 2, mediaId: 2)]);
 
       final result = await container.read(favoritesProvider.future);
 
@@ -36,18 +36,21 @@ void main() {
     });
 
     test('throws on repository failure', () async {
-      fakeRepo.onGetFavorites =
-          () async => const Left(ServerFailure(message: 'Boom'));
+      fakeRepo.onGetFavorites = () async =>
+          const Left(ServerFailure(message: 'Boom'));
 
+      // Riverpod 3: без подписки autoDispose-провайдер диспоузится до
+      // завершения future — держим его живым на время проверки.
+      final sub = container.listen(favoritesProvider, (_, _) {});
       await expectLater(
         container.read(favoritesProvider.future),
         throwsA(isA<Exception>()),
       );
+      sub.close();
     });
 
     test('addLocal appends without an extra GET', () async {
-      fakeRepo.onGetFavorites =
-          () async => Right([favorite(mediaId: 1)]);
+      fakeRepo.onGetFavorites = () async => Right([favorite(mediaId: 1)]);
 
       await container.read(favoritesProvider.future);
       container
@@ -60,8 +63,7 @@ void main() {
     });
 
     test('addLocal dedupes by mediaId', () async {
-      fakeRepo.onGetFavorites =
-          () async => Right([favorite(mediaId: 1)]);
+      fakeRepo.onGetFavorites = () async => Right([favorite(mediaId: 1)]);
 
       await container.read(favoritesProvider.future);
       container
@@ -74,9 +76,8 @@ void main() {
     });
 
     test('removeLocal removes by mediaId without an extra GET', () async {
-      fakeRepo.onGetFavorites = () async => Right(
-            [favorite(mediaId: 1), favorite(id: 2, mediaId: 2)],
-          );
+      fakeRepo.onGetFavorites = () async =>
+          Right([favorite(mediaId: 1), favorite(id: 2, mediaId: 2)]);
 
       await container.read(favoritesProvider.future);
       container.read(favoritesProvider.notifier).removeLocal(1);
@@ -89,13 +90,11 @@ void main() {
 
   group('favoriteMediaIdsProvider', () {
     test('derives media ids and skips artist favorites', () async {
-      fakeRepo.onGetFavorites = () async => Right(
-            [
-              favorite(mediaId: 1),
-              favorite(id: 2, artistId: 3),
-              favorite(id: 3, mediaId: 5),
-            ],
-          );
+      fakeRepo.onGetFavorites = () async => Right([
+        favorite(mediaId: 1),
+        favorite(id: 2, artistId: 3),
+        favorite(id: 3, mediaId: 5),
+      ]);
 
       final ids = await container.read(favoriteMediaIdsProvider.future);
 
@@ -130,9 +129,7 @@ void main() {
             Right(favorite(id: 10, mediaId: mediaId)));
 
       await loadState();
-      await toggleContainer
-          .read(favoriteToggleProvider(1).notifier)
-          .toggle();
+      await toggleContainer.read(favoriteToggleProvider(1).notifier).toggle();
       // Пересчёт ids после локальной мутации.
       await toggleContainer.read(favoriteMediaIdsProvider.future);
 
@@ -146,14 +143,11 @@ void main() {
 
     test('toggle removes a favorite without refetching the list', () async {
       fakeRepo
-        ..onGetFavorites =
-            (() async => Right([favorite(id: 10, mediaId: 1)]))
+        ..onGetFavorites = (() async => Right([favorite(id: 10, mediaId: 1)]))
         ..onRemoveFavorite = (_) async => const Right(null);
 
       await loadState();
-      await toggleContainer
-          .read(favoriteToggleProvider(1).notifier)
-          .toggle();
+      await toggleContainer.read(favoriteToggleProvider(1).notifier).toggle();
       await toggleContainer.read(favoriteMediaIdsProvider.future);
 
       expect(fakeRepo.removeFavoriteCalls, [1]);
@@ -166,72 +160,75 @@ void main() {
     test('toggle reverts state on repository failure', () async {
       fakeRepo
         ..onGetFavorites = (() async => const Right([]))
-        ..onAddFavorite =
-            ((_) async => const Left(ServerFailure(message: 'Conflict')));
+        ..onAddFavorite = ((_) async =>
+            const Left(ServerFailure(message: 'Conflict')));
 
       await loadState();
-      await toggleContainer
-          .read(favoriteToggleProvider(1).notifier)
-          .toggle();
+      await toggleContainer.read(favoriteToggleProvider(1).notifier).toggle();
 
       expect(toggleContainer.read(favoriteToggleProvider(1)).value, isFalse);
       expect(fakeRepo.getFavoritesCalls, 1);
     });
 
     test(
-        'icon stays in sync across screens when the list changes locally',
-        () async {
-      fakeRepo.onGetFavorites =
-          () async => Right([favorite(id: 10, mediaId: 1)]);
-      await loadState();
-      // Эмуляция UI: экран следит за иконкой избранного трека.
-      final sub = toggleContainer.listen(
-        favoriteToggleProvider(1),
-        (_, __) {},
-      );
-      addTearDown(sub.close);
+      'icon stays in sync across screens when the list changes locally',
+      () async {
+        fakeRepo.onGetFavorites = () async =>
+            Right([favorite(id: 10, mediaId: 1)]);
+        await loadState();
+        // Эмуляция UI: экран следит за иконкой избранного трека.
+        final sub = toggleContainer.listen(
+          favoriteToggleProvider(1),
+          (_, _) {},
+        );
+        addTearDown(sub.close);
 
-      expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
+        expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
 
-      // «Другой экран» снял избранное через локальную мутацию.
-      toggleContainer.read(favoritesProvider.notifier).removeLocal(1);
-      await toggleContainer.read(favoriteMediaIdsProvider.future);
-      expect(toggleContainer.read(favoriteToggleProvider(1)).value, isFalse);
+        // «Другой экран» снял избранное через локальную мутацию.
+        toggleContainer.read(favoritesProvider.notifier).removeLocal(1);
+        await toggleContainer.read(favoriteMediaIdsProvider.future);
+        expect(toggleContainer.read(favoriteToggleProvider(1)).value, isFalse);
 
-      toggleContainer
-          .read(favoritesProvider.notifier)
-          .addLocal(favorite(id: 11, mediaId: 1));
-      await toggleContainer.read(favoriteMediaIdsProvider.future);
-      expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
-    });
+        toggleContainer
+            .read(favoritesProvider.notifier)
+            .addLocal(favorite(id: 11, mediaId: 1));
+        await toggleContainer.read(favoriteMediaIdsProvider.future);
+        expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
+      },
+    );
 
-    test('offline toggle keeps current state and makes no network calls',
-        () async {
-      fakeRepo.onGetFavorites =
-          () async => Right([favorite(id: 10, mediaId: 1)]);
-      final offlineContainer = ProviderContainer(
-        overrides: [
-          favoritesRepositoryProvider.overrideWithValue(fakeRepo),
-          isOfflineProvider.overrideWithValue(true),
-        ],
-      );
-      addTearDown(offlineContainer.dispose);
-      await offlineContainer.read(favoritesProvider.future);
-      await offlineContainer.read(favoriteMediaIdsProvider.future);
-      final sub =
-          offlineContainer.listen(favoriteToggleProvider(1), (_, __) {});
-      addTearDown(sub.close);
+    test(
+      'offline toggle keeps current state and makes no network calls',
+      () async {
+        fakeRepo.onGetFavorites = () async =>
+            Right([favorite(id: 10, mediaId: 1)]);
+        final offlineContainer = ProviderContainer(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(fakeRepo),
+            isOfflineProvider.overrideWithValue(true),
+          ],
+        );
+        addTearDown(offlineContainer.dispose);
+        await offlineContainer.read(favoritesProvider.future);
+        await offlineContainer.read(favoriteMediaIdsProvider.future);
+        final sub = offlineContainer.listen(
+          favoriteToggleProvider(1),
+          (_, _) {},
+        );
+        addTearDown(sub.close);
 
-      await offlineContainer
-          .read(favoriteToggleProvider(1).notifier)
-          .toggle();
+        await offlineContainer
+            .read(favoriteToggleProvider(1).notifier)
+            .toggle();
 
-      // Офлайн: состояние не меняется на «снято», а остаётся текущим.
-      expect(offlineContainer.read(favoriteToggleProvider(1)).value, isTrue);
-      expect(fakeRepo.addFavoriteCalls, isEmpty);
-      expect(fakeRepo.removeFavoriteCalls, isEmpty);
-      expect(fakeRepo.getFavoritesCalls, 1);
-    });
+        // Офлайн: состояние не меняется на «снято», а остаётся текущим.
+        expect(offlineContainer.read(favoriteToggleProvider(1)).value, isTrue);
+        expect(fakeRepo.addFavoriteCalls, isEmpty);
+        expect(fakeRepo.removeFavoriteCalls, isEmpty);
+        expect(fakeRepo.getFavoritesCalls, 1);
+      },
+    );
 
     test('toggle state derives from fresh list when recreated', () async {
       fakeRepo
@@ -240,17 +237,12 @@ void main() {
             Right(favorite(id: 10, mediaId: mediaId)));
 
       await loadState();
-      await toggleContainer
-          .read(favoriteToggleProvider(1).notifier)
-          .toggle();
+      await toggleContainer.read(favoriteToggleProvider(1).notifier).toggle();
       await toggleContainer.read(favoriteMediaIdsProvider.future);
 
       // Пересоздание нотифаера (например, повторный вход на экран)
       // читает актуальное состояние из источника истины.
-      final sub = toggleContainer.listen(
-        favoriteToggleProvider(1),
-        (_, __) {},
-      );
+      final sub = toggleContainer.listen(favoriteToggleProvider(1), (_, _) {});
       addTearDown(sub.close);
       expect(toggleContainer.read(favoriteToggleProvider(1)).value, isTrue);
     });

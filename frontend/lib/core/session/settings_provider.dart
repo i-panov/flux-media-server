@@ -20,8 +20,9 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 
 const _secureStorage = FlutterSecureStorage();
 
-final settingsLocalDataSourceProvider =
-    Provider<SettingsLocalDataSource>((ref) {
+final settingsLocalDataSourceProvider = Provider<SettingsLocalDataSource>((
+  ref,
+) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return SettingsLocalDataSource(prefs, _secureStorage);
 });
@@ -32,10 +33,8 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 });
 
 @freezed
-class SettingsState with _$SettingsState {
-  const factory SettingsState({
-    required AppSettings settings,
-  }) = _SettingsState;
+sealed class SettingsState with _$SettingsState {
+  const factory({required AppSettings settings}) = _SettingsState;
 }
 
 class SettingsNotifier extends Notifier<SettingsState> {
@@ -93,18 +92,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _repository.clearAuthToken();
     await _repository.clearRefreshToken();
     state = SettingsState(
-      settings: state.settings.copyWith(
-        authToken: null,
-        refreshToken: null,
-      ),
+      settings: state.settings.copyWith(authToken: null, refreshToken: null),
     );
   }
 
   Future<void> setLocale(String locale) async {
     await _repository.setLocale(locale);
-    state = SettingsState(
-      settings: state.settings.copyWith(locale: locale),
-    );
+    state = SettingsState(settings: state.settings.copyWith(locale: locale));
   }
 }
 

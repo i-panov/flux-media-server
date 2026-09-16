@@ -4,7 +4,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 /// Полноэкранный блок ошибки с кнопкой «Повторить».
 /// Единая замена 3 дублирующих копий на экранах audio/video.
 class ErrorRetryView extends StatelessWidget {
-  const ErrorRetryView({
+  const new({
     required this.onRetry,
     super.key,
     this.message,

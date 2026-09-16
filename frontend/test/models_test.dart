@@ -67,12 +67,7 @@ void main() {
     });
 
     test('empty type becomes MediaType.unknown (consistent)', () {
-      final json = {
-        'id': 4,
-        'title': 'No Type',
-        'type': '',
-        'file_size': 1,
-      };
+      final json = {'id': 4, 'title': 'No Type', 'type': '', 'file_size': 1};
 
       final media = Media.fromJson(json);
 
@@ -226,8 +221,11 @@ void main() {
       final plain = User.fromJson({'id': 1, 'email': 'a@b.c'});
       expect(plain.isAdmin, isFalse);
 
-      final admin =
-          User.fromJson({'id': 2, 'email': 'a@b.c', 'is_admin': true});
+      final admin = User.fromJson({
+        'id': 2,
+        'email': 'a@b.c',
+        'is_admin': true,
+      });
       expect(admin.isAdmin, isTrue);
     });
 
@@ -239,12 +237,7 @@ void main() {
 
   group('WatchProgress', () {
     test('fromJson parses correctly', () {
-      final json = {
-        'id': 1,
-        'user_id': 1,
-        'media_id': 1,
-        'position': 3600,
-      };
+      final json = {'id': 1, 'user_id': 1, 'media_id': 1, 'position': 3600};
 
       final progress = WatchProgress.fromJson(json);
 
@@ -338,8 +331,7 @@ void main() {
       expect(restored.cast, isNull);
     });
 
-    test('invalid JSON string in genres/cast yields empty list, not crash',
-        () {
+    test('invalid JSON string in genres/cast yields empty list, not crash', () {
       final meta = Metadata.fromJson({
         'id': 6,
         'title': 'Broken genres',
@@ -351,18 +343,20 @@ void main() {
       expect(meta.cast, isEmpty);
     });
 
-    test('list with non-strings in genres/cast yields empty list, not crash',
-        () {
-      final meta = Metadata.fromJson({
-        'id': 7,
-        'title': 'Mixed genres',
-        'genres': ['Rock', 42, null],
-        'cast': [1, 2],
-      });
+    test(
+      'list with non-strings in genres/cast yields empty list, not crash',
+      () {
+        final meta = Metadata.fromJson({
+          'id': 7,
+          'title': 'Mixed genres',
+          'genres': ['Rock', 42, null],
+          'cast': [1, 2],
+        });
 
-      expect(meta.genres, isEmpty);
-      expect(meta.cast, isEmpty);
-    });
+        expect(meta.genres, isEmpty);
+        expect(meta.cast, isEmpty);
+      },
+    );
 
     test('equality works', () {
       const a = Metadata(id: 5, title: 'T', genres: ['A']);

@@ -3,7 +3,7 @@ import 'package:flux_media_server/core/session/settings_local_datasource.dart';
 import 'package:flux_media_server/core/session/settings_repository.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
-  SettingsRepositoryImpl(this._localDataSource);
+  new(this._localDataSource);
 
   final SettingsLocalDataSource _localDataSource;
 

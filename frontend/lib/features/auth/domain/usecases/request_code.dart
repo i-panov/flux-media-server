@@ -4,7 +4,7 @@ import 'package:flux_media_server/features/auth/domain/repositories/auth_reposit
 import 'package:fpdart/fpdart.dart';
 
 class RequestCode extends UseCase<Either<Failure, Unit>, String> {
-  RequestCode(this.repository);
+  new(this.repository);
 
   final AuthRepository repository;
 

@@ -11,32 +11,17 @@ void main() {
     });
 
     test('позиция >= 90% длительности — завершён', () {
-      expect(
-        isWatchCompleted(position: 900, duration: 1000),
-        isTrue,
-      );
-      expect(
-        isWatchCompleted(position: 999, duration: 1000),
-        isTrue,
-      );
+      expect(isWatchCompleted(position: 900, duration: 1000), isTrue);
+      expect(isWatchCompleted(position: 999, duration: 1000), isTrue);
     });
 
     test('позиция < 90% — не завершён', () {
-      expect(
-        isWatchCompleted(position: 899, duration: 1000),
-        isFalse,
-      );
-      expect(
-        isWatchCompleted(position: 0, duration: 1000),
-        isFalse,
-      );
+      expect(isWatchCompleted(position: 899, duration: 1000), isFalse);
+      expect(isWatchCompleted(position: 0, duration: 1000), isFalse);
     });
 
     test('длительность неизвестна (0) — не завершён по позиции', () {
-      expect(
-        isWatchCompleted(position: 500, duration: 0),
-        isFalse,
-      );
+      expect(isWatchCompleted(position: 500, duration: 0), isFalse);
     });
   });
 

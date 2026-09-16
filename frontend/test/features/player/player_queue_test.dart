@@ -4,12 +4,12 @@ import 'package:flux_media_server/features/player/data/providers/play_queue_prov
 import 'package:flux_media_server/shared/models/media.dart';
 
 Media _fakeMedia([int id = 1]) => Media(
-      id: id,
-      title: 'Test Media $id',
-      year: 2024,
-      type: MediaType.video,
-      fileSize: 1024,
-    );
+  id: id,
+  title: 'Test Media $id',
+  year: 2024,
+  type: MediaType.video,
+  fileSize: 1024,
+);
 
 /// Fake playback controller that records calls without touching media_kit.
 class _FakePlaybackController implements PlaybackController {
@@ -27,7 +27,6 @@ class _FakePlaybackController implements PlaybackController {
   }
 }
 
-
 void main() {
   late _FakePlaybackController fakeController;
   late PlayQueueNotifier notifier;
@@ -35,9 +34,9 @@ void main() {
 
   setUp(() {
     fakeController = _FakePlaybackController();
-    container = ProviderContainer(overrides: [
-      playbackControllerProvider.overrideWithValue(fakeController),
-    ],);
+    container = ProviderContainer(
+      overrides: [playbackControllerProvider.overrideWithValue(fakeController)],
+    );
     notifier = container.read(playQueueProvider.notifier);
   });
 
@@ -61,14 +60,18 @@ void main() {
     });
 
     test('hasNext returns true when there are more items', () {
-      final state =
-          PlayQueueState(items: [_fakeMedia(), _fakeMedia(2)], currentIndex: 0);
+      final state = PlayQueueState(
+        items: [_fakeMedia(), _fakeMedia(2)],
+        currentIndex: 0,
+      );
       expect(state.hasNext, isTrue);
     });
 
     test('hasPrevious returns true when not at first item', () {
-      final state =
-          PlayQueueState(items: [_fakeMedia(), _fakeMedia(2)], currentIndex: 1);
+      final state = PlayQueueState(
+        items: [_fakeMedia(), _fakeMedia(2)],
+        currentIndex: 1,
+      );
       expect(state.hasPrevious, isTrue);
     });
   });
@@ -197,11 +200,8 @@ void main() {
   });
 
   group('PlayQueueNotifier.removeAt auto-advance', () {
-    test('removing the playing track calls play with the next item',
-        () async {
-      await notifier.setQueue(
-        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
-      );
+    test('removing the playing track calls play with the next item', () async {
+      await notifier.setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)]);
       fakeController.playCalls.clear();
 
       notifier.removeAt(0);
@@ -212,27 +212,31 @@ void main() {
       expect(fakeController.playCalls.first.id, 2);
     });
 
-    test('removing the playing track in the middle plays the following item',
-        () async {
-      await notifier.setQueue(
-        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
-        startIndex: 1,
-      );
-      fakeController.playCalls.clear();
+    test(
+      'removing the playing track in the middle plays the following item',
+      () async {
+        await notifier.setQueue([
+          _fakeMedia(),
+          _fakeMedia(2),
+          _fakeMedia(3),
+        ], startIndex: 1);
+        fakeController.playCalls.clear();
 
-      notifier.removeAt(1);
+        notifier.removeAt(1);
 
-      expect(notifier.state.items, hasLength(2));
-      expect(notifier.state.currentIndex, 1);
-      expect(fakeController.playCalls, hasLength(1));
-      expect(fakeController.playCalls.first.id, 3);
-    });
+        expect(notifier.state.items, hasLength(2));
+        expect(notifier.state.currentIndex, 1);
+        expect(fakeController.playCalls, hasLength(1));
+        expect(fakeController.playCalls.first.id, 3);
+      },
+    );
 
     test('removing the playing last track plays the previous item', () async {
-      await notifier.setQueue(
-        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
-        startIndex: 2,
-      );
+      await notifier.setQueue([
+        _fakeMedia(),
+        _fakeMedia(2),
+        _fakeMedia(3),
+      ], startIndex: 2);
       fakeController.playCalls.clear();
 
       notifier.removeAt(2);
@@ -244,9 +248,7 @@ void main() {
     });
 
     test('removing a non-current track does not call play', () async {
-      await notifier.setQueue(
-        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
-      );
+      await notifier.setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)]);
       fakeController.playCalls.clear();
 
       notifier.removeAt(2);
@@ -255,17 +257,19 @@ void main() {
       expect(fakeController.playCalls, isEmpty);
     });
 
-    test('removing the only track stops playback without calling play',
-        () async {
-      await notifier.setQueue([_fakeMedia()]);
-      fakeController.playCalls.clear();
+    test(
+      'removing the only track stops playback without calling play',
+      () async {
+        await notifier.setQueue([_fakeMedia()]);
+        fakeController.playCalls.clear();
 
-      notifier.removeAt(0);
+        notifier.removeAt(0);
 
-      expect(notifier.state.items, isEmpty);
-      expect(fakeController.playCalls, isEmpty);
-      expect(fakeController.stopCalls, 1);
-    });
+        expect(notifier.state.items, isEmpty);
+        expect(fakeController.playCalls, isEmpty);
+        expect(fakeController.stopCalls, 1);
+      },
+    );
   });
 
   group('PlayQueueNotifier.removeAt', () {
@@ -360,9 +364,7 @@ void main() {
 
   group('PlayQueueNotifier.upcoming', () {
     test('returns items after current', () async {
-      await notifier.setQueue(
-        [_fakeMedia(), _fakeMedia(2), _fakeMedia(3)],
-      );
+      await notifier.setQueue([_fakeMedia(), _fakeMedia(2), _fakeMedia(3)]);
 
       expect(notifier.upcoming, hasLength(2));
       expect(notifier.upcoming[0].id, 2);

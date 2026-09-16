@@ -22,7 +22,7 @@ abstract class LibraryApiClient extends ChopperService {
   /// создаётся общий [TimeoutHttpClient].
   static LibraryApiClientBundle create({
     String? baseUrl,
-    Iterable<dynamic>? interceptors,
+    List<Interceptor>? interceptors,
     http.Client? httpClient,
   }) {
     final created = createChopperClient(
@@ -44,65 +44,65 @@ abstract class LibraryApiClient extends ChopperService {
       _$LibraryApiClient(client);
 
   // Favorites
-  @Post(path: '/media/{id}/favorite', optionalBody: true)
+  @POST(path: '/media/{id}/favorite', optionalBody: true)
   Future<Response<Map<String, dynamic>>> addFavorite(@Path('id') int id);
 
-  @Delete(path: '/media/{id}/favorite')
+  @DELETE(path: '/media/{id}/favorite')
   Future<Response<Map<String, dynamic>>> removeFavorite(@Path('id') int id);
 
-  @Get(path: '/favorites')
+  @GET(path: '/favorites')
   Future<Response<Map<String, dynamic>>> getFavorites();
 
-  @Post(path: '/favorites/artist')
+  @POST(path: '/favorites/artist')
   Future<Response<Map<String, dynamic>>> addArtistFavorite(
     @Body() Map<String, dynamic> body,
   );
 
-  @Delete(path: '/favorites/artist')
+  @DELETE(path: '/favorites/artist')
   Future<Response<Map<String, dynamic>>> removeArtistFavorite(
     @Query('artist_id') int artistId,
   );
 
   // Artists
-  @Get(path: '/artists')
+  @GET(path: '/artists')
   Future<Response<Map<String, dynamic>>> getArtists();
 
-  @Put(path: '/artists/{id}')
+  @PUT(path: '/artists/{id}')
   Future<Response<Map<String, dynamic>>> updateArtist(
     @Path('id') int id,
     @Body() Map<String, dynamic> body,
   );
 
   // Collections
-  @Post(path: '/collections')
+  @POST(path: '/collections')
   Future<Response<Map<String, dynamic>>> createCollection(
     @Body() Map<String, dynamic> body,
   );
 
-  @Get(path: '/collections')
+  @GET(path: '/collections')
   Future<Response<List<dynamic>>> getCollections();
 
-  @Put(path: '/collections/{id}')
+  @PUT(path: '/collections/{id}')
   Future<Response<Map<String, dynamic>>> updateCollection(
     @Path('id') int id,
     @Body() Map<String, dynamic> body,
   );
 
-  @Delete(path: '/collections/{id}')
+  @DELETE(path: '/collections/{id}')
   Future<Response<Map<String, dynamic>>> deleteCollection(@Path('id') int id);
 
-  @Post(path: '/collections/{id}/items')
+  @POST(path: '/collections/{id}/items')
   Future<Response<Map<String, dynamic>>> addCollectionItem(
     @Path('id') int id,
     @Body() Map<String, dynamic> body,
   );
 
-  @Delete(path: '/collections/{id}/items/{mediaId}')
+  @DELETE(path: '/collections/{id}/items/{mediaId}')
   Future<Response<Map<String, dynamic>>> removeCollectionItem(
     @Path('id') int id,
     @Path('mediaId') int mediaId,
   );
 
-  @Get(path: '/collections/{id}/items')
+  @GET(path: '/collections/{id}/items')
   Future<Response<List<dynamic>>> getCollectionItems(@Path('id') int id);
 }

@@ -38,6 +38,12 @@ void main() async {
       sharedPreferencesProvider.overrideWithValue(prefs),
       audioHandlerProvider.overrideWithValue(audioHandler),
     ],
+    // Riverpod 3 по умолчанию ретраит упавшие build-и (до 10 раз с
+    // бэкоффом), оставляя состояние в loading — экраны показывали бы
+    // спиннер вместо ошибки. Отключаем: ошибки (в т.ч. NetworkFailure
+    // для офлайн-детекта) должны сразу попадать в состояние, как в
+    // Riverpod 2.
+    retry: (_, _) => null,
   );
 
   // Load settings synchronously at app startup so they're available
@@ -87,7 +93,7 @@ void main() async {
 }
 
 class SplashScreen extends ConsumerWidget {
-  const SplashScreen({super.key});
+  const new({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -108,7 +114,7 @@ class SplashScreen extends ConsumerWidget {
 }
 
 class FluxApp extends ConsumerStatefulWidget {
-  const FluxApp({required this.router, super.key});
+  const new({required this.router, super.key});
 
   final AppRouter router;
 
@@ -142,7 +148,8 @@ class _FluxAppState extends ConsumerState<FluxApp> {
         // Редирект — только для стартовой проверки сессии и перехода
         // из авторизованного состояния; ошибки форм (verifyCode,
         // requestCode) маршрут не меняют — экран показывает ошибку сам.
-        final shouldRedirect = previous == null ||
+        final shouldRedirect =
+            previous == null ||
             previous is AuthLoading ||
             previous is AuthAuthenticated;
         if (!shouldRedirect) return;
@@ -156,7 +163,8 @@ class _FluxAppState extends ConsumerState<FluxApp> {
       } else if (next is AuthInitial && _hasServerUrl) {
         // Выход из офлайн-режима (AuthError → AuthInitial) тоже ведёт
         // на экран логина.
-        final shouldRedirect = previous == null ||
+        final shouldRedirect =
+            previous == null ||
             previous is AuthAuthenticated ||
             previous is AuthLoading ||
             previous is AuthError;
@@ -185,7 +193,8 @@ class _FluxAppState extends ConsumerState<FluxApp> {
 
     ref.listen(authProvider, _handleAuthStateChange);
 
-    final showSplash = authState is AuthLoading ||
+    final showSplash =
+        authState is AuthLoading ||
         (authState is AuthInitial &&
             settings.serverUrl != null &&
             settings.authToken != null);

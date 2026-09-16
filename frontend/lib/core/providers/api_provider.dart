@@ -15,8 +15,9 @@ final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
   return AuthInterceptor(ref);
 });
 
-final tokenRefreshInterceptorProvider =
-    Provider<TokenRefreshInterceptor>((ref) {
+final tokenRefreshInterceptorProvider = Provider<TokenRefreshInterceptor>((
+  ref,
+) {
   return TokenRefreshInterceptor(ref);
 });
 
@@ -42,9 +43,9 @@ final authTokenRefresherProvider = Provider<AuthTokenRefresher>((ref) {
   return AuthTokenRefresher(
     performRefresh: (refreshToken) async {
       try {
-        final response = await ref
-            .read(authApiClientProvider)
-            .refreshToken({'refresh_token': refreshToken});
+        final response = await ref.read(authApiClientProvider).refreshToken({
+          'refresh_token': refreshToken,
+        });
         if (response.statusCode != 200) return null;
         final tokens = parseRefreshTokens(response.body);
         if (tokens == null) return null;
@@ -52,10 +53,10 @@ final authTokenRefresherProvider = Provider<AuthTokenRefresher>((ref) {
             .read(settingsProvider.notifier)
             .setTokens(tokens.token, tokens.refreshToken);
         return tokens;
-        // ignore: avoid_catching_errors
-      } on Error {
         // Неожиданная форма ответа (TypeError и пр.) не должна
         // ронять приложение: считаем refresh неудачным.
+        // ignore: avoid_catching_errors
+      } on Error {
         return null;
       }
     },

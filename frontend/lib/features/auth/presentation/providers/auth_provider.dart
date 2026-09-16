@@ -16,6 +16,7 @@ import 'package:flux_media_server/features/media/presentation/providers/media_li
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/user.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'auth_provider.freezed.dart';
@@ -25,16 +26,13 @@ extension FailureNetworkX on Failure {
 }
 
 @freezed
-class AuthState with _$AuthState {
-  const factory AuthState.initial() = AuthInitial;
-  const factory AuthState.loading() = AuthLoading;
-  const factory AuthState.codeSent({
-    required String email,
-    String? debugCode,
-  }) = AuthCodeSent;
-  const factory AuthState.authenticated({required User user}) =
-      AuthAuthenticated;
-  const factory AuthState.error({
+sealed class AuthState with _$AuthState {
+  const factory initial() = AuthInitial;
+  const factory loading() = AuthLoading;
+  const factory codeSent({required String email, String? debugCode}) =
+      AuthCodeSent;
+  const factory authenticated({required User user}) = AuthAuthenticated;
+  const factory error({
     required String message,
     @Default(false) bool isOffline,
   }) = AuthError;
@@ -71,36 +69,38 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<bool> requestCode(String email) async {
     if (_requestInFlight) return false;
     _requestInFlight = true;
+    final Either<Failure, Unit> result;
     try {
-      final result = await _requestCode(email);
-      return result.fold(
-        (failure) {
-          state = AuthState.error(
-            message: failure.message,
-            isOffline: failure.isNetworkFailure,
-          );
-          return false;
-        },
-        (_) {
-          lastRequestedEmail = email;
-          state = AuthState.codeSent(
-            email: email,
-            debugCode: _requestCode.lastDebugCode,
-          );
-          return true;
-        },
-      );
+      result = await _requestCode(email);
     } finally {
       _requestInFlight = false;
     }
+    return result.fold(
+      (failure) {
+        state = AuthState.error(
+          message: failure.message,
+          isOffline: failure.isNetworkFailure,
+        );
+        return false;
+      },
+      (_) {
+        lastRequestedEmail = email;
+        state = AuthState.codeSent(
+          email: email,
+          debugCode: _requestCode.lastDebugCode,
+        );
+        return true;
+      },
+    );
   }
 
   /// Верифицирует код. Глобальный AuthLoading здесь НЕ выставляется:
   /// splash размонтировал бы Navigator и CodeScreen (потеря cooldown
   /// и состояния формы) — локальную загрузку показывает сам экран.
   Future<void> verifyCode(String email, String code) async {
-    final result =
-        await _verifyCode(VerifyCodeParams(email: email, code: code));
+    final result = await _verifyCode(
+      VerifyCodeParams(email: email, code: code),
+    );
     await result.fold<Future<void>>(
       (failure) async {
         state = AuthState.error(

@@ -16,18 +16,13 @@ Future<bool?> showAddToCollectionDialog(
 }) async {
   return showDialog<bool>(
     context: context,
-    builder: (ctx) => _AddToCollectionDialog(
-      mediaId: mediaId,
-      mediaType: mediaType,
-    ),
+    builder: (ctx) =>
+        _AddToCollectionDialog(mediaId: mediaId, mediaType: mediaType),
   );
 }
 
 class _AddToCollectionDialog extends ConsumerStatefulWidget {
-  const _AddToCollectionDialog({
-    required this.mediaId,
-    required this.mediaType,
-  });
+  const new({required this.mediaId, required this.mediaType});
 
   final int mediaId;
   final String mediaType;
@@ -57,8 +52,7 @@ class _AddToCollectionDialogState
             const SizedBox(height: 4),
             Flexible(
               child: collectionsState.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Text(l.failedToAdd(_errorText(e))),
                 data: (collections) {
                   final filtered = collections
@@ -72,8 +66,7 @@ class _AddToCollectionDialogState
                         return ListTile(
                           leading: const Icon(Icons.add),
                           title: Text(l.create),
-                          onTap:
-                              _loading ? null : () => _showCreateDialog(l),
+                          onTap: _loading ? null : () => _showCreateDialog(l),
                         );
                       }
                       final collection = filtered[index - 1];
@@ -129,9 +122,8 @@ class _AddToCollectionDialogState
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.failedToAdd(e.toString()))),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l.failedToAdd(e.toString()))));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -149,10 +141,7 @@ class _AddToCollectionDialogState
     try {
       final createCollection = ref.read(createCollectionProvider);
       final collection = await createCollection(
-        CreateCollectionParams(
-          name: name,
-          type: widget.mediaType,
-        ),
+        CreateCollectionParams(name: name, type: widget.mediaType),
       );
       if (!mounted) return;
       collection.fold(
@@ -167,9 +156,8 @@ class _AddToCollectionDialogState
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.failedToAdd(e.toString()))),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l.failedToAdd(e.toString()))));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -184,7 +172,7 @@ class _AddToCollectionDialogState
 
 /// Плитка коллекции: подсвечивает «уже добавлено» и блокирует тап.
 class _CollectionTile extends ConsumerWidget {
-  const _CollectionTile({
+  const new({
     required this.collection,
     required this.mediaId,
     required this.enabled,
@@ -199,10 +187,8 @@ class _CollectionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context)!;
-    final itemsState =
-        ref.watch(collectionItemsFullProvider(collection.id));
-    final alreadyAdded =
-        itemsState.valueOrNull?.any((m) => m.id == mediaId) ?? false;
+    final itemsState = ref.watch(collectionItemsFullProvider(collection.id));
+    final alreadyAdded = itemsState.value?.any((m) => m.id == mediaId) ?? false;
     return ListTile(
       enabled: enabled && !alreadyAdded,
       leading: Icon(alreadyAdded ? Icons.check_circle : Icons.folder),
@@ -217,7 +203,7 @@ class _CollectionTile extends ConsumerWidget {
 /// Диалог создания коллекции: trim имени, Create активна при непустом
 /// поле, контроллер диспозится.
 class _CreateCollectionDialog extends StatefulWidget {
-  const _CreateCollectionDialog();
+  const new();
 
   @override
   State<_CreateCollectionDialog> createState() =>

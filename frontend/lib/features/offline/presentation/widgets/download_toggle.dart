@@ -32,8 +32,9 @@ Future<void> toggleDownload(
   var media = _findInLoadedPages(ref, mediaId, mediaType);
   if (media == null) {
     // Трек вне загруженных страниц пагинации — берём детали с сервера.
-    final result =
-        await ref.read(mediaRepositoryProvider).getMediaDetail(mediaId);
+    final result = await ref
+        .read(mediaRepositoryProvider)
+        .getMediaDetail(mediaId);
     media = result.fold((_) => null, (m) => m);
   }
   // Фолбэк-заглушки больше нет: без реальных метаданных не скачиваем,
@@ -57,7 +58,7 @@ Future<void> toggleDownload(
 }
 
 Media? _findInLoadedPages(WidgetRef ref, int mediaId, String mediaType) {
-  final mediaList = ref.read(mediaListProvider(mediaType)).valueOrNull;
+  final mediaList = ref.read(mediaListProvider(mediaType)).value;
   if (mediaList == null) return null;
   for (final m in mediaList.items) {
     if (m.id == mediaId) return m;

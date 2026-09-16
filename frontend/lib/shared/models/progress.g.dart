@@ -6,8 +6,8 @@ part of 'progress.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$WatchProgressImpl _$$WatchProgressImplFromJson(Map<String, dynamic> json) =>
-    _$WatchProgressImpl(
+_WatchProgress _$WatchProgressFromJson(Map<String, dynamic> json) =>
+    _WatchProgress(
       userId: (json['user_id'] as num).toInt(),
       mediaId: (json['media_id'] as num).toInt(),
       position: (json['position'] as num).toInt(),
@@ -19,7 +19,7 @@ _$WatchProgressImpl _$$WatchProgressImplFromJson(Map<String, dynamic> json) =>
       id: (json['id'] as num?)?.toInt(),
     );
 
-Map<String, dynamic> _$$WatchProgressImplToJson(_$WatchProgressImpl instance) =>
+Map<String, dynamic> _$WatchProgressToJson(_WatchProgress instance) =>
     <String, dynamic>{
       'user_id': instance.userId,
       'media_id': instance.mediaId,

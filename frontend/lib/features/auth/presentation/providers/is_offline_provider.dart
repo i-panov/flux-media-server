@@ -18,8 +18,9 @@ class NetworkStatusNotifier extends Notifier<bool> {
   void markOnline() => state = false;
 }
 
-final networkStatusProvider =
-    NotifierProvider<NetworkStatusNotifier, bool>(NetworkStatusNotifier.new);
+final networkStatusProvider = NotifierProvider<NetworkStatusNotifier, bool>(
+  NetworkStatusNotifier.new,
+);
 
 /// True, когда приложение работает в офлайн-режиме: либо последняя
 /// проверка сервера завершилась сетевой ошибкой ([AuthState.error] с

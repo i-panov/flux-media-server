@@ -3,12 +3,12 @@ import 'package:flux_media_server/features/audio/presentation/utils/play_queue_u
 import 'package:flux_media_server/shared/models/media.dart';
 
 Media _fakeMedia(int id) => Media(
-      id: id,
-      title: 'Track $id',
-      year: 2024,
-      type: MediaType.audio,
-      fileSize: 1024,
-    );
+  id: id,
+  title: 'Track $id',
+  year: 2024,
+  type: MediaType.audio,
+  fileSize: 1024,
+);
 
 void main() {
   group('buildPlayQueue', () {
@@ -24,8 +24,7 @@ void main() {
       expect(result.queue.map((m) => m.id), [1, 2, 3]);
     });
 
-    test('MAJOR: трека нет в очереди — вставляется в начало, а не трек №0',
-        () {
+    test('MAJOR: трека нет в очереди — вставляется в начало, а не трек №0', () {
       final queue = [_fakeMedia(1), _fakeMedia(2)];
       final result = buildPlayQueue(
         media: _fakeMedia(99),
@@ -50,10 +49,7 @@ void main() {
     });
 
     test('пустая очередь — трек вставляется единственным', () {
-      final result = buildPlayQueue(
-        media: _fakeMedia(5),
-        fallbackQueue: [],
-      );
+      final result = buildPlayQueue(media: _fakeMedia(5), fallbackQueue: []);
 
       expect(result.queue.map((m) => m.id), [5]);
       expect(result.startIndex, 0);

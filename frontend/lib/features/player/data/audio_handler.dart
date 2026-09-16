@@ -14,7 +14,7 @@ import 'package:path_provider/path_provider.dart';
 /// The underlying [Player] is exposed so that UI widgets (e.g. volume
 /// slider, seek bar) can subscribe to its streams directly.
 class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
-  FluxAudioHandler() : player = Player() {
+  new() : player = Player() {
     unawaited(_init());
   }
 
@@ -41,13 +41,13 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
   StreamSubscription<dynamic>? _interruptionSub;
   StreamSubscription<dynamic>? _noisySub;
 
-  static const _controlsPlaying = [
+  static const List<MediaControl> _controlsPlaying = [
     MediaControl.skipToPrevious,
     MediaControl.pause,
     MediaControl.skipToNext,
   ];
 
-  static const _controlsPaused = [
+  static const List<MediaControl> _controlsPaused = [
     MediaControl.skipToPrevious,
     MediaControl.play,
     MediaControl.skipToNext,
@@ -69,12 +69,12 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
           unawaited(player.play());
         }
       });
-      _noisySub =
-          session.becomingNoisyEventStream.listen((_) => player.pause());
+      _noisySub = session.becomingNoisyEventStream.listen(
+        (_) => player.pause(),
+      );
     } catch (e) {
       // audio_session может быть недоступен на некоторых платформах —
       // воспроизведение продолжает работать без обработки фокуса.
-      // ignore: avoid_print
       print('AudioSession init failed: $e');
     }
 
@@ -96,11 +96,7 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
     });
 
     player.stream.position.listen((position) {
-      playbackState.add(
-        playbackState.value.copyWith(
-          updatePosition: position,
-        ),
-      );
+      playbackState.add(playbackState.value.copyWith(updatePosition: position));
     });
 
     player.stream.duration.listen((duration) {

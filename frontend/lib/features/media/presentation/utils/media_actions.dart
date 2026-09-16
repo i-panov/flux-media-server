@@ -23,13 +23,13 @@ Future<void> changeMediaCover(
   VoidCallback? onUploadFinished,
 }) async {
   final l = AppLocalizations.of(context)!;
-  final result = await FilePicker.platform.pickFiles(
+  final result = await FilePicker.pickFiles(
     type: FileType.custom,
     allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
   );
 
-  if (result == null || result.files.isEmpty) return;
-  final file = result.files.first;
+  if (result.isEmpty) return;
+  final file = result.first;
   if (file.path == null) return;
 
   onUploadStarted?.call();

@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:fpdart/fpdart.dart';
 
 class UpdateArtistNameParams {
-  const UpdateArtistNameParams({required this.artistId, required this.name});
+  const new({required this.artistId, required this.name});
 
   final int artistId;
   final String name;
@@ -15,7 +15,7 @@ class UpdateArtistNameParams {
 /// привязан (привязки идут по id).
 class UpdateArtistName
     extends UseCase<Either<Failure, Artist>, UpdateArtistNameParams> {
-  UpdateArtistName(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

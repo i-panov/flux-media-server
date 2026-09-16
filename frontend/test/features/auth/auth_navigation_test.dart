@@ -1,6 +1,5 @@
 import 'dart:async';
 
-
 import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,11 +26,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FakeAuthRepository implements AuthRepository {
   Future<Either<Failure, Unit>> Function(String)? onRequestCode;
   Future<Either<Failure, ({String token, String refreshToken, User user})>>
-      Function(String, String)? onVerifyCode;
+  Function(String, String)?
+  onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
   Future<Either<Failure, ({String token, String refreshToken})>> Function(
     String,
-  )? onRefreshToken;
+  )?
+  onRefreshToken;
 
   String? _lastDebugCode;
 
@@ -47,7 +48,7 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Either<Failure, ({String token, String refreshToken, User user})>>
-      verifyCode(String email, String code) => onVerifyCode!(email, code);
+  verifyCode(String email, String code) => onVerifyCode!(email, code);
 
   @override
   Future<Either<Failure, User>> getCurrentUser() => onGetCurrentUser!();
@@ -55,12 +56,11 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
     String refreshToken,
-  ) =>
-      onRefreshToken!(refreshToken);
+  ) => onRefreshToken!(refreshToken);
 }
 
 class FakeOfflineCacheService extends OfflineCacheService {
-  FakeOfflineCacheService(Ref ref) : super(ref, 'http://localhost:8080/api');
+  new(Ref ref) : super(ref, 'http://localhost:8080/api');
 
   @override
   Future<void> clearUserCache() async {}
@@ -121,29 +121,29 @@ class FakeAudioSource implements AudioPlaybackSource {
 }
 
 void main() {
-  const secureStorageChannel =
-      MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  const secureStorageChannel = MethodChannel(
+    'plugins.it_nomads.com/flutter_secure_storage',
+  );
   final mockStorage = <String, String>{};
 
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel,
-            (MethodCall methodCall) async {
-      final args = methodCall.arguments as Map<dynamic, dynamic>;
-      switch (methodCall.method) {
-        case 'read':
-          return mockStorage[args['key'] as String];
-        case 'write':
-          mockStorage[args['key'] as String] = args['value'] as String;
-          return null;
-        case 'delete':
-          mockStorage.remove(args['key'] as String);
-          return null;
-        default:
-          return null;
-      }
-    });
+        .setMockMethodCallHandler(secureStorageChannel, (methodCall) async {
+          final args = methodCall.arguments as Map<dynamic, dynamic>;
+          switch (methodCall.method) {
+            case 'read':
+              return mockStorage[args['key'] as String];
+            case 'write':
+              mockStorage[args['key'] as String] = args['value'] as String;
+              return null;
+            case 'delete':
+              mockStorage.remove(args['key'] as String);
+              return null;
+            default:
+              return null;
+          }
+        });
   });
 
   tearDownAll(() {
@@ -179,6 +179,9 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     fakeRepo = FakeAuthRepository();
     container = ProviderContainer(
+      // Riverpod 3 ретраит упавшие build-и по умолчанию: таймеры ретраев
+      // переживают конец теста (pending timers). Отключаем.
+      retry: (_, _) => null,
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         offlineCacheServiceProvider.overrideWith(FakeOfflineCacheService.new),
@@ -203,13 +206,14 @@ void main() {
   });
 
   group('навигация при ошибке верификации', () {
-    testWidgets('ошибка verifyCode не меняет маршрут (CodeRoute остаётся)',
-        (tester) async {
+    testWidgets('ошибка verifyCode не меняет маршрут (CodeRoute остаётся)', (
+      tester,
+    ) async {
       fakeRepo
         ..onRequestCode = (_) async {
           return const Right(unit);
         }
-        ..onVerifyCode = (_, __) async {
+        ..onVerifyCode = (_, _) async {
           return const Left(ServerFailure(message: 'Invalid or expired code'));
         };
 
@@ -230,13 +234,14 @@ void main() {
       expect(container.read(authProvider), isA<AuthError>());
     });
 
-    testWidgets('неверный код не отправляет на ServerSetupRoute',
-        (tester) async {
+    testWidgets('неверный код не отправляет на ServerSetupRoute', (
+      tester,
+    ) async {
       fakeRepo
         ..onRequestCode = (_) async {
           return const Right(unit);
         }
-        ..onVerifyCode = (_, __) async {
+        ..onVerifyCode = (_, _) async {
           return const Left(ServerFailure(message: 'Invalid or expired code'));
         };
 
@@ -256,8 +261,9 @@ void main() {
   });
 
   group('Retry офлайн-баннера', () {
-    testWidgets('вызывает checkAuthStatus, а не просто invalidate',
-        (tester) async {
+    testWidgets('вызывает checkAuthStatus, а не просто invalidate', (
+      tester,
+    ) async {
       await container
           .read(settingsProvider.notifier)
           .setServerUrl('http://localhost:8080/api');
@@ -292,10 +298,11 @@ void main() {
   });
 
   group('AuthGuard', () {
-    testWidgets('AuthError без offline отправляет на LoginRoute',
-        (tester) async {
-      fakeRepo.onGetCurrentUser =
-          () async => const Left(ServerFailure(message: 'Server error'));
+    testWidgets('AuthError без offline отправляет на LoginRoute', (
+      tester,
+    ) async {
+      fakeRepo.onGetCurrentUser = () async =>
+          const Left(ServerFailure(message: 'Server error'));
       await container.read(authProvider.notifier).checkAuthStatus();
       final state = container.read(authProvider);
       expect(state, isA<AuthError>());
@@ -310,10 +317,11 @@ void main() {
       expect(router.current.name, LoginRoute.name);
     });
 
-    testWidgets('AuthError + isOffline пропускает на защищённый маршрут',
-        (tester) async {
-      fakeRepo.onGetCurrentUser =
-          () async => const Left(NetworkFailure(message: 'No connection'));
+    testWidgets('AuthError + isOffline пропускает на защищённый маршрут', (
+      tester,
+    ) async {
+      fakeRepo.onGetCurrentUser = () async =>
+          const Left(NetworkFailure(message: 'No connection'));
       await container.read(authProvider.notifier).checkAuthStatus();
       final state = container.read(authProvider);
       expect(state, isA<AuthError>());

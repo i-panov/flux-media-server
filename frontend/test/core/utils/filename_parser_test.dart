@@ -9,12 +9,14 @@ void main() {
       expect(r.year, 2024);
     });
 
-    test('paren pattern replaces dots with spaces (unified with dot pattern)',
-        () {
-      final r = FilenameParser.parse('Movie.Name (2024).mp4');
-      expect(r.title, 'Movie Name');
-      expect(r.year, 2024);
-    });
+    test(
+      'paren pattern replaces dots with spaces (unified with dot pattern)',
+      () {
+        final r = FilenameParser.parse('Movie.Name (2024).mp4');
+        expect(r.title, 'Movie Name');
+        expect(r.year, 2024);
+      },
+    );
 
     test('paren pattern trims whitespace around title', () {
       final r = FilenameParser.parse('Movie  (1999).mp4');

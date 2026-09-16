@@ -20,7 +20,7 @@ String _errorText(Object error) {
 
 @RoutePage()
 class CollectionDetailScreen extends ConsumerStatefulWidget {
-  const CollectionDetailScreen({required this.collection, super.key});
+  const new({required this.collection, super.key});
 
   final Collection collection;
 
@@ -34,8 +34,9 @@ class _CollectionDetailScreenState
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final itemsState =
-        ref.watch(collectionItemsFullProvider(widget.collection.id));
+    final itemsState = ref.watch(
+      collectionItemsFullProvider(widget.collection.id),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -88,8 +89,9 @@ class _CollectionDetailScreenState
           return GridView.builder(
             padding: const EdgeInsets.all(8),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount:
-                  (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6),
+              crossAxisCount: (MediaQuery.of(context).size.width / 180)
+                  .floor()
+                  .clamp(2, 6),
               childAspectRatio: 0.7,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
@@ -105,8 +107,9 @@ class _CollectionDetailScreenState
                       if (media.type == MediaType.audio) {
                         context.router.push(AudioPlayerRoute(media: media));
                       } else {
-                        context.router
-                            .push(VideoDetailRoute(mediaId: media.id));
+                        context.router.push(
+                          VideoDetailRoute(mediaId: media.id),
+                        );
                       }
                     },
                   ),
@@ -203,8 +206,9 @@ class _CollectionDetailScreenState
   }
 
   Widget _buildSkeletonGrid(BuildContext context) {
-    final crossAxisCount =
-        (MediaQuery.of(context).size.width / 180).floor().clamp(2, 6);
+    final crossAxisCount = (MediaQuery.of(context).size.width / 180)
+        .floor()
+        .clamp(2, 6);
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -285,7 +289,7 @@ class _CollectionDetailScreenState
 
 /// Диалог со списком медиа (с фильтром) для добавления в коллекцию.
 class _AddMediaDialog extends ConsumerStatefulWidget {
-  const _AddMediaDialog({
+  const new({
     required this.collection,
     required this.mediaType,
     required this.l,
@@ -355,9 +359,7 @@ class _AddMediaDialogState extends ConsumerState<_AddMediaDialog> {
                       return ListTile(
                         leading: const Icon(Icons.movie),
                         title: Text(media.title),
-                        onTap: _adding
-                            ? null
-                            : () => _add(media),
+                        onTap: _adding ? null : () => _add(media),
                       );
                     },
                   );
@@ -390,9 +392,9 @@ class _AddMediaDialogState extends ConsumerState<_AddMediaDialog> {
     setState(() => _adding = false);
     result.fold(
       (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.failedToAdd(failure.message))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.failedToAdd(failure.message))));
       },
       (_) {
         // Оптимистичное обновление списка — без refetch.

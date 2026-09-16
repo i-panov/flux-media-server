@@ -5,17 +5,14 @@ import 'package:flux_media_server/shared/models/user.dart';
 import 'package:fpdart/fpdart.dart';
 
 class VerifyCodeParams {
-  const VerifyCodeParams({
-    required this.email,
-    required this.code,
-  });
+  const new({required this.email, required this.code});
 
   final String email;
   final String code;
 }
 
 class VerifyCodeResult {
-  const VerifyCodeResult({
+  const new({
     required this.token,
     required this.refreshToken,
     required this.user,
@@ -28,7 +25,7 @@ class VerifyCodeResult {
 
 class VerifyCode
     extends UseCase<Either<Failure, VerifyCodeResult>, VerifyCodeParams> {
-  VerifyCode(this.repository);
+  new(this.repository);
 
   final AuthRepository repository;
 

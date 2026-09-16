@@ -5,7 +5,7 @@ import 'package:flux_media_server/features/media/domain/repositories/media_repos
 import 'package:fpdart/fpdart.dart';
 
 class GetUploadStatus extends UseCase<Either<Failure, UploadStatus>, int> {
-  GetUploadStatus(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

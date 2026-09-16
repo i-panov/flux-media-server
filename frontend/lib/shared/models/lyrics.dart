@@ -1,13 +1,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-// ignore_for_file: invalid_annotation_target
-
 part 'lyrics.freezed.dart';
 part 'lyrics.g.dart';
 
 @freezed
-class Lyrics with _$Lyrics {
-  const factory Lyrics({
+sealed class Lyrics with _$Lyrics {
+  const factory({
     required int id,
     @JsonKey(name: 'media_id') required int mediaId,
     required String source,
@@ -18,5 +16,5 @@ class Lyrics with _$Lyrics {
     @JsonKey(name: 'sync_data') @Default('') String syncData,
   }) = _Lyrics;
 
-  factory Lyrics.fromJson(Map<String, dynamic> json) => _$LyricsFromJson(json);
+  factory fromJson(Map<String, dynamic> json) => _$LyricsFromJson(json);
 }

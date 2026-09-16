@@ -51,8 +51,7 @@ void main() {
   });
 
   group('MediaRemoteDataSource.uploadFile auth/refresh', () {
-    test('returns job id from the 202 response after 401 refresh',
-        () async {
+    test('returns job id from the 202 response after 401 refresh', () async {
       var calls = 0;
       var refreshCalls = 0;
       final client = MockClient((request) async {
@@ -139,9 +138,7 @@ void main() {
     });
 
     test('successful upload cancels the retry loop immediately', () async {
-      final client = MockClient(
-        (_) async => http.Response(_jobJson, 202),
-      );
+      final client = MockClient((_) async => http.Response(_jobJson, 202));
 
       final dataSource = _dataSource(client: client);
       final jobId = await dataSource.uploadFile(
@@ -172,21 +169,19 @@ void main() {
       expect(captured.headers['Authorization'], 'Bearer cover-token');
     });
 
-    test('isCancelled before send aborts with UploadCancelledException',
-        () async {
-      final client = MockClient(
-        (_) async => http.Response('{}', 200),
-      );
+    test(
+      'isCancelled before send aborts with UploadCancelledException',
+      () async {
+        final client = MockClient((_) async => http.Response('{}', 200));
 
-      final dataSource = _dataSource(
-        client: client,
-      );
+        final dataSource = _dataSource(client: client);
 
-      await expectLater(
-        dataSource.uploadCover(5, _coverFile.path, isCancelled: () => true),
-        throwsA(isA<UploadCancelledException>()),
-      );
-    });
+        await expectLater(
+          dataSource.uploadCover(5, _coverFile.path, isCancelled: () => true),
+          throwsA(isA<UploadCancelledException>()),
+        );
+      },
+    );
   });
 
   group('MediaRemoteDataSource artist actions', () {
@@ -218,8 +213,7 @@ void main() {
       expect(body['name'], 'New Name');
     });
 
-    test('uploadArtistCover sends multipart to /artists/{id}/cover',
-        () async {
+    test('uploadArtistCover sends multipart to /artists/{id}/cover', () async {
       late http.Request captured;
       final client = MockClient((request) async {
         captured = request;
@@ -269,9 +263,7 @@ void main() {
         return http.Response(_jobJson, 202);
       });
 
-      final dataSource = _dataSource(
-        client: client,
-      );
+      final dataSource = _dataSource(client: client);
 
       await expectLater(
         dataSource.uploadFile(
@@ -287,9 +279,7 @@ void main() {
 
   group('MediaRemoteDataSource upload job status/cancel', () {
     test('getUploadJobStatus returns parsed job status', () async {
-      final client = MockClient(
-        (_) async => http.Response(_statusJson, 200),
-      );
+      final client = MockClient((_) async => http.Response(_statusJson, 200));
 
       final dataSource = _dataSource(client: client);
       final status = await dataSource.getUploadJobStatus(42);

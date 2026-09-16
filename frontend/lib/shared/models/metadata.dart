@@ -23,11 +23,9 @@ List<String>? _stringListFromJson(Object? json) {
 String? _stringListToJson(List<String>? value) =>
     value == null ? null : jsonEncode(value);
 
-// ignore_for_file: invalid_annotation_target
-
 @freezed
-class Metadata with _$Metadata {
-  const factory Metadata({
+sealed class Metadata with _$Metadata {
+  const factory({
     required int id,
     @JsonKey(name: 'external_id') String? externalId,
     String? source,
@@ -51,6 +49,5 @@ class Metadata with _$Metadata {
     List<String>? cast,
   }) = _Metadata;
 
-  factory Metadata.fromJson(Map<String, dynamic> json) =>
-      _$MetadataFromJson(json);
+  factory fromJson(Map<String, dynamic> json) => _$MetadataFromJson(json);
 }

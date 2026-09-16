@@ -8,7 +8,7 @@ enum PlayerViewKind { initial, loading, error, completed, playing }
 
 @immutable
 class PlayerView {
-  const PlayerView({
+  const new({
     required this.kind,
     required this.media,
     required this.type,
@@ -51,56 +51,49 @@ class PlayerView {
 PlayerView playerViewFromPlaybackState(PlaybackState state) {
   return switch (state) {
     PlaybackInitial() => const PlayerView(
-        kind: PlayerViewKind.initial,
-        media: null,
-        type: null,
-        isPaused: false,
-        savedPosition: null,
-        errorMessage: null,
-      ),
+      kind: PlayerViewKind.initial,
+      media: null,
+      type: null,
+      isPaused: false,
+      savedPosition: null,
+      errorMessage: null,
+    ),
     PlaybackLoading() => const PlayerView(
-        kind: PlayerViewKind.loading,
-        media: null,
-        type: null,
-        isPaused: false,
-        savedPosition: null,
-        errorMessage: null,
-      ),
+      kind: PlayerViewKind.loading,
+      media: null,
+      type: null,
+      isPaused: false,
+      savedPosition: null,
+      errorMessage: null,
+    ),
     PlaybackError(:final message) => PlayerView(
-        kind: PlayerViewKind.error,
-        media: null,
-        type: null,
-        isPaused: false,
-        savedPosition: null,
-        errorMessage: message,
-      ),
+      kind: PlayerViewKind.error,
+      media: null,
+      type: null,
+      isPaused: false,
+      savedPosition: null,
+      errorMessage: message,
+    ),
     PlaybackCompleted() => const PlayerView(
-        kind: PlayerViewKind.completed,
-        media: null,
-        type: null,
-        isPaused: false,
-        savedPosition: null,
-        errorMessage: null,
-      ),
+      kind: PlayerViewKind.completed,
+      media: null,
+      type: null,
+      isPaused: false,
+      savedPosition: null,
+      errorMessage: null,
+    ),
     PlaybackPlaying(
       :final media,
       :final type,
       :final isPaused,
       :final savedPosition,
-    ) => PlayerView(
+    ) =>
+      PlayerView(
         kind: PlayerViewKind.playing,
         media: media,
         type: type,
         isPaused: isPaused,
         savedPosition: savedPosition,
-        errorMessage: null,
-      ),
-    _ => const PlayerView(
-        kind: PlayerViewKind.initial,
-        media: null,
-        type: null,
-        isPaused: false,
-        savedPosition: null,
         errorMessage: null,
       ),
   };

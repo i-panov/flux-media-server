@@ -19,11 +19,8 @@ const String storageKeyPrefix = kDebugMode ? 'debug_' : 'release_';
 ///   failure is rethrown instead of storing tokens in plaintext.
 /// - Server URL and locale are always stored in SharedPreferences.
 class SettingsLocalDataSource {
-  SettingsLocalDataSource(
-    this._prefs,
-    this._secureStorage, {
-    bool? allowInsecureFallback,
-  }) : _allowInsecureFallback = allowInsecureFallback ?? !kReleaseMode;
+  new(this._prefs, this._secureStorage, {bool? allowInsecureFallback})
+    : _allowInsecureFallback = allowInsecureFallback ?? !kReleaseMode;
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
@@ -100,7 +97,7 @@ class SettingsLocalDataSource {
     } catch (e) {
       if (!_allowInsecureFallback) rethrow;
       developer.log(
-          'WARNING: refresh token stored in insecure SharedPreferences: $e',
+        'WARNING: refresh token stored in insecure SharedPreferences: $e',
       );
       return _prefs.getString(_p(_keyRefreshTokenFallback));
     }
@@ -112,7 +109,7 @@ class SettingsLocalDataSource {
     } catch (e) {
       if (!_allowInsecureFallback) rethrow;
       developer.log(
-          'WARNING: refresh token stored in insecure SharedPreferences: $e',
+        'WARNING: refresh token stored in insecure SharedPreferences: $e',
       );
       await _prefs.setString(_p(_keyRefreshTokenFallback), token);
     }
@@ -124,7 +121,7 @@ class SettingsLocalDataSource {
     } catch (e) {
       if (!_allowInsecureFallback) rethrow;
       developer.log(
-          'WARNING: refresh token stored in insecure SharedPreferences: $e',
+        'WARNING: refresh token stored in insecure SharedPreferences: $e',
       );
     }
     // Безусловно чистим fallback-ключ: при успешном secure delete

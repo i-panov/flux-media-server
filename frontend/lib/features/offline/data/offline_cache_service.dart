@@ -20,7 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Загрузка отменена пользователем через [OfflineCacheService.cancelDownload].
 class DownloadCancelledException implements Exception {
-  const DownloadCancelledException();
+  const new();
 
   @override
   String toString() => 'Download cancelled';
@@ -30,11 +30,8 @@ class DownloadCancelledException implements Exception {
 /// Files are stored in the app's documents directory, с префиксом
 /// `user_{id}_`, чтобы кеши разных пользователей не пересекались.
 class OfflineCacheService {
-  OfflineCacheService(
-    this._ref,
-    this._baseUrl, {
-    Future<int> Function(File)? fileSizeReader,
-  }) : _fileSizeReader = fileSizeReader ?? _defaultFileSizeReader;
+  new(this._ref, this._baseUrl, {Future<int> Function(File)? fileSizeReader})
+    : _fileSizeReader = fileSizeReader ?? _defaultFileSizeReader;
 
   final Ref _ref;
   final String _baseUrl;
@@ -219,7 +216,9 @@ class OfflineCacheService {
       final partFile = File('${localFile.path}.part');
 
       try {
-        final response = await client.send(request).timeout(
+        final response = await client
+            .send(request)
+            .timeout(
               const Duration(minutes: 10),
               onTimeout: () => throw Exception('Download timed out'),
             );
@@ -245,13 +244,14 @@ class OfflineCacheService {
           await response.stream
               .timeout(const Duration(minutes: 10))
               .map((chunk) {
-            if (_cancelledDownloads.contains(media.id)) {
-              throw const DownloadCancelledException();
-            }
-            received += chunk.length;
-            onProgress?.call(received, total);
-            return chunk;
-          }).pipe(sink);
+                if (_cancelledDownloads.contains(media.id)) {
+                  throw const DownloadCancelledException();
+                }
+                received += chunk.length;
+                onProgress?.call(received, total);
+                return chunk;
+              })
+              .pipe(sink);
         } finally {
           try {
             await sink.close();
@@ -341,8 +341,9 @@ class OfflineCacheService {
     // Если другой поток уже выполняет refresh — ждём его результат.
     final inFlight = _refreshInFlight;
     if (inFlight == null) {
-      _refreshInFlight =
-          _ref.read(authTokenRefresherProvider).refresh(refreshToken);
+      _refreshInFlight = _ref
+          .read(authTokenRefresherProvider)
+          .refresh(refreshToken);
     }
     try {
       final ok = await (inFlight ?? _refreshInFlight);
@@ -478,7 +479,13 @@ class OfflineCacheService {
       var totalSize = stats.fold<int>(0, (prev, curr) => prev + curr.size);
 
       // Remove oldest downloads (by file modification time).
-      stats.sort((a, b) => a.modified.compareTo(b.modified));
+      // Тай-брейкер по id: List.sort нестабилен, а у файлов, созданных
+      // в одну миллисекунду, mtime совпадает — без него порядок
+      // вытеснения недетерминирован.
+      stats.sort((a, b) {
+        final byTime = a.modified.compareTo(b.modified);
+        return byTime != 0 ? byTime : a.id.compareTo(b.id);
+      });
       for (final s in stats) {
         if (totalSize <= _maxCacheBytes) break;
         await remove(s.id);
@@ -602,8 +609,5 @@ class OfflineCacheService {
 
 /// Provider for the offline cache service.
 final offlineCacheServiceProvider = Provider<OfflineCacheService>((ref) {
-  return OfflineCacheService(
-    ref,
-    ref.watch(baseUrlProvider),
-  );
+  return OfflineCacheService(ref, ref.watch(baseUrlProvider));
 });

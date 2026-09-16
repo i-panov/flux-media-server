@@ -15,7 +15,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class AudioPlayerScreen extends ConsumerStatefulWidget {
-  const AudioPlayerScreen({required this.media, super.key});
+  const new({required this.media, super.key});
   final Media media;
 
   @override
@@ -69,10 +69,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _EditableTextTab(
-            media: currentMedia,
-            kind: _EditableTextKind.lyrics,
-          ),
+          _EditableTextTab(media: currentMedia, kind: _EditableTextKind.lyrics),
           _EditableTextTab(
             media: currentMedia,
             kind: _EditableTextKind.translation,
@@ -86,7 +83,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 }
 
 class _EditableTextTab extends ConsumerStatefulWidget {
-  const _EditableTextTab({required this.media, required this.kind});
+  const new({required this.media, required this.kind});
   final Media media;
   final _EditableTextKind kind;
 
@@ -110,9 +107,9 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
 
   /// Редактируемое поле документа лирики.
   String _valueOf(Lyrics? lyrics) => switch (widget.kind) {
-        _EditableTextKind.lyrics => lyrics?.lyricsText ?? '',
-        _EditableTextKind.translation => lyrics?.translation ?? '',
-      };
+    _EditableTextKind.lyrics => lyrics?.lyricsText ?? '',
+    _EditableTextKind.translation => lyrics?.translation ?? '',
+  };
 
   @override
   void dispose() {
@@ -151,9 +148,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
     final result = await upsert(
       UpsertLyricsParams(
         mediaId: widget.media.id,
-        lyricsText: _isLyrics
-            ? _controller.text
-            : (existing?.lyricsText ?? ''),
+        lyricsText: _isLyrics ? _controller.text : (existing?.lyricsText ?? ''),
         translation: _isLyrics
             ? (existing?.translation ?? '')
             : _controller.text,
@@ -185,7 +180,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
     );
   }
 
-  late final l = AppLocalizations.of(context)!;
+  late final AppLocalizations l = AppLocalizations.of(context)!;
 
   @override
   Widget build(BuildContext context) {
@@ -241,9 +236,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              _isLyrics ? l.errorLoadingLyrics : l.errorLoadingTranslation,
-            ),
+            Text(_isLyrics ? l.errorLoadingLyrics : l.errorLoadingTranslation),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => ref.invalidate(lyricsProvider(widget.media.id)),
@@ -254,7 +247,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
       );
     }
 
-    final result = lyricsState.valueOrNull;
+    final result = lyricsState.value;
     if (result == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -262,16 +255,15 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
     final text = _valueOf(lyrics);
     final syncData = lyrics?.syncData ?? '';
 
-    final hasContent =
-        _isLyrics ? text.isNotEmpty || syncData.isNotEmpty : text.isNotEmpty;
+    final hasContent = _isLyrics
+        ? text.isNotEmpty || syncData.isNotEmpty
+        : text.isNotEmpty;
     if (!hasContent) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              _isLyrics ? l.noLyricsAvailable : l.noTranslationAvailable,
-            ),
+            Text(_isLyrics ? l.noLyricsAvailable : l.noTranslationAvailable),
             const SizedBox(height: 16),
             FilledButton.tonal(
               onPressed: () => _startEditing(''),
@@ -307,10 +299,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
             top: 8,
             left: 8,
             child: Chip(
-              label: Text(
-                l.offlineCopy,
-                style: const TextStyle(fontSize: 12),
-              ),
+              label: Text(l.offlineCopy, style: const TextStyle(fontSize: 12)),
               visualDensity: VisualDensity.compact,
             ),
           ),
@@ -335,7 +324,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
 }
 
 class _SyncedLyricsView extends ConsumerStatefulWidget {
-  const _SyncedLyricsView({required this.syncLines});
+  const new({required this.syncLines});
 
   final List<({Duration time, String text})> syncLines;
 
@@ -376,10 +365,11 @@ class _SyncedLyricsViewState extends ConsumerState<_SyncedLyricsView> {
       // Автоскролл к текущей строке при её смене.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
-        final target = (index * _lineExtent -
-                _scrollController.position.viewportDimension / 2 +
-                _lineExtent / 2)
-            .clamp(0.0, _scrollController.position.maxScrollExtent);
+        final target =
+            (index * _lineExtent -
+                    _scrollController.position.viewportDimension / 2 +
+                    _lineExtent / 2)
+                .clamp(0.0, _scrollController.position.maxScrollExtent);
         _scrollController.animateTo(
           target,
           duration: const Duration(milliseconds: 300),
@@ -402,16 +392,15 @@ class _SyncedLyricsViewState extends ConsumerState<_SyncedLyricsView> {
 
         final TextStyle style;
         if (isCurrentLine) {
-          style = Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ) ??
+          style =
+              Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ) ??
               defaultStyle;
         } else if (isPastLine) {
           style = defaultStyle.copyWith(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
+            color: Theme.of(context).colorScheme.onSurface
                 .withValues(alpha: 0.4),
           );
         } else {
@@ -432,10 +421,8 @@ class _SyncedLyricsViewState extends ConsumerState<_SyncedLyricsView> {
   }
 }
 
-
-
 class _QueueTab extends ConsumerWidget {
-  const _QueueTab();
+  const new();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -489,10 +476,9 @@ class _QueueTab extends ConsumerWidget {
                 ref.read(playQueueProvider.notifier).removeAt(index),
           ),
           onTap: () {
-            ref.read(playQueueProvider.notifier).setQueue(
-                  queueState.items,
-                  startIndex: index,
-                );
+            ref
+                .read(playQueueProvider.notifier)
+                .setQueue(queueState.items, startIndex: index);
           },
         );
       },

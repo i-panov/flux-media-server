@@ -5,13 +5,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
 class GetMediaListParams {
-  const GetMediaListParams({
-    this.type,
-    this.year,
-    this.q,
-    this.limit,
-    this.offset,
-  });
+  const new({this.type, this.year, this.q, this.limit, this.offset});
 
   final String? type;
   final int? year;
@@ -20,9 +14,13 @@ class GetMediaListParams {
   final int? offset;
 }
 
-class GetMediaList extends UseCase<
-    Either<Failure, ({List<Media> items, int total})>, GetMediaListParams> {
-  GetMediaList(this.repository);
+class GetMediaList
+    extends
+        UseCase<
+          Either<Failure, ({List<Media> items, int total})>,
+          GetMediaListParams
+        > {
+  new(this.repository);
 
   final MediaRepository repository;
 

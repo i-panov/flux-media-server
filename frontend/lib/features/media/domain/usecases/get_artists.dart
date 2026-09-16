@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:fpdart/fpdart.dart';
 
 class GetArtists extends UseCase<Either<Failure, List<Artist>>, NoParams> {
-  GetArtists(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

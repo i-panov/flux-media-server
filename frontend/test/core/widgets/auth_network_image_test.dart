@@ -8,7 +8,7 @@ import 'package:flux_media_server/core/session/settings_repository.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 
 class _FakeSettingsRepository implements SettingsRepository {
-  _FakeSettingsRepository(this.settings);
+  new(this.settings);
 
   AppSettings settings;
 
@@ -64,19 +64,11 @@ void main() {
 
     test('no token for foreign hosts (Bearer must not leak)', () {
       expect(
-        shouldAttachAuthHeader(
-          'https://imgur.com/cover.jpg',
-          baseUrl,
-          'token',
-        ),
+        shouldAttachAuthHeader('https://imgur.com/cover.jpg', baseUrl, 'token'),
         isFalse,
       );
       expect(
-        shouldAttachAuthHeader(
-          'https://evil.com/host:8080',
-          baseUrl,
-          'token',
-        ),
+        shouldAttachAuthHeader('https://evil.com/host:8080', baseUrl, 'token'),
         isFalse,
       );
     });
@@ -94,17 +86,18 @@ void main() {
   });
 
   group('AuthNetworkImage', () {
-    testWidgets('recreates the image load when the token changes',
-        (tester) async {
+    testWidgets('recreates the image load when the token changes', (
+      tester,
+    ) async {
       final repo = _FakeSettingsRepository(
         const AppSettings(
           serverUrl: 'http://host:8080/api',
           authToken: 'token-1',
         ),
       );
-      final container = ProviderContainer(overrides: [
-        settingsRepositoryProvider.overrideWithValue(repo),
-      ],);
+      final container = ProviderContainer(
+        overrides: [settingsRepositoryProvider.overrideWithValue(repo)],
+      );
       addTearDown(container.dispose);
       await container.read(settingsProvider.notifier).init();
 

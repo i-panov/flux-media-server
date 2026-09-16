@@ -6,7 +6,7 @@ import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/session/settings_repository.dart';
 
 class _FakeSettingsRepository implements SettingsRepository {
-  _FakeSettingsRepository(this.settings);
+  new(this.settings);
 
   AppSettings settings;
 
@@ -44,7 +44,6 @@ class _FakeSettingsRepository implements SettingsRepository {
   @override
   Future<void> setLocale(String locale) async {}
 }
-
 
 void main() {
   Future<ProviderContainer> makeContainerWithSettings(
@@ -100,16 +99,10 @@ void main() {
       await container
           .read(settingsProvider.notifier)
           .setTokens('access-1', 'refresh-1');
-      expect(
-        identical(container.read(authApiClientProvider), client1),
-        isTrue,
-      );
+      expect(identical(container.read(authApiClientProvider), client1), isTrue);
 
       await container.read(settingsProvider.notifier).logout();
-      expect(
-        identical(container.read(authApiClientProvider), client1),
-        isTrue,
-      );
+      expect(identical(container.read(authApiClientProvider), client1), isTrue);
     });
 
     test('recreates clients when serverUrl changes', () async {
@@ -131,52 +124,58 @@ void main() {
 
   group('shared http client', () {
     Future<ProviderContainer> makeContainer() async {
-      return makeContainerWithSettings(const AppSettings(serverUrl: 'http://host:8080/api'));
+      return makeContainerWithSettings(
+        const AppSettings(serverUrl: 'http://host:8080/api'),
+      );
     }
 
-    test('auth, media and library clients share one http client instance',
-        () async {
-      final container = await makeContainer();
-      final shared = container.read(httpClientProvider);
+    test(
+      'auth, media and library clients share one http client instance',
+      () async {
+        final container = await makeContainer();
+        final shared = container.read(httpClientProvider);
 
-      expect(
-        identical(
-          shared,
-          container.read(authApiClientProvider).client.httpClient,
-        ),
-        isTrue,
-      );
-      expect(
-        identical(
-          shared,
-          container.read(mediaApiClientProvider).client.httpClient,
-        ),
-        isTrue,
-      );
-      expect(
-        identical(
-          shared,
-          container.read(libraryApiClientProvider).client.httpClient,
-        ),
-        isTrue,
-      );
-    });
+        expect(
+          identical(
+            shared,
+            container.read(authApiClientProvider).client.httpClient,
+          ),
+          isTrue,
+        );
+        expect(
+          identical(
+            shared,
+            container.read(mediaApiClientProvider).client.httpClient,
+          ),
+          isTrue,
+        );
+        expect(
+          identical(
+            shared,
+            container.read(libraryApiClientProvider).client.httpClient,
+          ),
+          isTrue,
+        );
+      },
+    );
 
-    test('shared http client survives serverUrl change (no new pools)',
-        () async {
-      final container = await makeContainer();
-      final notifier = container.read(settingsProvider.notifier);
-      final shared = container.read(httpClientProvider);
+    test(
+      'shared http client survives serverUrl change (no new pools)',
+      () async {
+        final container = await makeContainer();
+        final notifier = container.read(settingsProvider.notifier);
+        final shared = container.read(httpClientProvider);
 
-      // Реальная смена адреса сервера.
-      await notifier.setServerUrl('http://other:9000/api');
-      final authClient = container.read(authApiClientProvider);
+        // Реальная смена адреса сервера.
+        await notifier.setServerUrl('http://other:9000/api');
+        final authClient = container.read(authApiClientProvider);
 
-      // Новый ChopperClient создан, но http.Client остался общим —
-      // connection-pool не плодится.
-      expect(container.read(httpClientProvider), same(shared));
-      expect(identical(shared, authClient.client.httpClient), isTrue);
-    });
+        // Новый ChopperClient создан, но http.Client остался общим —
+        // connection-pool не плодится.
+        expect(container.read(httpClientProvider), same(shared));
+        expect(identical(shared, authClient.client.httpClient), isTrue);
+      },
+    );
   });
 
   group('parseRefreshTokens', () {

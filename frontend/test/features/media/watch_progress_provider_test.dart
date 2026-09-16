@@ -16,14 +16,14 @@ import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 
 WatchProgress _progress(int id) => WatchProgress(
-      id: id,
-      userId: 7,
-      mediaId: id,
-      position: id * 100,
-      duration: id * 200,
-      completed: id.isOdd,
-      updatedAt: DateTime.utc(2024),
-    );
+  id: id,
+  userId: 7,
+  mediaId: id,
+  position: id * 100,
+  duration: id * 200,
+  completed: id.isOdd,
+  updatedAt: DateTime.utc(2024),
+);
 
 class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, List<WatchProgress>>> Function()? onGetProgress;
@@ -39,8 +39,7 @@ class FakeMediaRepository implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-  }) async =>
-      const Right((items: [], total: 0));
+  }) async => const Right((items: [], total: 0));
 
   @override
   Future<Either<Failure, Media>> getMediaDetail(int id) async =>
@@ -56,8 +55,8 @@ class FakeMediaRepository implements MediaRepository {
 
   @override
   Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
-      checkHash(String hash) async =>
-          const Left(ServerFailure(message: 'not used'));
+  checkHash(String hash) async =>
+      const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
@@ -66,8 +65,7 @@ class FakeMediaRepository implements MediaRepository {
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
+  }) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) async =>
@@ -85,8 +83,7 @@ class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
     MetadataEdit edit,
-  ) async =>
-      const Left(ServerFailure(message: 'not used'));
+  ) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, WatchProgress>> updateProgress(
@@ -94,39 +91,35 @@ class FakeMediaRepository implements MediaRepository {
     int? position,
     int? duration,
     bool? completed,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
+  }) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, void>> uploadCover(
     int mediaId,
     String filePath, {
     bool Function()? isCancelled,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
+  }) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, Artist>> updateArtistName(
     int artistId,
     String name,
-  ) async =>
-      const Left(ServerFailure());
+  ) async => const Left(ServerFailure());
 
   @override
   Future<Either<Failure, void>> uploadArtistCover(
     int artistId,
     String filePath, {
     bool Function()? isCancelled,
-  }) async =>
-      const Left(ServerFailure());
+  }) async => const Left(ServerFailure());
 }
 
 /// Фейк датасорса: записывает параметры updateProgress.
 class _FakeMediaRemoteDataSource extends MediaRemoteDataSource {
-  _FakeMediaRemoteDataSource()
-      : super(
-          MediaApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
-        );
+  new()
+    : super(
+        MediaApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
+      );
 
   int? lastMediaId;
   int? lastPosition;
@@ -164,9 +157,10 @@ void main() {
     setUp(() {
       fakeRepo = FakeMediaRepository();
       container = ProviderContainer(
-        overrides: [
-          mediaRepositoryProvider.overrideWithValue(fakeRepo),
-        ],
+        overrides: [mediaRepositoryProvider.overrideWithValue(fakeRepo)],
+        // Riverpod 3 ретраит упавшие build-и по умолчанию: отключаем,
+        // чтобы «throws on failure»-тесты видели ошибку сразу.
+        retry: (_, _) => null,
       );
     });
 
@@ -183,13 +177,17 @@ void main() {
     });
 
     test('throws on repository failure', () async {
-      fakeRepo.onGetProgress =
-          () async => const Left(ServerFailure(message: 'Boom'));
+      fakeRepo.onGetProgress = () async =>
+          const Left(ServerFailure(message: 'Boom'));
 
+      // Riverpod 3: без подписки autoDispose-провайдер диспоузится до
+      // завершения future — держим его живым на время проверки.
+      final sub = container.listen(watchProgressProvider, (_, _) {});
       await expectLater(
         container.read(watchProgressProvider.future),
         throwsA(isA<Exception>()),
       );
+      sub.close();
     });
   });
 
@@ -202,27 +200,29 @@ void main() {
       repository = MediaRepositoryImpl(datasource);
     });
 
-    test('passes position, duration and completed to the data source',
-        () async {
-      final result = await repository.updateProgress(
-        5,
-        position: 100,
-        duration: 5000,
-        completed: true,
-      );
+    test(
+      'passes position, duration and completed to the data source',
+      () async {
+        final result = await repository.updateProgress(
+          5,
+          position: 100,
+          duration: 5000,
+          completed: true,
+        );
 
-      expect(datasource.lastMediaId, 5);
-      expect(datasource.lastPosition, 100);
-      expect(datasource.lastDuration, 5000);
-      expect(datasource.lastCompleted, isTrue);
-      expect(result.isRight(), isTrue);
-      final progress = result.getOrElse(
-        (_) => const WatchProgress(id: 0, userId: 0, mediaId: 0, position: 0),
-      );
-      expect(progress.position, 100);
-      expect(progress.duration, 5000);
-      expect(progress.completed, isTrue);
-      expect(progress.updatedAt, isNotNull);
-    });
+        expect(datasource.lastMediaId, 5);
+        expect(datasource.lastPosition, 100);
+        expect(datasource.lastDuration, 5000);
+        expect(datasource.lastCompleted, isTrue);
+        expect(result.isRight(), isTrue);
+        final progress = result.getOrElse(
+          (_) => const WatchProgress(id: 0, userId: 0, mediaId: 0, position: 0),
+        );
+        expect(progress.position, 100);
+        expect(progress.duration, 5000);
+        expect(progress.completed, isTrue);
+        expect(progress.updatedAt, isNotNull);
+      },
+    );
   });
 }

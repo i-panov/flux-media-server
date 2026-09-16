@@ -6,7 +6,7 @@ import 'package:media_kit/media_kit.dart';
 /// Data source wrapping media_kit's [Player] for video playback.
 class VideoPlayerDatasource implements VideoPlaybackSource {
   /// Creates a [VideoPlayerDatasource] with a new [Player] instance.
-  VideoPlayerDatasource() : player = Player();
+  new() : player = Player();
 
   /// The underlying media_kit player.
   @override

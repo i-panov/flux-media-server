@@ -5,7 +5,7 @@ import 'package:flux_media_server/features/media/domain/repositories/media_repos
 import 'package:fpdart/fpdart.dart';
 
 class UploadMediaParams {
-  const UploadMediaParams({
+  const new({
     required this.filePath,
     required this.mediaType,
     required this.fileName,
@@ -26,7 +26,7 @@ class UploadMediaParams {
 
 class UploadMedia
     extends UseCase<Either<Failure, UploadResult>, UploadMediaParams> {
-  UploadMedia(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

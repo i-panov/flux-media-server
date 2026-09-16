@@ -12,19 +12,14 @@ import 'package:flux_media_server/core/utils/logger.dart';
 /// Не зависит от features: логика refresh-запроса и реакция на неудачу
 /// передаются колбэками, поэтому core/network не знает про auth.
 class AuthTokenRefresher {
-  AuthTokenRefresher({
-    required Future<({String token, String refreshToken})?> Function(
-      String refreshToken,
-    ) performRefresh,
-    required Future<void> Function() onRefreshFailure,
-  })  : _performRefresh = performRefresh,
-        _onRefreshFailure = onRefreshFailure;
+  new({required this._performRefresh, required this._onRefreshFailure});
 
   /// Выполняет refresh-запрос и сохраняет новые токены.
   /// Возвращает `null`, если сервер отклонил refresh-токен.
   final Future<({String token, String refreshToken})?> Function(
     String refreshToken,
-  ) _performRefresh;
+  )
+  _performRefresh;
 
   /// Вызывается при неудачном refresh (очистка токенов и logout).
   final Future<void> Function() _onRefreshFailure;
@@ -52,8 +47,8 @@ class AuthTokenRefresher {
     if (refreshToken == null || refreshToken.isEmpty) {
       return _onRefreshFailure().then((_) => null);
     }
-    return _inFlight ??=
-        _doRefresh(refreshToken).whenComplete(() => _inFlight = null);
+    return _inFlight ??= _doRefresh(refreshToken)
+        .whenComplete(() => _inFlight = null);
   }
 
   Future<({String token, String refreshToken})?> _doRefresh(

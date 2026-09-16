@@ -4,7 +4,7 @@ import 'package:flux_media_server/features/media/domain/repositories/media_repos
 import 'package:fpdart/fpdart.dart';
 
 class CancelUpload extends UseCase<Either<Failure, void>, int> {
-  CancelUpload(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

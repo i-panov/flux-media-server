@@ -10,20 +10,23 @@ import 'package:flux_media_server/features/auth/presentation/providers/auth_prov
 
 /// Signal that a token refresh succeeded and the request should be retried.
 class TokenRefreshedException implements Exception {
-  const TokenRefreshedException();
+  const new();
 }
 
 /// Intercepts 401 responses, attempts token refresh, and signals retry.
 ///
 /// Использует единый [AuthTokenRefresher]: параллельные 401-запросы
 /// ждут один общий refresh вместо конкурентных запросов.
-class TokenRefreshInterceptor implements ResponseInterceptor {
-  TokenRefreshInterceptor(this._ref);
+class TokenRefreshInterceptor implements Interceptor {
+  new(this._ref);
 
   final Ref _ref;
 
   @override
-  FutureOr<Response<dynamic>> onResponse(Response<dynamic> response) async {
+  FutureOr<Response<BodyType>> intercept<BodyType>(
+    Chain<BodyType> chain,
+  ) async {
+    final response = await chain.proceed(chain.request);
     if (response.statusCode != 401) return response;
 
     // 401 на auth-эндпоинтах — бизнес-ошибка, а не истёкшая сессия:

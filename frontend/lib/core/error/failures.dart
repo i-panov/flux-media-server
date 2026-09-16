@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show immutable;
 /// Base class for all failures in the application.
 @immutable
 abstract class Failure {
-  const Failure({required this.message});
+  const new({required this.message});
 
   final String message;
 
@@ -19,22 +19,22 @@ abstract class Failure {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure({super.message = 'Server error occurred'});
+  const new({super.message = 'Server error occurred'});
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure({super.message = 'Network error occurred'});
+  const new({super.message = 'Network error occurred'});
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure({super.message = 'Cache error occurred'});
+  const new({super.message = 'Cache error occurred'});
 }
 
 class AuthFailure extends Failure {
-  const AuthFailure({super.message = 'Authentication error occurred'});
+  const new({super.message = 'Authentication error occurred'});
 }
 
 /// Операция загрузки (upload/download) была отменена пользователем.
 class UploadCancelledFailure extends Failure {
-  const UploadCancelledFailure({super.message = 'Upload cancelled'});
+  const new({super.message = 'Upload cancelled'});
 }

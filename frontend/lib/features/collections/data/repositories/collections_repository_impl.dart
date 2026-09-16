@@ -7,7 +7,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
 class CollectionsRepositoryImpl implements CollectionsRepository {
-  CollectionsRepositoryImpl(this.remoteDataSource);
+  new(this.remoteDataSource);
 
   final CollectionsRemoteDataSource remoteDataSource;
 
@@ -19,19 +19,17 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
   Future<Either<Failure, Collection>> createCollection({
     required String name,
     required String type,
-  }) =>
-      safeRepositoryCall(
-        () => remoteDataSource.createCollection(name: name, type: type),
-      );
+  }) => safeRepositoryCall(
+    () => remoteDataSource.createCollection(name: name, type: type),
+  );
 
   @override
   Future<Either<Failure, Collection>> updateCollection(
     int id, {
     String? name,
-  }) =>
-      safeRepositoryCall(
-        () => remoteDataSource.updateCollection(id, name: name),
-      );
+  }) => safeRepositoryCall(
+    () => remoteDataSource.updateCollection(id, name: name),
+  );
 
   @override
   Future<Either<Failure, void>> deleteCollection(int id) =>
@@ -41,25 +39,22 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
   Future<Either<Failure, CollectionItem>> addCollectionItem(
     int collectionId,
     int mediaId,
-  ) =>
-      safeRepositoryCall(
-        () => remoteDataSource.addCollectionItem(collectionId, mediaId),
-      );
+  ) => safeRepositoryCall(
+    () => remoteDataSource.addCollectionItem(collectionId, mediaId),
+  );
 
   @override
   Future<Either<Failure, void>> removeCollectionItem(
     int collectionId,
     int mediaId,
-  ) =>
-      safeRepositoryCall(
-        () => remoteDataSource.removeCollectionItem(collectionId, mediaId),
-      );
+  ) => safeRepositoryCall(
+    () => remoteDataSource.removeCollectionItem(collectionId, mediaId),
+  );
 
   @override
   Future<Either<Failure, List<Media>>> getCollectionItemsFull(
     int collectionId,
-  ) =>
-      safeRepositoryCall(
-        () => remoteDataSource.getCollectionItemsFull(collectionId),
-      );
+  ) => safeRepositoryCall(
+    () => remoteDataSource.getCollectionItemsFull(collectionId),
+  );
 }

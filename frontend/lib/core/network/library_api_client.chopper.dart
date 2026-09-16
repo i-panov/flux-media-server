@@ -1,4 +1,5 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format width=80
 
 part of 'library_api_client.dart';
 
@@ -20,47 +21,31 @@ final class _$LibraryApiClient extends LibraryApiClient {
   @override
   Future<Response<Map<String, dynamic>>> addFavorite(int id) {
     final Uri $url = Uri.parse('/media/${id}/favorite');
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('POST', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<Map<String, dynamic>>> removeFavorite(int id) {
     final Uri $url = Uri.parse('/media/${id}/favorite');
-    final Request $request = Request(
-      'DELETE',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('DELETE', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<Map<String, dynamic>>> getFavorites() {
     final Uri $url = Uri.parse('/favorites');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<Map<String, dynamic>>> addArtistFavorite(
-      Map<String, dynamic> body) {
+    Map<String, dynamic> body,
+  ) {
     final Uri $url = Uri.parse('/favorites/artist');
     final $body = body;
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -68,7 +53,7 @@ final class _$LibraryApiClient extends LibraryApiClient {
   Future<Response<Map<String, dynamic>>> removeArtistFavorite(int artistId) {
     final Uri $url = Uri.parse('/favorites/artist');
     final Map<String, dynamic> $params = <String, dynamic>{
-      'artist_id': artistId
+      'artist_id': artistId,
     };
     final Request $request = Request(
       'DELETE',
@@ -82,11 +67,7 @@ final class _$LibraryApiClient extends LibraryApiClient {
   @override
   Future<Response<Map<String, dynamic>>> getArtists() {
     final Uri $url = Uri.parse('/artists');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -97,37 +78,24 @@ final class _$LibraryApiClient extends LibraryApiClient {
   ) {
     final Uri $url = Uri.parse('/artists/${id}');
     final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('PUT', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<Map<String, dynamic>>> createCollection(
-      Map<String, dynamic> body) {
+    Map<String, dynamic> body,
+  ) {
     final Uri $url = Uri.parse('/collections');
     final $body = body;
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<List<dynamic>>> getCollections() {
     final Uri $url = Uri.parse('/collections');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<List<dynamic>, List<dynamic>>($request);
   }
 
@@ -138,23 +106,14 @@ final class _$LibraryApiClient extends LibraryApiClient {
   ) {
     final Uri $url = Uri.parse('/collections/${id}');
     final $body = body;
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('PUT', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<Map<String, dynamic>>> deleteCollection(int id) {
     final Uri $url = Uri.parse('/collections/${id}');
-    final Request $request = Request(
-      'DELETE',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('DELETE', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -165,12 +124,7 @@ final class _$LibraryApiClient extends LibraryApiClient {
   ) {
     final Uri $url = Uri.parse('/collections/${id}/items');
     final $body = body;
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-      body: $body,
-    );
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
@@ -180,22 +134,14 @@ final class _$LibraryApiClient extends LibraryApiClient {
     int mediaId,
   ) {
     final Uri $url = Uri.parse('/collections/${id}/items/${mediaId}');
-    final Request $request = Request(
-      'DELETE',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('DELETE', $url, client.baseUrl);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
   }
 
   @override
   Future<Response<List<dynamic>>> getCollectionItems(int id) {
     final Uri $url = Uri.parse('/collections/${id}/items');
-    final Request $request = Request(
-      'GET',
-      $url,
-      client.baseUrl,
-    );
+    final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<List<dynamic>, List<dynamic>>($request);
   }
 }

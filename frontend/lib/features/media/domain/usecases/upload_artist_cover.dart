@@ -4,11 +4,7 @@ import 'package:flux_media_server/features/media/domain/repositories/media_repos
 import 'package:fpdart/fpdart.dart';
 
 class UploadArtistCoverParams {
-  const UploadArtistCoverParams({
-    required this.artistId,
-    required this.filePath,
-    this.isCancelled,
-  });
+  const new({required this.artistId, required this.filePath, this.isCancelled});
 
   final int artistId;
   final String filePath;
@@ -20,7 +16,7 @@ class UploadArtistCoverParams {
 /// Загружает обложку артиста.
 class UploadArtistCover
     extends UseCase<Either<Failure, void>, UploadArtistCoverParams> {
-  UploadArtistCover(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

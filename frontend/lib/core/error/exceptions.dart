@@ -1,28 +1,28 @@
 class ServerException implements Exception {
-  const ServerException({required this.message});
+  const new({required this.message});
 
   final String message;
 }
 
 class CacheException implements Exception {
-  const CacheException({required this.message});
+  const new({required this.message});
 
   final String message;
 }
 
 class AuthException implements Exception {
-  const AuthException({required this.message});
+  const new({required this.message});
 
   final String message;
 }
 
 class NetworkException implements Exception {
-  const NetworkException({required this.message});
+  const new({required this.message});
 
   final String message;
 }
 
 /// Сигнал отмены загрузки (upload/download) пользователем.
 class UploadCancelledException implements Exception {
-  const UploadCancelledException();
+  const new();
 }

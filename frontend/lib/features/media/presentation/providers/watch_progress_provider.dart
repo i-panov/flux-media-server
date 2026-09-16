@@ -10,12 +10,12 @@ final getWatchProgressProvider = Provider<GetWatchProgress>((ref) {
 });
 
 /// Async provider that fetches all watch progress for the current user.
-final watchProgressProvider =
+final FutureProvider<List<WatchProgress>> watchProgressProvider =
     FutureProvider.autoDispose<List<WatchProgress>>((ref) async {
-  final getProgress = ref.watch(getWatchProgressProvider);
-  final result = await getProgress(const NoParams());
-  return result.fold(
-    (failure) => throw Exception(failure.message),
-    (progress) => progress,
-  );
-});
+      final getProgress = ref.watch(getWatchProgressProvider);
+      final result = await getProgress(const NoParams());
+      return result.fold(
+        (failure) => throw Exception(failure.message),
+        (progress) => progress,
+      );
+    });

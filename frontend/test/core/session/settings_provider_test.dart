@@ -60,9 +60,9 @@ void main() {
 
     setUp(() {
       repo = _FlakySettingsRepository();
-      container = ProviderContainer(overrides: [
-        settingsRepositoryProvider.overrideWithValue(repo),
-      ],);
+      container = ProviderContainer(
+        overrides: [settingsRepositoryProvider.overrideWithValue(repo)],
+      );
       notifier = container.read(settingsProvider.notifier);
     });
 
@@ -85,20 +85,22 @@ void main() {
       expect(notifier.state.settings.refreshToken, 'old-refresh');
     });
 
-    test('clears access token on rollback when there was none before',
-        () async {
-      repo.settings = const AppSettings(serverUrl: 'http://host:8080/api');
-      await notifier.init();
-      repo.failRefreshWrite = true;
+    test(
+      'clears access token on rollback when there was none before',
+      () async {
+        repo.settings = const AppSettings(serverUrl: 'http://host:8080/api');
+        await notifier.init();
+        repo.failRefreshWrite = true;
 
-      await expectLater(
-        notifier.setTokens('new-access', 'new-refresh'),
-        throwsException,
-      );
+        await expectLater(
+          notifier.setTokens('new-access', 'new-refresh'),
+          throwsException,
+        );
 
-      expect(repo.settings.authToken, isNull);
-      expect(notifier.state.settings.authToken, isNull);
-    });
+        expect(repo.settings.authToken, isNull);
+        expect(notifier.state.settings.authToken, isNull);
+      },
+    );
 
     test('keeps both tokens when both writes succeed', () async {
       await notifier.init();

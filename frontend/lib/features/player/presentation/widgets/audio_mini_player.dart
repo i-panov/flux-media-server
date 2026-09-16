@@ -17,7 +17,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 /// Mini-player bar shown above the bottom navigation bar during audio playback.
 class AudioMiniPlayer extends ConsumerStatefulWidget {
-  const AudioMiniPlayer({super.key, this.disableTap = false});
+  const new({super.key, this.disableTap = false});
 
   /// When true, tapping the mini-player does not navigate to the full
   /// player screen (used when already displayed inside the player screen).
@@ -85,14 +85,14 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
       MediaType type,
       bool isPaused,
       Duration position,
-      Duration? duration
+      Duration? duration,
     ) = info;
     if (type != MediaType.audio) return const SizedBox.shrink();
 
     // Пока ids избранного грузятся впервые (нет предыдущего значения),
     // иконка нейтральная — без ложного «не избранное».
     final favoriteState = ref.watch(favoriteToggleProvider(media.id));
-    final isFavorite = favoriteState.valueOrNull;
+    final isFavorite = favoriteState.value;
 
     final progress = (duration != null && duration > Duration.zero)
         ? position.inMicroseconds / duration.inMicroseconds
@@ -130,8 +130,8 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       setState(() => _dragValue = null);
                       if (duration != null && duration > Duration.zero) {
                         final newPos = Duration(
-                          microseconds:
-                              (value * duration.inMicroseconds).toInt(),
+                          microseconds: (value * duration.inMicroseconds)
+                              .toInt(),
                         );
                         ref
                             .read(playbackCoordinatorProvider.notifier)
@@ -151,8 +151,9 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            border:
-                Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+            border: Border(
+              top: BorderSide(color: Theme.of(context).dividerColor),
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: InkWell(
@@ -179,7 +180,8 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                         width: 36,
                         height: 36,
                         child: () {
-                          final hasCover = media.coverUrl != null &&
+                          final hasCover =
+                              media.coverUrl != null &&
                               media.coverUrl!.isNotEmpty;
                           if (!hasCover) {
                             return const Center(
@@ -188,14 +190,15 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                           }
                           final cacheBuster =
                               media.updatedAt?.millisecondsSinceEpoch;
-                          final buster =
-                              cacheBuster != null ? '?v=$cacheBuster' : '';
+                          final buster = cacheBuster != null
+                              ? '?v=$cacheBuster'
+                              : '';
                           return AuthNetworkImage(
                             imageUrl: '$baseUrl/media/${media.id}/cover$buster',
                             width: 36,
                             height: 36,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
+                            errorWidget: (_, _, _) => Container(
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
@@ -231,12 +234,12 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                           media.artists.map((a) => a.name).join(', '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
                         ),
                       ],
                     ),
@@ -294,22 +297,25 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                             _volume == 0
                                 ? Icons.volume_off
                                 : _volume < 50
-                                    ? Icons.volume_down
-                                    : Icons.volume_up,
+                                ? Icons.volume_down
+                                : Icons.volume_up,
                             size: 18,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
                           ),
                           Expanded(
                             child: SliderTheme(
                               data: SliderTheme.of(context).copyWith(
-                                activeTrackColor:
-                                    Theme.of(context).colorScheme.primary,
+                                activeTrackColor: Theme.of(context)
+                                    .colorScheme
+                                    .primary,
                                 inactiveTrackColor: Theme.of(context)
                                     .colorScheme
                                     .surfaceContainerHighest,
-                                thumbColor:
-                                    Theme.of(context).colorScheme.primary,
+                                thumbColor: Theme.of(context)
+                                    .colorScheme
+                                    .primary,
                                 overlayColor: Theme.of(context)
                                     .colorScheme
                                     .primary
@@ -345,10 +351,8 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                       color: isFavorite == null
                           // Первичная загрузка состояния: приглушённый
                           // серый вместо мигания «не избранное».
-                          ? Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant
-                              .withValues(alpha: 0.4)
+                          ? Theme.of(context).colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.4)
                           : (isFavorite ? Colors.red : null),
                     ),
                     tooltip: l.favorites,

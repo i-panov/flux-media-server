@@ -24,14 +24,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Exposes Ref for building the token refresh interceptor in tests.
 final _refProvider = Provider<Ref>((ref) => ref);
 
+/// Fixed [Chain] для вызова `intercept` вне реального Chopper-клиента:
+/// proceed игнорирует запрос и возвращает canned-ответ.
+class _FixedChain implements Chain<String> {
+  new(this.response)
+    : request = Request(
+        'GET',
+        Uri.parse('/media'),
+        Uri.parse('http://localhost'),
+      );
+
+  @override
+  final Request request;
+
+  final Response<String> response;
+
+  @override
+  Future<Response<String>> proceed(Request request) async => response;
+}
+
 class FakeAuthRepository implements AuthRepository {
   Future<Either<Failure, Unit>> Function(String)? onRequestCode;
   Future<Either<Failure, ({String token, String refreshToken, User user})>>
-      Function(String, String)? onVerifyCode;
+  Function(String, String)?
+  onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
   Future<Either<Failure, ({String token, String refreshToken})>> Function(
     String,
-  )? onRefreshToken;
+  )?
+  onRefreshToken;
 
   int requestCodeCalls = 0;
 
@@ -50,7 +71,7 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Either<Failure, ({String token, String refreshToken, User user})>>
-      verifyCode(String email, String code) => onVerifyCode!(email, code);
+  verifyCode(String email, String code) => onVerifyCode!(email, code);
 
   @override
   Future<Either<Failure, User>> getCurrentUser() => onGetCurrentUser!();
@@ -58,13 +79,12 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
     String refreshToken,
-  ) =>
-      onRefreshToken!(refreshToken);
+  ) => onRefreshToken!(refreshToken);
 }
 
 /// Фейк офлайн-кеша: считает вызовы clearUserCache без реального IO.
 class FakeOfflineCacheService extends OfflineCacheService {
-  FakeOfflineCacheService(Ref ref) : super(ref, 'http://localhost:8080/api');
+  new(Ref ref) : super(ref, 'http://localhost:8080/api');
 
   int clearUserCacheCalls = 0;
 
@@ -75,30 +95,30 @@ class FakeOfflineCacheService extends OfflineCacheService {
 }
 
 void main() {
-  const secureStorageChannel =
-      MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  const secureStorageChannel = MethodChannel(
+    'plugins.it_nomads.com/flutter_secure_storage',
+  );
   final mockStorage = <String, String>{};
   const keyPrefix = kDebugMode ? 'debug_' : 'release_';
 
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel,
-            (MethodCall methodCall) async {
-      final args = methodCall.arguments as Map<dynamic, dynamic>;
-      switch (methodCall.method) {
-        case 'read':
-          return mockStorage[args['key'] as String];
-        case 'write':
-          mockStorage[args['key'] as String] = args['value'] as String;
-          return null;
-        case 'delete':
-          mockStorage.remove(args['key'] as String);
-          return null;
-        default:
-          return null;
-      }
-    });
+        .setMockMethodCallHandler(secureStorageChannel, (methodCall) async {
+          final args = methodCall.arguments as Map<dynamic, dynamic>;
+          switch (methodCall.method) {
+            case 'read':
+              return mockStorage[args['key'] as String];
+            case 'write':
+              mockStorage[args['key'] as String] = args['value'] as String;
+              return null;
+            case 'delete':
+              mockStorage.remove(args['key'] as String);
+              return null;
+            default:
+              return null;
+          }
+        });
   });
 
   tearDownAll(() {
@@ -131,8 +151,8 @@ void main() {
         ),
       ],
     );
-    fakeCache = container.read(offlineCacheServiceProvider)
-        as FakeOfflineCacheService;
+    fakeCache =
+        container.read(offlineCacheServiceProvider) as FakeOfflineCacheService;
   });
 
   tearDown(() {
@@ -152,13 +172,9 @@ void main() {
       };
 
       final states = <AuthState>[];
-      container.listen<AuthState>(
-        authProvider,
-        (prev, next) {
-          states.add(next);
-        },
-        fireImmediately: true,
-      );
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
       await container
           .read(authProvider.notifier)
@@ -174,13 +190,9 @@ void main() {
       fakeRepo.onRequestCode = (_) async => const Right(unit);
 
       final states = <AuthState>[];
-      container.listen<AuthState>(
-        authProvider,
-        (prev, next) {
-          states.add(next);
-        },
-        fireImmediately: true,
-      );
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
       await container
           .read(authProvider.notifier)
@@ -192,17 +204,13 @@ void main() {
     });
 
     test('requestCode emits error on failure', () async {
-      fakeRepo.onRequestCode =
-          (_) async => const Left(ServerFailure(message: 'Email not allowed'));
+      fakeRepo.onRequestCode = (_) async =>
+          const Left(ServerFailure(message: 'Email not allowed'));
 
       final states = <AuthState>[];
-      container.listen<AuthState>(
-        authProvider,
-        (prev, next) {
-          states.add(next);
-        },
-        fireImmediately: true,
-      );
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
       await container
           .read(authProvider.notifier)
@@ -213,18 +221,19 @@ void main() {
       expect(error.message, 'Email not allowed');
     });
 
-    test('concurrent requestCode calls do not duplicate the request',
-        () async {
+    test('concurrent requestCode calls do not duplicate the request', () async {
       final gate = Completer<void>();
       fakeRepo.onRequestCode = (_) async {
         await gate.future;
         return const Right(unit);
       };
 
-      final first =
-          container.read(authProvider.notifier).requestCode('test@example.com');
-      final second =
-          container.read(authProvider.notifier).requestCode('test@example.com');
+      final first = container
+          .read(authProvider.notifier)
+          .requestCode('test@example.com');
+      final second = container
+          .read(authProvider.notifier)
+          .requestCode('test@example.com');
       gate.complete();
       await Future.wait([first, second]);
 
@@ -233,18 +242,16 @@ void main() {
 
     test('verifyCode emits authenticated on success', () async {
       const user = User(id: 1, email: 'test@example.com');
-      fakeRepo.onVerifyCode = (_, __) async => const Right(
-            (token: 'jwt-token', refreshToken: 'refresh-token', user: user),
-          );
+      fakeRepo.onVerifyCode = (_, _) async => const Right((
+        token: 'jwt-token',
+        refreshToken: 'refresh-token',
+        user: user,
+      ));
 
       final states = <AuthState>[];
-      container.listen<AuthState>(
-        authProvider,
-        (prev, next) {
-          states.add(next);
-        },
-        fireImmediately: true,
-      );
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
       await container
           .read(authProvider.notifier)
@@ -257,9 +264,11 @@ void main() {
 
     test('verifyCode persists tokens to secure storage', () async {
       const user = User(id: 1, email: 'test@example.com');
-      fakeRepo.onVerifyCode = (_, __) async => const Right(
-            (token: 'jwt-token', refreshToken: 'refresh-token', user: user),
-          );
+      fakeRepo.onVerifyCode = (_, _) async => const Right((
+        token: 'jwt-token',
+        refreshToken: 'refresh-token',
+        user: user,
+      ));
 
       await container
           .read(authProvider.notifier)
@@ -273,17 +282,13 @@ void main() {
     });
 
     test('verifyCode emits error on invalid code', () async {
-      fakeRepo.onVerifyCode = (_, __) async =>
+      fakeRepo.onVerifyCode = (_, _) async =>
           const Left(ServerFailure(message: 'Invalid or expired code'));
 
       final states = <AuthState>[];
-      container.listen<AuthState>(
-        authProvider,
-        (prev, next) {
-          states.add(next);
-        },
-        fireImmediately: true,
-      );
+      container.listen<AuthState>(authProvider, (prev, next) {
+        states.add(next);
+      }, fireImmediately: true);
 
       await container
           .read(authProvider.notifier)
@@ -295,9 +300,8 @@ void main() {
     });
 
     test('checkAuthStatus emits authenticated on success', () async {
-      fakeRepo.onGetCurrentUser = () async => const Right(
-            User(id: 1, email: 'test@example.com'),
-          );
+      fakeRepo.onGetCurrentUser = () async =>
+          const Right(User(id: 1, email: 'test@example.com'));
 
       await container.read(authProvider.notifier).checkAuthStatus();
 
@@ -310,8 +314,8 @@ void main() {
       await container
           .read(settingsProvider.notifier)
           .setTokens('stale-token', 'stale-refresh');
-      fakeRepo.onGetCurrentUser =
-          () async => const Left(AuthFailure(message: 'Session expired'));
+      fakeRepo.onGetCurrentUser = () async =>
+          const Left(AuthFailure(message: 'Session expired'));
 
       await container.read(authProvider.notifier).checkAuthStatus();
 
@@ -326,8 +330,8 @@ void main() {
       await container
           .read(settingsProvider.notifier)
           .setTokens('stale-token', 'stale-refresh');
-      fakeRepo.onGetCurrentUser =
-          () async => const Left(NetworkFailure(message: 'No connection'));
+      fakeRepo.onGetCurrentUser = () async =>
+          const Left(NetworkFailure(message: 'No connection'));
 
       await container.read(authProvider.notifier).checkAuthStatus();
 
@@ -355,29 +359,27 @@ void main() {
       expect(state, isA<AuthInitial>());
     });
 
-    test('verifyCode does not emit AuthLoading (CodeScreen stays mounted)',
-        () async {
-      fakeRepo.onVerifyCode = (_, __) async =>
-          const Left(ServerFailure(message: 'Invalid or expired code'));
+    test(
+      'verifyCode does not emit AuthLoading (CodeScreen stays mounted)',
+      () async {
+        fakeRepo.onVerifyCode = (_, _) async =>
+            const Left(ServerFailure(message: 'Invalid or expired code'));
 
-      final states = <AuthState>[];
-      container.listen<AuthState>(
-        authProvider,
-        (prev, next) {
+        final states = <AuthState>[];
+        container.listen<AuthState>(authProvider, (prev, next) {
           states.add(next);
-        },
-        fireImmediately: true,
-      );
+        }, fireImmediately: true);
 
-      await container
-          .read(authProvider.notifier)
-          .verifyCode('test@example.com', '000000');
+        await container
+            .read(authProvider.notifier)
+            .verifyCode('test@example.com', '000000');
 
-      // Глобальный AuthLoading размонтировал бы Navigator через splash
-      // (потеря cooldown и формы) — его не должно быть ни до, ни после.
-      expect(states.whereType<AuthLoading>(), isEmpty);
-      expect(states.last, isA<AuthError>());
-    });
+        // Глобальный AuthLoading размонтировал бы Navigator через splash
+        // (потеря cooldown и формы) — его не должно быть ни до, ни после.
+        expect(states.whereType<AuthLoading>(), isEmpty);
+        expect(states.last, isA<AuthError>());
+      },
+    );
 
     test('requestCode returns true when the code was sent', () async {
       fakeRepo.onRequestCode = (_) async {
@@ -385,42 +387,45 @@ void main() {
         return const Right(unit);
       };
 
-      final sent =
-          await container.read(authProvider.notifier).requestCode('a@b.c');
+      final sent = await container
+          .read(authProvider.notifier)
+          .requestCode('a@b.c');
       expect(sent, isTrue);
-      expect(
-        container.read(authProvider.notifier).lastRequestedEmail,
-        'a@b.c',
-      );
+      expect(container.read(authProvider.notifier).lastRequestedEmail, 'a@b.c');
     });
 
     test('requestCode returns false on failure', () async {
-      fakeRepo.onRequestCode =
-          (_) async => const Left(NetworkFailure(message: 'No connection'));
+      fakeRepo.onRequestCode = (_) async =>
+          const Left(NetworkFailure(message: 'No connection'));
 
-      final sent =
-          await container.read(authProvider.notifier).requestCode('a@b.c');
+      final sent = await container
+          .read(authProvider.notifier)
+          .requestCode('a@b.c');
       expect(sent, isFalse);
     });
 
-    test('concurrent requestCode returns false for the swallowed call',
-        () async {
-      final gate = Completer<void>();
-      fakeRepo.onRequestCode = (_) async {
-        await gate.future;
-        return const Right(unit);
-      };
+    test(
+      'concurrent requestCode returns false for the swallowed call',
+      () async {
+        final gate = Completer<void>();
+        fakeRepo.onRequestCode = (_) async {
+          await gate.future;
+          return const Right(unit);
+        };
 
-      final first =
-          container.read(authProvider.notifier).requestCode('a@b.c');
-      final second =
-          container.read(authProvider.notifier).requestCode('a@b.c');
-      gate.complete();
-      final results = await Future.wait([first, second]);
+        final first = container
+            .read(authProvider.notifier)
+            .requestCode('a@b.c');
+        final second = container
+            .read(authProvider.notifier)
+            .requestCode('a@b.c');
+        gate.complete();
+        final results = await Future.wait([first, second]);
 
-      expect(results, [true, false]);
-      expect(fakeRepo.requestCodeCalls, 1);
-    });
+        expect(results, [true, false]);
+        expect(fakeRepo.requestCodeCalls, 1);
+      },
+    );
 
     test('checkAuthStatus result is ignored after logout', () async {
       final gate = Completer<void>();
@@ -440,9 +445,8 @@ void main() {
 
     test('expireSession resets state to initial', () async {
       const user = User(id: 1, email: 'test@example.com');
-      fakeRepo.onVerifyCode = (_, __) async => const Right(
-            (token: 't', refreshToken: 'r', user: user),
-          );
+      fakeRepo.onVerifyCode = (_, _) async =>
+          const Right((token: 't', refreshToken: 'r', user: user));
       await container
           .read(authProvider.notifier)
           .verifyCode('test@example.com', '123456');
@@ -458,20 +462,19 @@ void main() {
           .read(settingsProvider.notifier)
           .setTokens('token', 'refresh');
       const user = User(id: 1, email: 'test@example.com');
-      fakeRepo.onVerifyCode = (_, __) async => const Right(
-            (token: 't', refreshToken: 'r', user: user),
-          );
+      fakeRepo.onVerifyCode = (_, _) async =>
+          const Right((token: 't', refreshToken: 'r', user: user));
       await container
           .read(authProvider.notifier)
           .verifyCode('test@example.com', '123456');
       expect(container.read(authProvider), isA<AuthAuthenticated>());
 
-      final interceptor = TokenRefreshInterceptor(
-        container.read(_refProvider),
+      final interceptor = TokenRefreshInterceptor(container.read(_refProvider));
+      final response = Response<String>(
+        http.Response('unauthorized', 401),
+        'unauthorized',
       );
-      final response =
-          Response<String>(http.Response('unauthorized', 401), 'unauthorized');
-      final result = await interceptor.onResponse(response);
+      final result = await interceptor.intercept(_FixedChain(response));
 
       // 401 + неудачный refresh → сессия сброшена в AuthInitial,
       // а не «залогиненный» пользователь со стейлыми токенами.

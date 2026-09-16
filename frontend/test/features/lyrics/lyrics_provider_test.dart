@@ -21,6 +21,9 @@ void main() {
         getLyricsProvider.overrideWithValue(GetLyrics(fakeRepo)),
         lyricsCacheRepositoryProvider.overrideWithValue(fakeCache),
       ],
+      // Riverpod 3 ретраит упавшие build-и по умолчанию: отключаем,
+      // чтобы «throws on failure»-тесты видели ошибку сразу.
+      retry: (_, _) => null,
     );
   });
 
@@ -67,8 +70,8 @@ void main() {
     test('falls back to cached lyrics on network failure', () async {
       final cached = fakeLyrics();
       fakeCache.cache[5] = cached;
-      fakeRepo.onGetLyrics =
-          (_) async => const Left(NetworkFailure(message: 'Offline'));
+      fakeRepo.onGetLyrics = (_) async =>
+          const Left(NetworkFailure(message: 'Offline'));
 
       final result = await container.read(lyricsProvider(5).future);
 
@@ -77,13 +80,17 @@ void main() {
     });
 
     test('throws on failure when there is no cached copy', () async {
-      fakeRepo.onGetLyrics =
-          (_) async => const Left(NetworkFailure(message: 'Offline'));
+      fakeRepo.onGetLyrics = (_) async =>
+          const Left(NetworkFailure(message: 'Offline'));
 
+      // Riverpod 3: без подписки autoDispose-провайдер диспоузится до
+      // завершения future — держим его живым на время проверки.
+      final sub = container.listen(lyricsProvider(5), (_, _) {});
       await expectLater(
         container.read(lyricsProvider(5).future),
         throwsA(isA<Exception>()),
       );
+      sub.close();
       final state = container.read(lyricsProvider(5));
       expect(state.hasError, isTrue);
     });

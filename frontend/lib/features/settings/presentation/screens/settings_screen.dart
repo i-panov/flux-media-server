@@ -29,7 +29,7 @@ String _formatBytes(int bytes) {
 
 @RoutePage()
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const new({super.key});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -47,8 +47,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _cacheSizeFuture =
-        ref.read(offlineCacheServiceProvider).getCacheSize();
+    _cacheSizeFuture = ref.read(offlineCacheServiceProvider).getCacheSize();
     _loadAppVersion();
   }
 
@@ -76,9 +75,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!isValidServerUrl(url)) {
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.invalidServerUrl)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l.invalidServerUrl)));
       return;
     }
 
@@ -91,9 +89,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.failedToSaveSettings(e.toString())),
-        ),
+        SnackBar(content: Text(l.failedToSaveSettings(e.toString()))),
       );
       return;
     }
@@ -101,31 +97,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.serverUrlSaved),
-      ),
+      SnackBar(content: Text(AppLocalizations.of(context)!.serverUrlSaved)),
     );
     // Navigate to login if authenticated.
-    unawaited(
-      context.router.replace(
-        const LoginRoute(),
-      ),
-    );
+    unawaited(context.router.replace(const LoginRoute()));
   }
 
   Future<void> _logout() async {
     final l = AppLocalizations.of(context)!;
-    final cacheSize =
-        await ref.read(offlineCacheServiceProvider).getCacheSize();
+    final cacheSize = await ref
+        .read(offlineCacheServiceProvider)
+        .getCacheSize();
     if (!mounted) return;
     if (cacheSize > _logoutConfirmCacheBytes) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(l.logoutConfirmTitle),
-          content: Text(
-            l.logoutConfirmMessage(_formatBytes(cacheSize)),
-          ),
+          content: Text(l.logoutConfirmMessage(_formatBytes(cacheSize))),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -143,9 +132,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.loggedOut),
-      ),
+      SnackBar(content: Text(AppLocalizations.of(context)!.loggedOut)),
     );
   }
 
@@ -162,9 +149,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l.settings),
-      ),
+      appBar: AppBar(title: Text(l.settings)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -280,14 +265,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Expanded(
                     child: SegmentedButton<String>(
                       segments: const [
-                        ButtonSegment(
-                          value: 'en',
-                          label: Text('English'),
-                        ),
-                        ButtonSegment(
-                          value: 'ru',
-                          label: Text('Русский'),
-                        ),
+                        ButtonSegment(value: 'en', label: Text('English')),
+                        ButtonSegment(value: 'ru', label: Text('Русский')),
                       ],
                       selected: {settingsState.settings.locale},
                       onSelectionChanged: (selection) {

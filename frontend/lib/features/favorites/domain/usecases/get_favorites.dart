@@ -5,12 +5,12 @@ import 'package:flux_media_server/shared/models/favorite.dart';
 import 'package:fpdart/fpdart.dart';
 
 class GetFavoritesParams {
-  const GetFavoritesParams();
+  const new();
 }
 
 class GetFavorites
     extends UseCase<Either<Failure, List<Favorite>>, GetFavoritesParams> {
-  GetFavorites(this.repository);
+  new(this.repository);
   final FavoritesRepository repository;
 
   @override

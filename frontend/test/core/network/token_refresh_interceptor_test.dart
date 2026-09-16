@@ -14,9 +14,28 @@ import 'package:http/http.dart' as http;
 /// Exposes Ref for testing.
 final _refProvider = Provider<Ref>((ref) => ref);
 
+/// Fixed [Chain] для вызова `intercept` вне реального Chopper-клиента:
+/// proceed игнорирует запрос и возвращает canned-ответ.
+class _FixedChain implements Chain<String> {
+  new(this.response)
+    : request = Request(
+        'GET',
+        Uri.parse('/media'),
+        Uri.parse('http://localhost'),
+      );
+
+  @override
+  final Request request;
+
+  final Response<String> response;
+
+  @override
+  Future<Response<String>> proceed(Request request) async => response;
+}
+
 /// Fake HTTP client that returns canned responses for /auth/refresh.
 class _FakeHttpClient extends http.BaseClient {
-  _FakeHttpClient(this.response);
+  new(this.response);
 
   http.Response Function() response;
   int callCount = 0;
@@ -81,10 +100,7 @@ class _FakeSettingsRepository implements SettingsRepository {
 /// Реальный [AuthTokenRefresher] с фейковым HTTP-клиентом: повторяет
 /// логику authTokenRefresherProvider (запрос + сохранение токенов +
 /// очистка при неудаче), но без Chopper.
-AuthTokenRefresher _buildRefresher(
-  Ref ref,
-  _FakeHttpClient fakeClient,
-) {
+AuthTokenRefresher _buildRefresher(Ref ref, _FakeHttpClient fakeClient) {
   return AuthTokenRefresher(
     performRefresh: (refreshToken) async {
       final response = await fakeClient.post(
@@ -141,16 +157,17 @@ void main() {
       container.dispose();
     });
 
-    test('refreshes token on 401 and throws TokenRefreshedException',
-        () async {
+    test('refreshes token on 401 and throws TokenRefreshedException', () async {
       final interceptor = TokenRefreshInterceptor(ref);
 
       // Build a fake 401 response.
-      final response =
-          Response<String>(http.Response('unauthorized', 401), 'unauthorized');
+      final response = Response<String>(
+        http.Response('unauthorized', 401),
+        'unauthorized',
+      );
 
       await expectLater(
-        () => interceptor.onResponse(response),
+        () => interceptor.intercept(_FixedChain(response)),
         throwsA(isA<TokenRefreshedException>()),
       );
 
@@ -161,32 +178,34 @@ void main() {
       expect(settings.refreshToken, 'new-refresh');
     });
 
-    test('clears tokens when refresh fails (401 from refresh endpoint)',
-        () async {
-      fakeClient.response = () => http.Response(
-            '{"error": "invalid token"}',
-            401,
-          );
+    test(
+      'clears tokens when refresh fails (401 from refresh endpoint)',
+      () async {
+        fakeClient.response = () =>
+            http.Response('{"error": "invalid token"}', 401);
 
-      final interceptor = TokenRefreshInterceptor(ref);
+        final interceptor = TokenRefreshInterceptor(ref);
 
-      final response =
-          Response<String>(http.Response('unauthorized', 401), 'unauthorized');
-      final result = await interceptor.onResponse(response);
+        final response = Response<String>(
+          http.Response('unauthorized', 401),
+          'unauthorized',
+        );
+        final result = await interceptor.intercept(_FixedChain(response));
 
-      // Should return the 401 response (not throw).
-      expect(result.statusCode, 401);
-      // Tokens should be cleared.
-      final settings = await fakeRepo.getSettings();
-      expect(settings.authToken, isNull);
-      expect(settings.refreshToken, isNull);
-    });
+        // Should return the 401 response (not throw).
+        expect(result.statusCode, 401);
+        // Tokens should be cleared.
+        final settings = await fakeRepo.getSettings();
+        expect(settings.authToken, isNull);
+        expect(settings.refreshToken, isNull);
+      },
+    );
 
     test('passes through non-401 responses', () async {
       final interceptor = TokenRefreshInterceptor(ref);
 
       final response = Response<String>(http.Response('ok', 200), 'ok');
-      final result = await interceptor.onResponse(response);
+      final result = await interceptor.intercept(_FixedChain(response));
 
       expect(result.statusCode, 200);
       expect(fakeClient.callCount, 0);
@@ -199,9 +218,11 @@ void main() {
 
       final interceptor = TokenRefreshInterceptor(ref);
 
-      final response =
-          Response<String>(http.Response('unauthorized', 401), 'unauthorized');
-      final result = await interceptor.onResponse(response);
+      final response = Response<String>(
+        http.Response('unauthorized', 401),
+        'unauthorized',
+      );
+      final result = await interceptor.intercept(_FixedChain(response));
 
       expect(result.statusCode, 401);
       expect(fakeClient.callCount, 0);
@@ -216,7 +237,7 @@ void main() {
           'unauthorized',
         );
         try {
-          await interceptor.onResponse(response);
+          await interceptor.intercept(_FixedChain(response));
         } on TokenRefreshedException {
           // Ожидаемое исключение.
         }

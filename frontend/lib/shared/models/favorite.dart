@@ -1,13 +1,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-// ignore_for_file: invalid_annotation_target
-
 part 'favorite.freezed.dart';
 part 'favorite.g.dart';
 
 @freezed
-class Favorite with _$Favorite {
-  const factory Favorite({
+sealed class Favorite with _$Favorite {
+  const factory({
     required int id,
     @JsonKey(name: 'user_id') required int userId,
     @JsonKey(name: 'created_at') required DateTime createdAt,
@@ -15,6 +13,5 @@ class Favorite with _$Favorite {
     @JsonKey(name: 'artist_id') int? artistId,
   }) = _Favorite;
 
-  factory Favorite.fromJson(Map<String, dynamic> json) =>
-      _$FavoriteFromJson(json);
+  factory fromJson(Map<String, dynamic> json) => _$FavoriteFromJson(json);
 }

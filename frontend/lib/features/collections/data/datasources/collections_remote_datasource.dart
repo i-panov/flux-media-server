@@ -6,7 +6,7 @@ import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 class CollectionsRemoteDataSource {
-  CollectionsRemoteDataSource(this.apiClient);
+  new(this.apiClient);
 
   final LibraryApiClient apiClient;
 
@@ -28,8 +28,10 @@ class CollectionsRemoteDataSource {
     required String name,
     required String type,
   }) async {
-    final response =
-        await apiClient.createCollection({'name': name, 'type': type});
+    final response = await apiClient.createCollection({
+      'name': name,
+      'type': type,
+    });
     checkResponse(response, 'Failed to create collection');
     return _collectionFromBody(response, 'Failed to create collection');
   }
@@ -51,10 +53,9 @@ class CollectionsRemoteDataSource {
     int collectionId,
     int mediaId,
   ) async {
-    final response = await apiClient.addCollectionItem(
-      collectionId,
-      {'media_id': mediaId},
-    );
+    final response = await apiClient.addCollectionItem(collectionId, {
+      'media_id': mediaId,
+    });
     checkResponse(response, 'Failed to add item to collection');
     final body = response.body;
     if (body is! Map<String, dynamic>) {
@@ -66,8 +67,10 @@ class CollectionsRemoteDataSource {
   }
 
   Future<void> removeCollectionItem(int collectionId, int mediaId) async {
-    final response =
-        await apiClient.removeCollectionItem(collectionId, mediaId);
+    final response = await apiClient.removeCollectionItem(
+      collectionId,
+      mediaId,
+    );
     checkResponse(response, 'Failed to remove item from collection');
   }
 
@@ -93,10 +96,7 @@ class CollectionsRemoteDataSource {
     return body;
   }
 
-  Collection _collectionFromBody(
-    Response<dynamic> response,
-    String message,
-  ) {
+  Collection _collectionFromBody(Response<dynamic> response, String message) {
     final body = response.body;
     if (body is! Map<String, dynamic>) {
       throw ServerException(message: 'Malformed response: $message');

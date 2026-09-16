@@ -8,15 +8,14 @@ import 'package:flux_media_server/features/favorites/domain/usecases/get_favorit
 import 'package:flux_media_server/features/favorites/domain/usecases/remove_favorite.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
 
-final favoritesRemoteDataSourceProvider =
-    Provider<FavoritesRemoteDataSource>((ref) {
+final favoritesRemoteDataSourceProvider = Provider<FavoritesRemoteDataSource>((
+  ref,
+) {
   return FavoritesRemoteDataSource(ref.watch(libraryApiClientProvider));
 });
 
 final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
-  return FavoritesRepositoryImpl(
-    ref.watch(favoritesRemoteDataSourceProvider),
-  );
+  return FavoritesRepositoryImpl(ref.watch(favoritesRemoteDataSourceProvider));
 });
 
 final getFavoritesProvider = Provider<GetFavorites>((ref) {
@@ -53,7 +52,7 @@ class FavoritesNotifier extends AsyncNotifier<List<Favorite>> {
   /// Если список ещё не загружен — ничего не делаем: серверный запрос
   /// (в полёте либо при следующем входе) сам принесёт изменение.
   void addLocal(Favorite favorite) {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     if (current.any((f) => f.mediaId == favorite.mediaId)) return;
     state = AsyncValue.data([...current, favorite]);
@@ -61,7 +60,7 @@ class FavoritesNotifier extends AsyncNotifier<List<Favorite>> {
 
   /// Удаляет избранное [mediaId] из кеша без сетевого запроса.
   void removeLocal(int mediaId) {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     state = AsyncValue.data(
       current.where((f) => f.mediaId != mediaId).toList(),
@@ -72,8 +71,8 @@ class FavoritesNotifier extends AsyncNotifier<List<Favorite>> {
 /// Fetches all favorites for the current user.
 final favoritesProvider =
     AsyncNotifierProvider<FavoritesNotifier, List<Favorite>>(
-  FavoritesNotifier.new,
-);
+      FavoritesNotifier.new,
+    );
 
 /// Tracks favorite media IDs for quick lookup.
 ///

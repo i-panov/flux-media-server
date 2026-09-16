@@ -11,7 +11,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 /// мини-плеер, признак офлайна) передаются извне, чтобы core/widgets
 /// не зависел от features.
 class MainScreen extends StatelessWidget {
-  const MainScreen({
+  const new({
     required this.tabs,
     required this.settingsRoute,
     required this.miniPlayer,
@@ -43,7 +43,8 @@ class MainScreen extends StatelessWidget {
 
     // SystemNavigator.pop работает только на мобильных (Android/iOS):
     // на web/desktop он no-op, а блокировка back съедала бы навигацию.
-    final isMobile = !kIsWeb &&
+    final isMobile =
+        !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.android ||
             defaultTargetPlatform == TargetPlatform.iOS);
 
@@ -173,12 +174,12 @@ class MainScreen extends StatelessWidget {
       (
         icon: Icons.movie_outlined,
         selectedIcon: Icons.movie,
-        label: l.videoTab
+        label: l.videoTab,
       ),
       (
         icon: Icons.music_note_outlined,
         selectedIcon: Icons.music_note,
-        label: l.audioTab
+        label: l.audioTab,
       ),
     ];
   }
@@ -186,7 +187,7 @@ class MainScreen extends StatelessWidget {
 
 /// Offline mode banner that shows when the server is unreachable.
 class _OfflineBanner extends StatelessWidget {
-  const _OfflineBanner({required this.onRetry});
+  const new({required this.onRetry});
 
   final VoidCallback onRetry;
 
@@ -197,17 +198,11 @@ class _OfflineBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       leading: const Icon(Icons.cloud_off, color: Colors.white),
       backgroundColor: Colors.orange.shade800,
-      content: Text(
-        l.offlineMode,
-        style: const TextStyle(color: Colors.white),
-      ),
+      content: Text(l.offlineMode, style: const TextStyle(color: Colors.white)),
       actions: [
         TextButton(
           onPressed: onRetry,
-          child: Text(
-            l.retry,
-            style: const TextStyle(color: Colors.white),
-          ),
+          child: Text(l.retry, style: const TextStyle(color: Colors.white)),
         ),
       ],
     );

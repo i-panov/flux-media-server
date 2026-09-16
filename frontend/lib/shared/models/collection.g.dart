@@ -6,17 +6,16 @@ part of 'collection.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$CollectionImpl _$$CollectionImplFromJson(Map<String, dynamic> json) =>
-    _$CollectionImpl(
-      id: (json['id'] as num).toInt(),
-      userId: (json['user_id'] as num).toInt(),
-      name: json['name'] as String,
-      type: const MediaTypeConverter().fromJson(json['type']),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-    );
+_Collection _$CollectionFromJson(Map<String, dynamic> json) => _Collection(
+  id: (json['id'] as num).toInt(),
+  userId: (json['user_id'] as num).toInt(),
+  name: json['name'] as String,
+  type: const MediaTypeConverter().fromJson(json['type']),
+  createdAt: DateTime.parse(json['created_at'] as String),
+  updatedAt: DateTime.parse(json['updated_at'] as String),
+);
 
-Map<String, dynamic> _$$CollectionImplToJson(_$CollectionImpl instance) =>
+Map<String, dynamic> _$CollectionToJson(_Collection instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,
@@ -26,8 +25,8 @@ Map<String, dynamic> _$$CollectionImplToJson(_$CollectionImpl instance) =>
       'updated_at': instance.updatedAt.toIso8601String(),
     };
 
-_$CollectionItemImpl _$$CollectionItemImplFromJson(Map<String, dynamic> json) =>
-    _$CollectionItemImpl(
+_CollectionItem _$CollectionItemFromJson(Map<String, dynamic> json) =>
+    _CollectionItem(
       id: (json['id'] as num).toInt(),
       collectionId: (json['collection_id'] as num?)?.toInt(),
       mediaId: (json['media_id'] as num?)?.toInt(),
@@ -37,8 +36,7 @@ _$CollectionItemImpl _$$CollectionItemImplFromJson(Map<String, dynamic> json) =>
       position: (json['position'] as num?)?.toInt(),
     );
 
-Map<String, dynamic> _$$CollectionItemImplToJson(
-        _$CollectionItemImpl instance) =>
+Map<String, dynamic> _$CollectionItemToJson(_CollectionItem instance) =>
     <String, dynamic>{
       'id': instance.id,
       'collection_id': instance.collectionId,

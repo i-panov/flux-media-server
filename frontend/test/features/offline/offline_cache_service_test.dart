@@ -23,27 +23,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _keyPrefix = kDebugMode ? 'debug_' : 'release_';
 
 Media _media(int id) => Media(
-      id: id,
-      title: 'Media $id',
-      year: 2024,
-      type: MediaType.video,
-      fileSize: 1024,
-    );
+  id: id,
+  title: 'Media $id',
+  year: 2024,
+  type: MediaType.video,
+  fileSize: 1024,
+);
 
 Lyrics _lyrics(int mediaId) => Lyrics(
-      id: 1,
-      mediaId: mediaId,
-      source: 'test',
-      createdAt: DateTime.utc(2024),
-      updatedAt: DateTime.utc(2024),
-      lyricsText: 'Text',
-    );
-
+  id: 1,
+  mediaId: mediaId,
+  source: 'test',
+  createdAt: DateTime.utc(2024),
+  updatedAt: DateTime.utc(2024),
+  lyricsText: 'Text',
+);
 
 /// Фейковый auth-нотифаер: «залогинен» как пользователь 7, либо
 /// в начальном состоянии (после рестарта), если user == null.
 class _FakeAuthNotifier extends AuthNotifier {
-  _FakeAuthNotifier({User? user}) : _user = user;
+  new({this._user});
 
   final User? _user;
 
@@ -62,7 +61,7 @@ final _refProvider = Provider<Ref>((ref) => ref);
 /// Фейковый стек HTTP поверх [HttpOverrides]: перехватывает создаваемые
 /// внутри [OfflineCacheService] клиенты http.Client() без сети.
 class _FakeHttpClient implements HttpClient {
-  _FakeHttpClient(this._handler);
+  new(this._handler);
 
   final Future<http.StreamedResponse> Function(http.BaseRequest) _handler;
 
@@ -74,12 +73,11 @@ class _FakeHttpClient implements HttpClient {
   void close({bool force = false}) {}
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeHttpClientRequest implements HttpClientRequest {
-  _FakeHttpClientRequest(this._method, this._url, this._handler);
+  new(this._method, this._url, this._handler);
 
   final String _method;
   final Uri _url;
@@ -100,6 +98,7 @@ class _FakeHttpClientRequest implements HttpClientRequest {
 
   @override
   Future<void> addStream(Stream<List<int>> stream) async {
+    // ignore: prefer_foreach, await for нельзя заменить на forEach.
     await for (final chunk in stream) {
       _bodyBytes.addAll(chunk);
     }
@@ -107,8 +106,7 @@ class _FakeHttpClientRequest implements HttpClientRequest {
 
   @override
   Future<HttpClientResponse> close() async {
-    final request = http.Request(_method, _url)
-      ..bodyBytes = _bodyBytes;
+    final request = http.Request(_method, _url)..bodyBytes = _bodyBytes;
     headers.forEach((name, values) {
       request.headers[name] = values.join(',');
     });
@@ -117,12 +115,11 @@ class _FakeHttpClientRequest implements HttpClientRequest {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeHttpClientResponse implements HttpClientResponse {
-  _FakeHttpClientResponse(this._streamed);
+  new(this._streamed);
 
   final http.StreamedResponse _streamed;
 
@@ -175,8 +172,7 @@ class _FakeHttpClientResponse implements HttpClientResponse {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeHttpHeaders implements HttpHeaders {
@@ -198,8 +194,7 @@ class _FakeHttpHeaders implements HttpHeaders {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
@@ -214,13 +209,12 @@ void main() {
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('flux_cache_test');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(pathProviderChannel,
-            (MethodCall methodCall) async {
-      if (methodCall.method == 'getApplicationDocumentsDirectory') {
-        return tempDir.path;
-      }
-      return null;
-    });
+        .setMockMethodCallHandler(pathProviderChannel, (methodCall) async {
+          if (methodCall.method == 'getApplicationDocumentsDirectory') {
+            return tempDir.path;
+          }
+          return null;
+        });
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     container = ProviderContainer(
@@ -268,7 +262,8 @@ void main() {
       final ids = await service.getCachedIds();
 
       // Файл другого пользователя (5) и .part (4) не попадают в список.
-      expect(ids, [3, 1]);
+      // Порядок list() файловой системой не гарантируется.
+      expect(ids, unorderedEquals([3, 1]));
     });
 
     test('getCachedMedia reads metadata from user-scoped keys', () async {
@@ -305,31 +300,20 @@ void main() {
 
   group('clearUserCache', () {
     test('removes files, metadata and lyrics of the current user', () async {
-      final file =
-          File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5')
-            ..writeAsStringSync('x');
+      final file = File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5')
+        ..writeAsStringSync('x');
       await service.saveMetadata(_media(5));
       await service.saveLyrics(5, _lyrics(5));
 
       await service.clearUserCache();
 
       expect(file.existsSync(), isFalse);
-      expect(
-        prefs.containsKey('${_keyPrefix}user_7_flux_meta_5'),
-        isFalse,
-      );
-      expect(
-        prefs.containsKey('${_keyPrefix}user_7_flux_lyrics_5'),
-        isFalse,
-      );
-      expect(
-        prefs.containsKey('${_keyPrefix}flux_current_user_id'),
-        isFalse,
-      );
+      expect(prefs.containsKey('${_keyPrefix}user_7_flux_meta_5'), isFalse);
+      expect(prefs.containsKey('${_keyPrefix}user_7_flux_lyrics_5'), isFalse);
+      expect(prefs.containsKey('${_keyPrefix}flux_current_user_id'), isFalse);
     });
 
-    test('removes files after restart without prior initialization',
-        () async {
+    test('removes files after restart without prior initialization', () async {
       // Рестарт: auth ещё не подтверждён, id пользователя только в prefs,
       // _userId в сервисе == null (ни одна операция не инициализировала его).
       final container2 = ProviderContainer(
@@ -350,16 +334,12 @@ void main() {
       await svc.clearUserCache();
 
       expect(file.existsSync(), isFalse);
-      expect(
-        prefs.containsKey('${_keyPrefix}flux_current_user_id'),
-        isFalse,
-      );
+      expect(prefs.containsKey('${_keyPrefix}flux_current_user_id'), isFalse);
     });
 
     test('leaves files and metadata of other users intact', () async {
-      final otherFile =
-          File('${tempDir.path}/${_keyPrefix}user_9_flux_media_5')
-            ..writeAsStringSync('x');
+      final otherFile = File('${tempDir.path}/${_keyPrefix}user_9_flux_media_5')
+        ..writeAsStringSync('x');
       await service.saveMetadata(_media(5));
       await prefs.setString(
         '${_keyPrefix}user_9_flux_meta_5',
@@ -369,20 +349,13 @@ void main() {
       await service.clearUserCache();
 
       expect(otherFile.existsSync(), isTrue);
-      expect(
-        prefs.containsKey('${_keyPrefix}user_9_flux_meta_5'),
-        isTrue,
-      );
-      expect(
-        prefs.containsKey('${_keyPrefix}user_7_flux_meta_5'),
-        isFalse,
-      );
+      expect(prefs.containsKey('${_keyPrefix}user_9_flux_meta_5'), isTrue);
+      expect(prefs.containsKey('${_keyPrefix}user_7_flux_meta_5'), isFalse);
     });
   });
 
   group('migration of legacy files', () {
-    test('moves files and metadata into the user-scoped namespace',
-        () async {
+    test('moves files and metadata into the user-scoped namespace', () async {
       final legacy = File('${tempDir.path}/${_keyPrefix}flux_media_3')
         ..writeAsStringSync('legacy');
       await prefs.setString(
@@ -398,14 +371,8 @@ void main() {
 
       expect(path, '${tempDir.path}/${_keyPrefix}user_7_flux_media_3');
       expect(legacy.existsSync(), isFalse);
-      expect(
-        prefs.getString('${_keyPrefix}user_7_flux_meta_3'),
-        isNotNull,
-      );
-      expect(
-        prefs.getString('${_keyPrefix}user_7_flux_lyrics_3'),
-        isNotNull,
-      );
+      expect(prefs.getString('${_keyPrefix}user_7_flux_meta_3'), isNotNull);
+      expect(prefs.getString('${_keyPrefix}user_7_flux_lyrics_3'), isNotNull);
       expect(prefs.getBool('${_keyPrefix}flux_migrated_user_7'), isTrue);
       expect(prefs.containsKey('${_keyPrefix}flux_meta_3'), isFalse);
       expect(prefs.containsKey('${_keyPrefix}flux_lyrics_3'), isFalse);
@@ -454,51 +421,50 @@ void main() {
         File('${tempDir.path}/${_keyPrefix}user_7_flux_media_6').existsSync(),
         isTrue,
       );
-      expect(
-        prefs.containsKey('${_keyPrefix}user_7_flux_meta_6'),
-        isTrue,
-      );
+      expect(prefs.containsKey('${_keyPrefix}user_7_flux_meta_6'), isTrue);
     });
 
-    test('cancelDownload aborts the active download and cleans up .part',
-        () async {
-      final requestStarted = Completer<void>();
-      final proceed = Completer<void>();
-      Future<http.StreamedResponse> handler(http.BaseRequest request) async {
-        // Сигналим, что запрос уже ушёл (флаг отмены зафиксирован),
-        // и ждём команду отдать тело ответа.
-        requestStarted.complete();
-        await proceed.future;
-        return http.StreamedResponse(
-          Stream.fromIterable([
-            [1, 2],
-            [3, 4],
-          ]),
-          200,
-          contentLength: 4,
+    test(
+      'cancelDownload aborts the active download and cleans up .part',
+      () async {
+        final requestStarted = Completer<void>();
+        final proceed = Completer<void>();
+        Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+          // Сигналим, что запрос уже ушёл (флаг отмены зафиксирован),
+          // и ждём команду отдать тело ответа.
+          requestStarted.complete();
+          await proceed.future;
+          return http.StreamedResponse(
+            Stream.fromIterable([
+              [1, 2],
+              [3, 4],
+            ]),
+            200,
+            contentLength: 4,
+          );
+        }
+
+        final future = HttpOverrides.runZoned(
+          () => service.download(_media(5)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
         );
-      }
 
-      final future = HttpOverrides.runZoned(
-        () => service.download(_media(5)),
-        createHttpClient: (_) => _FakeHttpClient(handler),
-      );
+        await requestStarted.future;
+        service.cancelDownload(5);
+        proceed.complete();
 
-      await requestStarted.future;
-      service.cancelDownload(5);
-      proceed.complete();
-
-      await expectLater(future, throwsA(isA<DownloadCancelledException>()));
-      expect(
-        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5.part')
-            .existsSync(),
-        isFalse,
-      );
-      expect(
-        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5').existsSync(),
-        isFalse,
-      );
-    });
+        await expectLater(future, throwsA(isA<DownloadCancelledException>()));
+        expect(
+          File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5.part')
+              .existsSync(),
+          isFalse,
+        );
+        expect(
+          File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5').existsSync(),
+          isFalse,
+        );
+      },
+    );
   });
 
   group('orphan .part cleanup', () {
@@ -552,9 +518,7 @@ void main() {
           () => service.download(_media(6)),
           createHttpClient: (_) => _FakeHttpClient(handler),
         ),
-        throwsA(
-          predicate((e) => e.toString().contains('Download incomplete')),
-        ),
+        throwsA(predicate((e) => e.toString().contains('Download incomplete'))),
       );
 
       expect(
@@ -593,9 +557,7 @@ void main() {
           () => svc.download(_media(7)),
           createHttpClient: (_) => _FakeHttpClient(handler),
         ),
-        throwsA(
-          predicate((e) => e.toString().contains('Download incomplete')),
-        ),
+        throwsA(predicate((e) => e.toString().contains('Download incomplete'))),
       );
 
       expect(
@@ -751,11 +713,9 @@ void main() {
   });
 
   group('enforceCacheLimit', () {
-    test('removes oldest downloads when the cache exceeds the limit',
-        () async {
-      final small =
-          File('${tempDir.path}/${_keyPrefix}user_7_flux_media_1')
-            ..writeAsStringSync('x' * 100);
+    test('removes oldest downloads when the cache exceeds the limit', () async {
+      final small = File('${tempDir.path}/${_keyPrefix}user_7_flux_media_1')
+        ..writeAsStringSync('x' * 100);
       // Гарантируем разный mtime (секундная точность на части ФС):
       // вытеснение идёт от самого старого файла.
       await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -785,8 +745,7 @@ void main() {
       expect(small.existsSync(), isFalse);
       expect(big.existsSync(), isFalse);
       expect(
-        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_3')
-            .existsSync(),
+        File('${tempDir.path}/${_keyPrefix}user_7_flux_media_3').existsSync(),
         isTrue,
       );
     });

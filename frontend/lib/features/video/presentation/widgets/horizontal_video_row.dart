@@ -12,7 +12,7 @@ import 'package:flux_media_server/shared/models/progress.dart';
 /// [progressById]), и для обычных секций — раньше было два почти
 /// одинаковых виджета.
 class HorizontalVideoRow extends StatelessWidget {
-  const HorizontalVideoRow({
+  const new({
     required this.title,
     required this.icon,
     required this.items,
@@ -71,7 +71,7 @@ class HorizontalVideoRow extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final media = items[index];
               final progress = progressById[media.id];
@@ -116,8 +116,9 @@ class HorizontalVideoRow extends StatelessWidget {
       duration: duration,
       completed: progress.completed,
     );
-    final fraction =
-        duration > 0 ? (progress.position / duration).clamp(0.0, 1.0) : 0.0;
+    final fraction = duration > 0
+        ? (progress.position / duration).clamp(0.0, 1.0)
+        : 0.0;
     final secondsLeft = (duration - progress.position).clamp(0, 359999);
 
     return Stack(

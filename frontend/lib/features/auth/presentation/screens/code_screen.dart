@@ -10,10 +10,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class CodeScreen extends ConsumerStatefulWidget {
-  const CodeScreen({
-    required this.email,
-    super.key,
-  });
+  const new({required this.email, super.key});
 
   final String email;
 
@@ -89,8 +86,9 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
 
   Future<void> _resendCode() async {
     if (_cooldown.value > 0 || _isVerifying) return;
-    final sent =
-        await ref.read(authProvider.notifier).requestCode(widget.email);
+    final sent = await ref
+        .read(authProvider.notifier)
+        .requestCode(widget.email);
     if (!mounted) return;
     // Cooldown — только если код реально отправлен; при ошибке (в т.ч.
     // сетевой) не блокируем повторную попытку.
@@ -103,9 +101,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
     final authState = ref.watch(authProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l.enterCode),
-      ),
+      appBar: AppBar(title: Text(l.enterCode)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -169,10 +165,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   ],
                   onFieldSubmitted: (_) => _verifyCode(),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    letterSpacing: 8,
-                  ),
+                  style: const TextStyle(fontSize: 24, letterSpacing: 8),
                   decoration: InputDecoration(
                     labelText: l.code,
                     border: const OutlineInputBorder(),
@@ -233,8 +226,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   },
                 ),
                 TextButton(
-                  onPressed: () =>
-                      context.router.replace(const LoginRoute()),
+                  onPressed: () => context.router.replace(const LoginRoute()),
                   child: Text(l.changeEmail),
                 ),
               ],

@@ -21,27 +21,27 @@ void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-      final args = methodCall.arguments as Map<dynamic, dynamic>;
-      final key = args['key'] as String;
-      if ((throwOnAllKeys || throwOnRefreshToken) &&
-          (throwOnAllKeys || key.contains('refresh_token'))) {
-        throw PlatformException(code: 'not_available');
-      }
-      switch (methodCall.method) {
-        case 'read':
-          return mockStorage[key];
-        case 'write':
-          mockStorage[key] = args['value'] as String;
-          writeCalls.add(key);
-          return null;
-        case 'delete':
-          mockStorage.remove(key);
-          return null;
-        default:
-          return null;
-      }
-    });
+        .setMockMethodCallHandler(channel, (methodCall) async {
+          final args = methodCall.arguments as Map<dynamic, dynamic>;
+          final key = args['key'] as String;
+          if ((throwOnAllKeys || throwOnRefreshToken) &&
+              (throwOnAllKeys || key.contains('refresh_token'))) {
+            throw PlatformException(code: 'not_available');
+          }
+          switch (methodCall.method) {
+            case 'read':
+              return mockStorage[key];
+            case 'write':
+              mockStorage[key] = args['value'] as String;
+              writeCalls.add(key);
+              return null;
+            case 'delete':
+              mockStorage.remove(key);
+              return null;
+            default:
+              return null;
+          }
+        });
   });
 
   tearDownAll(() {
@@ -70,10 +70,8 @@ void main() {
       expect(dataSource.getServerUrl(), isNull);
     });
 
-    test(
-        'setServerUrl persists value as-is '
-        '(normalization is in SettingsNotifier)',
-        () async {
+    test('setServerUrl persists value as-is '
+        '(normalization is in SettingsNotifier)', () async {
       await dataSource.setServerUrl('http://localhost:8080');
       expect(dataSource.getServerUrl(), 'http://localhost:8080');
     });
@@ -144,10 +142,7 @@ void main() {
     test('clearRefreshToken removes the insecure fallback', () async {
       await prefs.setString('${keyPrefix}refresh_token_insecure', 'stored');
       await dataSource.clearRefreshToken();
-      expect(
-        prefs.getString('${keyPrefix}refresh_token_insecure'),
-        isNull,
-      );
+      expect(prefs.getString('${keyPrefix}refresh_token_insecure'), isNull);
     });
 
     test('auth token uses its own fallback key', () async {
@@ -217,9 +212,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       container = ProviderContainer(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(prefs),
-        ],
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
       );
     });
 

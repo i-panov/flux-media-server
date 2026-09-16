@@ -9,7 +9,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const new({super.key});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -71,9 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _isLoading = false);
       if (sent) {
         _startCooldown();
-        await context.router.replace(
-          CodeRoute(email: email),
-        );
+        await context.router.replace(CodeRoute(email: email));
       }
     }
   }
@@ -138,8 +136,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed:
-                            _isLoading || seconds > 0 ? null : _requestCode,
+                        onPressed: _isLoading || seconds > 0
+                            ? null
+                            : _requestCode,
                         child: _isLoading
                             ? const CircularProgressIndicator()
                             : Text(

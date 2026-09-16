@@ -8,7 +8,7 @@ import 'package:media_kit/media_kit.dart';
 /// Delegates to the audio handler's media_kit [Player] so that
 /// playback state is synced with the system media notification.
 class AudioPlayerDatasource implements AudioPlaybackSource {
-  AudioPlayerDatasource(this._handler);
+  new(this._handler);
 
   final FluxAudioHandler _handler;
 

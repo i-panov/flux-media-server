@@ -13,7 +13,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// Flat track row for audio listings with cover, title, artist, and actions.
 /// Tap on the row toggles play/pause for the current track or starts it.
 class AudioTrackRow extends ConsumerWidget {
-  const AudioTrackRow({
+  const new({
     required this.media,
     super.key,
     this.isFavorite = false,
@@ -40,10 +40,7 @@ class AudioTrackRow extends ConsumerWidget {
 
   /// Клик по треку: текущий — пауза/продолжение (а не перезапуск
   /// с нуля), любой другой — запуск.
-  void _handleTap(
-    WidgetRef ref,
-    ({int mediaId, bool isPaused})? playback,
-  ) {
+  void _handleTap(WidgetRef ref, ({int mediaId, bool isPaused})? playback) {
     if (playback != null && playback.mediaId == media.id) {
       final coordinator = ref.read(playbackCoordinatorProvider.notifier);
       if (playback.isPaused) {
@@ -84,9 +81,9 @@ class AudioTrackRow extends ConsumerWidget {
       playbackCoordinatorProvider.select((state) {
         return switch (state) {
           PlaybackPlaying(:final media, :final isPaused) => (
-              mediaId: media.id,
-              isPaused: isPaused,
-            ),
+            mediaId: media.id,
+            isPaused: isPaused,
+          ),
           _ => null,
         };
       }),
@@ -122,7 +119,7 @@ class AudioTrackRow extends ConsumerWidget {
                           width: 48,
                           height: 48,
                           fit: BoxFit.cover,
-                          placeholder: (_, __) => ColoredBox(
+                          placeholder: (_, _) => ColoredBox(
                             color: colorScheme.primaryContainer,
                             child: Icon(
                               Icons.music_note,
@@ -130,7 +127,7 @@ class AudioTrackRow extends ConsumerWidget {
                               size: 24,
                             ),
                           ),
-                          errorWidget: (_, __, ___) => ColoredBox(
+                          errorWidget: (_, _, _) => ColoredBox(
                             color: colorScheme.primaryContainer,
                             child: Icon(
                               Icons.music_note,
@@ -140,18 +137,14 @@ class AudioTrackRow extends ConsumerWidget {
                           ),
                         )
                       else
-                        const Center(
-                          child: AudioPlaceholder(size: 36),
-                        ),
+                        const Center(child: AudioPlaceholder(size: 36)),
                       // Индикатор поверх обложки: сам фон не заменяем,
                       // чтобы обложка не пропадала при воспроизведении.
                       if (isCurrentlyPlaying)
                         ColoredBox(
                           color: Colors.black45,
                           child: Icon(
-                            isCurrentlyPaused
-                                ? Icons.pause
-                                : Icons.equalizer,
+                            isCurrentlyPaused ? Icons.pause : Icons.equalizer,
                             color: Colors.white,
                             size: 24,
                           ),
@@ -173,20 +166,17 @@ class AudioTrackRow extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color:
-                              isCurrentlyPlaying ? colorScheme.primary : null,
-                          fontWeight:
-                              isCurrentlyPlaying ? FontWeight.bold : null,
-                        ),
+                      color: isCurrentlyPlaying ? colorScheme.primary : null,
+                      fontWeight: isCurrentlyPlaying ? FontWeight.bold : null,
+                    ),
                   ),
                   if (media.artists.isNotEmpty)
                     Text(
                       media.artists.map((a) => a.name).join(', '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                 ],
               ),
@@ -223,8 +213,8 @@ class AudioTrackRow extends ConsumerWidget {
                 tooltip: isDownloaded
                     ? l.downloaded
                     : isDownloading
-                        ? l.downloading
-                        : l.download,
+                    ? l.downloading
+                    : l.download,
               ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 20),

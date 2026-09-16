@@ -6,7 +6,7 @@ import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:fpdart/fpdart.dart';
 
 class LyricsRepositoryImpl implements LyricsRepository {
-  LyricsRepositoryImpl(this.remoteDataSource);
+  new(this.remoteDataSource);
 
   final LyricsRemoteDataSource remoteDataSource;
 
@@ -21,14 +21,13 @@ class LyricsRepositoryImpl implements LyricsRepository {
     required String source,
     String? translation,
     String? syncData,
-  }) =>
-      safeRepositoryCall(
-        () => remoteDataSource.upsertLyrics(
-          mediaId,
-          lyricsText: lyricsText,
-          translation: translation,
-          syncData: syncData,
-          source: source,
-        ),
-      );
+  }) => safeRepositoryCall(
+    () => remoteDataSource.upsertLyrics(
+      mediaId,
+      lyricsText: lyricsText,
+      translation: translation,
+      syncData: syncData,
+      source: source,
+    ),
+  );
 }

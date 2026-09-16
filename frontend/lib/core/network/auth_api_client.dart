@@ -29,8 +29,8 @@ abstract class AuthApiClient extends ChopperService {
       baseUrl: baseUrl ?? 'http://localhost:8080/api',
       services: [_$AuthApiClient()],
       interceptors: [
-        if (authInterceptor != null) authInterceptor,
-        if (tokenRefreshInterceptor != null) tokenRefreshInterceptor,
+        ?authInterceptor,
+        ?tokenRefreshInterceptor,
         SafeLoggingInterceptor(),
       ],
     );
@@ -45,21 +45,21 @@ abstract class AuthApiClient extends ChopperService {
   /// HTTP-клиент.
   static AuthApiClient bind(ChopperClient client) => _$AuthApiClient(client);
 
-  @Post(path: '/auth/request-code')
+  @POST(path: '/auth/request-code')
   Future<Response<Map<String, dynamic>>> requestCode(
     @Body() Map<String, dynamic> body,
   );
 
-  @Post(path: '/auth/verify-code')
+  @POST(path: '/auth/verify-code')
   Future<Response<Map<String, dynamic>>> verifyCode(
     @Body() Map<String, dynamic> body,
   );
 
-  @Post(path: '/auth/refresh')
+  @POST(path: '/auth/refresh')
   Future<Response<Map<String, dynamic>>> refreshToken(
     @Body() Map<String, dynamic> body,
   );
 
-  @Get(path: '/auth/me')
+  @GET(path: '/auth/me')
   Future<Response<Map<String, dynamic>>> getMe();
 }

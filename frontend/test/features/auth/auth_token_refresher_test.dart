@@ -54,43 +54,47 @@ void main() {
       expect(failures, 1);
     });
 
-    test('exception during refresh returns null and calls onRefreshFailure',
-        () async {
-      var failures = 0;
-      final refresher = AuthTokenRefresher(
-        performRefresh: (_) async => throw Exception('connection refused'),
-        onRefreshFailure: () async => failures++,
-      );
+    test(
+      'exception during refresh returns null and calls onRefreshFailure',
+      () async {
+        var failures = 0;
+        final refresher = AuthTokenRefresher(
+          performRefresh: (_) async => throw Exception('connection refused'),
+          onRefreshFailure: () async => failures++,
+        );
 
-      final tokens = await refresher.refreshTokens('refresh');
+        final tokens = await refresher.refreshTokens('refresh');
 
-      expect(tokens, isNull);
-      expect(failures, 1);
-    });
+        expect(tokens, isNull);
+        expect(failures, 1);
+      },
+    );
 
-    test('parallel calls share one refresh and return the same tokens',
-        () async {
-      var calls = 0;
-      final refresher = AuthTokenRefresher(
-        performRefresh: (_) async {
-          calls++;
-          return (token: 'new-jwt', refreshToken: 'new-refresh');
-        },
-        onRefreshFailure: () async {},
-      );
+    test(
+      'parallel calls share one refresh and return the same tokens',
+      () async {
+        var calls = 0;
+        final refresher = AuthTokenRefresher(
+          performRefresh: (_) async {
+            calls++;
+            return (token: 'new-jwt', refreshToken: 'new-refresh');
+          },
+          onRefreshFailure: () async {},
+        );
 
-      final results = await Future.wait([
-        refresher.refreshTokens('r1'),
-        refresher.refreshTokens('r2'),
-        refresher.refreshTokens('r3'),
-      ]);
+        final results = await Future.wait([
+          refresher.refreshTokens('r1'),
+          refresher.refreshTokens('r2'),
+          refresher.refreshTokens('r3'),
+        ]);
 
-      expect(calls, 1);
-      expect(results, hasLength(3));
-      for (final tokens in results) {
-        expect(tokens, (token: 'new-jwt', refreshToken: 'new-refresh'));
-      }
-    });
+        expect(calls, 1);
+        expect(results, hasLength(3));
+        for (final tokens in results) {
+          expect(tokens, (token: 'new-jwt', refreshToken: 'new-refresh'));
+        }
+      },
+    );
 
     test('failed refresh after a success does not corrupt the result of '
         'the success (no shared mutable state)', () async {

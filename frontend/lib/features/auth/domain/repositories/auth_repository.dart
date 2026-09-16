@@ -5,7 +5,7 @@ import 'package:fpdart/fpdart.dart';
 abstract class AuthRepository {
   Future<Either<Failure, Unit>> requestCode(String email);
   Future<Either<Failure, ({String token, String refreshToken, User user})>>
-      verifyCode(String email, String code);
+  verifyCode(String email, String code);
   Future<Either<Failure, User>> getCurrentUser();
   Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
     String refreshToken,

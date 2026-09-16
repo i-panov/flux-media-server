@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/favorite.dart';
 import 'package:fpdart/fpdart.dart';
 
 class AddFavorite extends UseCase<Either<Failure, Favorite>, int> {
-  AddFavorite(this.repository);
+  new(this.repository);
   final FavoritesRepository repository;
 
   @override

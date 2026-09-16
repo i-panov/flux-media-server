@@ -9,16 +9,16 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Media _media(int id) => Media(
-      id: id,
-      title: 'Media $id',
-      year: 2024,
-      type: MediaType.video,
-      fileSize: 1024,
-    );
+  id: id,
+  title: 'Media $id',
+  year: 2024,
+  type: MediaType.video,
+  fileSize: 1024,
+);
 
 /// Фейк кеш-сервиса: isCached завершается вручную, download мгновенный.
 class _ControllableCache extends OfflineCacheService {
-  _ControllableCache(super.ref, super.baseUrl);
+  new(super.ref, super.baseUrl);
 
   final Completer<bool> isCachedCompleter = Completer<bool>();
 
@@ -80,29 +80,31 @@ void main() {
       );
     });
 
-    test('race: late isCached result does not revert downloaded state',
-        () async {
-      // build запускает checkStatus, который ждёт isCachedCompleter.
-      final initial = container.read(downloadNotifierProvider(1));
-      expect(initial, isA<DownloadIdle>());
+    test(
+      'race: late isCached result does not revert downloaded state',
+      () async {
+        // build запускает checkStatus, который ждёт isCachedCompleter.
+        final initial = container.read(downloadNotifierProvider(1));
+        expect(initial, isA<DownloadIdle>());
 
-      // Загрузка завершается раньше, чем checkStatus получил результат.
-      await container
-          .read(downloadNotifierProvider(1).notifier)
-          .download(_media(1));
-      expect(
-        container.read(downloadNotifierProvider(1)),
-        isA<DownloadDownloaded>(),
-      );
+        // Загрузка завершается раньше, чем checkStatus получил результат.
+        await container
+            .read(downloadNotifierProvider(1).notifier)
+            .download(_media(1));
+        expect(
+          container.read(downloadNotifierProvider(1)),
+          isA<DownloadDownloaded>(),
+        );
 
-      // Поздний ответ isCached == false не должен откатить состояние.
-      cache.isCachedCompleter.complete(false);
-      await flush();
+        // Поздний ответ isCached == false не должен откатить состояние.
+        cache.isCachedCompleter.complete(false);
+        await flush();
 
-      expect(
-        container.read(downloadNotifierProvider(1)),
-        isA<DownloadDownloaded>(),
-      );
-    });
+        expect(
+          container.read(downloadNotifierProvider(1)),
+          isA<DownloadDownloaded>(),
+        );
+      },
+    );
   });
 }

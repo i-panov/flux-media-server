@@ -25,7 +25,7 @@ Future<void> showEditMetadataDialog(
 }
 
 class _EditMetadataDialog extends ConsumerStatefulWidget {
-  const _EditMetadataDialog({required this.media});
+  const new({required this.media});
 
   final Media media;
 
@@ -52,20 +52,20 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     _titleController = TextEditingController(text: widget.media.title);
     _artistControllers = widget.media.artists.isNotEmpty
         ? widget.media.artists
-            .map((a) => TextEditingController(text: a.name))
-            .toList()
+              .map((a) => TextEditingController(text: a.name))
+              .toList()
         : [TextEditingController()];
     _albumController = TextEditingController(text: widget.media.album ?? '');
     _genreController = TextEditingController(text: widget.media.genre ?? '');
     _yearController = TextEditingController(
-      text: hasMediaYear(widget.media.year)
-          ? widget.media.year.toString()
-          : '',
+      text: hasMediaYear(widget.media.year) ? widget.media.year.toString() : '',
     );
-    _descriptionController =
-        TextEditingController(text: widget.media.description ?? '');
-    _originalFilename =
-        widget.media.filename.isNotEmpty ? widget.media.filename : null;
+    _descriptionController = TextEditingController(
+      text: widget.media.description ?? '',
+    );
+    _originalFilename = widget.media.filename.isNotEmpty
+        ? widget.media.filename
+        : null;
   }
 
   /// Parse the original filename to extract title and year, then fill
@@ -148,10 +148,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     setState(() => _isSaving = true);
     final updateMetadata = ref.read(updateMetadataProvider);
     final result = await updateMetadata(
-      UpdateMetadataParams(
-        mediaId: widget.media.id,
-        edit: _collectData(),
-      ),
+      UpdateMetadataParams(mediaId: widget.media.id, edit: _collectData()),
     );
 
     if (!mounted) return;
@@ -201,7 +198,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
               artistsAsync.when(
                 data: (artists) => _buildArtistsGroup(l, artists),
                 loading: () => _buildArtistsGroup(l, const []),
-                error: (_, __) => _buildArtistsGroup(l, const []),
+                error: (_, _) => _buildArtistsGroup(l, const []),
               ),
               TextFormField(
                 controller: _albumController,
@@ -328,7 +325,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
 
 /// A single artist text field with autocomplete dropdown.
 class _ArtistField extends StatefulWidget {
-  const _ArtistField({
+  const new({
     required this.controller,
     required this.allArtists,
     this.onRemove,
@@ -396,8 +393,10 @@ class _ArtistFieldState extends State<_ArtistField> {
           onSubmitted: (_) => onFieldSubmitted(),
           decoration: InputDecoration(
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             border: const OutlineInputBorder(),
             suffixIcon: widget.onRemove != null
                 ? IconButton(

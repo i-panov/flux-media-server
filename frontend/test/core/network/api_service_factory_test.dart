@@ -8,8 +8,7 @@ import 'package:http/http.dart' as http;
 /// Сервер, который принимает соединение и никогда не отвечает:
 /// фиксирует момент, когда клиент закрывает сокет (abort после таймаута).
 class _SilentServer {
-  _SilentServer()
-      : _future = ServerSocket.bind(InternetAddress.loopbackIPv4, 0) {
+  new() : _future = ServerSocket.bind(InternetAddress.loopbackIPv4, 0) {
     _future.then((server) {
       server.listen((socket) {
         socket.listen(
@@ -38,25 +37,27 @@ class _SilentServer {
 
 void main() {
   group('TimeoutHttpClient', () {
-    test('throws TimeoutException and closes the connection on timeout',
-        () async {
-      final silent = _SilentServer();
-      addTearDown(silent.close);
-      final port = await silent.port;
+    test(
+      'throws TimeoutException and closes the connection on timeout',
+      () async {
+        final silent = _SilentServer();
+        addTearDown(silent.close);
+        final port = await silent.port;
 
-      final client = TimeoutHttpClient(
-        requestTimeout: const Duration(milliseconds: 150),
-      );
-      addTearDown(client.close);
+        final client = TimeoutHttpClient(
+          requestTimeout: const Duration(milliseconds: 150),
+        );
+        addTearDown(client.close);
 
-      await expectLater(
-        client.get(Uri.parse('http://127.0.0.1:$port/slow')),
-        throwsA(isA<TimeoutException>()),
-      );
+        await expectLater(
+          client.get(Uri.parse('http://127.0.0.1:$port/slow')),
+          throwsA(isA<TimeoutException>()),
+        );
 
-      // Базовый запрос должен быть отменён (соединение реально закрыто).
-      await silent.closedByClient.future.timeout(const Duration(seconds: 5));
-    });
+        // Базовый запрос должен быть отменён (соединение реально закрыто).
+        await silent.closedByClient.future.timeout(const Duration(seconds: 5));
+      },
+    );
 
     test('multipart uploads use the longer timeout', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -75,9 +76,7 @@ void main() {
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('http://127.0.0.1:${server.port}/upload'),
-      )..files.add(
-          http.MultipartFile.fromString('file', 'x' * 1024),
-        );
+      )..files.add(http.MultipartFile.fromString('file', 'x' * 1024));
 
       final response = await client.send(request);
       expect(response.statusCode, 200);
@@ -108,8 +107,9 @@ void main() {
       await silent.closedByClient.future.timeout(const Duration(seconds: 5));
 
       // После отменённого запроса клиент ещё жив и отвечает.
-      final response =
-          await client.get(Uri.parse('http://127.0.0.1:${server.port}/ok'));
+      final response = await client.get(
+        Uri.parse('http://127.0.0.1:${server.port}/ok'),
+      );
       expect(response.statusCode, 200);
     });
   });

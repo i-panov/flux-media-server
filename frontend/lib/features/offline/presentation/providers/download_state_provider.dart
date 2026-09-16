@@ -8,37 +8,42 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 /// Represents the download state of a media item.
 sealed class DownloadState {
-  const DownloadState();
-  const factory DownloadState.idle() = DownloadIdle;
-  const factory DownloadState.downloading({double progress}) =
-      DownloadDownloading;
-  const factory DownloadState.downloaded() = DownloadDownloaded;
-  const factory DownloadState.error(String message) = DownloadError;
+  const new();
+  const factory idle() = DownloadIdle;
+  const factory downloading({double progress}) = DownloadDownloading;
+  const factory downloaded() = DownloadDownloaded;
+  const factory error(String message) = DownloadError;
 }
 
 class DownloadIdle extends DownloadState {
-  const DownloadIdle();
+  const new();
 }
 
 class DownloadDownloading extends DownloadState {
-  const DownloadDownloading({this.progress = 0.0});
+  const new({this.progress = 0.0});
   final double progress;
 }
 
 class DownloadDownloaded extends DownloadState {
-  const DownloadDownloaded();
+  const new();
 }
 
 class DownloadError extends DownloadState {
-  const DownloadError(this.message);
+  const new(this.message);
   final String message;
 }
 
 /// State notifier for managing download state of a specific media item.
-class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
+class DownloadNotifier extends Notifier<DownloadState> {
+  // Riverpod 3: family-аргумент приходит через конструктор (create-функция
+  // провайдера — tear-off конструктора с параметром), build() без аргументов.
+  new(this.mediaId);
+
+  final int mediaId;
+
   @override
-  DownloadState build(int arg) {
-    checkStatus(arg);
+  DownloadState build() {
+    checkStatus(mediaId);
     return const DownloadState.idle();
   }
 
@@ -87,7 +92,8 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
       state = const DownloadState.idle();
     } on FileSystemException catch (e) {
       // Маппим нехватку места на диске в человекочитаемое сообщение.
-      final noSpace = e.osError?.errorCode == 28 ||
+      final noSpace =
+          e.osError?.errorCode == 28 ||
           e.message.toLowerCase().contains('no space');
       state = DownloadError(
         noSpace
@@ -118,5 +124,5 @@ class DownloadNotifier extends FamilyNotifier<DownloadState, int> {
 /// Not auto-disposed: downloads must survive widget rebuilds/navigation.
 final downloadNotifierProvider =
     NotifierProvider.family<DownloadNotifier, DownloadState, int>(
-  DownloadNotifier.new,
-);
+      DownloadNotifier.new,
+    );

@@ -59,8 +59,9 @@ class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
       final cachedById = <int, Media>{
         for (final m in await cacheService.getCachedMedia()) m.id: m,
       };
-      final missingIds =
-          ids.where((id) => !cachedById.containsKey(id)).toList();
+      final missingIds = ids
+          .where((id) => !cachedById.containsKey(id))
+          .toList();
 
       final mediaRepository = ref.read(mediaRepositoryProvider);
       // Один bulk-запрос вместо N+1 (лимит сервера — 100 id на запрос,
@@ -81,15 +82,12 @@ class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
           // Bulk недоступен (старый сервер или сбой) — поштучно.
           for (final id in chunk) {
             final detail = await mediaRepository.getMediaDetail(id);
-            detail.fold(
-              (failure) => null,
-              (media) {
-                fetchedById[media.id] = media;
-                allFailed = false;
-                // Persist metadata for offline access.
-                cacheService.saveMetadata(media);
-              },
-            );
+            detail.fold((failure) => null, (media) {
+              fetchedById[media.id] = media;
+              allFailed = false;
+              // Persist metadata for offline access.
+              cacheService.saveMetadata(media);
+            });
           }
           continue;
         }
@@ -136,5 +134,5 @@ class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
 
 final downloadsProvider =
     NotifierProvider<DownloadsNotifier, AsyncValue<List<Media>>>(
-  DownloadsNotifier.new,
-);
+      DownloadsNotifier.new,
+    );

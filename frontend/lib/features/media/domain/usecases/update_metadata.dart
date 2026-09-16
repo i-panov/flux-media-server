@@ -6,10 +6,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
 class UpdateMetadataParams {
-  const UpdateMetadataParams({
-    required this.mediaId,
-    required this.edit,
-  });
+  const new({required this.mediaId, required this.edit});
 
   final int mediaId;
   final MetadataEdit edit;
@@ -17,7 +14,7 @@ class UpdateMetadataParams {
 
 class UpdateMetadata
     extends UseCase<Either<Failure, Media>, UpdateMetadataParams> {
-  UpdateMetadata(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

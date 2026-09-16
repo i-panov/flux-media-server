@@ -3,12 +3,7 @@ import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 
 /// Circular card representing an artist for horizontal scroll display.
 class ArtistCard extends StatelessWidget {
-  const ArtistCard({
-    required this.name,
-    super.key,
-    this.onTap,
-    this.coverUrl,
-  });
+  const new({required this.name, super.key, this.onTap, this.coverUrl});
 
   final String name;
   final VoidCallback? onTap;
@@ -44,7 +39,7 @@ class ArtistCard extends StatelessWidget {
 }
 
 class _ArtistAvatar extends StatefulWidget {
-  const _ArtistAvatar({this.onTap, this.coverUrl});
+  const new({this.onTap, this.coverUrl});
 
   final VoidCallback? onTap;
   final String? coverUrl;
@@ -90,8 +85,8 @@ class _ArtistAvatarState extends State<_ArtistAvatar> {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => _placeholder(colorScheme),
-                    errorWidget: (_, __, ___) => _placeholder(colorScheme),
+                    placeholder: (_, _) => _placeholder(colorScheme),
+                    errorWidget: (_, _, _) => _placeholder(colorScheme),
                   )
                 : _placeholder(colorScheme),
           ),
@@ -103,11 +98,7 @@ class _ArtistAvatarState extends State<_ArtistAvatar> {
   Widget _placeholder(ColorScheme colorScheme) {
     return ColoredBox(
       color: colorScheme.primaryContainer,
-      child: Icon(
-        Icons.person,
-        size: 40,
-        color: colorScheme.primary,
-      ),
+      child: Icon(Icons.person, size: 40, color: colorScheme.primary),
     );
   }
 }

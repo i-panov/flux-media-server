@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// Draws a purple gradient background with a music note icon — no image
 /// file needed.
 class AudioPlaceholder extends StatelessWidget {
-  const AudioPlaceholder({super.key, this.size = 80});
+  const new({super.key, this.size = 80});
 
   final double size;
 
@@ -20,10 +20,7 @@ class AudioPlaceholder extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primaryContainer,
-            colorScheme.surface,
-          ],
+          colors: [colorScheme.primaryContainer, colorScheme.surface],
         ),
       ),
       child: Center(

@@ -5,14 +5,14 @@ import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:fpdart/fpdart.dart';
 
 class CreateCollectionParams {
-  const CreateCollectionParams({required this.name, required this.type});
+  const new({required this.name, required this.type});
   final String name;
   final String type;
 }
 
 class CreateCollection
     extends UseCase<Either<Failure, Collection>, CreateCollectionParams> {
-  CreateCollection(this.repository);
+  new(this.repository);
   final CollectionsRepository repository;
 
   @override

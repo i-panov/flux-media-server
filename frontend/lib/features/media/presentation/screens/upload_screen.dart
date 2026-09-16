@@ -15,7 +15,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class UploadScreen extends ConsumerStatefulWidget {
-  const UploadScreen({required this.mediaType, super.key});
+  const new({required this.mediaType, super.key});
 
   final String mediaType;
 
@@ -25,7 +25,7 @@ class UploadScreen extends ConsumerStatefulWidget {
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
   /// Лимит сервера по умолчанию (configs/config.yaml: max_upload_size).
-  static const _maxUploadSizeBytes = 2 * 1024 * 1024 * 1024;
+  static const int _maxUploadSizeBytes = 2 * 1024 * 1024 * 1024;
 
   /// Интервал опроса статуса асинхронного upload-джоба.
   static const _statusPollInterval = Duration(milliseconds: 1500);
@@ -63,21 +63,21 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: widget.mediaType == 'audio'
           ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
           : ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v'],
     );
 
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
+    if (result.isEmpty) return;
+    final file = result.first;
     if (file.path == null) return;
 
     setState(() {
       _selectedFile = File(file.path!);
       _selectedFileName = file.name;
-      _selectedFileSize = file.size;
+      _selectedFileSize = file.lengthSync() ?? 0;
     });
   }
 
@@ -87,9 +87,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
   void _showSnackBar(String message, Color color) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   Future<void> _startUpload() async {
@@ -103,10 +102,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       return;
     }
     if (fileSize > _maxUploadSizeBytes) {
-      _showSnackBar(
-        l.uploadFileTooLarge,
-        Colors.red,
-      );
+      _showSnackBar(l.uploadFileTooLarge, Colors.red);
       return;
     }
 
@@ -133,16 +129,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       // в «дубликатов нет»: показываем ошибку и прерываемся.
       final checkMediaHash = ref.read(checkMediaHashProvider);
       final checkResult = await checkMediaHash(hash.toString());
-      final exists = checkResult.fold(
-        (failure) {
-          _showSnackBar(
-            '${l.errorLabel}: ${failure.message}',
-            Colors.red,
-          );
-          return null;
-        },
-        (data) => data.exists,
-      );
+      final exists = checkResult.fold((failure) {
+        _showSnackBar('${l.errorLabel}: ${failure.message}', Colors.red);
+        return null;
+      }, (data) => data.exists);
       if (exists == null) return;
       if (_cancelled) throw const _UploadCancelled();
 
@@ -186,17 +176,14 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
         return;
       }
 
-      final jobId = result.fold(
-        (failure) {
-          if (failure is UploadCancelledFailure) {
-            _showSnackBar(l.uploadCancelled, Colors.orange);
-          } else {
-            _showSnackBar(l.failedToAdd(failure.message), Colors.red);
-          }
-          return null;
-        },
-        (r) => r.jobId,
-      );
+      final jobId = result.fold((failure) {
+        if (failure is UploadCancelledFailure) {
+          _showSnackBar(l.uploadCancelled, Colors.orange);
+        } else {
+          _showSnackBar(l.failedToAdd(failure.message), Colors.red);
+        }
+        return null;
+      }, (r) => r.jobId);
       if (jobId == null) return;
 
       // Отмена ровно между POST и первым опросом: джоб уже создан на
@@ -411,5 +398,5 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
 /// Внутренний маркер отмены (отличаем от сетевых ошибок).
 class _UploadCancelled implements Exception {
-  const _UploadCancelled();
+  const new();
 }

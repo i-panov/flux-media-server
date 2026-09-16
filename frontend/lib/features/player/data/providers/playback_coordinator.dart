@@ -17,9 +17,9 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'playback_coordinator.freezed.dart';
 
 @freezed
-class PlaybackState with _$PlaybackState {
-  const factory PlaybackState.initial() = PlaybackInitial;
-  const factory PlaybackState.playing({
+sealed class PlaybackState with _$PlaybackState {
+  const factory initial() = PlaybackInitial;
+  const factory playing({
     required Media media,
     required MediaType type,
     @Default(false) bool isPaused,
@@ -28,9 +28,9 @@ class PlaybackState with _$PlaybackState {
     @Default(1.0) double speed,
     Duration? savedPosition,
   }) = PlaybackPlaying;
-  const factory PlaybackState.completed() = PlaybackCompleted;
-  const factory PlaybackState.loading() = PlaybackLoading;
-  const factory PlaybackState.error({required String message}) = PlaybackError;
+  const factory completed() = PlaybackCompleted;
+  const factory loading() = PlaybackLoading;
+  const factory error({required String message}) = PlaybackError;
 }
 
 /// Manages unified playback across audio and video.
@@ -171,8 +171,8 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
         coverUrl = (media.coverUrl != null && media.coverUrl!.isNotEmpty)
             ? '$_baseUrl/media/${media.id}/cover'
             : (media.thumbnailUrl != null && media.thumbnailUrl!.isNotEmpty
-                ? '$_baseUrl/media/${media.id}/thumb'
-                : null);
+                  ? '$_baseUrl/media/${media.id}/thumb'
+                  : null);
       }
 
       // Start audio playback with metadata for the system notification.
@@ -181,18 +181,16 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
         title: media.title,
         artist: media.artists.map((a) => a.name).join(', '),
         artUri: coverUrl,
-        duration:
-            media.duration != null ? Duration(seconds: media.duration!) : null,
+        duration: media.duration != null
+            ? Duration(seconds: media.duration!)
+            : null,
         httpHeaders: headers,
       );
       if (generation != _playGeneration) return;
       await _audioPlayer.play();
       if (generation != _playGeneration) return;
 
-      state = PlaybackState.playing(
-        media: media,
-        type: MediaType.audio,
-      );
+      state = PlaybackState.playing(media: media, type: MediaType.audio);
 
       _subscribeToStream(_audioPlayer.positionStream, (pos) {
         if (state is PlaybackPlaying) {
@@ -231,8 +229,8 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
         type: MediaType.video,
         savedPosition:
             resumePosition != null && resumePosition > _resumeThreshold
-                ? resumePosition
-                : null,
+            ? resumePosition
+            : null,
       );
 
       if (resumePosition != null && resumePosition <= _resumeThreshold) {
@@ -321,17 +319,14 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   /// none (or the media was already completed).
   Future<Duration?> _loadSavedPosition(int mediaId) async {
     final result = await ref.read(mediaRepositoryProvider).getProgress();
-    return result.fold(
-      (_) => null,
-      (progressList) {
-        for (final p in progressList) {
-          if (p.mediaId == mediaId && p.position > 0) {
-            return Duration(seconds: p.position);
-          }
+    return result.fold((_) => null, (progressList) {
+      for (final p in progressList) {
+        if (p.mediaId == mediaId && p.position > 0) {
+          return Duration(seconds: p.position);
         }
-        return null;
-      },
-    );
+      }
+      return null;
+    });
   }
 
   /// Saves watch progress to the backend. Best-effort: errors are logged
@@ -344,12 +339,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     bool? completed,
   }) {
     final result = _saveChain.then(
-      (_) => _doSaveProgress(
-        mediaId,
-        position,
-        duration,
-        completed: completed,
-      ),
+      (_) => _doSaveProgress(mediaId, position, duration, completed: completed),
     );
     _saveChain = result.catchError((_) {});
     return result;
@@ -363,7 +353,9 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   }) async {
     if (position <= Duration.zero) return;
     try {
-      await ref.read(mediaRepositoryProvider).updateProgress(
+      await ref
+          .read(mediaRepositoryProvider)
+          .updateProgress(
             mediaId,
             position: position.inSeconds,
             duration: duration.inSeconds,
@@ -377,8 +369,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   /// Periodically persists watch progress while playing.
   void _startProgressTimer() {
     _cancelProgressTimer();
-    _progressTimer =
-        Timer.periodic(_progressSaveInterval, (_) {
+    _progressTimer = Timer.periodic(_progressSaveInterval, (_) {
       final current = state;
       // Периодическое сохранение — только для видео.
       if (current is PlaybackPlaying &&
@@ -540,5 +531,5 @@ final videoPlayerDatasourceProvider = Provider<VideoPlaybackSource>((ref) {
 /// Provider for playback coordinator.
 final playbackCoordinatorProvider =
     NotifierProvider<PlaybackCoordinator, PlaybackState>(
-  PlaybackCoordinator.new,
-);
+      PlaybackCoordinator.new,
+    );

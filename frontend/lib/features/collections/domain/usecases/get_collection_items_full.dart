@@ -6,7 +6,7 @@ import 'package:fpdart/fpdart.dart';
 
 class GetCollectionItemsFull
     extends UseCase<Either<Failure, List<Media>>, int> {
-  GetCollectionItemsFull(this.repository);
+  new(this.repository);
 
   final CollectionsRepository repository;
 

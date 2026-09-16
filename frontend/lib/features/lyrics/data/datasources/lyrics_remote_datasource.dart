@@ -3,7 +3,7 @@ import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/shared/models/lyrics.dart';
 
 class LyricsRemoteDataSource {
-  LyricsRemoteDataSource(this.apiClient);
+  new(this.apiClient);
 
   final MediaApiClient apiClient;
 

@@ -5,7 +5,7 @@ import 'package:flux_media_server/features/auth/presentation/providers/auth_prov
 
 /// Protects routes that require authentication.
 class AuthGuard extends AutoRouteGuard {
-  AuthGuard(this._container);
+  new(this._container);
 
   final ProviderContainer _container;
 

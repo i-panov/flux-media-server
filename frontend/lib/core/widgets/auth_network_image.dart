@@ -7,7 +7,7 @@ import 'package:flux_media_server/core/session/settings_provider.dart';
 /// `Authorization` header. Required for protected endpoints
 /// such as `/api/media/:id/thumb`.
 class AuthNetworkImage extends ConsumerWidget {
-  const AuthNetworkImage({
+  const new({
     required this.imageUrl,
     super.key,
     this.fit,
@@ -26,10 +26,12 @@ class AuthNetworkImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final token =
-        ref.watch(settingsProvider.select((s) => s.settings.authToken));
-    final baseUrl =
-        ref.watch(settingsProvider.select((s) => s.settings.serverUrl));
+    final token = ref.watch(
+      settingsProvider.select((s) => s.settings.authToken),
+    );
+    final baseUrl = ref.watch(
+      settingsProvider.select((s) => s.settings.serverUrl),
+    );
     final headers = shouldAttachAuthHeader(imageUrl, baseUrl, token)
         ? {'Authorization': 'Bearer $token'}
         : null;

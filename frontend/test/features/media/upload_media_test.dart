@@ -21,7 +21,8 @@ class FakeMediaRepository implements MediaRepository {
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
-  })? onUploadFile;
+  })?
+  onUploadFile;
 
   String? lastFilePath;
   String? lastMediaType;
@@ -69,8 +70,7 @@ class FakeMediaRepository implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-  }) async =>
-      const Right((items: [], total: 0));
+  }) async => const Right((items: [], total: 0));
 
   @override
   Future<Either<Failure, Media>> getMediaDetail(int id) async =>
@@ -86,8 +86,8 @@ class FakeMediaRepository implements MediaRepository {
 
   @override
   Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
-      checkHash(String hash) async =>
-          const Left(ServerFailure(message: 'not used'));
+  checkHash(String hash) async =>
+      const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, List<WatchProgress>>> getProgress() async =>
@@ -97,8 +97,7 @@ class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
     MetadataEdit edit,
-  ) async =>
-      const Left(ServerFailure(message: 'not used'));
+  ) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, WatchProgress>> updateProgress(
@@ -106,41 +105,36 @@ class FakeMediaRepository implements MediaRepository {
     int? position,
     int? duration,
     bool? completed,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
+  }) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, void>> uploadCover(
     int mediaId,
     String filePath, {
     bool Function()? isCancelled,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
+  }) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, Artist>> updateArtistName(
     int artistId,
     String name,
-  ) async =>
-      const Left(ServerFailure());
+  ) async => const Left(ServerFailure());
 
   @override
   Future<Either<Failure, void>> uploadArtistCover(
     int artistId,
     String filePath, {
     bool Function()? isCancelled,
-  }) async =>
-      const Left(ServerFailure());
+  }) async => const Left(ServerFailure());
 }
 
 /// Датсорс-заглушка для проверки реальной цепочки отмены
 /// (datasource → repository → Failure).
 class _StubUploadDataSource extends MediaRemoteDataSource {
-  _StubUploadDataSource(this._result)
-      : super(
-          MediaApiClient.create(baseUrl: 'http://localhost:8080/api')
-              .apiClient,
-        );
+  new(this._result)
+    : super(
+        MediaApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
+      );
 
   final Object _result;
 
@@ -168,16 +162,8 @@ class _StubUploadDataSource extends MediaRemoteDataSource {
   }
 
   @override
-  Future<
-      ({
-        int id,
-        String status,
-        String? error,
-        Map<String, dynamic>? media,
-      })> getUploadJobStatus(
-    int jobId, {
-    bool Function()? isCancelled,
-  }) async {
+  Future<({int id, String status, String? error, Map<String, dynamic>? media})>
+  getUploadJobStatus(int jobId, {bool Function()? isCancelled}) async {
     return (id: jobId, status: 'processing', error: null, media: null);
   }
 }
@@ -192,44 +178,50 @@ void main() {
       uploadMedia = UploadMedia(fakeRepo);
     });
 
-    test('passes file params and progress callback to the repository',
-        () async {
-      fakeRepo.onUploadFile =
-          ({required filePath, required mediaType, required fileName,
+    test(
+      'passes file params and progress callback to the repository',
+      () async {
+        fakeRepo.onUploadFile =
+            ({
+              required filePath,
+              required mediaType,
+              required fileName,
               onProgress,
               isCancelled,
             }) async {
-        onProgress?.call(10, 100);
-        onProgress?.call(20, 100);
-        return const Right(UploadResult(jobId: 42));
-      };
+              onProgress?.call(10, 100);
+              onProgress?.call(20, 100);
+              return const Right(UploadResult(jobId: 42));
+            };
 
-      final result = await uploadMedia(
-        UploadMediaParams(
-          filePath: '/tmp/movie.mp4',
-          mediaType: 'video',
-          fileName: 'movie.mp4',
-          onProgress: (sent, total) {
-            fakeRepo.progressEvents.add((sent, total));
-          },
-        ),
-      );
+        final result = await uploadMedia(
+          UploadMediaParams(
+            filePath: '/tmp/movie.mp4',
+            mediaType: 'video',
+            fileName: 'movie.mp4',
+            onProgress: (sent, total) {
+              fakeRepo.progressEvents.add((sent, total));
+            },
+          ),
+        );
 
-      expect(result.isRight(), isTrue);
-      expect(result.getRight().toNullable()?.jobId, 42);
-      expect(fakeRepo.lastFilePath, '/tmp/movie.mp4');
-      expect(fakeRepo.lastMediaType, 'video');
-      expect(fakeRepo.lastFileName, 'movie.mp4');
-      expect(fakeRepo.progressEvents, [(10, 100), (20, 100)]);
-    });
+        expect(result.isRight(), isTrue);
+        expect(result.getRight().toNullable()?.jobId, 42);
+        expect(fakeRepo.lastFilePath, '/tmp/movie.mp4');
+        expect(fakeRepo.lastMediaType, 'video');
+        expect(fakeRepo.lastFileName, 'movie.mp4');
+        expect(fakeRepo.progressEvents, [(10, 100), (20, 100)]);
+      },
+    );
 
     test('returns Left on repository failure', () async {
-      fakeRepo.onUploadFile =
-          ({required filePath, required mediaType, required fileName,
-              onProgress,
-              isCancelled,
-            }) async =>
-              const Left(ServerFailure(message: 'Too large'));
+      fakeRepo.onUploadFile = ({
+        required filePath,
+        required mediaType,
+        required fileName,
+        onProgress,
+        isCancelled,
+      }) async => const Left(ServerFailure(message: 'Too large'));
 
       final result = await uploadMedia(
         const UploadMediaParams(
@@ -245,41 +237,45 @@ void main() {
   });
 
   group('MediaRepositoryImpl upload cancellation chain', () {
-    test('cancellation becomes UploadCancelledFailure, not ServerFailure',
-        () async {
-      final repository = MediaRepositoryImpl(
-        _StubUploadDataSource(const UploadCancelledException()),
-      );
+    test(
+      'cancellation becomes UploadCancelledFailure, not ServerFailure',
+      () async {
+        final repository = MediaRepositoryImpl(
+          _StubUploadDataSource(const UploadCancelledException()),
+        );
 
-      final result = await repository.uploadFile(
-        filePath: '/tmp/movie.mp4',
-        mediaType: 'video',
-        fileName: 'movie.mp4',
-      );
+        final result = await repository.uploadFile(
+          filePath: '/tmp/movie.mp4',
+          mediaType: 'video',
+          fileName: 'movie.mp4',
+        );
 
-      expect(result.isLeft(), isTrue);
-      final failure = result.fold((l) => l, (_) => null);
-      expect(failure, isA<UploadCancelledFailure>());
-      expect(failure, isNot(isA<ServerFailure>()));
-    });
+        expect(result.isLeft(), isTrue);
+        final failure = result.fold((l) => l, (_) => null);
+        expect(failure, isA<UploadCancelledFailure>());
+        expect(failure, isNot(isA<ServerFailure>()));
+      },
+    );
 
-    test('non-cancellation errors still map through safeRepositoryCall',
-        () async {
-      final repository = MediaRepositoryImpl(
-        _StubUploadDataSource(const ServerException(message: 'Disk full')),
-      );
+    test(
+      'non-cancellation errors still map through safeRepositoryCall',
+      () async {
+        final repository = MediaRepositoryImpl(
+          _StubUploadDataSource(const ServerException(message: 'Disk full')),
+        );
 
-      final result = await repository.uploadFile(
-        filePath: '/tmp/movie.mp4',
-        mediaType: 'video',
-        fileName: 'movie.mp4',
-      );
+        final result = await repository.uploadFile(
+          filePath: '/tmp/movie.mp4',
+          mediaType: 'video',
+          fileName: 'movie.mp4',
+        );
 
-      expect(result.isLeft(), isTrue);
-      final failure = result.fold((l) => l, (_) => null);
-      expect(failure, isA<ServerFailure>());
-      expect(failure?.message, 'Disk full');
-    });
+        expect(result.isLeft(), isTrue);
+        final failure = result.fold((l) => l, (_) => null);
+        expect(failure, isA<ServerFailure>());
+        expect(failure?.message, 'Disk full');
+      },
+    );
 
     test('successful upload returns the job id', () async {
       final repository = MediaRepositoryImpl(_StubUploadDataSource(42));
@@ -307,18 +303,20 @@ void main() {
       expect(status?.media, isNull);
     });
 
-    test('uploadCover also surfaces cancellation as UploadCancelledFailure',
-        () async {
-      final repository = MediaRepositoryImpl(
-        _StubUploadDataSource(const UploadCancelledException()),
-      );
+    test(
+      'uploadCover also surfaces cancellation as UploadCancelledFailure',
+      () async {
+        final repository = MediaRepositoryImpl(
+          _StubUploadDataSource(const UploadCancelledException()),
+        );
 
-      final result = await repository.uploadCover(5, '/tmp/cover.jpg');
+        final result = await repository.uploadCover(5, '/tmp/cover.jpg');
 
-      expect(result.isLeft(), isTrue);
-      final failure = result.fold((l) => l, (_) => null);
-      expect(failure, isA<UploadCancelledFailure>());
-    });
+        expect(result.isLeft(), isTrue);
+        final failure = result.fold((l) => l, (_) => null);
+        expect(failure, isA<UploadCancelledFailure>());
+      },
+    );
   });
 
   group('MediaRepositoryImpl.updateMetadata mapping', () {
@@ -328,32 +326,24 @@ void main() {
 
       await repository.updateMetadata(
         5,
-        const MetadataEdit(
-          title: 'New Title',
-          artists: ['A', 'B'],
-          year: 2020,
-        ),
+        const MetadataEdit(title: 'New Title', artists: ['A', 'B'], year: 2020),
       );
 
       expect(datasource.lastMetadataId, 5);
-      expect(
-        datasource.lastMetadata,
-        {
-          'title': 'New Title',
-          'artists': ['A', 'B'],
-          'year': 2020,
-        },
-      );
+      expect(datasource.lastMetadata, {
+        'title': 'New Title',
+        'artists': ['A', 'B'],
+        'year': 2020,
+      });
     });
   });
 }
 
 class _RecordingDataSource extends MediaRemoteDataSource {
-  _RecordingDataSource()
-      : super(
-          MediaApiClient.create(baseUrl: 'http://localhost:8080/api')
-              .apiClient,
-        );
+  new()
+    : super(
+        MediaApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
+      );
 
   int? lastMetadataId;
   Map<String, dynamic>? lastMetadata;

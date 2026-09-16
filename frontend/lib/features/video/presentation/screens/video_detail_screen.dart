@@ -16,17 +16,15 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class VideoDetailScreen extends ConsumerStatefulWidget {
-  const VideoDetailScreen({required this.mediaId, super.key});
+  const new({required this.mediaId, super.key});
 
   final int mediaId;
 
   @override
-  ConsumerState<VideoDetailScreen> createState() =>
-      _VideoDetailScreenState();
+  ConsumerState<VideoDetailScreen> createState() => _VideoDetailScreenState();
 }
 
-class _VideoDetailScreenState
-    extends ConsumerState<VideoDetailScreen> {
+class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
   bool _isFullscreen = false;
   bool _isUploadingCover = false;
   bool _coverUploadCancelled = false;
@@ -36,27 +34,19 @@ class _VideoDetailScreenState
   }
 
   Future<void> _toggleFavorite() async {
-    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-          loaded: (m) => m,
-          orElse: () => null,
-        );
+    final media = ref
+        .read(mediaDetailProvider(widget.mediaId))
+        .maybeWhen(loaded: (m) => m, orElse: () => null);
     if (media == null) return;
-    await ref
-        .read(favoriteToggleProvider(media.id).notifier)
-        .toggle();
+    await ref.read(favoriteToggleProvider(media.id).notifier).toggle();
   }
 
   Future<void> _addToCollection() async {
-    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-          loaded: (m) => m,
-          orElse: () => null,
-        );
+    final media = ref
+        .read(mediaDetailProvider(widget.mediaId))
+        .maybeWhen(loaded: (m) => m, orElse: () => null);
     final type = media?.type.value ?? 'video';
-    await showAddToCollectionDialog(
-      context,
-      widget.mediaId,
-      mediaType: type,
-    );
+    await showAddToCollectionDialog(context, widget.mediaId, mediaType: type);
   }
 
   Future<void> _changeCover() async {
@@ -89,10 +79,9 @@ class _VideoDetailScreenState
   }
 
   Future<void> _download() async {
-    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-          loaded: (m) => m,
-          orElse: () => null,
-        );
+    final media = ref
+        .read(mediaDetailProvider(widget.mediaId))
+        .maybeWhen(loaded: (m) => m, orElse: () => null);
     if (media == null) return;
 
     final downloadState = ref.read(downloadNotifierProvider(widget.mediaId));
@@ -115,9 +104,7 @@ class _VideoDetailScreenState
       if (newState is DownloadError) {
         final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l.errorLabel}: ${newState.message}'),
-          ),
+          SnackBar(content: Text('${l.errorLabel}: ${newState.message}')),
         );
       }
     }
@@ -133,15 +120,12 @@ class _VideoDetailScreenState
   }
 
   Future<void> _play() async {
-    final media = ref.read(mediaDetailProvider(widget.mediaId)).maybeWhen(
-          loaded: (m) => m,
-          orElse: () => null,
-        );
+    final media = ref
+        .read(mediaDetailProvider(widget.mediaId))
+        .maybeWhen(loaded: (m) => m, orElse: () => null);
     if (media == null) return;
     ref.read(playQueueProvider.notifier).setQueue([media]);
-    await ref
-        .read(playbackCoordinatorProvider.notifier)
-        .play(media);
+    await ref.read(playbackCoordinatorProvider.notifier).play(media);
   }
 
   @override
@@ -150,9 +134,8 @@ class _VideoDetailScreenState
     final state = ref.watch(mediaDetailProvider(widget.mediaId));
 
     return state.maybeWhen(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (message) => Scaffold(
         appBar: AppBar(),
         body: Center(
@@ -172,9 +155,8 @@ class _VideoDetailScreenState
         ),
       ),
       loaded: (media) => _buildLoaded(l, media),
-      orElse: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      orElse: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
     );
   }
 
@@ -219,19 +201,13 @@ class _VideoDetailScreenState
                     ),
                   )
                 : const Icon(Icons.image),
-            tooltip: _isUploadingCover
-                ? l.uploadingCover
-                : l.changeCover,
+            tooltip: _isUploadingCover ? l.uploadingCover : l.changeCover,
             onPressed: _changeCover,
           ),
           IconButton(
             color: Colors.white,
             icon: const Icon(Icons.edit),
-            onPressed: () => showEditMetadataDialog(
-              context,
-              ref,
-              media,
-            ),
+            onPressed: () => showEditMetadataDialog(context, ref, media),
             tooltip: l.edit,
           ),
           IconButton(
@@ -246,7 +222,6 @@ class _VideoDetailScreenState
         children: [
           VideoPlayerPanel(
             media: media,
-            isFullscreen: false,
             onToggleFullscreen: () => _setFullscreen(true),
           ),
           Expanded(
@@ -259,16 +234,11 @@ class _VideoDetailScreenState
                 onAddToCollection: _addToCollection,
                 onDownload: _download,
                 onChangeCover: _changeCover,
-                onEditMetadata: () => showEditMetadataDialog(
-                  context,
-                  ref,
-                  media,
-                ),
+                onEditMetadata: () =>
+                    showEditMetadataDialog(context, ref, media),
                 onDelete: _delete,
                 onAddToQueue: () async {
-                  ref
-                      .read(playQueueProvider.notifier)
-                      .enqueue(media);
+                  ref.read(playQueueProvider.notifier).enqueue(media);
                 },
               ),
             ),

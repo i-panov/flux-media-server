@@ -112,10 +112,7 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
       newIndex = state.currentIndex.clamp(0, items.length - 1);
     }
 
-    state = PlayQueueState(
-      items: items,
-      currentIndex: newIndex,
-    );
+    state = PlayQueueState(items: items, currentIndex: newIndex);
 
     // If we removed the currently playing item, stop playback.
     // The queue is now empty — coordinator should stop playback.
@@ -125,9 +122,7 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
     // If we removed the currently playing track and there are more items,
     // auto-advance to the new currentIndex (which is the next track).
     else if (wasPlaying && newIndex >= 0 && newIndex < items.length) {
-      unawaited(
-        _coordinator.play(items[newIndex]).catchError((_) {}),
-      );
+      unawaited(_coordinator.play(items[newIndex]).catchError((_) {}));
     }
   }
 
@@ -140,8 +135,8 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
   /// Returns the current media item, or null if queue is empty.
   Media? get current =>
       state.currentIndex >= 0 && state.currentIndex < state.items.length
-          ? state.items[state.currentIndex]
-          : null;
+      ? state.items[state.currentIndex]
+      : null;
 
   /// Returns upcoming items after the current one.
   List<Media> get upcoming => state.currentIndex + 1 < state.items.length
@@ -151,10 +146,7 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
 
 /// State of the play queue.
 class PlayQueueState {
-  const PlayQueueState({
-    this.items = const [],
-    this.currentIndex = -1,
-  });
+  const new({this.items = const [], this.currentIndex = -1});
 
   final List<Media> items;
   final int currentIndex;
@@ -164,10 +156,7 @@ class PlayQueueState {
   bool get hasNext => currentIndex + 1 < items.length;
   bool get hasPrevious => currentIndex > 0;
 
-  PlayQueueState copyWith({
-    List<Media>? items,
-    int? currentIndex,
-  }) {
+  PlayQueueState copyWith({List<Media>? items, int? currentIndex}) {
     return PlayQueueState(
       items: items ?? this.items,
       currentIndex: currentIndex ?? this.currentIndex,

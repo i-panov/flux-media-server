@@ -1,6 +1,6 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// ignore_for_file: type=lint
+// coverage:ignore-file
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'app_settings.dart';
@@ -9,185 +9,265 @@ part of 'app_settings.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
 /// @nodoc
 mixin _$AppSettings {
-  String? get serverUrl => throw _privateConstructorUsedError;
-  String? get authToken => throw _privateConstructorUsedError;
-  String? get refreshToken => throw _privateConstructorUsedError;
-  String get locale => throw _privateConstructorUsedError;
 
-  @JsonKey(ignore: true)
-  $AppSettingsCopyWith<AppSettings> get copyWith =>
-      throw _privateConstructorUsedError;
+ String? get serverUrl; String? get authToken; String? get refreshToken; String get locale;
+/// Create a copy of AppSettings
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$AppSettingsCopyWith<AppSettings> get copyWith => _$AppSettingsCopyWithImpl<AppSettings>(this as AppSettings, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  final _this = this as AppSettings;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppSettings&&(identical(other.serverUrl, _this.serverUrl) || other.serverUrl == _this.serverUrl)&&(identical(other.authToken, _this.authToken) || other.authToken == _this.authToken)&&(identical(other.refreshToken, _this.refreshToken) || other.refreshToken == _this.refreshToken)&&(identical(other.locale, _this.locale) || other.locale == _this.locale));
+}
+
+
+@override
+int get hashCode {
+  final _this = this as AppSettings;
+  return Object.hash(runtimeType,_this.serverUrl,_this.authToken,_this.refreshToken,_this.locale);
+}
+
+
+
 }
 
 /// @nodoc
-abstract class $AppSettingsCopyWith<$Res> {
-  factory $AppSettingsCopyWith(
-          AppSettings value, $Res Function(AppSettings) then) =
-      _$AppSettingsCopyWithImpl<$Res, AppSettings>;
-  @useResult
-  $Res call(
-      {String? serverUrl,
-      String? authToken,
-      String? refreshToken,
-      String locale});
-}
+abstract mixin class $AppSettingsCopyWith<$Res>  {
+  factory $AppSettingsCopyWith(AppSettings value, $Res Function(AppSettings) _then) = _$AppSettingsCopyWithImpl;
+@useResult
+$Res call({
+ String? serverUrl, String? authToken, String? refreshToken, String locale
+});
 
+
+
+
+}
 /// @nodoc
-class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
+class _$AppSettingsCopyWithImpl<$Res>
     implements $AppSettingsCopyWith<$Res> {
-  _$AppSettingsCopyWithImpl(this._value, this._then);
+  _$AppSettingsCopyWithImpl(this._self, this._then);
 
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
+  final AppSettings _self;
+  final $Res Function(AppSettings) _then;
 
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? serverUrl = freezed,
-    Object? authToken = freezed,
-    Object? refreshToken = freezed,
-    Object? locale = null,
-  }) {
-    return _then(_value.copyWith(
-      serverUrl: freezed == serverUrl
-          ? _value.serverUrl
-          : serverUrl // ignore: cast_nullable_to_non_nullable
-              as String?,
-      authToken: freezed == authToken
-          ? _value.authToken
-          : authToken // ignore: cast_nullable_to_non_nullable
-              as String?,
-      refreshToken: freezed == refreshToken
-          ? _value.refreshToken
-          : refreshToken // ignore: cast_nullable_to_non_nullable
-              as String?,
-      locale: null == locale
-          ? _value.locale
-          : locale // ignore: cast_nullable_to_non_nullable
-              as String,
-    ) as $Val);
-  }
+/// Create a copy of AppSettings
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? serverUrl = freezed,Object? authToken = freezed,Object? refreshToken = freezed,Object? locale = null,}) {
+  return _then(AppSettings(
+serverUrl: freezed == serverUrl ? _self.serverUrl : serverUrl // ignore: cast_nullable_to_non_nullable
+as String?,authToken: freezed == authToken ? _self.authToken : authToken // ignore: cast_nullable_to_non_nullable
+as String?,refreshToken: freezed == refreshToken ? _self.refreshToken : refreshToken // ignore: cast_nullable_to_non_nullable
+as String?,locale: null == locale ? _self.locale : locale // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [AppSettings].
+extension AppSettingsPatterns on AppSettings {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _AppSettings value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _AppSettings() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _AppSettings value)  $default,){
+final _that = this;
+switch (_that) {
+case _AppSettings():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _AppSettings value)?  $default,){
+final _that = this;
+switch (_that) {
+case _AppSettings() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _AppSettings() when $default != null:
+return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale)  $default,) {final _that = this;
+switch (_that) {
+case _AppSettings():
+return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale)?  $default,) {final _that = this;
+switch (_that) {
+case _AppSettings() when $default != null:
+return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale);case _:
+  return null;
+
+}
+}
+
 }
 
 /// @nodoc
-abstract class _$$AppSettingsImplCopyWith<$Res>
-    implements $AppSettingsCopyWith<$Res> {
-  factory _$$AppSettingsImplCopyWith(
-          _$AppSettingsImpl value, $Res Function(_$AppSettingsImpl) then) =
-      __$$AppSettingsImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call(
-      {String? serverUrl,
-      String? authToken,
-      String? refreshToken,
-      String locale});
+
+
+class _AppSettings implements AppSettings {
+  const _AppSettings({this.serverUrl, this.authToken, this.refreshToken, this.locale = 'en'});
+  
+
+@override final  String? serverUrl;
+@override final  String? authToken;
+@override final  String? refreshToken;
+@override@JsonKey() final  String locale;
+
+/// Create a copy of AppSettings
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$AppSettingsCopyWith<_AppSettings> get copyWith => __$AppSettingsCopyWithImpl<_AppSettings>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppSettings&&(identical(other.serverUrl, serverUrl) || other.serverUrl == serverUrl)&&(identical(other.authToken, authToken) || other.authToken == authToken)&&(identical(other.refreshToken, refreshToken) || other.refreshToken == refreshToken)&&(identical(other.locale, locale) || other.locale == locale));
+}
+
+
+@override
+int get hashCode {
+    return Object.hash(runtimeType,serverUrl,authToken,refreshToken,locale);
+}
+
+
+
 }
 
 /// @nodoc
-class __$$AppSettingsImplCopyWithImpl<$Res>
-    extends _$AppSettingsCopyWithImpl<$Res, _$AppSettingsImpl>
-    implements _$$AppSettingsImplCopyWith<$Res> {
-  __$$AppSettingsImplCopyWithImpl(
-      _$AppSettingsImpl _value, $Res Function(_$AppSettingsImpl) _then)
-      : super(_value, _then);
+abstract mixin class _$AppSettingsCopyWith<$Res> implements $AppSettingsCopyWith<$Res> {
+  factory _$AppSettingsCopyWith(_AppSettings value, $Res Function(_AppSettings) _then) = __$AppSettingsCopyWithImpl;
+@override @useResult
+$Res call({
+ String? serverUrl, String? authToken, String? refreshToken, String locale
+});
 
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? serverUrl = freezed,
-    Object? authToken = freezed,
-    Object? refreshToken = freezed,
-    Object? locale = null,
-  }) {
-    return _then(_$AppSettingsImpl(
-      serverUrl: freezed == serverUrl
-          ? _value.serverUrl
-          : serverUrl // ignore: cast_nullable_to_non_nullable
-              as String?,
-      authToken: freezed == authToken
-          ? _value.authToken
-          : authToken // ignore: cast_nullable_to_non_nullable
-              as String?,
-      refreshToken: freezed == refreshToken
-          ? _value.refreshToken
-          : refreshToken // ignore: cast_nullable_to_non_nullable
-              as String?,
-      locale: null == locale
-          ? _value.locale
-          : locale // ignore: cast_nullable_to_non_nullable
-              as String,
-    ));
-  }
+
+
+
 }
-
 /// @nodoc
+class __$AppSettingsCopyWithImpl<$Res>
+    implements _$AppSettingsCopyWith<$Res> {
+  __$AppSettingsCopyWithImpl(this._self, this._then);
 
-class _$AppSettingsImpl implements _AppSettings {
-  const _$AppSettingsImpl(
-      {this.serverUrl, this.authToken, this.refreshToken, this.locale = 'en'});
+  final _AppSettings _self;
+  final $Res Function(_AppSettings) _then;
 
-  @override
-  final String? serverUrl;
-  @override
-  final String? authToken;
-  @override
-  final String? refreshToken;
-  @override
-  @JsonKey()
-  final String locale;
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$AppSettingsImpl &&
-            (identical(other.serverUrl, serverUrl) ||
-                other.serverUrl == serverUrl) &&
-            (identical(other.authToken, authToken) ||
-                other.authToken == authToken) &&
-            (identical(other.refreshToken, refreshToken) ||
-                other.refreshToken == refreshToken) &&
-            (identical(other.locale, locale) || other.locale == locale));
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(runtimeType, serverUrl, authToken, refreshToken, locale);
-
-  @JsonKey(ignore: true)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$AppSettingsImplCopyWith<_$AppSettingsImpl> get copyWith =>
-      __$$AppSettingsImplCopyWithImpl<_$AppSettingsImpl>(this, _$identity);
+/// Create a copy of AppSettings
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? serverUrl = freezed,Object? authToken = freezed,Object? refreshToken = freezed,Object? locale = null,}) {
+  return _then(_AppSettings(
+serverUrl: freezed == serverUrl ? _self.serverUrl : serverUrl // ignore: cast_nullable_to_non_nullable
+as String?,authToken: freezed == authToken ? _self.authToken : authToken // ignore: cast_nullable_to_non_nullable
+as String?,refreshToken: freezed == refreshToken ? _self.refreshToken : refreshToken // ignore: cast_nullable_to_non_nullable
+as String?,locale: null == locale ? _self.locale : locale // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
 }
 
-abstract class _AppSettings implements AppSettings {
-  const factory _AppSettings(
-      {final String? serverUrl,
-      final String? authToken,
-      final String? refreshToken,
-      final String locale}) = _$AppSettingsImpl;
 
-  @override
-  String? get serverUrl;
-  @override
-  String? get authToken;
-  @override
-  String? get refreshToken;
-  @override
-  String get locale;
-  @override
-  @JsonKey(ignore: true)
-  _$$AppSettingsImplCopyWith<_$AppSettingsImpl> get copyWith =>
-      throw _privateConstructorUsedError;
 }
+
+// dart format on

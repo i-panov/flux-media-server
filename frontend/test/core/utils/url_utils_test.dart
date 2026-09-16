@@ -74,10 +74,7 @@ void main() {
         normalizeServerUrl('http://user:pass@host:8080'),
         'http://host:8080/api',
       );
-      expect(
-        normalizeServerUrl('https://user@host/api'),
-        'https://host/api',
-      );
+      expect(normalizeServerUrl('https://user@host/api'), 'https://host/api');
     });
   });
 }

@@ -44,8 +44,11 @@ void main() {
             'Default message',
           ),
           throwsA(
-            isA<AuthException>()
-                .having((e) => e.message, 'message', 'Invalid or expired code'),
+            isA<AuthException>().having(
+              (e) => e.message,
+              'message',
+              'Invalid or expired code',
+            ),
           ),
         );
       });
@@ -55,10 +58,10 @@ void main() {
           () => checkResponse(response(401, body: {'error': 42}), 'Default'),
           throwsA(
             isA<AuthException>().having(
-            (e) => e.message,
-            'message',
-            'Session expired',
-          ),
+              (e) => e.message,
+              'message',
+              'Session expired',
+            ),
           ),
         );
       });
@@ -70,8 +73,7 @@ void main() {
             'Default message',
           ),
           throwsA(
-            isA<ServerException>()
-                .having((e) => e.message, 'message', 'Boom'),
+            isA<ServerException>().having((e) => e.message, 'message', 'Boom'),
           ),
         );
       });
@@ -83,8 +85,11 @@ void main() {
             'Default message',
           ),
           throwsA(
-            isA<ServerException>()
-                .having((e) => e.message, 'message', 'Default message'),
+            isA<ServerException>().having(
+              (e) => e.message,
+              'message',
+              'Default message',
+            ),
           ),
         );
       });
@@ -96,8 +101,11 @@ void main() {
             'Default message',
           ),
           throwsA(
-            isA<ServerException>()
-                .having((e) => e.message, 'message', 'Default message'),
+            isA<ServerException>().having(
+              (e) => e.message,
+              'message',
+              'Default message',
+            ),
           ),
         );
       });

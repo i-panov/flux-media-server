@@ -3,12 +3,12 @@ import 'package:flux_media_server/features/audio/presentation/utils/download_bat
 import 'package:flux_media_server/shared/models/media.dart';
 
 Media _fakeMedia(int id) => Media(
-      id: id,
-      title: 'Track $id',
-      year: 2024,
-      type: MediaType.audio,
-      fileSize: 1024,
-    );
+  id: id,
+  title: 'Track $id',
+  year: 2024,
+  type: MediaType.audio,
+  fileSize: 1024,
+);
 
 Future<bool> Function(int mediaId) _isCachedFor(int cachedId) {
   return (id) async => id == cachedId;
@@ -19,19 +19,15 @@ void main() {
     test('исключает уже скачанные треки', () async {
       final tracks = [_fakeMedia(1), _fakeMedia(2), _fakeMedia(3)];
 
-      final pending = await filterUncachedTracks(
-        tracks,
-        _isCachedFor(2),
-      );
+      final pending = await filterUncachedTracks(tracks, _isCachedFor(2));
 
       expect(pending.map((m) => m.id), [1, 3]);
     });
 
     test('все скачаны — пустой результат', () async {
-      final pending = await filterUncachedTracks(
-        [_fakeMedia(1)],
-        (_) async => true,
-      );
+      final pending = await filterUncachedTracks([
+        _fakeMedia(1),
+      ], (_) async => true);
 
       expect(pending, isEmpty);
     });
@@ -65,23 +61,25 @@ void main() {
       expect(result.failed, 1);
     });
 
-    test('CRITICAL #20: исключение в первом треке не блокирует остальные',
-        () async {
-      final called = <int>[];
-      final result = await downloadTracksBatch(
-        pending: [_fakeMedia(1), _fakeMedia(2), _fakeMedia(3)],
-        download: (track) async {
-          called.add(track.id);
-          if (track.id == 1) throw Exception('boom');
-        },
-        isDownloaded: (id) => id != 1,
-        isFailed: (_) => false,
-      );
+    test(
+      'CRITICAL #20: исключение в первом треке не блокирует остальные',
+      () async {
+        final called = <int>[];
+        final result = await downloadTracksBatch(
+          pending: [_fakeMedia(1), _fakeMedia(2), _fakeMedia(3)],
+          download: (track) async {
+            called.add(track.id);
+            if (track.id == 1) throw Exception('boom');
+          },
+          isDownloaded: (id) => id != 1,
+          isFailed: (_) => false,
+        );
 
-      expect(called.toSet(), {1, 2, 3});
-      expect(result.downloaded, 2);
-      expect(result.failed, 1);
-    });
+        expect(called.toSet(), {1, 2, 3});
+        expect(result.downloaded, 2);
+        expect(result.failed, 1);
+      },
+    );
 
     test('состояние DownloadError учитывается как failed', () async {
       final result = await downloadTracksBatch(
@@ -120,19 +118,21 @@ void main() {
       expect(called, isEmpty);
     });
 
-    test('onTrackDone вызывается после каждого трека (живой прогресс)',
-        () async {
-      final progress = <(int, int)>[];
-      await downloadTracksBatch(
-        pending: [_fakeMedia(1), _fakeMedia(2)],
-        download: (_) async {},
-        isDownloaded: (_) => true,
-        isFailed: (_) => false,
-        onTrackDone: (done, failed) => progress.add((done, failed)),
-      );
+    test(
+      'onTrackDone вызывается после каждого трека (живой прогресс)',
+      () async {
+        final progress = <(int, int)>[];
+        await downloadTracksBatch(
+          pending: [_fakeMedia(1), _fakeMedia(2)],
+          download: (_) async {},
+          isDownloaded: (_) => true,
+          isFailed: (_) => false,
+          onTrackDone: (done, failed) => progress.add((done, failed)),
+        );
 
-      expect(progress, [(1, 0), (2, 0)]);
-    });
+        expect(progress, [(1, 0), (2, 0)]);
+      },
+    );
 
     test('конкурентность ограничена по умолчанию (не больше 4)', () async {
       var active = 0;

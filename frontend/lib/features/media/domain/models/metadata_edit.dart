@@ -3,7 +3,7 @@
 /// Заменяет «сырой» `Map<String, dynamic>`, который раньше протекал
 /// через domain-слой. Маппинг в JSON выполняется в data-слое.
 class MetadataEdit {
-  const MetadataEdit({
+  const new({
     required this.title,
     required this.artists,
     this.album,

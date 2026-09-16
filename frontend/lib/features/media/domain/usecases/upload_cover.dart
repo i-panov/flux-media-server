@@ -4,11 +4,7 @@ import 'package:flux_media_server/features/media/domain/repositories/media_repos
 import 'package:fpdart/fpdart.dart';
 
 class UploadCoverParams {
-  const UploadCoverParams({
-    required this.mediaId,
-    required this.filePath,
-    this.isCancelled,
-  });
+  const new({required this.mediaId, required this.filePath, this.isCancelled});
 
   final int mediaId;
   final String filePath;
@@ -18,7 +14,7 @@ class UploadCoverParams {
 }
 
 class UploadCover extends UseCase<Either<Failure, void>, UploadCoverParams> {
-  UploadCover(this.repository);
+  new(this.repository);
 
   final MediaRepository repository;
 

@@ -15,8 +15,8 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 final collectionsRemoteDataSourceProvider =
     Provider<CollectionsRemoteDataSource>((ref) {
-  return CollectionsRemoteDataSource(ref.watch(libraryApiClientProvider));
-});
+      return CollectionsRemoteDataSource(ref.watch(libraryApiClientProvider));
+    });
 
 final collectionsRepositoryProvider = Provider<CollectionsRepository>((ref) {
   return CollectionsRepositoryImpl(
@@ -49,26 +49,31 @@ final getCollectionItemsFullProvider = Provider<GetCollectionItemsFull>((ref) {
 });
 
 /// Fetches all user collections.
-final collectionsProvider =
+final FutureProvider<List<Collection>> collectionsProvider =
     FutureProvider.autoDispose<List<Collection>>((ref) async {
-  final getCollections = ref.watch(getCollectionsProvider);
-  final result = await getCollections(const NoParams());
-  return result.fold(
-    // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
-    // ignore: only_throw_errors
-    (failure) => throw failure,
-    (collections) => collections,
-  );
-});
+      final getCollections = ref.watch(getCollectionsProvider);
+      final result = await getCollections(const NoParams());
+      return result.fold(
+        // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
+        // ignore: only_throw_errors
+        (failure) => throw failure,
+        (collections) => collections,
+      );
+    });
 
 /// Полные элементы коллекции с локальными мутациями.
 ///
 /// [addLocal]/[removeLocal] обновляют список без refetch после
 /// добавления/удаления элемента (оптимистичные апдейты).
-class CollectionItemsNotifier
-    extends AutoDisposeFamilyAsyncNotifier<List<Media>, int> {
+class CollectionItemsNotifier extends AsyncNotifier<List<Media>> {
+  // Riverpod 3: family-аргумент приходит через конструктор (create-функция
+  // провайдера — tear-off конструктора с параметром), build() без аргументов.
+  new(this.collectionId);
+
+  final int collectionId;
+
   @override
-  Future<List<Media>> build(int collectionId) async {
+  Future<List<Media>> build() async {
     final getItemsFull = ref.watch(getCollectionItemsFullProvider);
     final result = await getItemsFull(collectionId);
     return result.fold(
@@ -81,7 +86,7 @@ class CollectionItemsNotifier
 
   /// Добавляет [media] в кеш без сетевого запроса.
   void addLocal(Media media) {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     if (current.any((m) => m.id == media.id)) return;
     state = AsyncValue.data([...current, media]);
@@ -89,11 +94,9 @@ class CollectionItemsNotifier
 
   /// Удаляет медиа с [mediaId] из кеша без сетевого запроса.
   void removeLocal(int mediaId) {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
-    state = AsyncValue.data(
-      current.where((m) => m.id != mediaId).toList(),
-    );
+    state = AsyncValue.data(current.where((m) => m.id != mediaId).toList());
   }
 }
 
@@ -101,5 +104,5 @@ class CollectionItemsNotifier
 /// Media objects).
 final collectionItemsFullProvider = AsyncNotifierProvider.autoDispose
     .family<CollectionItemsNotifier, List<Media>, int>(
-  CollectionItemsNotifier.new,
-);
+      CollectionItemsNotifier.new,
+    );

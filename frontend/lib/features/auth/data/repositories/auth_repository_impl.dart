@@ -6,7 +6,7 @@ import 'package:flux_media_server/shared/models/user.dart';
 import 'package:fpdart/fpdart.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
-  AuthRepositoryImpl(this.remoteDataSource);
+  new(this.remoteDataSource);
 
   final AuthRemoteDataSource remoteDataSource;
 
@@ -17,8 +17,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, Unit>> requestCode(String email) async {
-    final result =
-        await safeRepositoryCall(() => remoteDataSource.requestCode(email));
+    final result = await safeRepositoryCall(
+      () => remoteDataSource.requestCode(email),
+    );
     return result.fold(
       (failure) {
         // Не оставляем debug-код от предыдущего успешного запроса.
@@ -34,8 +35,8 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, ({String token, String refreshToken, User user})>>
-      verifyCode(String email, String code) =>
-          safeRepositoryCall(() => remoteDataSource.verifyCode(email, code));
+  verifyCode(String email, String code) =>
+      safeRepositoryCall(() => remoteDataSource.verifyCode(email, code));
 
   @override
   Future<Either<Failure, User>> getCurrentUser() =>
@@ -44,6 +45,5 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
     String refreshToken,
-  ) =>
-      safeRepositoryCall(() => remoteDataSource.refreshTokens(refreshToken));
+  ) => safeRepositoryCall(() => remoteDataSource.refreshTokens(refreshToken));
 }

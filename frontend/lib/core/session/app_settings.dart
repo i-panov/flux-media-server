@@ -3,8 +3,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'app_settings.freezed.dart';
 
 @freezed
-class AppSettings with _$AppSettings {
-  const factory AppSettings({
+sealed class AppSettings with _$AppSettings {
+  const factory({
     String? serverUrl,
     String? authToken,
     String? refreshToken,

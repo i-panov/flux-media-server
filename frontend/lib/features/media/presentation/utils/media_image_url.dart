@@ -4,9 +4,9 @@ enum MediaImageKind {
   cover;
 
   String get path => switch (this) {
-        MediaImageKind.thumb => 'thumb',
-        MediaImageKind.cover => 'cover',
-      };
+    MediaImageKind.thumb => 'thumb',
+    MediaImageKind.cover => 'cover',
+  };
 }
 
 /// Строит URL картинки медиа (`{baseUrl}/media/{id}/thumb|cover`) с

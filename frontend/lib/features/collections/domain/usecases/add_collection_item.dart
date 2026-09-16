@@ -5,17 +5,14 @@ import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:fpdart/fpdart.dart';
 
 class AddCollectionItemParams {
-  const AddCollectionItemParams({
-    required this.collectionId,
-    required this.mediaId,
-  });
+  const new({required this.collectionId, required this.mediaId});
   final int collectionId;
   final int mediaId;
 }
 
 class AddCollectionItem
     extends UseCase<Either<Failure, CollectionItem>, AddCollectionItemParams> {
-  AddCollectionItem(this.repository);
+  new(this.repository);
   final CollectionsRepository repository;
 
   @override

@@ -8,7 +8,7 @@ import 'package:flux_media_server/shared/models/user.dart';
 class AuthRemoteDataSource {
   /// Creates an [AuthRemoteDataSource] with the given [apiClient]
   /// and [refresher].
-  AuthRemoteDataSource(this.apiClient, {required this.refresher});
+  new(this.apiClient, {required this.refresher});
 
   /// The API client used for HTTP requests.
   final AuthApiClient apiClient;
@@ -30,10 +30,7 @@ class AuthRemoteDataSource {
     String email,
     String code,
   ) async {
-    final response = await apiClient.verifyCode({
-      'email': email,
-      'code': code,
-    });
+    final response = await apiClient.verifyCode({'email': email, 'code': code});
     checkResponse(response, 'Failed to verify code');
     final body = response.body!;
     return (

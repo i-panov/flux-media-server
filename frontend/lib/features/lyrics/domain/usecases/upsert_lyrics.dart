@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:fpdart/fpdart.dart';
 
 class UpsertLyricsParams {
-  const UpsertLyricsParams({
+  const new({
     required this.mediaId,
     required this.lyricsText,
     required this.source,
@@ -21,7 +21,7 @@ class UpsertLyricsParams {
 
 class UpsertLyrics
     extends UseCase<Either<Failure, Lyrics>, UpsertLyricsParams> {
-  UpsertLyrics(this.repository);
+  new(this.repository);
   final LyricsRepository repository;
 
   @override

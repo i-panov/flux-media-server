@@ -9,7 +9,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 class MediaCard extends ConsumerWidget {
-  const MediaCard({
+  const new({
     required this.media,
     super.key,
     this.onTap,
@@ -44,19 +44,16 @@ class MediaCard extends ConsumerWidget {
     Widget imageWidget = AuthNetworkImage(
       imageUrl: imageUrl,
       fit: BoxFit.cover,
-      placeholder: (_, __) => const Center(
+      placeholder: (_, _) => const Center(
         child: SkeletonWidget(width: double.infinity, height: double.infinity),
       ),
-      errorWidget: (_, __, ___) => const Center(
-        child: Icon(Icons.broken_image, size: 48),
-      ),
+      errorWidget: (_, _, _) =>
+          const Center(child: Icon(Icons.broken_image, size: 48)),
     );
 
     // For files without cover, show programmatic placeholder for audio.
     if (!hasCover && media.type == MediaType.audio) {
-      imageWidget = const Center(
-        child: AudioPlaceholder(size: 120),
-      );
+      imageWidget = const Center(child: AudioPlaceholder(size: 120));
     }
 
     return RepaintBoundary(
@@ -69,9 +66,7 @@ class MediaCard extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: imageWidget,
-                  ),
+                  Expanded(child: imageWidget),
                   Padding(
                     padding: const EdgeInsets.all(8),
                     child: Column(
@@ -89,10 +84,8 @@ class MediaCard extends ConsumerWidget {
                             media.artists.map((a) => a.name).join(', '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.primary,
-                                    ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colorScheme.primary),
                           ),
                         ],
                         // 0 = «нет данных» на бэкенде — не показываем.
@@ -100,9 +93,7 @@ class MediaCard extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             '${media.year}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey),
                           ),
                         ],
@@ -130,9 +121,7 @@ class MediaCard extends ConsumerWidget {
                           width: 28,
                           height: 28,
                           child: Icon(
-                            isFavorite
-                                ? Icons.favorite
-                                : Icons.favorite_border,
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
                             size: 16,
                             color: isFavorite ? Colors.red : Colors.white,
                           ),

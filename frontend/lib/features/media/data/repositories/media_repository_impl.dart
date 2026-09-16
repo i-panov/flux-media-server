@@ -12,7 +12,7 @@ import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 
 class MediaRepositoryImpl implements MediaRepository {
-  MediaRepositoryImpl(this.remoteDataSource);
+  new(this.remoteDataSource);
 
   final MediaRemoteDataSource remoteDataSource;
 
@@ -23,18 +23,17 @@ class MediaRepositoryImpl implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-  }) =>
-      safeRepositoryCall(() async {
-        final result = await remoteDataSource.getMediaList(
-          type: type,
-          year: year,
-          q: q,
-          limit: limit,
-          offset: offset,
-        );
-        final mediaList = result.items.map(Media.fromJson).toList();
-        return (items: mediaList, total: result.total);
-      });
+  }) => safeRepositoryCall(() async {
+    final result = await remoteDataSource.getMediaList(
+      type: type,
+      year: year,
+      q: q,
+      limit: limit,
+      offset: offset,
+    );
+    final mediaList = result.items.map(Media.fromJson).toList();
+    return (items: mediaList, total: result.total);
+  });
 
   @override
   Future<Either<Failure, Media>> getMediaDetail(int id) =>
@@ -53,8 +52,8 @@ class MediaRepositoryImpl implements MediaRepository {
 
   @override
   Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
-      checkHash(String hash) =>
-          safeRepositoryCall(() => remoteDataSource.checkHash(hash));
+  checkHash(String hash) =>
+      safeRepositoryCall(() => remoteDataSource.checkHash(hash));
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
@@ -63,16 +62,17 @@ class MediaRepositoryImpl implements MediaRepository {
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
-  }) =>
-      _cancellableCall(
-        () => remoteDataSource.uploadFile(
+  }) => _cancellableCall(
+    () => remoteDataSource
+        .uploadFile(
           filePath: filePath,
           mediaType: mediaType,
           fileName: fileName,
           onProgress: onProgress,
           isCancelled: isCancelled,
-        ).then((jobId) => UploadResult(jobId: jobId)),
-      );
+        )
+        .then((jobId) => UploadResult(jobId: jobId)),
+  );
 
   @override
   Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) =>
@@ -105,10 +105,9 @@ class MediaRepositoryImpl implements MediaRepository {
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
     MetadataEdit edit,
-  ) =>
-      safeRepositoryCall(
-        () => remoteDataSource.updateMetadata(mediaId, _editToJson(edit)),
-      );
+  ) => safeRepositoryCall(
+    () => remoteDataSource.updateMetadata(mediaId, _editToJson(edit)),
+  );
 
   @override
   Future<Either<Failure, WatchProgress>> updateProgress(
@@ -116,35 +115,30 @@ class MediaRepositoryImpl implements MediaRepository {
     int? position,
     int? duration,
     bool? completed,
-  }) =>
-      safeRepositoryCall(
-        () => remoteDataSource.updateProgress(
-          mediaId,
-          position: position,
-          duration: duration,
-          completed: completed,
-        ),
-      );
+  }) => safeRepositoryCall(
+    () => remoteDataSource.updateProgress(
+      mediaId,
+      position: position,
+      duration: duration,
+      completed: completed,
+    ),
+  );
 
   @override
   Future<Either<Failure, void>> uploadCover(
     int mediaId,
     String filePath, {
     bool Function()? isCancelled,
-  }) =>
-      _cancellableCall(
-        () => remoteDataSource.uploadCover(
-          mediaId,
-          filePath,
-          isCancelled: isCancelled,
-        ),
-      );
+  }) => _cancellableCall(
+    () => remoteDataSource.uploadCover(
+      mediaId,
+      filePath,
+      isCancelled: isCancelled,
+    ),
+  );
 
   @override
-  Future<Either<Failure, Artist>> updateArtistName(
-    int artistId,
-    String name,
-  ) =>
+  Future<Either<Failure, Artist>> updateArtistName(int artistId, String name) =>
       safeRepositoryCall(() async {
         final json = await remoteDataSource.updateArtistName(artistId, name);
         return Artist.fromJson(json);
@@ -155,14 +149,13 @@ class MediaRepositoryImpl implements MediaRepository {
     int artistId,
     String filePath, {
     bool Function()? isCancelled,
-  }) =>
-      _cancellableCall(
-        () => remoteDataSource.uploadArtistCover(
-          artistId,
-          filePath,
-          isCancelled: isCancelled,
-        ),
-      );
+  }) => _cancellableCall(
+    () => remoteDataSource.uploadArtistCover(
+      artistId,
+      filePath,
+      isCancelled: isCancelled,
+    ),
+  );
 
   /// Обёртка над [safeRepositoryCall] для операций с отменой: общий маппинг
   /// уже превращает [UploadCancelledException] в [UploadCancelledFailure],
@@ -172,7 +165,6 @@ class MediaRepositoryImpl implements MediaRepository {
   ) async {
     try {
       return await safeRepositoryCall(call);
-      // ignore: avoid_catching_errors
     } on UploadCancelledException {
       return const Left(UploadCancelledFailure());
     }
@@ -180,11 +172,11 @@ class MediaRepositoryImpl implements MediaRepository {
 
   /// Маппинг типизированного редактирования в JSON — остаётся в data-слое.
   static Map<String, dynamic> _editToJson(MetadataEdit edit) => {
-        'title': edit.title,
-        'artists': edit.artists,
-        if (edit.album != null) 'album': edit.album,
-        if (edit.genre != null) 'genre': edit.genre,
-        if (edit.year != null) 'year': edit.year,
-        if (edit.description != null) 'description': edit.description,
-      };
+    'title': edit.title,
+    'artists': edit.artists,
+    if (edit.album != null) 'album': edit.album,
+    if (edit.genre != null) 'genre': edit.genre,
+    if (edit.year != null) 'year': edit.year,
+    if (edit.description != null) 'description': edit.description,
+  };
 }

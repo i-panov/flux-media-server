@@ -13,7 +13,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// (VideoDetailScreen) owns any stateful side effects (e.g. cover-upload
 /// spinner) and passes them through callbacks.
 class VideoDetailsPanel extends ConsumerWidget {
-  const VideoDetailsPanel({
+  const new({
     required this.media,
     this.onChangeCover,
     this.onEditMetadata,
@@ -40,7 +40,7 @@ class VideoDetailsPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context)!;
     final favoriteState = ref.watch(favoriteToggleProvider(media.id));
-    final isFavorite = favoriteState.valueOrNull;
+    final isFavorite = favoriteState.value;
     final downloadState = ref.watch(downloadNotifierProvider(media.id));
 
     final downloadProgress = switch (downloadState) {
@@ -68,11 +68,11 @@ class VideoDetailsPanel extends ConsumerWidget {
               fit: BoxFit.cover,
               height: 200,
               width: double.infinity,
-              placeholder: (_, __) => const SizedBox(
+              placeholder: (_, _) => const SizedBox(
                 height: 200,
                 child: Center(child: CircularProgressIndicator()),
               ),
-              errorWidget: (_, __, ___) => const SizedBox(
+              errorWidget: (_, _, _) => const SizedBox(
                 height: 200,
                 child: Center(child: Icon(Icons.broken_image, size: 64)),
               ),
@@ -81,9 +81,7 @@ class VideoDetailsPanel extends ConsumerWidget {
           ],
           Text(
             media.title,
-            style: Theme.of(context)
-                .textTheme
-                .headlineMedium
+            style: Theme.of(context).textTheme.headlineMedium
                 ?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 8),
@@ -95,27 +93,21 @@ class VideoDetailsPanel extends ConsumerWidget {
               ];
               return parts.join(' · ');
             }(),
-            style: Theme.of(context)
-                .textTheme
-                .bodyLarge
+            style: Theme.of(context).textTheme.bodyLarge
                 ?.copyWith(color: Colors.white70),
           ),
           if (media.artists.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               media.artists.map((a) => a.name).join(', '),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
+              style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: Colors.white),
             ),
           ],
           if (media.album != null && media.album!.isNotEmpty) ...[
             Text(
               media.album!,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
+              style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(color: Colors.white60),
             ),
           ],
@@ -145,9 +137,7 @@ class VideoDetailsPanel extends ConsumerWidget {
             Text(
               '${l.duration}: '
               '${Duration(seconds: media.duration!).formatted}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
+              style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(color: Colors.white60),
             ),
           ],
@@ -173,8 +163,8 @@ class VideoDetailsPanel extends ConsumerWidget {
                     onPressed: isFavorite == null
                         ? null
                         : onToggleFavorite == null
-                            ? null
-                            : () => onToggleFavorite?.call(),
+                        ? null
+                        : () => onToggleFavorite?.call(),
                     icon: Icon(
                       (isFavorite ?? false)
                           ? Icons.favorite
@@ -223,16 +213,15 @@ class VideoDetailsPanel extends ConsumerWidget {
                                 ? Theme.of(context).colorScheme.primary
                                 : null,
                           ),
-                    label: Text(
-                      switch (downloadState) {
-                        DownloadDownloading(:final progress) => progress > 0
+                    label: Text(switch (downloadState) {
+                      DownloadDownloading(:final progress) =>
+                        progress > 0
                             ? '${(progress * 100).toInt()}%'
                             : l.downloading,
-                        DownloadDownloaded() => l.downloaded,
-                        DownloadError() => l.errorLabel,
-                        _ => l.download,
-                      },
-                    ),
+                      DownloadDownloaded() => l.downloaded,
+                      DownloadError() => l.errorLabel,
+                      _ => l.download,
+                    }),
                   ),
                 ),
               ),

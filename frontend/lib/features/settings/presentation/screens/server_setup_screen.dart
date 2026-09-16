@@ -10,7 +10,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
 class ServerSetupScreen extends ConsumerStatefulWidget {
-  const ServerSetupScreen({super.key});
+  const new({super.key});
 
   @override
   ConsumerState<ServerSetupScreen> createState() => _ServerSetupScreenState();

@@ -1,13 +1,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-// ignore_for_file: invalid_annotation_target
-
 part 'artist.freezed.dart';
 part 'artist.g.dart';
 
 @freezed
-class Artist with _$Artist {
-  const factory Artist({
+sealed class Artist with _$Artist {
+  const factory({
     required int id,
     required String name,
     @Default(0) int position,
@@ -15,5 +13,5 @@ class Artist with _$Artist {
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
   }) = _Artist;
 
-  factory Artist.fromJson(Map<String, dynamic> json) => _$ArtistFromJson(json);
+  factory fromJson(Map<String, dynamic> json) => _$ArtistFromJson(json);
 }

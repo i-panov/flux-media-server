@@ -23,13 +23,8 @@ import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:media_kit/media_kit.dart' hide Media;
 
-Media _media(int id, MediaType type) => Media(
-      id: id,
-      title: 'Media $id',
-      year: 2024,
-      type: type,
-      fileSize: 1024,
-    );
+Media _media(int id, MediaType type) =>
+    Media(id: id, title: 'Media $id', year: 2024, type: type, fileSize: 1024);
 
 class _FakeAudioSource implements AudioPlaybackSource {
   final positionCtl = StreamController<Duration>.broadcast();
@@ -187,20 +182,19 @@ class _FakeMediaRepository implements MediaRepository {
     int? position,
     int? duration,
     bool? completed,
-  }) async =>
-      Right(
-        WatchProgress(
-          userId: 1,
-          mediaId: mediaId,
-          position: position ?? 0,
-          duration: duration ?? 0,
-          completed: completed ?? false,
-        ),
-      );
+  }) async => Right(
+    WatchProgress(
+      userId: 1,
+      mediaId: mediaId,
+      position: position ?? 0,
+      duration: duration ?? 0,
+      completed: completed ?? false,
+    ),
+  );
 
   @override
   Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
-      checkHash(String hash) => throw UnimplementedError();
+  checkHash(String hash) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, void>> deleteMedia(int id) =>
@@ -221,38 +215,33 @@ class _FakeMediaRepository implements MediaRepository {
     String? q,
     int? limit,
     int? offset,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
     MetadataEdit edit,
-  ) =>
-      throw UnimplementedError();
+  ) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, void>> uploadCover(
     int mediaId,
     String filePath, {
     bool Function()? isCancelled,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, Artist>> updateArtistName(
     int artistId,
     String name,
-  ) async =>
-      const Left(ServerFailure());
+  ) async => const Left(ServerFailure());
 
   @override
   Future<Either<Failure, void>> uploadArtistCover(
     int artistId,
     String filePath, {
     bool Function()? isCancelled,
-  }) async =>
-      const Left(ServerFailure());
+  }) async => const Left(ServerFailure());
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
@@ -261,8 +250,7 @@ class _FakeMediaRepository implements MediaRepository {
     required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId) =>
@@ -304,7 +292,7 @@ class _FakeSettingsRepository implements SettingsRepository {
 }
 
 class _FakeOfflineCache extends OfflineCacheService {
-  _FakeOfflineCache(super.ref, super.baseUrl);
+  new(super.ref, super.baseUrl);
 
   @override
   Future<String?> getLocalPath(int mediaId) async => null;
@@ -313,7 +301,7 @@ class _FakeOfflineCache extends OfflineCacheService {
 /// Считает пересоздания консьюмера, который слушает ровно тот же селектор,
 /// что и панель управления видеоплеера.
 class _BuildProbe extends ConsumerWidget {
-  const _BuildProbe({required this.onBuild});
+  const new({required this.onBuild});
   final void Function(PlayerView view) onBuild;
 
   @override
@@ -363,10 +351,12 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
-          home: _BuildProbe(onBuild: (view) {
-            builds++;
-            last = view;
-          },),
+          home: _BuildProbe(
+            onBuild: (view) {
+              builds++;
+              last = view;
+            },
+          ),
         ),
       ),
     );

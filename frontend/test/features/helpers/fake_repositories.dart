@@ -9,45 +9,40 @@ import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
-Favorite favorite({
-  int id = 1,
-  int? mediaId,
-  int? artistId,
-}) =>
-    Favorite(
-      id: id,
-      userId: 7,
-      createdAt: DateTime.utc(2024),
-      mediaId: mediaId,
-      artistId: artistId,
-    );
+Favorite favorite({int id = 1, int? mediaId, int? artistId}) => Favorite(
+  id: id,
+  userId: 7,
+  createdAt: DateTime.utc(2024),
+  mediaId: mediaId,
+  artistId: artistId,
+);
 
 Collection collection(int id, [String? name]) => Collection(
-      id: id,
-      userId: 7,
-      name: name ?? 'Collection $id',
-      type: MediaType.audio,
-      createdAt: DateTime.utc(2024),
-      updatedAt: DateTime.utc(2024),
-    );
+  id: id,
+  userId: 7,
+  name: name ?? 'Collection $id',
+  type: MediaType.audio,
+  createdAt: DateTime.utc(2024),
+  updatedAt: DateTime.utc(2024),
+);
 
 Media media(int id) => Media(
-      id: id,
-      title: 'Media $id',
-      year: 2024,
-      type: MediaType.audio,
-      fileSize: 100,
-    );
+  id: id,
+  title: 'Media $id',
+  year: 2024,
+  type: MediaType.audio,
+  fileSize: 100,
+);
 
 Lyrics fakeLyrics([int mediaId = 5]) => Lyrics(
-      id: 1,
-      mediaId: mediaId,
-      source: 'musixmatch',
-      createdAt: DateTime.utc(2024),
-      updatedAt: DateTime.utc(2024),
-      lyricsText: 'La la la',
-      translation: 'Ля-ля-ля',
-    );
+  id: 1,
+  mediaId: mediaId,
+  source: 'musixmatch',
+  createdAt: DateTime.utc(2024),
+  updatedAt: DateTime.utc(2024),
+  lyricsText: 'La la la',
+  translation: 'Ля-ля-ля',
+);
 
 class FakeFavoritesRepository implements FavoritesRepository {
   Future<Either<Failure, List<Favorite>>> Function()? onGetFavorites;
@@ -103,15 +98,13 @@ class FakeCollectionsRepository implements CollectionsRepository {
   Future<Either<Failure, Collection>> createCollection({
     required String name,
     required String type,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
+  }) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, Collection>> updateCollection(
     int id, {
     String? name,
-  }) async =>
-      const Left(ServerFailure(message: 'not used'));
+  }) async => const Left(ServerFailure(message: 'not used'));
 
   @override
   Future<Either<Failure, void>> deleteCollection(int id) async =>
@@ -152,7 +145,8 @@ class FakeLyricsRepository implements LyricsRepository {
     required String source,
     String? translation,
     String? syncData,
-  })? onUpsertLyrics;
+  })?
+  onUpsertLyrics;
 
   @override
   Future<Either<Failure, Lyrics?>> getLyrics(int mediaId) =>
@@ -165,14 +159,13 @@ class FakeLyricsRepository implements LyricsRepository {
     required String source,
     String? translation,
     String? syncData,
-  }) =>
-      onUpsertLyrics!(
-        mediaId,
-        lyricsText: lyricsText,
-        source: source,
-        translation: translation,
-        syncData: syncData,
-      );
+  }) => onUpsertLyrics!(
+    mediaId,
+    lyricsText: lyricsText,
+    source: source,
+    translation: translation,
+    syncData: syncData,
+  );
 }
 
 class FakeLyricsCacheRepository implements LyricsCacheRepository {

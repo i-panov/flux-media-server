@@ -5,7 +5,7 @@ import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:fpdart/fpdart.dart';
 
 class GetLyrics extends UseCase<Either<Failure, Lyrics?>, int> {
-  GetLyrics(this.repository);
+  new(this.repository);
   final LyricsRepository repository;
 
   @override

@@ -12,19 +12,19 @@ import 'package:fpdart/fpdart.dart';
 /// canned data or throw exceptions, allowing us to test the real
 /// AuthRepositoryImpl + safeRepositoryCall chain.
 class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
-  _FakeAuthRemoteDataSource()
-      : super(
-          AuthApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
-          refresher: AuthTokenRefresher(
-            performRefresh: (_) async => null,
-            onRefreshFailure: () async {},
-          ),
-        );
+  new()
+    : super(
+        AuthApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
+        refresher: AuthTokenRefresher(
+          performRefresh: (_) async => null,
+          onRefreshFailure: () async {},
+        ),
+      );
 
   // Canned responses / exceptions for each method.
   String? Function(String)? onRequestCode;
   ({String token, String refreshToken, User user}) Function(String, String)?
-      onVerifyCode;
+  onVerifyCode;
   User Function()? onGetCurrentUser;
   ({String token, String refreshToken}) Function(String)? onRefreshToken;
 
@@ -93,21 +93,18 @@ void main() {
     });
 
     test('returns Left(ServerFailure) on ServerException', () async {
-      datasource.onRequestCode =
-          (_) => throw const ServerException(message: 'Email not allowed');
+      datasource.onRequestCode = (_) =>
+          throw const ServerException(message: 'Email not allowed');
 
       final result = await repository.requestCode('test@example.com');
 
       expect(result, isA<Left<Failure, Unit>>());
-      expect(
-        result.fold((l) => l.message, (_) => ''),
-        'Email not allowed',
-      );
+      expect(result.fold((l) => l.message, (_) => ''), 'Email not allowed');
     });
 
     test('returns Left(AuthFailure) on AuthException', () async {
-      datasource.onRequestCode =
-          (_) => throw const AuthException(message: 'Session expired');
+      datasource.onRequestCode = (_) =>
+          throw const AuthException(message: 'Session expired');
 
       final result = await repository.requestCode('test@example.com');
 
@@ -119,25 +116,18 @@ void main() {
   group('verifyCode', () {
     test('returns Right(token, refreshToken, user) on success', () async {
       const user = User(id: 1, email: 'test@example.com');
-      datasource.onVerifyCode = (_, __) => (
-            token: 'jwt-123',
-            refreshToken: 'refresh-456',
-            user: user,
-          );
+      datasource.onVerifyCode = (_, _) =>
+          (token: 'jwt-123', refreshToken: 'refresh-456', user: user);
 
-      final result =
-          await repository.verifyCode('test@example.com', '123456');
+      final result = await repository.verifyCode('test@example.com', '123456');
 
       expect(
         result,
         isA<Right<Failure, ({String token, String refreshToken, User user})>>(),
       );
       final data = result.getOrElse(
-        (_) => (
-          token: '',
-          refreshToken: '',
-          user: const User(id: 0, email: ''),
-        ),
+        (_) =>
+            (token: '', refreshToken: '', user: const User(id: 0, email: '')),
       );
       expect(data.token, 'jwt-123');
       expect(data.refreshToken, 'refresh-456');
@@ -145,17 +135,14 @@ void main() {
     });
 
     test('returns Left(ServerFailure) on ServerException', () async {
-      datasource.onVerifyCode = (_, __) => throw const ServerException(
-            message: 'Invalid or expired code',
-          );
+      datasource.onVerifyCode = (_, _) =>
+          throw const ServerException(message: 'Invalid or expired code');
 
-      final result =
-          await repository.verifyCode('test@example.com', '000000');
+      final result = await repository.verifyCode('test@example.com', '000000');
 
       expect(
         result,
-        isA<Left<
-            Failure, ({String token, String refreshToken, User user})>>(),
+        isA<Left<Failure, ({String token, String refreshToken, User user})>>(),
       );
       expect(
         result.fold((l) => l.message, (_) => ''),
@@ -179,8 +166,8 @@ void main() {
     });
 
     test('returns Left(AuthFailure) on AuthException', () async {
-      datasource.onGetCurrentUser =
-          () => throw const AuthException(message: 'Unauthorized');
+      datasource.onGetCurrentUser = () =>
+          throw const AuthException(message: 'Unauthorized');
 
       final result = await repository.getCurrentUser();
 
@@ -191,10 +178,8 @@ void main() {
 
   group('refreshToken', () {
     test('returns Right(tokens) on success', () async {
-      datasource.onRefreshToken = (_) => (
-            token: 'new-jwt',
-            refreshToken: 'new-refresh',
-          );
+      datasource.onRefreshToken = (_) =>
+          (token: 'new-jwt', refreshToken: 'new-refresh');
 
       final result = await repository.refreshToken('old-refresh');
 
@@ -208,8 +193,8 @@ void main() {
     });
 
     test('returns Left(ServerFailure) on ServerException', () async {
-      datasource.onRefreshToken =
-          (_) => throw const ServerException(message: 'Invalid refresh token');
+      datasource.onRefreshToken = (_) =>
+          throw const ServerException(message: 'Invalid refresh token');
 
       final result = await repository.refreshToken('old-refresh');
 
@@ -217,10 +202,7 @@ void main() {
         result,
         isA<Left<Failure, ({String token, String refreshToken})>>(),
       );
-      expect(
-        result.fold((l) => l.message, (_) => ''),
-        'Invalid refresh token',
-      );
+      expect(result.fold((l) => l.message, (_) => ''), 'Invalid refresh token');
     });
   });
 }

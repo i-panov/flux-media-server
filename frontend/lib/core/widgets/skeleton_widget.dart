@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 
 class SkeletonWidget extends StatefulWidget {
-  const SkeletonWidget({
-    super.key,
-    this.width,
-    this.height,
-    this.borderRadius = 4,
-  });
+  const new({super.key, this.width, this.height, this.borderRadius = 4});
 
   final double? width;
   final double? height;
@@ -45,9 +40,7 @@ class _SkeletonWidgetState extends State<SkeletonWidget>
           height: widget.height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.borderRadius),
-            color: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
+            color: Theme.of(context).colorScheme.surfaceContainerHighest
                 .withValues(alpha: 0.4 + _controller.value * 0.3),
           ),
         );

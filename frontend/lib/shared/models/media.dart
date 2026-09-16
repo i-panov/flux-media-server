@@ -3,16 +3,14 @@ import 'package:flux_media_server/shared/models/media_type.dart';
 import 'package:flux_media_server/shared/models/metadata.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-// ignore_for_file: invalid_annotation_target
-
 export 'media_type.dart';
 
 part 'media.freezed.dart';
 part 'media.g.dart';
 
 @freezed
-class Media with _$Media {
-  const factory Media({
+sealed class Media with _$Media {
+  const factory({
     required int id,
     required String title,
     @MediaTypeConverter() required MediaType type,
@@ -32,5 +30,5 @@ class Media with _$Media {
     @JsonKey(name: 'created_at') DateTime? createdAt,
   }) = _Media;
 
-  factory Media.fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);
+  factory fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);
 }
