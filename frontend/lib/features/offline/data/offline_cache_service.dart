@@ -340,16 +340,19 @@ class OfflineCacheService {
     if (refreshToken == null) return null;
     // Если другой поток уже выполняет refresh — ждём его результат.
     final inFlight = _refreshInFlight;
-    if (inFlight == null) {
-      _refreshInFlight = _ref
+    final Future<bool> refreshFuture;
+    if (inFlight != null) {
+      refreshFuture = inFlight;
+    } else {
+      refreshFuture = _ref
           .read(authTokenRefresherProvider)
           .refresh(refreshToken);
+      _refreshInFlight = refreshFuture;
     }
     try {
-      final ok = await (inFlight ?? _refreshInFlight);
-      return ok ?? false
-          ? _ref.read(settingsProvider).settings.authToken
-          : null;
+      final ok = await refreshFuture;
+      if (!ok) return null;
+      return _ref.read(settingsProvider).settings.authToken;
     } finally {
       _refreshInFlight = null;
     }

@@ -301,11 +301,10 @@ class MediaRemoteDataSource {
     );
   }
 
-  /// Multipart-POST с тем же контрактом, что у основного пути:
-  /// Bearer-токен из настроек, один refresh при 401 (через тот же
-  /// AuthTokenRefresher, что и Chopper-перехватчики), повторная
-  /// попытка только если пользователь не отменил загрузку, 401 после
-  /// неудачного refresh → [AuthException].
+  /// Multipart-POST с тем же контрактом, что у основного пути
+  /// (см. [_sendWithAuthRetry]): Bearer-токен из настроек, один refresh
+  /// при 401, повторная попытка только если пользователь не отменил
+  /// загрузку.
   Future<Map<String, dynamic>> _postMultipart(
     String path, {
     required Map<String, String> fields,
@@ -313,9 +312,87 @@ class MediaRemoteDataSource {
     bool Function()? isCancelled,
     void Function()? onRetry,
   }) async {
-    final baseUrl =
-        _uploadBaseUrl ??
-        apiClient.client.baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
+    final body = await _sendWithAuthRetry(
+      path,
+      (token) {
+        final request = http.MultipartRequest('POST', _resolveUrl(path));
+        if (token != null) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
+        request.fields.addAll(fields);
+        // Файлы строим на каждую попытку: MultipartFile можно
+        // финализировать только один раз, retry требует новый запрос.
+        request.files.addAll(createFiles());
+        return request;
+      },
+      isCancelled: isCancelled,
+      onRetry: onRetry,
+      acceptedStatuses: const {200, 201, 202},
+      unexpectedResponseMessage: 'Unexpected server response during upload',
+      defaultErrorMessage: 'Failed to upload file',
+    );
+    return body!;
+  }
+
+  /// GET/DELETE с тем же контрактом auth/refresh, что и [_postMultipart]
+  /// (см. [_sendWithAuthRetry]).
+  Future<Map<String, dynamic>?> _sendJsonRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? jsonBody,
+    bool Function()? isCancelled,
+    Set<int> acceptedStatuses = const {200},
+  }) {
+    return _sendWithAuthRetry(
+      path,
+      (token) {
+        final request = http.Request(method, _resolveUrl(path));
+        if (jsonBody != null) {
+          request.headers['Content-Type'] = 'application/json';
+          request.body = jsonEncode(jsonBody);
+        }
+        if (token != null) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
+        return request;
+      },
+      isCancelled: isCancelled,
+      acceptedStatuses: acceptedStatuses,
+      allowEmptyBody: true,
+    );
+  }
+
+  /// База прямых http-запросов: из инъекционного [_uploadBaseUrl] либо
+  /// из baseUrl Chopper-клиента. Хвостовой слэш отрезается, чтобы
+  /// конкатенация с [path] не давала двойной слэш.
+  Uri _resolveUrl(String path) {
+    var base = _uploadBaseUrl;
+    base ??= apiClient.client.baseUrl.toString();
+    if (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    return Uri.parse('$base$path');
+  }
+
+  /// Единый контракт прямых http-запросов в обход Chopper (прогресс
+  /// загрузки и отмена недоступны через Chopper):
+  /// Bearer-токен из настроек, один refresh при 401 (через тот же
+  /// AuthTokenRefresher, что и Chopper-перехватчики), повторная попытка
+  /// только если пользователь не отменил операцию, 401 после неудачного
+  /// refresh → [AuthException].
+  ///
+  /// [buildRequest] строит запрос на каждую попытку (тело
+  /// MultipartRequest финализируется один раз — retry требует новый).
+  Future<Map<String, dynamic>?> _sendWithAuthRetry(
+    String path,
+    http.BaseRequest Function(String? token) buildRequest, {
+    bool Function()? isCancelled,
+    void Function()? onRetry,
+    Set<int> acceptedStatuses = const {200},
+    bool allowEmptyBody = false,
+    String unexpectedResponseMessage = 'Unexpected server response',
+    String defaultErrorMessage = 'Failed to execute request',
+  }) async {
     var token = _authToken?.call();
 
     for (var attempt = 0; attempt < 2; attempt++) {
@@ -324,17 +401,7 @@ class MediaRemoteDataSource {
       }
       final client = _clientFactory();
       try {
-        final request = http.MultipartRequest(
-          'POST',
-          Uri.parse('$baseUrl$path'),
-        );
-        if (token != null) {
-          request.headers['Authorization'] = 'Bearer $token';
-        }
-        request.fields.addAll(fields);
-        request.files.addAll(createFiles());
-
-        final streamed = await client.send(request);
+        final streamed = await client.send(buildRequest(token));
         if (isCancelled?.call() ?? false) {
           throw const UploadCancelledException();
         }
@@ -343,7 +410,7 @@ class MediaRemoteDataSource {
           if (attempt == 0) {
             final refreshed = await _refreshAuth?.call();
             // Повторная попытка — только если пользователь не отменил
-            // загрузку, иначе свежий токен уйдёт в никуда.
+            // операцию, иначе свежий токен уйдёт в никуда.
             if (isCancelled?.call() ?? false) {
               throw const UploadCancelledException();
             }
@@ -366,111 +433,27 @@ class MediaRemoteDataSource {
           throw const UploadCancelledException();
         }
 
+        // Пустое тело (204) — успех без данных.
+        if (allowEmptyBody && responseBody.trim().isEmpty) {
+          if (!acceptedStatuses.contains(streamed.statusCode)) {
+            throw ServerException(message: defaultErrorMessage);
+          }
+          return null;
+        }
+
         // 502 от proxy или HTML-ответ — не JSON: не тащим сырой текст
         // в Failure, а отдаём понятное сообщение.
         final Map<String, dynamic> body;
         try {
           body = jsonDecode(responseBody) as Map<String, dynamic>;
         } on FormatException {
-          throw const ServerException(
-            message: 'Unexpected server response during upload',
-          );
-        }
-
-        if (streamed.statusCode != 200 &&
-            streamed.statusCode != 201 &&
-            streamed.statusCode != 202) {
-          final error = body['error'];
-          throw ServerException(
-            message: error is String ? error : 'Failed to upload file',
-          );
-        }
-        return body;
-      } finally {
-        client.close();
-      }
-    }
-    throw const ServerException(message: 'Failed to upload file');
-  }
-
-  /// GET/DELETE с тем же контрактом auth/refresh, что и [_postMultipart]:
-  /// Bearer-токен из настроек, один refresh при 401, повторная попытка
-  /// только если пользователь не отменил операцию.
-  Future<Map<String, dynamic>?> _sendJsonRequest(
-    String method,
-    String path, {
-    Map<String, dynamic>? jsonBody,
-    bool Function()? isCancelled,
-    Set<int> acceptedStatuses = const {200},
-  }) async {
-    final baseUrl =
-        _uploadBaseUrl ??
-        apiClient.client.baseUrl.toString().replaceFirst(RegExp(r'/$'), '');
-    var token = _authToken?.call();
-
-    for (var attempt = 0; attempt < 2; attempt++) {
-      if (isCancelled?.call() ?? false) {
-        throw const UploadCancelledException();
-      }
-      final client = _clientFactory();
-      try {
-        final request = http.Request(method, Uri.parse('$baseUrl$path'));
-        if (jsonBody != null) {
-          request.headers['Content-Type'] = 'application/json';
-          request.body = jsonEncode(jsonBody);
-        }
-        if (token != null) {
-          request.headers['Authorization'] = 'Bearer $token';
-        }
-
-        final streamed = await client.send(request);
-        if (isCancelled?.call() ?? false) {
-          throw const UploadCancelledException();
-        }
-
-        if (streamed.statusCode == 401) {
-          if (attempt == 0) {
-            final refreshed = await _refreshAuth?.call();
-            if (isCancelled?.call() ?? false) {
-              throw const UploadCancelledException();
-            }
-            if (refreshed != null) {
-              token = refreshed;
-              continue;
-            }
-          }
-          throw const AuthException(message: 'Session expired');
-        }
-
-        final responseBody = await streamed.stream.bytesToString().timeout(
-          const Duration(minutes: 10),
-          onTimeout: () => throw const NetworkException(
-            message: 'Upload response timed out',
-          ),
-        );
-        if (isCancelled?.call() ?? false) {
-          throw const UploadCancelledException();
-        }
-
-        // Пустое тело (204) — успех без данных.
-        if (responseBody.trim().isEmpty) {
-          if (!acceptedStatuses.contains(streamed.statusCode)) {
-            throw const ServerException(message: 'Failed to execute request');
-          }
-          return null;
-        }
-
-        final Map<String, dynamic> body;
-        try {
-          body = jsonDecode(responseBody) as Map<String, dynamic>;
-        } on FormatException {
-          throw const ServerException(message: 'Unexpected server response');
+          throw ServerException(message: unexpectedResponseMessage);
         }
 
         if (!acceptedStatuses.contains(streamed.statusCode)) {
           final error = body['error'];
           throw ServerException(
-            message: error is String ? error : 'Failed to execute request',
+            message: error is String ? error : defaultErrorMessage,
           );
         }
         return body;
@@ -478,7 +461,7 @@ class MediaRemoteDataSource {
         client.close();
       }
     }
-    throw const ServerException(message: 'Failed to execute request');
+    throw ServerException(message: defaultErrorMessage);
   }
 
   /// Fetches watch progress for all media.

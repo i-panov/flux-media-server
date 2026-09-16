@@ -132,6 +132,18 @@ final mediaListProvider =
       MediaListNotifier.new,
     );
 
+/// Обёртка [Failure] в Exception для проброса в AsyncValue.error:
+/// линт only_throw_errors требует Exception/Error, а типизированный
+/// failure сохраняется в поле — UI может различать network/auth/server.
+class MediaListFailure implements Exception {
+  const new(this.failure);
+
+  final Failure failure;
+
+  @override
+  String toString() => failure.message;
+}
+
 class MediaListNotifier extends AsyncNotifier<MediaListResult> {
   // Riverpod 3: family-аргумент приходит через конструктор (create-функция
   // провайдера — tear-off конструктора с параметром), build() без аргументов.
@@ -167,7 +179,7 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
         if (failure is NetworkFailure) {
           ref.read(networkStatusProvider.notifier).markOffline();
         }
-        throw Exception(failure.message);
+        throw MediaListFailure(failure);
       },
       (data) {
         ref.read(networkStatusProvider.notifier).markOnline();
@@ -217,7 +229,7 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
         // присвоении AsyncError сам сохраняет предыдущее значение
         // (copyWithPrevious теперь internal и вызывается фреймворком).
         state = AsyncValue<MediaListResult>.error(
-          Exception(failure.message),
+          MediaListFailure(failure),
           StackTrace.current,
         );
       },

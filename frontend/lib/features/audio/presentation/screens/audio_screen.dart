@@ -295,202 +295,216 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
 
     // Системный back при активном поиске сначала очищает поиск (возврат
     // к полному списку), а не «проглатывается» корневым PopScope
-    // (выход из приложения на мобильных).
-    return PopScope(
-      canPop: _searchController.text.isEmpty,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _clearSearch();
-      },
-      child: RefreshIndicator(
-        onRefresh: () async {
-          ref
-            ..invalidate(mediaListProvider(_mediaType))
-            ..invalidate(favoritesProvider);
-          // Ошибка уже отражена в состоянии провайдера.
-          try {
-            await ref.read(mediaListProvider(_mediaType).future);
-          } catch (_) {}
+    // (выход из приложения на мобильных). ListenableBuilder: canPop
+    // должен обновляться на каждый символ, а не при rebuild экрана —
+    // иначе в окне до debounce back выходит из приложения.
+    return ListenableBuilder(
+      listenable: _searchController,
+      builder: (context, _) => PopScope(
+        canPop: _searchController.text.isEmpty,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _clearSearch();
         },
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: SearchBar(
-                  controller: _searchController,
-                  hintText: l.searchMedia,
-                  leading: const Icon(Icons.search),
-                  trailing: [
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _searchController,
-                      builder: (context, value, _) => IconButton(
-                        icon: const Icon(Icons.close),
-                        tooltip: l.cancel,
-                        onPressed: value.text.isEmpty ? null : _clearSearch,
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref
+              ..invalidate(mediaListProvider(_mediaType))
+              ..invalidate(favoritesProvider);
+            // Ошибка уже отражена в состоянии провайдера.
+            try {
+              await ref.read(mediaListProvider(_mediaType).future);
+            } catch (_) {}
+          },
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: SearchBar(
+                    controller: _searchController,
+                    hintText: l.searchMedia,
+                    leading: const Icon(Icons.search),
+                    trailing: [
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _searchController,
+                        builder: (context, value, _) => IconButton(
+                          icon: const Icon(Icons.close),
+                          tooltip: l.cancel,
+                          onPressed: value.text.isEmpty ? null : _clearSearch,
+                        ),
+                      ),
+                    ],
+                    onChanged: _onSearchChanged,
+                  ),
+                ),
+              ),
+              if (likedToShow.isNotEmpty) ...[
+                SliverSectionHeader(
+                  icon: Icons.favorite,
+                  title: l.likedTracks,
+                  trailing: likedTracks.length > 10 && !_showAllLiked
+                      ? TextButton(
+                          onPressed: () => setState(() => _showAllLiked = true),
+                          child: Text(l.showAll),
+                        )
+                      : null,
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => AudioTrackRow(
+                      media: likedToShow[index],
+                      isFavorite: true,
+                      onPlay: () => _playTrack(likedToShow[index], allTracks),
+                      onFavorite: () =>
+                          toggleFavoriteTrack(ref, likedToShow[index].id),
+                      onDownload: () => toggleDownloadTrack(
+                        ref,
+                        _mediaType,
+                        likedToShow[index].id,
+                      ),
+                      onAddToQueue: () =>
+                          addTrackToQueue(ref, likedToShow[index]),
+                      onAddToCollection: () => showAddToCollectionDialog(
+                        context,
+                        likedToShow[index].id,
+                        mediaType: 'audio',
+                      ),
+                      onEditMetadata: () => showEditMetadataDialog(
+                        context,
+                        ref,
+                        likedToShow[index],
+                      ),
+                      onChangeCover: () =>
+                          changeMediaCover(context, ref, likedToShow[index].id),
+                      onDelete: () => deleteMediaWithConfirm(
+                        context,
+                        ref,
+                        likedToShow[index].id,
                       ),
                     ),
-                  ],
-                  onChanged: _onSearchChanged,
-                ),
-              ),
-            ),
-            if (likedToShow.isNotEmpty) ...[
-              SliverSectionHeader(
-                icon: Icons.favorite,
-                title: l.likedTracks,
-                trailing: likedTracks.length > 10 && !_showAllLiked
-                    ? TextButton(
-                        onPressed: () => setState(() => _showAllLiked = true),
-                        child: Text(l.showAll),
-                      )
-                    : null,
-              ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => AudioTrackRow(
-                    media: likedToShow[index],
-                    isFavorite: true,
-                    onPlay: () => _playTrack(likedToShow[index], allTracks),
-                    onFavorite: () =>
-                        toggleFavoriteTrack(ref, likedToShow[index].id),
-                    onDownload: () => toggleDownloadTrack(
-                      ref,
-                      _mediaType,
-                      likedToShow[index].id,
-                    ),
-                    onAddToQueue: () =>
-                        addTrackToQueue(ref, likedToShow[index]),
-                    onAddToCollection: () => showAddToCollectionDialog(
-                      context,
-                      likedToShow[index].id,
-                      mediaType: 'audio',
-                    ),
-                    onEditMetadata: () => showEditMetadataDialog(
-                      context,
-                      ref,
-                      likedToShow[index],
-                    ),
-                    onChangeCover: () =>
-                        changeMediaCover(context, ref, likedToShow[index].id),
-                    onDelete: () => deleteMediaWithConfirm(
-                      context,
-                      ref,
-                      likedToShow[index].id,
-                    ),
+                    childCount: likedToShow.length,
                   ),
-                  childCount: likedToShow.length,
                 ),
-              ),
-            ],
-            if (artists.isNotEmpty) ...[
-              SliverSectionHeader(icon: Icons.people, title: l.artists),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 120,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: artists.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 16),
-                    itemBuilder: (context, index) {
-                      final artist = artists[index];
-                      final serverArtist = artistsState.value
-                          ?.where((a) => a.id == artist.id)
-                          .firstOrNull;
-                      return ArtistCard(
-                        name: artist.name,
-                        coverUrl: (serverArtist?.hasCover ?? false)
-                            ? buildArtistCoverUrl(
-                                baseUrl: ref.watch(baseUrlProvider),
-                                artistId: artist.id,
-                                cacheBust: serverArtist
-                                    ?.updatedAt
-                                    ?.millisecondsSinceEpoch,
-                              )
-                            : null,
-                        onTap: () => context.router.push(
-                          ArtistRoute(
-                            artistId: artist.id,
-                            artistName: artist.name,
+              ],
+              if (artists.isNotEmpty) ...[
+                SliverSectionHeader(icon: Icons.people, title: l.artists),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: artists.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 16),
+                      itemBuilder: (context, index) {
+                        final artist = artists[index];
+                        final serverArtist = artistsState.value
+                            ?.where((a) => a.id == artist.id)
+                            .firstOrNull;
+                        return ArtistCard(
+                          name: artist.name,
+                          coverUrl: (serverArtist?.hasCover ?? false)
+                              ? buildArtistCoverUrl(
+                                  baseUrl: ref.watch(baseUrlProvider),
+                                  artistId: artist.id,
+                                  cacheBust: serverArtist
+                                      ?.updatedAt
+                                      ?.millisecondsSinceEpoch,
+                                )
+                              : null,
+                          onTap: () => context.router.push(
+                            ArtistRoute(
+                              artistId: artist.id,
+                              artistName: artist.name,
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
-            ],
-            if (downloadedAudio.isNotEmpty) ...[
-              SliverSectionHeader(icon: Icons.download, title: l.downloads),
+              ],
+              if (downloadedAudio.isNotEmpty) ...[
+                SliverSectionHeader(icon: Icons.download, title: l.downloads),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => AudioTrackRow(
+                      media: downloadedAudio[index],
+                      isFavorite: favoriteIds.contains(
+                        downloadedAudio[index].id,
+                      ),
+                      onPlay: () =>
+                          _playTrack(downloadedAudio[index], allTracks),
+                      onFavorite: () =>
+                          toggleFavoriteTrack(ref, downloadedAudio[index].id),
+                      onDownload: () => toggleDownloadTrack(
+                        ref,
+                        _mediaType,
+                        downloadedAudio[index].id,
+                      ),
+                      onAddToQueue: () =>
+                          addTrackToQueue(ref, downloadedAudio[index]),
+                      onAddToCollection: () => showAddToCollectionDialog(
+                        context,
+                        downloadedAudio[index].id,
+                        mediaType: 'audio',
+                      ),
+                      onEditMetadata: () => showEditMetadataDialog(
+                        context,
+                        ref,
+                        downloadedAudio[index],
+                      ),
+                      onChangeCover: () => changeMediaCover(
+                        context,
+                        ref,
+                        downloadedAudio[index].id,
+                      ),
+                      onDelete: () => deleteMediaWithConfirm(
+                        context,
+                        ref,
+                        downloadedAudio[index].id,
+                      ),
+                    ),
+                    childCount: downloadedAudio.length,
+                  ),
+                ),
+              ],
+              SliverSectionHeader(icon: Icons.music_note, title: l.allTracks),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => AudioTrackRow(
-                    media: downloadedAudio[index],
-                    isFavorite: favoriteIds.contains(downloadedAudio[index].id),
-                    onPlay: () => _playTrack(downloadedAudio[index], allTracks),
+                    media: allTracks[index],
+                    isFavorite: favoriteIds.contains(allTracks[index].id),
+                    onPlay: () => _playTrack(allTracks[index], allTracks),
                     onFavorite: () =>
-                        toggleFavoriteTrack(ref, downloadedAudio[index].id),
+                        toggleFavoriteTrack(ref, allTracks[index].id),
                     onDownload: () => toggleDownloadTrack(
                       ref,
                       _mediaType,
-                      downloadedAudio[index].id,
+                      allTracks[index].id,
                     ),
-                    onAddToQueue: () =>
-                        addTrackToQueue(ref, downloadedAudio[index]),
+                    onAddToQueue: () => addTrackToQueue(ref, allTracks[index]),
                     onAddToCollection: () => showAddToCollectionDialog(
                       context,
-                      downloadedAudio[index].id,
+                      allTracks[index].id,
                       mediaType: 'audio',
                     ),
-                    onEditMetadata: () => showEditMetadataDialog(
-                      context,
-                      ref,
-                      downloadedAudio[index],
-                    ),
-                    onChangeCover: () => changeMediaCover(
-                      context,
-                      ref,
-                      downloadedAudio[index].id,
-                    ),
+                    onEditMetadata: () =>
+                        showEditMetadataDialog(context, ref, allTracks[index]),
+                    onChangeCover: () =>
+                        changeMediaCover(context, ref, allTracks[index].id),
                     onDelete: () => deleteMediaWithConfirm(
                       context,
                       ref,
-                      downloadedAudio[index].id,
+                      allTracks[index].id,
                     ),
                   ),
-                  childCount: downloadedAudio.length,
+                  childCount: allTracks.length,
                 ),
               ),
             ],
-            SliverSectionHeader(icon: Icons.music_note, title: l.allTracks),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => AudioTrackRow(
-                  media: allTracks[index],
-                  isFavorite: favoriteIds.contains(allTracks[index].id),
-                  onPlay: () => _playTrack(allTracks[index], allTracks),
-                  onFavorite: () =>
-                      toggleFavoriteTrack(ref, allTracks[index].id),
-                  onDownload: () =>
-                      toggleDownloadTrack(ref, _mediaType, allTracks[index].id),
-                  onAddToQueue: () => addTrackToQueue(ref, allTracks[index]),
-                  onAddToCollection: () => showAddToCollectionDialog(
-                    context,
-                    allTracks[index].id,
-                    mediaType: 'audio',
-                  ),
-                  onEditMetadata: () =>
-                      showEditMetadataDialog(context, ref, allTracks[index]),
-                  onChangeCover: () =>
-                      changeMediaCover(context, ref, allTracks[index].id),
-                  onDelete: () =>
-                      deleteMediaWithConfirm(context, ref, allTracks[index].id),
-                ),
-                childCount: allTracks.length,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

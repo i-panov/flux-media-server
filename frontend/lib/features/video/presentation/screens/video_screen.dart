@@ -180,110 +180,115 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
 
     // Системный back при активном поиске сначала очищает поиск (возврат
     // к полному списку), а не «проглатывается» корневым PopScope
-    // (выход из приложения на мобильных).
-    return PopScope(
-      canPop: _searchController.text.isEmpty,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _clearSearch();
-      },
-      child: RefreshIndicator(
-        onRefresh: () async {
-          ref
-            ..invalidate(mediaListProvider(_mediaType))
-            ..invalidate(watchProgressProvider)
-            ..invalidate(favoritesProvider)
-            ..invalidate(collectionsProvider);
-          // Ошибка уже отражена в состоянии провайдера.
-          try {
-            await ref.read(mediaListProvider(_mediaType).future);
-          } catch (_) {}
+    // (выход из приложения на мобильных). ListenableBuilder: canPop
+    // должен обновляться на каждый символ, а не при rebuild экрана —
+    // иначе в окне до debounce back выходит из приложения.
+    return ListenableBuilder(
+      listenable: _searchController,
+      builder: (context, _) => PopScope(
+        canPop: _searchController.text.isEmpty,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _clearSearch();
         },
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            // Search bar
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: SearchBar(
-                  controller: _searchController,
-                  hintText: l.searchMedia,
-                  leading: const Icon(Icons.search),
-                  trailing: [
-                    // ValueListenableBuilder вместо setState на каждый символ.
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _searchController,
-                      builder: (context, value, _) => IconButton(
-                        icon: const Icon(Icons.close),
-                        tooltip: l.cancel,
-                        onPressed: value.text.isEmpty ? null : _clearSearch,
-                      ),
-                    ),
-                  ],
-                  onChanged: _onSearchChanged,
-                ),
-              ),
-            ),
-            if (mediaItems.isEmpty && !hasDownloadedVideo)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.video_library_outlined,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        l.noMediaFound,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(color: Colors.grey),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref
+              ..invalidate(mediaListProvider(_mediaType))
+              ..invalidate(watchProgressProvider)
+              ..invalidate(favoritesProvider)
+              ..invalidate(collectionsProvider);
+            // Ошибка уже отражена в состоянии провайдера.
+            try {
+              await ref.read(mediaListProvider(_mediaType).future);
+            } catch (_) {}
+          },
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              // Search bar
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: SearchBar(
+                    controller: _searchController,
+                    hintText: l.searchMedia,
+                    leading: const Icon(Icons.search),
+                    trailing: [
+                      // ValueListenableBuilder вместо setState на каждый символ.
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _searchController,
+                        builder: (context, value, _) => IconButton(
+                          icon: const Icon(Icons.close),
+                          tooltip: l.cancel,
+                          onPressed: value.text.isEmpty ? null : _clearSearch,
+                        ),
                       ),
                     ],
+                    onChanged: _onSearchChanged,
                   ),
                 ),
-              )
-            else ...[
-              _ContinueWatchingSection(
-                mediaItems: mediaItems,
-                isOffline: isOffline,
-                onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                onDownloadToggled: (id) =>
-                    toggleDownloadTrack(ref, _mediaType, id),
               ),
-              _RecentlyAddedSection(
-                mediaItems: mediaItems,
-                isOffline: isOffline,
-                onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                onDownloadToggled: (id) =>
-                    toggleDownloadTrack(ref, _mediaType, id),
-              ),
-              _FavoritesSection(
-                mediaItems: mediaItems,
-                isOffline: isOffline,
-                onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                onDownloadToggled: (id) =>
-                    toggleDownloadTrack(ref, _mediaType, id),
-              ),
-              const _CollectionsSection(),
-              _DownloadsSection(
-                isOffline: isOffline,
-                onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                onDownloadToggled: (id) =>
-                    toggleDownloadTrack(ref, _mediaType, id),
-              ),
-              _AllVideosGrid(
-                mediaItems: mediaItems,
-                isOffline: isOffline,
-                onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                onDownloadToggled: (id) =>
-                    toggleDownloadTrack(ref, _mediaType, id),
-              ),
+              if (mediaItems.isEmpty && !hasDownloadedVideo)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.video_library_outlined,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          l.noMediaFound,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else ...[
+                _ContinueWatchingSection(
+                  mediaItems: mediaItems,
+                  isOffline: isOffline,
+                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+                  onDownloadToggled: (id) =>
+                      toggleDownloadTrack(ref, _mediaType, id),
+                ),
+                _RecentlyAddedSection(
+                  mediaItems: mediaItems,
+                  isOffline: isOffline,
+                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+                  onDownloadToggled: (id) =>
+                      toggleDownloadTrack(ref, _mediaType, id),
+                ),
+                _FavoritesSection(
+                  mediaItems: mediaItems,
+                  isOffline: isOffline,
+                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+                  onDownloadToggled: (id) =>
+                      toggleDownloadTrack(ref, _mediaType, id),
+                ),
+                const _CollectionsSection(),
+                _DownloadsSection(
+                  isOffline: isOffline,
+                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+                  onDownloadToggled: (id) =>
+                      toggleDownloadTrack(ref, _mediaType, id),
+                ),
+                _AllVideosGrid(
+                  mediaItems: mediaItems,
+                  isOffline: isOffline,
+                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+                  onDownloadToggled: (id) =>
+                      toggleDownloadTrack(ref, _mediaType, id),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

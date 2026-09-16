@@ -48,8 +48,12 @@ class SettingsLocalDataSource {
 
   String getLocale() => _prefs.getString(_p(_keyLocale)) ?? 'en';
 
-  Future<void> setLocale(String locale) =>
-      _prefs.setString(_p(_keyLocale), locale);
+  Future<void> setLocale(String locale) async {
+    final success = await _prefs.setString(_p(_keyLocale), locale);
+    if (!success) {
+      throw Exception('Failed to save locale to SharedPreferences');
+    }
+  }
 
   /// Reads the auth token from secure storage. In debug builds falls back
   /// to SharedPreferences when secure storage is unavailable.

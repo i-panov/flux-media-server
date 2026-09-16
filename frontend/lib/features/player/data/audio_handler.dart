@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:http/http.dart' as http;
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -75,7 +76,7 @@ class FluxAudioHandler extends BaseAudioHandler with SeekHandler {
     } catch (e) {
       // audio_session может быть недоступен на некоторых платформах —
       // воспроизведение продолжает работать без обработки фокуса.
-      print('AudioSession init failed: $e');
+      AppLogger.error('AudioSession init failed', e);
     }
 
     player.stream.playing.listen((playing) {
