@@ -4,6 +4,10 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Android 13+ (API 33): без него foreground service не может
+         показать уведомление с медиакнопками, и системный плеер
+         выглядит как «пропавший». -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Flux"
         android:name="${applicationName}"

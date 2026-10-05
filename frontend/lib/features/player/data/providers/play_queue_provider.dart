@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -8,19 +9,57 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// This abstraction allows testing the queue logic without instantiating
 /// a full [PlaybackCoordinator] (which requires media_kit Player instances).
 abstract class PlaybackController {
-  Future<void> play(Media media);
+  /// Загружает текущую очередь в mpv и стартует с [startIndex].
+  Future<void> startQueue({required int startIndex});
+
+  /// Дописывает [items] в конец уже загруженного плейлиста, не прерывая
+  /// воспроизведение.
+  Future<void> enqueue(List<Media> items);
+
+  /// Переход к следующему треку. `false` — следующего нет.
+  Future<bool> next();
+
+  /// Переход к предыдущему треку. `false` — предыдущего нет.
+  Future<bool> previous();
+
+  /// Переход к треку по индексу очереди. `false` — индекс некорректен.
+  Future<bool> jump(int index);
+
+  /// Удаление элемента очереди; индексы очереди и mpv совпадают.
+  Future<void> removeAt(int index);
+
+  /// Перезапуск текущего трека (например, play из уведомления после
+  /// завершения воспроизведения).
+  Future<void> restartCurrent();
+
+  /// Индекс текущего трека по данным mpv.
+  Stream<int> get playlistIndexStream;
+
   Future<void> stop();
 }
 
 /// Manages a play queue: ordered list of media items with current index.
 /// Supports next/previous, add, remove, and reorder.
+///
+/// Список треков — источник истины для UI, а текущий индекс приходит из
+/// mpv: переход между треками инициирует mpv, поэтому считать его в
+/// Dart («+1») значило бы расходиться с реальным воспроизведением.
 class PlayQueueNotifier extends Notifier<PlayQueueState> {
   late final PlaybackController _coordinator;
+  StreamSubscription<int>? _indexSub;
 
   @override
   PlayQueueState build() {
     _coordinator = ref.watch(playbackControllerProvider);
+    _indexSub = _coordinator.playlistIndexStream.listen(_onMpvIndex);
+    ref.onDispose(() => unawaited(_indexSub?.cancel()));
     return const PlayQueueState();
+  }
+
+  void _onMpvIndex(int index) {
+    if (index < 0 || index == state.currentIndex) return;
+    if (index >= state.items.length) return;
+    state = state.copyWith(currentIndex: index);
   }
 
   /// Sets the queue to [items], starting playback from [startIndex].
@@ -33,40 +72,48 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
     final index = startIndex.clamp(0, items.length - 1);
     state = PlayQueueState(items: items, currentIndex: index);
     // Ошибка воспроизведения уже отражена в PlaybackState.error —
-    // не пробрасываем её в UI-вызовы (часто fire-and-forget).
-    try {
-      await _coordinator.play(items[index]);
-    } catch (_) {}
+    // не пробрасываем её в UI-вызовы (часто fire-and-forget), но пишем
+    // в лог: раньше ошибка здесь терялась молча и выглядела как «плеер
+    // просто остановился».
+    await _guard(() => _coordinator.startQueue(startIndex: index));
+  }
+
+  /// Гарантирует, что [media] присутствует в очереди, и делает его
+  /// текущим. Очередь при этом не пересобирается целиком: если трек
+  /// уже играет, состояние вообще не трогаем (переоткрытие очереди
+  /// ломало бы авто-переход на текущем треке).
+  Future<void> playFromQueue(Media media) async {
+    final index = state.items.indexWhere((m) => m.id == media.id);
+    if (index >= 0) {
+      if (index == state.currentIndex) return;
+      await jumpTo(index);
+      return;
+    }
+    await setQueue([...state.items, media], startIndex: state.items.length);
   }
 
   /// Adds a single item to the end of the queue.
-  void enqueue(Media item) {
-    final items = [...state.items, item];
-    state = PlayQueueState(
-      items: items,
-      // Первый трек в пустой очереди становится текущим.
-      currentIndex: state.currentIndex < 0 ? 0 : state.currentIndex,
-    );
-  }
+  void enqueue(Media item) => enqueueAll([item]);
 
   /// Adds multiple items to the queue.
   void enqueueAll(List<Media> items) {
-    final newItems = [...state.items, ...items];
+    if (items.isEmpty) return;
     state = PlayQueueState(
-      items: newItems,
-      currentIndex: state.currentIndex < 0 ? 0 : state.currentIndex,
+      items: [...state.items, ...items],
+      // В пустую очередь «В очередь» ничего не запускает (как и раньше),
+      // поэтому текущего трека нет: currentIndex остаётся -1, иначе
+      // current и вкладка «Очередь» показывали бы трек, который не играет.
+      currentIndex: state.currentIndex,
     );
+    unawaited(_guard(() => _coordinator.enqueue(items)));
   }
 
-  /// Перезапускает текущий трек очереди (например, play из системного
-  /// уведомления после завершения воспроизведения).
+  /// Plays the current track of the queue from the beginning.
   Future<bool> playCurrent() async {
     if (state.currentIndex < 0 || state.currentIndex >= state.items.length) {
       return false;
     }
-    try {
-      await _coordinator.play(state.items[state.currentIndex]);
-    } catch (_) {}
+    await _guard(_coordinator.restartCurrent);
     return true;
   }
 
@@ -74,32 +121,26 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
   /// Returns false if there is no next track.
   Future<bool> next() async {
     if (state.currentIndex + 1 >= state.items.length) return false;
-    final newIndex = state.currentIndex + 1;
-    state = state.copyWith(currentIndex: newIndex);
-    try {
-      await _coordinator.play(state.items[newIndex]);
-    } catch (_) {}
-    return true;
+    return await _guard(() => _coordinator.next()) ?? false;
   }
 
   /// Plays the previous track in the queue.
   /// Returns false if there is no previous track.
   Future<bool> previous() async {
     if (state.currentIndex <= 0) return false;
-    final newIndex = state.currentIndex - 1;
-    state = state.copyWith(currentIndex: newIndex);
-    try {
-      await _coordinator.play(state.items[newIndex]);
-    } catch (_) {}
-    return true;
+    return await _guard(() => _coordinator.previous()) ?? false;
+  }
+
+  /// Jumps to [index] in the queue. Returns false for an invalid index.
+  Future<bool> jumpTo(int index) async {
+    if (index < 0 || index >= state.items.length) return false;
+    return await _guard(() => _coordinator.jump(index)) ?? false;
   }
 
   /// Removes item at [index] from the queue.
   void removeAt(int index) {
     if (index < 0 || index >= state.items.length) return;
     final items = List<Media>.from(state.items)..removeAt(index);
-
-    final wasPlaying = index == state.currentIndex;
 
     int newIndex;
     if (items.isEmpty) {
@@ -114,15 +155,13 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
 
     state = PlayQueueState(items: items, currentIndex: newIndex);
 
-    // If we removed the currently playing item, stop playback.
-    // The queue is now empty — coordinator should stop playback.
     if (items.isEmpty) {
       unawaited(_coordinator.stop());
-    }
-    // If we removed the currently playing track and there are more items,
-    // auto-advance to the new currentIndex (which is the next track).
-    else if (wasPlaying && newIndex >= 0 && newIndex < items.length) {
-      unawaited(_coordinator.play(items[newIndex]).catchError((_) {}));
+    } else {
+      // Состояние уже обновлено, поэтому координатор пересоберёт
+      // воспроизведение по новому currentIndex, если плейлист mpv не
+      // справится сам (удаление текущего элемента).
+      unawaited(_guard(() => _coordinator.removeAt(index)));
     }
   }
 
@@ -130,6 +169,15 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
   void clear() {
     state = const PlayQueueState();
     unawaited(_coordinator.stop());
+  }
+
+  Future<T?> _guard<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } catch (e, s) {
+      AppLogger.error('Play queue operation failed', e, s);
+      return null;
+    }
   }
 
   /// Returns the current media item, or null if queue is empty.

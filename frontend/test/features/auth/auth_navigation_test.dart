@@ -71,14 +71,31 @@ class FakeOfflineCacheService extends OfflineCacheService {
 
 class FakeAudioSource implements AudioPlaybackSource {
   @override
-  Future<void> loadSource({
-    required String url,
-    required String title,
-    String? artist,
-    String? artUri,
-    Duration? duration,
-    Map<String, String>? httpHeaders,
+  int get playlistIndex => 0;
+
+  @override
+  Stream<int> get playlistIndexStream => const Stream.empty();
+
+  @override
+  Future<void> loadPlaylist(
+    List<AudioQueueEntry> entries, {
+    required int startIndex,
   }) async {}
+
+  @override
+  Future<void> appendToPlaylist(List<AudioQueueEntry> entries) async {}
+
+  @override
+  Future<void> next() async {}
+
+  @override
+  Future<void> previous() async {}
+
+  @override
+  Future<void> jump(int index) async {}
+
+  @override
+  Future<void> remove(int index) async {}
 
   @override
   Future<void> play() async {}

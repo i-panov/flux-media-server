@@ -391,9 +391,10 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                     icon: const Icon(Icons.close, size: 20),
                     tooltip: l.close,
                     onPressed: () {
-                      unawaited(
-                        ref.read(playbackCoordinatorProvider.notifier).stop(),
-                      );
+                      // clear(), а не stop(): иначе очередь оставалась
+                      // с hasNext == true при молчащем плеере, и
+                      // auto-advance вёл в никуда.
+                      ref.read(playQueueProvider.notifier).clear();
                       if (widget.disableTap) {
                         Navigator.of(context).maybePop();
                       }

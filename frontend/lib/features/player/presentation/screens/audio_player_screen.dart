@@ -31,16 +31,19 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final playback = ref.read(playbackCoordinatorProvider);
-      final alreadyPlaying =
-          playback is PlaybackPlaying && playback.media.id == widget.media.id;
-      if (!alreadyPlaying) {
-        // Use setQueue so the queue is in sync with what's playing.
-        // Without this, _onCompleted would jump to a stale queue item.
-        unawaited(
-          ref.read(playQueueProvider.notifier).setQueue([widget.media]),
-        );
+      // Источник истины один — currentIndex очереди, он следует за mpv.
+      // Сверяемся с ним, а не с PlaybackState: если трек уже играет, но
+      // индекс ещё не догнал mpv, лишний jumpTo был бы слышимой командой
+      // посреди playback.
+      if (ref.read(playQueueProvider.notifier).current?.id == widget.media.id) {
+        return;
       }
+      // Очередь не схлопываем до одного элемента: раньше setQueue([media])
+      // делал hasNext == false, и после возврата с экрана музыка
+      // останавливалась на первом же треке «не последнего в плейлисте».
+      unawaited(
+        ref.read(playQueueProvider.notifier).playFromQueue(widget.media),
+      );
     });
   }
 
@@ -478,11 +481,9 @@ class _QueueTab extends ConsumerWidget {
                 ref.read(playQueueProvider.notifier).removeAt(index),
           ),
           onTap: () {
-            unawaited(
-              ref
-                  .read(playQueueProvider.notifier)
-                  .setQueue(queueState.items, startIndex: index),
-            );
+            // Переход внутри уже загруженного плейлиста mpv — одна
+            // команда, без пересборки очереди и переоткрытия URL.
+            unawaited(ref.read(playQueueProvider.notifier).jumpTo(index));
           },
         );
       },

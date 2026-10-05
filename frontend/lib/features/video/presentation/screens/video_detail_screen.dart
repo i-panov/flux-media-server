@@ -10,7 +10,6 @@ import 'package:flux_media_server/features/media/presentation/utils/media_action
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
-import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_details_panel.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_player_panel.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -126,8 +125,8 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
         .read(mediaDetailProvider(widget.mediaId))
         .maybeWhen(loaded: (m) => m, orElse: () => null);
     if (media == null) return;
-    unawaited(ref.read(playQueueProvider.notifier).setQueue([media]));
-    await ref.read(playbackCoordinatorProvider.notifier).play(media);
+    // setQueue сам открывает очередь в плеере и запускает первый трек.
+    await ref.read(playQueueProvider.notifier).setQueue([media]);
   }
 
   @override

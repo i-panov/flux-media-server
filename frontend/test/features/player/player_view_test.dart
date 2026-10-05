@@ -14,6 +14,7 @@ import 'package:flux_media_server/features/media/domain/models/upload_status.dar
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
 import 'package:flux_media_server/features/player/presentation/screens/player_view.dart';
@@ -34,19 +35,37 @@ class _FakeAudioSource implements AudioPlaybackSource {
   final errorCtl = StreamController<String>.broadcast();
   final bufferingCtl = StreamController<bool>.broadcast();
   final volumeCtl = StreamController<double>.broadcast();
+  final indexCtl = StreamController<int>.broadcast();
 
   @override
   double volume = 100;
 
   @override
-  Future<void> loadSource({
-    required String url,
-    required String title,
-    String? artist,
-    String? artUri,
-    Duration? duration,
-    Map<String, String>? httpHeaders,
+  int get playlistIndex => 0;
+
+  @override
+  Stream<int> get playlistIndexStream => indexCtl.stream;
+
+  @override
+  Future<void> loadPlaylist(
+    List<AudioQueueEntry> entries, {
+    required int startIndex,
   }) async {}
+
+  @override
+  Future<void> appendToPlaylist(List<AudioQueueEntry> entries) async {}
+
+  @override
+  Future<void> next() async {}
+
+  @override
+  Future<void> previous() async {}
+
+  @override
+  Future<void> jump(int index) async {}
+
+  @override
+  Future<void> remove(int index) async {}
 
   @override
   Future<void> play() async {}
@@ -364,7 +383,9 @@ void main() {
     expect(builds, 1, reason: 'начальное состояние — один build');
 
     final coordinator = container.read(playbackCoordinatorProvider.notifier);
-    await coordinator.play(_media(1, MediaType.video));
+    await container.read(playQueueProvider.notifier).setQueue([
+      _media(1, MediaType.video),
+    ]);
     await tester.pump();
     expect(last!.kind, PlayerViewKind.playing);
     final buildsAfterPlay = builds;

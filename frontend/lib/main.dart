@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/features/auth/presentation/auth_guard.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
@@ -94,6 +96,25 @@ void main() async {
   );
 }
 
+/// Канал запроса runtime-разрешения на уведомления (Android 13+).
+/// Реализация — в `MainActivity.kt`; на остальных платформах канала нет,
+/// поэтому вызов безопасно игнорируется.
+const MethodChannel _notificationChannel = MethodChannel(
+  'ru.ithub24.flux/notifications',
+);
+
+Future<void> _requestNotificationPermission() async {
+  try {
+    await _notificationChannel.invokeMethod<bool>(
+      'requestNotificationPermission',
+    );
+  } on MissingPluginException {
+    // Не Android — разрешение не требуется.
+  } catch (e) {
+    AppLogger.warn('Notification permission request failed: $e');
+  }
+}
+
 class SplashScreen extends ConsumerWidget {
   const new({super.key});
 
@@ -133,6 +154,11 @@ class _FluxAppState extends ConsumerState<FluxApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _handleAuthStateChange(null, ref.read(authProvider));
+      // Android 13+: без POST_NOTIFICATIONS foreground service не может
+      // показать уведомление с медиакнопками, и системный плеер выглядит
+      // пропавшим. Запрашиваем после первого кадра: до onResume вызов
+      // Activity.requestPermissions может быть проигнорирован.
+      unawaited(_requestNotificationPermission());
     });
   }
 
