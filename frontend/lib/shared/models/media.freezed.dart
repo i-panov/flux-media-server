@@ -16,7 +16,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Media {
 
- int get id; String get title;@MediaTypeConverter() MediaType get type;@JsonKey(name: 'file_size') int get fileSize;@JsonKey(name: 'filename') String get filename; int? get year; String? get description; int? get duration;@JsonKey(name: 'thumbnail_url') String? get thumbnailUrl;@JsonKey(name: 'cover_url') String? get coverUrl; List<Artist> get artists; String? get album; String? get genre; Metadata? get metadata;@JsonKey(name: 'file_hash') String get fileHash;@JsonKey(name: 'updated_at') DateTime? get updatedAt;@JsonKey(name: 'created_at') DateTime? get createdAt;
+ int get id; String get title;@MediaTypeConverter() MediaType get type;@JsonKey(name: 'file_size') int get fileSize;@JsonKey(name: 'filename') String get filename; int? get year; String? get description; int? get duration;@JsonKey(name: 'thumbnail_url') String? get thumbnailUrl;@JsonKey(name: 'cover_url') String? get coverUrl;@JsonKey(name: 'source_url') String? get sourceUrl; List<Artist> get artists; String? get album; String? get genre; Metadata? get metadata;@JsonKey(name: 'file_hash') String get fileHash;@JsonKey(name: 'updated_at') DateTime? get updatedAt;@JsonKey(name: 'created_at') DateTime? get createdAt;
 /// Create a copy of Media
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,20 +30,20 @@ $MediaCopyWith<Media> get copyWith => _$MediaCopyWithImpl<Media>(this as Media, 
 @override
 bool operator ==(Object other) {
   final _this = this as Media;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Media&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.fileSize, _this.fileSize) || other.fileSize == _this.fileSize)&&(identical(other.filename, _this.filename) || other.filename == _this.filename)&&(identical(other.year, _this.year) || other.year == _this.year)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.duration, _this.duration) || other.duration == _this.duration)&&(identical(other.thumbnailUrl, _this.thumbnailUrl) || other.thumbnailUrl == _this.thumbnailUrl)&&(identical(other.coverUrl, _this.coverUrl) || other.coverUrl == _this.coverUrl)&&const DeepCollectionEquality().equals(other.artists, _this.artists)&&(identical(other.album, _this.album) || other.album == _this.album)&&(identical(other.genre, _this.genre) || other.genre == _this.genre)&&(identical(other.metadata, _this.metadata) || other.metadata == _this.metadata)&&(identical(other.fileHash, _this.fileHash) || other.fileHash == _this.fileHash)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt)&&(identical(other.createdAt, _this.createdAt) || other.createdAt == _this.createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Media&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.fileSize, _this.fileSize) || other.fileSize == _this.fileSize)&&(identical(other.filename, _this.filename) || other.filename == _this.filename)&&(identical(other.year, _this.year) || other.year == _this.year)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.duration, _this.duration) || other.duration == _this.duration)&&(identical(other.thumbnailUrl, _this.thumbnailUrl) || other.thumbnailUrl == _this.thumbnailUrl)&&(identical(other.coverUrl, _this.coverUrl) || other.coverUrl == _this.coverUrl)&&(identical(other.sourceUrl, _this.sourceUrl) || other.sourceUrl == _this.sourceUrl)&&const DeepCollectionEquality().equals(other.artists, _this.artists)&&(identical(other.album, _this.album) || other.album == _this.album)&&(identical(other.genre, _this.genre) || other.genre == _this.genre)&&(identical(other.metadata, _this.metadata) || other.metadata == _this.metadata)&&(identical(other.fileHash, _this.fileHash) || other.fileHash == _this.fileHash)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt)&&(identical(other.createdAt, _this.createdAt) || other.createdAt == _this.createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Media;
-  return Object.hash(runtimeType,_this.id,_this.title,_this.type,_this.fileSize,_this.filename,_this.year,_this.description,_this.duration,_this.thumbnailUrl,_this.coverUrl,const DeepCollectionEquality().hash(_this.artists),_this.album,_this.genre,_this.metadata,_this.fileHash,_this.updatedAt,_this.createdAt);
+  return Object.hash(runtimeType,_this.id,_this.title,_this.type,_this.fileSize,_this.filename,_this.year,_this.description,_this.duration,_this.thumbnailUrl,_this.coverUrl,_this.sourceUrl,const DeepCollectionEquality().hash(_this.artists),_this.album,_this.genre,_this.metadata,_this.fileHash,_this.updatedAt,_this.createdAt);
 }
 
 @override
 String toString() {
   final _this = this as Media;
-  return 'Media(id: ${_this.id}, title: ${_this.title}, type: ${_this.type}, fileSize: ${_this.fileSize}, filename: ${_this.filename}, year: ${_this.year}, description: ${_this.description}, duration: ${_this.duration}, thumbnailUrl: ${_this.thumbnailUrl}, coverUrl: ${_this.coverUrl}, artists: ${_this.artists}, album: ${_this.album}, genre: ${_this.genre}, metadata: ${_this.metadata}, fileHash: ${_this.fileHash}, updatedAt: ${_this.updatedAt}, createdAt: ${_this.createdAt})';
+  return 'Media(id: ${_this.id}, title: ${_this.title}, type: ${_this.type}, fileSize: ${_this.fileSize}, filename: ${_this.filename}, year: ${_this.year}, description: ${_this.description}, duration: ${_this.duration}, thumbnailUrl: ${_this.thumbnailUrl}, coverUrl: ${_this.coverUrl}, sourceUrl: ${_this.sourceUrl}, artists: ${_this.artists}, album: ${_this.album}, genre: ${_this.genre}, metadata: ${_this.metadata}, fileHash: ${_this.fileHash}, updatedAt: ${_this.updatedAt}, createdAt: ${_this.createdAt})';
 }
 
 
@@ -54,7 +54,7 @@ abstract mixin class $MediaCopyWith<$Res>  {
   factory $MediaCopyWith(Media value, $Res Function(Media) _then) = _$MediaCopyWithImpl;
 @useResult
 $Res call({
- int id, String title,@MediaTypeConverter() MediaType type,@JsonKey(name: 'file_size') int fileSize,@JsonKey(name: 'filename') String filename, int? year, String? description, int? duration,@JsonKey(name: 'thumbnail_url') String? thumbnailUrl,@JsonKey(name: 'cover_url') String? coverUrl, List<Artist> artists, String? album, String? genre, Metadata? metadata,@JsonKey(name: 'file_hash') String fileHash,@JsonKey(name: 'updated_at') DateTime? updatedAt,@JsonKey(name: 'created_at') DateTime? createdAt
+ int id, String title,@MediaTypeConverter() MediaType type,@JsonKey(name: 'file_size') int fileSize,@JsonKey(name: 'filename') String filename, int? year, String? description, int? duration,@JsonKey(name: 'thumbnail_url') String? thumbnailUrl,@JsonKey(name: 'cover_url') String? coverUrl,@JsonKey(name: 'source_url') String? sourceUrl, List<Artist> artists, String? album, String? genre, Metadata? metadata,@JsonKey(name: 'file_hash') String fileHash,@JsonKey(name: 'updated_at') DateTime? updatedAt,@JsonKey(name: 'created_at') DateTime? createdAt
 });
 
 
@@ -71,7 +71,7 @@ class _$MediaCopyWithImpl<$Res>
 
 /// Create a copy of Media
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? type = null,Object? fileSize = null,Object? filename = null,Object? year = freezed,Object? description = freezed,Object? duration = freezed,Object? thumbnailUrl = freezed,Object? coverUrl = freezed,Object? artists = null,Object? album = freezed,Object? genre = freezed,Object? metadata = freezed,Object? fileHash = null,Object? updatedAt = freezed,Object? createdAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? title = null,Object? type = null,Object? fileSize = null,Object? filename = null,Object? year = freezed,Object? description = freezed,Object? duration = freezed,Object? thumbnailUrl = freezed,Object? coverUrl = freezed,Object? sourceUrl = freezed,Object? artists = null,Object? album = freezed,Object? genre = freezed,Object? metadata = freezed,Object? fileHash = null,Object? updatedAt = freezed,Object? createdAt = freezed,}) {
   return _then(Media(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
@@ -83,6 +83,7 @@ as int?,description: freezed == description ? _self.description : description //
 as String?,duration: freezed == duration ? _self.duration : duration // ignore: cast_nullable_to_non_nullable
 as int?,thumbnailUrl: freezed == thumbnailUrl ? _self.thumbnailUrl : thumbnailUrl // ignore: cast_nullable_to_non_nullable
 as String?,coverUrl: freezed == coverUrl ? _self.coverUrl : coverUrl // ignore: cast_nullable_to_non_nullable
+as String?,sourceUrl: freezed == sourceUrl ? _self.sourceUrl : sourceUrl // ignore: cast_nullable_to_non_nullable
 as String?,artists: null == artists ? _self.artists : artists // ignore: cast_nullable_to_non_nullable
 as List<Artist>,album: freezed == album ? _self.album : album // ignore: cast_nullable_to_non_nullable
 as String?,genre: freezed == genre ? _self.genre : genre // ignore: cast_nullable_to_non_nullable
@@ -184,10 +185,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'file_size')  int fileSize, @JsonKey(name: 'filename')  String filename,  int? year,  String? description,  int? duration, @JsonKey(name: 'thumbnail_url')  String? thumbnailUrl, @JsonKey(name: 'cover_url')  String? coverUrl,  List<Artist> artists,  String? album,  String? genre,  Metadata? metadata, @JsonKey(name: 'file_hash')  String fileHash, @JsonKey(name: 'updated_at')  DateTime? updatedAt, @JsonKey(name: 'created_at')  DateTime? createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String title, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'file_size')  int fileSize, @JsonKey(name: 'filename')  String filename,  int? year,  String? description,  int? duration, @JsonKey(name: 'thumbnail_url')  String? thumbnailUrl, @JsonKey(name: 'cover_url')  String? coverUrl, @JsonKey(name: 'source_url')  String? sourceUrl,  List<Artist> artists,  String? album,  String? genre,  Metadata? metadata, @JsonKey(name: 'file_hash')  String fileHash, @JsonKey(name: 'updated_at')  DateTime? updatedAt, @JsonKey(name: 'created_at')  DateTime? createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Media() when $default != null:
-return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_that.year,_that.description,_that.duration,_that.thumbnailUrl,_that.coverUrl,_that.artists,_that.album,_that.genre,_that.metadata,_that.fileHash,_that.updatedAt,_that.createdAt);case _:
+return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_that.year,_that.description,_that.duration,_that.thumbnailUrl,_that.coverUrl,_that.sourceUrl,_that.artists,_that.album,_that.genre,_that.metadata,_that.fileHash,_that.updatedAt,_that.createdAt);case _:
   return orElse();
 
 }
@@ -205,10 +206,10 @@ return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'file_size')  int fileSize, @JsonKey(name: 'filename')  String filename,  int? year,  String? description,  int? duration, @JsonKey(name: 'thumbnail_url')  String? thumbnailUrl, @JsonKey(name: 'cover_url')  String? coverUrl,  List<Artist> artists,  String? album,  String? genre,  Metadata? metadata, @JsonKey(name: 'file_hash')  String fileHash, @JsonKey(name: 'updated_at')  DateTime? updatedAt, @JsonKey(name: 'created_at')  DateTime? createdAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String title, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'file_size')  int fileSize, @JsonKey(name: 'filename')  String filename,  int? year,  String? description,  int? duration, @JsonKey(name: 'thumbnail_url')  String? thumbnailUrl, @JsonKey(name: 'cover_url')  String? coverUrl, @JsonKey(name: 'source_url')  String? sourceUrl,  List<Artist> artists,  String? album,  String? genre,  Metadata? metadata, @JsonKey(name: 'file_hash')  String fileHash, @JsonKey(name: 'updated_at')  DateTime? updatedAt, @JsonKey(name: 'created_at')  DateTime? createdAt)  $default,) {final _that = this;
 switch (_that) {
 case _Media():
-return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_that.year,_that.description,_that.duration,_that.thumbnailUrl,_that.coverUrl,_that.artists,_that.album,_that.genre,_that.metadata,_that.fileHash,_that.updatedAt,_that.createdAt);}
+return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_that.year,_that.description,_that.duration,_that.thumbnailUrl,_that.coverUrl,_that.sourceUrl,_that.artists,_that.album,_that.genre,_that.metadata,_that.fileHash,_that.updatedAt,_that.createdAt);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -222,10 +223,10 @@ return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'file_size')  int fileSize, @JsonKey(name: 'filename')  String filename,  int? year,  String? description,  int? duration, @JsonKey(name: 'thumbnail_url')  String? thumbnailUrl, @JsonKey(name: 'cover_url')  String? coverUrl,  List<Artist> artists,  String? album,  String? genre,  Metadata? metadata, @JsonKey(name: 'file_hash')  String fileHash, @JsonKey(name: 'updated_at')  DateTime? updatedAt, @JsonKey(name: 'created_at')  DateTime? createdAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String title, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'file_size')  int fileSize, @JsonKey(name: 'filename')  String filename,  int? year,  String? description,  int? duration, @JsonKey(name: 'thumbnail_url')  String? thumbnailUrl, @JsonKey(name: 'cover_url')  String? coverUrl, @JsonKey(name: 'source_url')  String? sourceUrl,  List<Artist> artists,  String? album,  String? genre,  Metadata? metadata, @JsonKey(name: 'file_hash')  String fileHash, @JsonKey(name: 'updated_at')  DateTime? updatedAt, @JsonKey(name: 'created_at')  DateTime? createdAt)?  $default,) {final _that = this;
 switch (_that) {
 case _Media() when $default != null:
-return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_that.year,_that.description,_that.duration,_that.thumbnailUrl,_that.coverUrl,_that.artists,_that.album,_that.genre,_that.metadata,_that.fileHash,_that.updatedAt,_that.createdAt);case _:
+return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_that.year,_that.description,_that.duration,_that.thumbnailUrl,_that.coverUrl,_that.sourceUrl,_that.artists,_that.album,_that.genre,_that.metadata,_that.fileHash,_that.updatedAt,_that.createdAt);case _:
   return null;
 
 }
@@ -237,7 +238,7 @@ return $default(_that.id,_that.title,_that.type,_that.fileSize,_that.filename,_t
 @JsonSerializable()
 
 class _Media implements Media {
-  const _Media({required this.id, required this.title, @MediaTypeConverter() required this.type, @JsonKey(name: 'file_size') required this.fileSize, @JsonKey(name: 'filename') this.filename = '', this.year, this.description, this.duration, @JsonKey(name: 'thumbnail_url') this.thumbnailUrl, @JsonKey(name: 'cover_url') this.coverUrl,  List<Artist> artists = const <Artist>[], this.album, this.genre, this.metadata, @JsonKey(name: 'file_hash') this.fileHash = '', @JsonKey(name: 'updated_at') this.updatedAt, @JsonKey(name: 'created_at') this.createdAt}): _artists = artists;
+  const _Media({required this.id, required this.title, @MediaTypeConverter() required this.type, @JsonKey(name: 'file_size') required this.fileSize, @JsonKey(name: 'filename') this.filename = '', this.year, this.description, this.duration, @JsonKey(name: 'thumbnail_url') this.thumbnailUrl, @JsonKey(name: 'cover_url') this.coverUrl, @JsonKey(name: 'source_url') this.sourceUrl,  List<Artist> artists = const <Artist>[], this.album, this.genre, this.metadata, @JsonKey(name: 'file_hash') this.fileHash = '', @JsonKey(name: 'updated_at') this.updatedAt, @JsonKey(name: 'created_at') this.createdAt}): _artists = artists;
   factory _Media.fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);
 
 @override final  int id;
@@ -250,6 +251,7 @@ class _Media implements Media {
 @override final  int? duration;
 @override@JsonKey(name: 'thumbnail_url') final  String? thumbnailUrl;
 @override@JsonKey(name: 'cover_url') final  String? coverUrl;
+@override@JsonKey(name: 'source_url') final  String? sourceUrl;
  final  List<Artist> _artists;
 @override@JsonKey() List<Artist> get artists {
   if (_artists is EqualUnmodifiableListView) return _artists;
@@ -277,18 +279,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Media&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.type, type) || other.type == type)&&(identical(other.fileSize, fileSize) || other.fileSize == fileSize)&&(identical(other.filename, filename) || other.filename == filename)&&(identical(other.year, year) || other.year == year)&&(identical(other.description, description) || other.description == description)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.thumbnailUrl, thumbnailUrl) || other.thumbnailUrl == thumbnailUrl)&&(identical(other.coverUrl, coverUrl) || other.coverUrl == coverUrl)&&const DeepCollectionEquality().equals(other.artists, _artists)&&(identical(other.album, album) || other.album == album)&&(identical(other.genre, genre) || other.genre == genre)&&(identical(other.metadata, metadata) || other.metadata == metadata)&&(identical(other.fileHash, fileHash) || other.fileHash == fileHash)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Media&&(identical(other.id, id) || other.id == id)&&(identical(other.title, title) || other.title == title)&&(identical(other.type, type) || other.type == type)&&(identical(other.fileSize, fileSize) || other.fileSize == fileSize)&&(identical(other.filename, filename) || other.filename == filename)&&(identical(other.year, year) || other.year == year)&&(identical(other.description, description) || other.description == description)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.thumbnailUrl, thumbnailUrl) || other.thumbnailUrl == thumbnailUrl)&&(identical(other.coverUrl, coverUrl) || other.coverUrl == coverUrl)&&(identical(other.sourceUrl, sourceUrl) || other.sourceUrl == sourceUrl)&&const DeepCollectionEquality().equals(other.artists, _artists)&&(identical(other.album, album) || other.album == album)&&(identical(other.genre, genre) || other.genre == genre)&&(identical(other.metadata, metadata) || other.metadata == metadata)&&(identical(other.fileHash, fileHash) || other.fileHash == fileHash)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,title,type,fileSize,filename,year,description,duration,thumbnailUrl,coverUrl,const DeepCollectionEquality().hash(_artists),album,genre,metadata,fileHash,updatedAt,createdAt);
+    return Object.hash(runtimeType,id,title,type,fileSize,filename,year,description,duration,thumbnailUrl,coverUrl,sourceUrl,const DeepCollectionEquality().hash(_artists),album,genre,metadata,fileHash,updatedAt,createdAt);
 }
 
 @override
 String toString() {
-    return 'Media(id: $id, title: $title, type: $type, fileSize: $fileSize, filename: $filename, year: $year, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, artists: $artists, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash, updatedAt: $updatedAt, createdAt: $createdAt)';
+    return 'Media(id: $id, title: $title, type: $type, fileSize: $fileSize, filename: $filename, year: $year, description: $description, duration: $duration, thumbnailUrl: $thumbnailUrl, coverUrl: $coverUrl, sourceUrl: $sourceUrl, artists: $artists, album: $album, genre: $genre, metadata: $metadata, fileHash: $fileHash, updatedAt: $updatedAt, createdAt: $createdAt)';
 }
 
 
@@ -299,7 +301,7 @@ abstract mixin class _$MediaCopyWith<$Res> implements $MediaCopyWith<$Res> {
   factory _$MediaCopyWith(_Media value, $Res Function(_Media) _then) = __$MediaCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String title,@MediaTypeConverter() MediaType type,@JsonKey(name: 'file_size') int fileSize,@JsonKey(name: 'filename') String filename, int? year, String? description, int? duration,@JsonKey(name: 'thumbnail_url') String? thumbnailUrl,@JsonKey(name: 'cover_url') String? coverUrl, List<Artist> artists, String? album, String? genre, Metadata? metadata,@JsonKey(name: 'file_hash') String fileHash,@JsonKey(name: 'updated_at') DateTime? updatedAt,@JsonKey(name: 'created_at') DateTime? createdAt
+ int id, String title,@MediaTypeConverter() MediaType type,@JsonKey(name: 'file_size') int fileSize,@JsonKey(name: 'filename') String filename, int? year, String? description, int? duration,@JsonKey(name: 'thumbnail_url') String? thumbnailUrl,@JsonKey(name: 'cover_url') String? coverUrl,@JsonKey(name: 'source_url') String? sourceUrl, List<Artist> artists, String? album, String? genre, Metadata? metadata,@JsonKey(name: 'file_hash') String fileHash,@JsonKey(name: 'updated_at') DateTime? updatedAt,@JsonKey(name: 'created_at') DateTime? createdAt
 });
 
 
@@ -316,7 +318,7 @@ class __$MediaCopyWithImpl<$Res>
 
 /// Create a copy of Media
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? type = null,Object? fileSize = null,Object? filename = null,Object? year = freezed,Object? description = freezed,Object? duration = freezed,Object? thumbnailUrl = freezed,Object? coverUrl = freezed,Object? artists = null,Object? album = freezed,Object? genre = freezed,Object? metadata = freezed,Object? fileHash = null,Object? updatedAt = freezed,Object? createdAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? title = null,Object? type = null,Object? fileSize = null,Object? filename = null,Object? year = freezed,Object? description = freezed,Object? duration = freezed,Object? thumbnailUrl = freezed,Object? coverUrl = freezed,Object? sourceUrl = freezed,Object? artists = null,Object? album = freezed,Object? genre = freezed,Object? metadata = freezed,Object? fileHash = null,Object? updatedAt = freezed,Object? createdAt = freezed,}) {
   return _then(_Media(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
@@ -328,6 +330,7 @@ as int?,description: freezed == description ? _self.description : description //
 as String?,duration: freezed == duration ? _self.duration : duration // ignore: cast_nullable_to_non_nullable
 as int?,thumbnailUrl: freezed == thumbnailUrl ? _self.thumbnailUrl : thumbnailUrl // ignore: cast_nullable_to_non_nullable
 as String?,coverUrl: freezed == coverUrl ? _self.coverUrl : coverUrl // ignore: cast_nullable_to_non_nullable
+as String?,sourceUrl: freezed == sourceUrl ? _self.sourceUrl : sourceUrl // ignore: cast_nullable_to_non_nullable
 as String?,artists: null == artists ? _self._artists : artists // ignore: cast_nullable_to_non_nullable
 as List<Artist>,album: freezed == album ? _self.album : album // ignore: cast_nullable_to_non_nullable
 as String?,genre: freezed == genre ? _self.genre : genre // ignore: cast_nullable_to_non_nullable

@@ -104,6 +104,7 @@ void main() {
         duration: 180,
         thumbnailUrl: 'http://example.com/thumb.jpg',
         coverUrl: 'http://example.com/cover.jpg',
+        sourceUrl: 'https://www.youtube.com/watch?v=abc',
         artists: const [
           Artist(id: 1, name: 'Artist One'),
           Artist(id: 2, name: 'Artist Two'),
@@ -126,6 +127,26 @@ void main() {
       expect(restored.artists, hasLength(2));
       expect(restored.metadata?.genres, ['Rock', 'Indie']);
       expect(restored.type, MediaType.audio);
+      expect(restored.sourceUrl, 'https://www.youtube.com/watch?v=abc');
+    });
+
+    test('parses source_url and defaults to null when missing', () {
+      final withUrl = Media.fromJson({
+        'id': 1,
+        'title': 'T',
+        'type': 'video',
+        'file_size': 1,
+        'source_url': 'https://youtu.be/abc',
+      });
+      expect(withUrl.sourceUrl, 'https://youtu.be/abc');
+
+      final withoutUrl = Media.fromJson({
+        'id': 2,
+        'title': 'T',
+        'type': 'video',
+        'file_size': 1,
+      });
+      expect(withoutUrl.sourceUrl, isNull);
     });
 
     test('unknown type survives toJson to fromJson roundtrip', () {

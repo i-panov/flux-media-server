@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"log"
+	"errors"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
@@ -70,8 +70,7 @@ func (h *MetadataHandler) Refresh(c *fiber.Ctx) error {
 	media.Year = year
 
 	if err := h.mediaRepo.Update(ctx, media); err != nil {
-		log.Printf("Update: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to update metadata")
+		return repoError(c, err, "Media not found", "Failed to update metadata")
 	}
 
 	return c.JSON(media)
@@ -101,9 +100,25 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		PosterURL   *string   `json:"poster_url"`
 		Rating      *float64  `json:"rating"`
 		Genres      *string   `json:"genres"`
+		SourceURL   *string   `json:"source_url"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	// Ссылку валидируем до любых записей: при невалидном URL ничего
+	// из присланного применяться не должно.
+	var sourceURL *string
+	if req.SourceURL != nil {
+		normalized, err := metadata.NormalizeSourceURL(*req.SourceURL)
+		if err != nil {
+			msg := "Invalid source_url: must be an http(s) URL"
+			if errors.Is(err, metadata.ErrSourceURLTooLong) {
+				msg = "Invalid source_url: too long (max 2048 characters)"
+			}
+			return response.Error(c, fiber.StatusBadRequest, msg)
+		}
+		sourceURL = &normalized
 	}
 
 	if req.Title != nil {
@@ -151,9 +166,27 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		media.Metadata.Genres = *req.Genres
 	}
 
-	if err := h.mediaRepo.Update(ctx, media); err != nil {
-		log.Printf("Update: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to update metadata")
+	// Одна транзакция на всё: метаданные и ссылка пишутся вместе.
+	// Пустая source_url означает «очистить» — общий Update такое
+	// пропускает, поэтому ссылка идёт через UpdateWithSourceURL.
+	// Сентinелы валидации маппятся в 400 и здесь тоже: репозиторий
+	// перепроверяет ссылку как defense-in-depth, и его ответ не должен
+	// превращаться в 500.
+	if err := h.mediaRepo.UpdateWithSourceURL(ctx, media, sourceURL); err != nil {
+		if errors.Is(err, metadata.ErrSourceURLTooLong) {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid source_url: too long (max 2048 characters)")
+		}
+		if errors.Is(err, metadata.ErrSourceURLInvalid) {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid source_url: must be an http(s) URL")
+		}
+		return repoError(c, err, "Media not found", "Failed to update metadata")
+	}
+
+	// Перечитываем для ответа: UpdatedAt и связанные данные после записи
+	// свежее, чем в объекте до неё.
+	media, err = h.mediaRepo.FindByID(ctx, mediaID)
+	if err != nil {
+		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	return c.JSON(media)

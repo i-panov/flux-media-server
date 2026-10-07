@@ -21,6 +21,7 @@ sealed class Media with _$Media {
     int? duration,
     @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
     @JsonKey(name: 'cover_url') String? coverUrl,
+    @JsonKey(name: 'source_url') String? sourceUrl,
     @Default(<Artist>[]) List<Artist> artists,
     String? album,
     String? genre,

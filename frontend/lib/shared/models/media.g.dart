@@ -17,6 +17,7 @@ _Media _$MediaFromJson(Map<String, dynamic> json) => _Media(
   duration: (json['duration'] as num?)?.toInt(),
   thumbnailUrl: json['thumbnail_url'] as String?,
   coverUrl: json['cover_url'] as String?,
+  sourceUrl: json['source_url'] as String?,
   artists:
       (json['artists'] as List<dynamic>?)
           ?.map((e) => Artist.fromJson(e as Map<String, dynamic>))
@@ -47,6 +48,7 @@ Map<String, dynamic> _$MediaToJson(_Media instance) => <String, dynamic>{
   'duration': instance.duration,
   'thumbnail_url': instance.thumbnailUrl,
   'cover_url': instance.coverUrl,
+  'source_url': instance.sourceUrl,
   'artists': instance.artists.map((e) => e.toJson()).toList(),
   'album': instance.album,
   'genre': instance.genre,

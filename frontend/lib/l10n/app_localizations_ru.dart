@@ -411,6 +411,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get description => 'Описание';
 
   @override
+  String get coverImage => 'Обложка';
+
+  @override
+  String get sourceUrl => 'Ссылка на источник';
+
+  @override
+  String get invalidSourceUrl => 'Введите корректную http(s)-ссылку';
+
+  @override
+  String get copyLink => 'Скопировать ссылку';
+
+  @override
+  String get linkCopied => 'Ссылка скопирована в буфер обмена';
+
+  @override
+  String get cannotOpenLink => 'Не удалось открыть ссылку';
+
+  @override
   String get speed => 'Скорость';
 
   @override

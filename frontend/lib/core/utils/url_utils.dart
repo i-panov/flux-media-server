@@ -7,8 +7,27 @@ const String defaultServerAddress = 'http://localhost:8080';
 /// Проверяет, что [input] похож на корректный адрес сервера:
 /// непустая строка со схемой http/https и непустым хостом.
 bool isValidServerUrl(String input) {
+  return _isHttpUrl(input, maxLength: null);
+}
+
+/// Проверяет, что [input] — готовая http(s)-ссылка (например, на
+/// источник видео): схема и хост на месте, схему НЕ добавляем —
+/// в отличие от адреса сервера, здесь нужна полная ссылка.
+/// Пустая строка — невалидна (очистку поля диалог обрабатывает отдельно).
+///
+/// Лимит длины — как на сервере (`maxSourceURLLen = 2048`): паритет,
+/// чтобы длинная вставка подсвечивала поле, а не падала на PUT 400.
+bool isValidHttpUrl(String input) {
+  return _isHttpUrl(input, maxLength: 2048);
+}
+
+/// Общее ядро обеих проверок: trim, схема http/https, непустой хост.
+/// [maxLength] в символах (руны, как серверный `RuneCountInString`);
+/// `null` — без лимита.
+bool _isHttpUrl(String input, {required int? maxLength}) {
   final trimmed = input.trim();
   if (trimmed.isEmpty) return false;
+  if (maxLength != null && trimmed.runes.length > maxLength) return false;
   final uri = Uri.tryParse(trimmed);
   if (uri == null) return false;
   final scheme = uri.scheme.toLowerCase();

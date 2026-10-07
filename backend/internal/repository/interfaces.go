@@ -41,6 +41,12 @@ type MediaRepository interface {
 	// Update обновляет только непустые поля; ассоциации Artists заменяются
 	// целиком, Metadata сохраняется upsert'ом при наличии.
 	Update(ctx context.Context, media *models.Media) error
+	// UpdateWithSourceURL — то же, что Update, плюс безусловная запись
+	// ссылки на источник в той же транзакции (включая пустую строку =
+	// очистка). Отдельный метод, а не флаг в Update: общий Update
+	// пропускает пустые значения, чтобы сканер и очередь не затирали
+	// ручные правки. nil = ссылку не трогать.
+	UpdateWithSourceURL(ctx context.Context, media *models.Media, sourceURL *string) error
 	Delete(ctx context.Context, id uint) error
 }
 

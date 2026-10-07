@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
@@ -106,7 +107,7 @@ class MediaRepositoryImpl implements MediaRepository {
     int mediaId,
     MetadataEdit edit,
   ) => safeRepositoryCall(
-    () => remoteDataSource.updateMetadata(mediaId, _editToJson(edit)),
+    () => remoteDataSource.updateMetadata(mediaId, editToJson(edit)),
   );
 
   @override
@@ -171,12 +172,19 @@ class MediaRepositoryImpl implements MediaRepository {
   }
 
   /// Маппинг типизированного редактирования в JSON — остаётся в data-слое.
-  static Map<String, dynamic> _editToJson(MetadataEdit edit) => {
+  /// `source_url` включается при не-null (в т.ч. пустой строкой для
+  /// очистки): отсутствие ключа означает «не трогать». Dirty-check
+  /// (не слать без изменений) — задача диалога, собирающего edit.
+  /// Открыт для тестов: только так проверяется маппинг без поднятия
+  /// реального HTTP-клиента в моке datasource.
+  @visibleForTesting
+  static Map<String, dynamic> editToJson(MetadataEdit edit) => {
     'title': edit.title,
     'artists': edit.artists,
     if (edit.album != null) 'album': edit.album,
     if (edit.genre != null) 'genre': edit.genre,
     if (edit.year != null) 'year': edit.year,
     if (edit.description != null) 'description': edit.description,
+    if (edit.sourceUrl != null) 'source_url': edit.sourceUrl,
   };
 }

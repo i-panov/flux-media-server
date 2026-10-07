@@ -6,12 +6,19 @@ import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
+import 'package:flux_media_server/features/video/presentation/widgets/source_link_row.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// Metadata + action buttons for a video. Stateless presentation: parent
 /// (VideoDetailScreen) owns any stateful side effects (e.g. cover-upload
 /// spinner) and passes them through callbacks.
+///
+/// Панель намеренно на фиксированной тёмной подложке (экран задаёт
+/// `Colors.black87` в обеих темах), поэтому текст — захардкоженные белые
+/// оттенки, а не `colorScheme`: в светлой теме `onSurface` был бы тёмным
+/// и стал невидимым. Контраст пар: белый/70%/60% на near-black — от ~5:1
+/// и выше при требовании 4.5:1; акцент ссылки — lightBlueAccent.
 class VideoDetailsPanel extends ConsumerWidget {
   const new({
     required this.media,
@@ -63,26 +70,40 @@ class VideoDetailsPanel extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (hasCover) ...[
-            AuthNetworkImage(
-              imageUrl: coverUrl,
-              fit: BoxFit.cover,
-              height: 200,
-              width: double.infinity,
-              placeholder: (_, _) => const SizedBox(
+            Semantics(
+              label: l.coverImage,
+              image: true,
+              child: AuthNetworkImage(
+                imageUrl: coverUrl,
+                fit: BoxFit.cover,
                 height: 200,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              errorWidget: (_, _, _) => const SizedBox(
-                height: 200,
-                child: Center(child: Icon(Icons.broken_image, size: 64)),
+                width: double.infinity,
+                // Состояния загрузки/ошибки из семантики исключены: иначе
+                // скринридер анонсировал бы спиннер и иконку поверх метки
+                // «Обложка».
+                placeholder: (_, _) => const ExcludeSemantics(
+                  child: SizedBox(
+                    height: 200,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+                errorWidget: (_, _, _) => const ExcludeSemantics(
+                  child: SizedBox(
+                    height: 200,
+                    child: Center(child: Icon(Icons.broken_image, size: 64)),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),
           ],
-          Text(
-            media.title,
-            style: Theme.of(context).textTheme.headlineMedium
-                ?.copyWith(color: Colors.white),
+          Semantics(
+            header: true,
+            child: Text(
+              media.title,
+              style: Theme.of(context).textTheme.headlineMedium
+                  ?.copyWith(color: Colors.white),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -140,6 +161,10 @@ class VideoDetailsPanel extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(color: Colors.white60),
             ),
+          ],
+          if (media.sourceUrl != null && media.sourceUrl!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            SourceLinkRow(url: media.sourceUrl!),
           ],
           const SizedBox(height: 24),
           SizedBox(

@@ -410,6 +410,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get description => 'Description';
 
   @override
+  String get coverImage => 'Cover image';
+
+  @override
+  String get sourceUrl => 'Source link';
+
+  @override
+  String get invalidSourceUrl => 'Enter a valid http(s) link';
+
+  @override
+  String get copyLink => 'Copy link';
+
+  @override
+  String get linkCopied => 'Link copied to clipboard';
+
+  @override
+  String get cannotOpenLink => 'Couldn\'t open the link';
+
+  @override
   String get speed => 'Speed';
 
   @override

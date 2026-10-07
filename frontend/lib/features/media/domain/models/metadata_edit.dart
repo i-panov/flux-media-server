@@ -10,6 +10,7 @@ class MetadataEdit {
     this.genre,
     this.year,
     this.description,
+    this.sourceUrl,
   });
 
   final String title;
@@ -18,4 +19,16 @@ class MetadataEdit {
   final String? genre;
   final int? year;
   final String? description;
+
+  /// Ссылка на источник. `null` — не трогать (в т.ч. без изменений),
+  /// пустая строка — очистить. Отличие от album/genre осознанное: пустое
+  /// поле ссылки в диалоге обязано стираться на сервере, а не
+  /// игнорироваться.
+  ///
+  /// UI ссылки — только видео-панель (`VideoDetailsPanel`): задать ссылку
+  /// можно и для аудио (диалог общий), но увидеть — только у видео.
+  /// Несогласованность с `description` (пусто = null = не очистить)
+  /// историческая и зафиксирована здесь, чтобы не чинить молча:
+  /// менять поведение description — отдельная задача.
+  final String? sourceUrl;
 }

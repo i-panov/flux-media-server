@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/utils/filename_parser.dart';
 import 'package:flux_media_server/core/utils/media_image_url.dart';
+import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
 import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
@@ -42,6 +43,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
   late final TextEditingController _genreController;
   late final TextEditingController _yearController;
   late final TextEditingController _descriptionController;
+  late final TextEditingController _sourceUrlController;
   final _formKey = GlobalKey<FormState>();
 
   String? _originalFilename;
@@ -63,6 +65,9 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     );
     _descriptionController = TextEditingController(
       text: widget.media.description ?? '',
+    );
+    _sourceUrlController = TextEditingController(
+      text: widget.media.sourceUrl ?? '',
     );
     _originalFilename = widget.media.filename.isNotEmpty
         ? widget.media.filename
@@ -106,6 +111,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     _genreController.dispose();
     _yearController.dispose();
     _descriptionController.dispose();
+    _sourceUrlController.dispose();
     super.dispose();
   }
 
@@ -124,10 +130,26 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     return null;
   }
 
+  /// Ссылка на источник: либо пусто (поле очистится), либо
+  /// готовая http(s)-ссылка. Схему не добавляем — нужна полная ссылка.
+  String? _validateSourceUrl(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
+    if (!isValidHttpUrl(text)) {
+      return AppLocalizations.of(context)!.invalidSourceUrl;
+    }
+    return null;
+  }
+
   MetadataEdit _collectData() {
     final album = _albumController.text.trim();
     final genre = _genreController.text.trim();
     final description = _descriptionController.text.trim();
+    final sourceUrl = _sourceUrlController.text.trim();
+    // Шлём ссылку, только если она менялась: иначе каждое сохранение
+    // дёргало бы лишний UPDATE и бампило updated_at без изменений.
+    // Пустая строка при непустом исходном — осознанная очистка.
+    final originalSourceUrl = (widget.media.sourceUrl ?? '').trim();
     return MetadataEdit(
       title: _titleController.text.trim(),
       artists: _artistControllers
@@ -139,6 +161,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
       // Валидатор гарантирует корректный год (или пусто).
       year: int.tryParse(_yearController.text.trim()),
       description: description.isEmpty ? null : description,
+      sourceUrl: sourceUrl == originalSourceUrl ? null : sourceUrl,
     );
   }
 
@@ -213,6 +236,15 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
                 controller: _descriptionController,
                 decoration: InputDecoration(labelText: l.description),
                 maxLines: 3,
+              ),
+              TextFormField(
+                controller: _sourceUrlController,
+                decoration: InputDecoration(
+                  labelText: l.sourceUrl,
+                  hintText: 'https://',
+                ),
+                keyboardType: TextInputType.url,
+                validator: _validateSourceUrl,
               ),
 
               // Original filename section (only shown if available).

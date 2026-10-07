@@ -25,17 +25,21 @@ type Media struct {
 	// delete — a file re-appearing after its record was soft-deleted would
 	// fail with a UNIQUE error and the media would be lost. Duplicate
 	// detection is done in the scanner via FindByPath/FindByHash.
-	FilePath     string         `gorm:"index" json:"-"`
-	FileSize     int64          `json:"file_size"`
-	FileHash     string         `gorm:"index" json:"file_hash"`
-	QuickHash    string         `gorm:"index" json:"quick_hash"`
-	ThumbnailURL string         `json:"thumbnail_url"`
-	CoverURL     string         `json:"cover_url"`
-	MetadataID   *uint          `json:"metadata_id,omitempty"`
-	Metadata     *Metadata      `json:"metadata,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	FilePath     string `gorm:"index" json:"-"`
+	FileSize     int64  `json:"file_size"`
+	FileHash     string `gorm:"index" json:"file_hash"`
+	QuickHash    string `gorm:"index" json:"quick_hash"`
+	ThumbnailURL string `json:"thumbnail_url"`
+	CoverURL     string `json:"cover_url"`
+	// SourceURL — ссылка на источник (например, страница YouTube).
+	// Заполняется только вручную через PUT /api/metadata/:mediaId,
+	// сканер и очередь загрузок её не трогают.
+	SourceURL  string         `json:"source_url"`
+	MetadataID *uint          `json:"metadata_id,omitempty"`
+	Metadata   *Metadata      `json:"metadata,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 type Metadata struct {

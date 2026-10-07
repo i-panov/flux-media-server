@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"flux/internal/metadata"
 	"flux/internal/models"
 
 	"gorm.io/gorm"
@@ -180,83 +181,126 @@ func (r *MediaStore) Update(ctx context.Context, media *models.Media) error {
 	}
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		artists, err := resolveArtists(tx, media.Artists)
+		return updateMediaTx(tx, media, nil)
+	})
+}
+
+// UpdateWithSourceURL — то же, что Update, плюс безусловная запись ссылки
+// на источник (включая пустую строку = очистка), всё в одной транзакции.
+func (r *MediaStore) UpdateWithSourceURL(ctx context.Context, media *models.Media, sourceURL *string) error {
+	if media.ID == 0 {
+		return errors.New("repository: media ID required for UpdateWithSourceURL")
+	}
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return updateMediaTx(tx, media, sourceURL)
+	})
+}
+
+func updateMediaTx(tx *gorm.DB, media *models.Media, sourceURL *string) error {
+	// Запись существует? Без проверки удаление между Find и Update — или
+	// вызов в обход чтения вообще — дало бы 200 с фантомом (при пустом
+	// updates не пишется ничего, и пропажа видна только здесь).
+	// Один индексированный COUNT по первичному ключу на фоне ffprobe
+	// и файлового IO незаметен даже на горячем пути сканера.
+	var count int64
+	if err := tx.Model(&models.Media{}).Where("id = ?", media.ID).Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	// Defense-in-depth: ссылку перепроверяем и здесь, а не только в
+	// хендлере — прямой вызов репозитория в обход валидации не должен
+	// положить мусор в БД.
+	if sourceURL != nil {
+		normalized, err := metadata.NormalizeSourceURL(*sourceURL)
 		if err != nil {
 			return err
 		}
-		media.Artists = artists
+		*sourceURL = normalized
+	}
 
-		updates := make(map[string]interface{})
-		if media.Title != "" {
-			updates["title"] = media.Title
-		}
-		if media.Filename != "" {
-			updates["filename"] = media.Filename
-		}
-		if media.Year != 0 {
-			updates["year"] = media.Year
-		}
-		if media.Description != "" {
-			updates["description"] = media.Description
-		}
-		if media.Type != "" {
-			updates["type"] = media.Type
-		}
-		if media.Album != "" {
-			updates["album"] = media.Album
-		}
-		if media.Genre != "" {
-			updates["genre"] = media.Genre
-		}
-		if media.Duration != 0 {
-			updates["duration"] = media.Duration
-		}
-		if media.FilePath != "" {
-			updates["file_path"] = media.FilePath
-		}
-		if media.FileSize != 0 {
-			updates["file_size"] = media.FileSize
-		}
-		if media.FileHash != "" {
-			updates["file_hash"] = media.FileHash
-		}
-		if media.QuickHash != "" {
-			updates["quick_hash"] = media.QuickHash
-		}
-		if media.ThumbnailURL != "" {
-			updates["thumbnail_url"] = media.ThumbnailURL
-		}
-		if media.CoverURL != "" {
-			updates["cover_url"] = media.CoverURL
-		}
-		if media.MetadataID != nil && media.Metadata == nil {
-			updates["metadata_id"] = *media.MetadataID
-		}
+	artists, err := resolveArtists(tx, media.Artists)
+	if err != nil {
+		return err
+	}
+	media.Artists = artists
 
-		if len(updates) > 0 {
-			if err := tx.Model(media).Updates(updates).Error; err != nil {
+	updates := make(map[string]interface{})
+	if media.Title != "" {
+		updates["title"] = media.Title
+	}
+	if media.Filename != "" {
+		updates["filename"] = media.Filename
+	}
+	if media.Year != 0 {
+		updates["year"] = media.Year
+	}
+	if media.Description != "" {
+		updates["description"] = media.Description
+	}
+	if media.Type != "" {
+		updates["type"] = media.Type
+	}
+	if media.Album != "" {
+		updates["album"] = media.Album
+	}
+	if media.Genre != "" {
+		updates["genre"] = media.Genre
+	}
+	if media.Duration != 0 {
+		updates["duration"] = media.Duration
+	}
+	if media.FilePath != "" {
+		updates["file_path"] = media.FilePath
+	}
+	if media.FileSize != 0 {
+		updates["file_size"] = media.FileSize
+	}
+	if media.FileHash != "" {
+		updates["file_hash"] = media.FileHash
+	}
+	if media.QuickHash != "" {
+		updates["quick_hash"] = media.QuickHash
+	}
+	if media.ThumbnailURL != "" {
+		updates["thumbnail_url"] = media.ThumbnailURL
+	}
+	if media.CoverURL != "" {
+		updates["cover_url"] = media.CoverURL
+	}
+	if media.MetadataID != nil && media.Metadata == nil {
+		updates["metadata_id"] = *media.MetadataID
+	}
+	if sourceURL != nil {
+		updates["source_url"] = *sourceURL
+	}
+
+	if len(updates) > 0 {
+		if err := tx.Model(media).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+
+	// Has-one Metadata сохраняется явно: Updates не трогает ассоциации,
+	// а старый Save(media) сохранял её через upsert.
+	if media.Metadata != nil {
+		if err := tx.Save(media.Metadata).Error; err != nil {
+			return err
+		}
+		if media.MetadataID == nil || *media.MetadataID != media.Metadata.ID {
+			if err := tx.Model(media).Update("metadata_id", media.Metadata.ID).Error; err != nil {
 				return err
 			}
 		}
+	}
 
-		// Has-one Metadata сохраняется явно: Updates не трогает ассоциации,
-		// а старый Save(media) сохранял её через upsert.
-		if media.Metadata != nil {
-			if err := tx.Save(media.Metadata).Error; err != nil {
-				return err
-			}
-			if media.MetadataID == nil || *media.MetadataID != media.Metadata.ID {
-				if err := tx.Model(media).Update("metadata_id", media.Metadata.ID).Error; err != nil {
-					return err
-				}
-			}
-		}
-
-		if media.Artists != nil {
-			return tx.Model(media).Association("Artists").Replace(&media.Artists)
-		}
-		return nil
-	})
+	if media.Artists != nil {
+		return tx.Model(media).Association("Artists").Replace(&media.Artists)
+	}
+	return nil
 }
 
 // resolveArtists находит артистов по имени (find-or-create) и возвращает

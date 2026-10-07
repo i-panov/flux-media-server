@@ -836,6 +836,42 @@ abstract class AppLocalizations {
   /// **'Description'**
   String get description;
 
+  /// No description provided for @coverImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover image'**
+  String get coverImage;
+
+  /// No description provided for @sourceUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Source link'**
+  String get sourceUrl;
+
+  /// No description provided for @invalidSourceUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid http(s) link'**
+  String get invalidSourceUrl;
+
+  /// No description provided for @copyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get copyLink;
+
+  /// No description provided for @linkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied to clipboard'**
+  String get linkCopied;
+
+  /// No description provided for @cannotOpenLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the link'**
+  String get cannotOpenLink;
+
   /// No description provided for @speed.
   ///
   /// In en, this message translates to:
