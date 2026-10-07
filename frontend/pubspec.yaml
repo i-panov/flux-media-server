@@ -12,7 +12,7 @@ dependencies:
   audio_service: ^0.18.19
   audio_session: ^0.2.4
   auto_route: ^11.1.0
-  cached_network_image: ^4.0.0
+  cached_network_image: ^4.0.4
   chopper: ^8.7.0
   connectivity_plus: ^7.3.1
   crypto: ^3.0.7
