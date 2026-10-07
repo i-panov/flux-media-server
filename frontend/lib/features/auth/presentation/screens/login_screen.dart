@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/widgets/cooldown_button.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
@@ -23,8 +22,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  final ValueNotifier<int> _cooldown = ValueNotifier(0);
-  Timer? _cooldownTimer;
+  /// Не даёт спамить requestCode.
+  final _cooldown = CooldownController(_requestCooldown);
 
   @override
   void initState() {
@@ -39,30 +38,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
-    _cooldownTimer?.cancel();
     _cooldown.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
-  void _startCooldown() {
-    _cooldownTimer?.cancel();
-    _cooldown.value = _requestCooldown.inSeconds;
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_cooldown.value > 0) {
-        _cooldown.value--;
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
   Future<void> _requestCode() async {
-    if (_isLoading || _cooldown.value > 0) return;
+    if (_isLoading || _cooldown.isActive) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     final email = _emailController.text.trim();
@@ -70,7 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (mounted) {
       setState(() => _isLoading = false);
       if (sent) {
-        _startCooldown();
+        _cooldown.start();
         await context.router.replace(CodeRoute(email: email));
       }
     }
@@ -129,26 +111,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                ValueListenableBuilder<int>(
-                  valueListenable: _cooldown,
-                  builder: (context, seconds, _) {
-                    return SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _isLoading || seconds > 0
-                            ? null
-                            : _requestCode,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : Text(
-                                seconds > 0
-                                    ? '${l.getCode} (${seconds}s)'
-                                    : l.getCode,
-                              ),
-                      ),
-                    );
-                  },
+                CooldownButton(
+                  cooldown: _cooldown,
+                  onPressed: _requestCode,
+                  loading: _isLoading,
+                  label: l.getCode,
                 ),
                 if (authState is AuthError) ...[
                   const SizedBox(height: 16),

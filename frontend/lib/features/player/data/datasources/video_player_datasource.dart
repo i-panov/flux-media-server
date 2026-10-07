@@ -42,6 +42,10 @@ class VideoPlayerDatasource implements VideoPlaybackSource {
   @override
   Duration get position => player.state.position;
 
+  /// Current known duration; `Duration.zero` until the file is loaded.
+  @override
+  Duration get duration => player.state.duration;
+
   /// Current playback rate.
   @override
   double get rate => player.state.rate;

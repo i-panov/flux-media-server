@@ -49,11 +49,6 @@ class FakeAuthRepository implements AuthRepository {
   Function(String, String)?
   onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
-  Future<Either<Failure, ({String token, String refreshToken})>> Function(
-    String,
-  )?
-  onRefreshToken;
-
   int requestCodeCalls = 0;
 
   String? _lastDebugCode;
@@ -75,11 +70,6 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Either<Failure, User>> getCurrentUser() => onGetCurrentUser!();
-
-  @override
-  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
-    String refreshToken,
-  ) => onRefreshToken!(refreshToken);
 }
 
 /// Фейк офлайн-кеша: считает вызовы clearUserCache без реального IO.

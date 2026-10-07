@@ -6,10 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
-import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/player/presentation/screens/player_view.dart';
+import 'package:flux_media_server/features/player/presentation/utils/playback_toggle.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -391,12 +392,13 @@ class _SeekButton extends ConsumerWidget {
       icon: Icon(direction < 0 ? Icons.replay_10 : Icons.forward_10),
       iconSize: 24,
       onPressed: () {
-        final position = ref.read(videoPlayerDatasourceProvider).position;
-        unawaited(
-          coordinator.seek(
-            position + Duration(seconds: _seekStep.inSeconds * direction),
-          ),
+        final video = ref.read(videoPlayerDatasourceProvider);
+        final target = clampSeekPosition(
+          position: video.position,
+          step: _seekStep * direction,
+          duration: video.duration,
         );
+        unawaited(coordinator.seek(target));
       },
     );
   }

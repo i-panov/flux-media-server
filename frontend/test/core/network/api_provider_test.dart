@@ -43,6 +43,10 @@ class _FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<void> setLocale(String locale) async {}
+  @override
+  bool getTrustSelfSignedCertificates() => false;
+  @override
+  Future<void> setTrustSelfSignedCertificates({required bool value}) async {}
 }
 
 void main() {

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
@@ -47,6 +49,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    // Начальное значение поля: ref.listen ниже срабатывает только на
+    // ИЗМЕНЕНИИ состояния, поэтому без этого первый же показ диалога
+    // предлагал бы пустое поле вместо текущего адреса.
+    _serverUrlController.text =
+        ref.read(settingsProvider).settings.serverUrl ?? '';
     _cacheSizeFuture = ref.read(offlineCacheServiceProvider).getCacheSize();
     unawaited(_loadAppVersion());
   }
@@ -70,13 +77,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _saveServerUrl() async {
     final l = AppLocalizations.of(context)!;
     final url = _serverUrlController.text.trim();
-    if (url.isEmpty) return;
+    // Пустой ввод — тоже ошибка, а не тихий return: иначе диалог просто
+    // закрывается без объяснений, в отличие от остальных веток.
+    if (url.isEmpty) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      showErrorSnackBar(context, l.pleaseEnterServerUrl);
+      return;
+    }
     // Validate URL format.
     if (!isValidServerUrl(url)) {
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.invalidServerUrl)));
+      showErrorSnackBar(context, l.invalidServerUrl);
       return;
     }
 
@@ -88,17 +101,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await ref.read(authProvider.notifier).logout();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.failedToSaveSettings(e.toString()))),
-      );
+      showErrorSnackBar(context, l.failedToSaveSettings(e.toString()));
       return;
     }
 
     if (!mounted) return;
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.serverUrlSaved)),
-    );
+    showSuccessSnackBar(context, context.l10n.serverUrlSaved);
     // Navigate to login if authenticated.
     unawaited(context.router.replace(const LoginRoute()));
   }
@@ -131,9 +140,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context)!.loggedOut)),
-    );
+    showSuccessSnackBar(context, context.l10n.loggedOut);
   }
 
   @override
@@ -242,9 +249,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               .getCacheSize();
                         });
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(l.cacheCleared)),
-                          );
+                          showSuccessSnackBar(context, l.cacheCleared);
                         }
                       },
                       child: Text(l.clearCache),

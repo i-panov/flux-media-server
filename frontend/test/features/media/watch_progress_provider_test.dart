@@ -183,9 +183,14 @@ void main() {
       // Riverpod 3: без подписки autoDispose-провайдер диспоузится до
       // завершения future — держим его живым на время проверки.
       final sub = container.listen(watchProgressProvider, (_, _) {});
+      // Тип Failure сохраняется: UI различает network/auth/server.
       await expectLater(
         container.read(watchProgressProvider.future),
-        throwsA(isA<Exception>()),
+        throwsA(
+          isA<Failure>()
+              .having((f) => f.message, 'message', 'Boom')
+              .having((f) => f, 'type', isA<ServerFailure>()),
+        ),
       );
       sub.close();
     });

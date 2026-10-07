@@ -249,6 +249,9 @@ class MediaRemoteDataSource {
     final length = await file.length();
     await _postMultipart(
       '/media/$mediaId/cover',
+      // Сервер регистрирует именно PUT (app.go: `media.Put("/:id/cover")`).
+      // POST по этому пути не существует — загрузка обложки падала бы 404.
+      method: 'PUT',
       fields: const {},
       createFiles: () => [
         _CountingMultipartFile(
@@ -301,21 +304,23 @@ class MediaRemoteDataSource {
     );
   }
 
-  /// Multipart-POST с тем же контрактом, что у основного пути
+  /// Multipart-запрос с тем же контрактом, что у основного пути
   /// (см. [_sendWithAuthRetry]): Bearer-токен из настроек, один refresh
   /// при 401, повторная попытка только если пользователь не отменил
-  /// загрузку.
+  /// загрузку. [method] различен: обложка медиа уходит PUT'ом, остальное
+  /// — POST'ом.
   Future<Map<String, dynamic>> _postMultipart(
     String path, {
     required Map<String, String> fields,
     required List<http.MultipartFile> Function() createFiles,
+    String method = 'POST',
     bool Function()? isCancelled,
     void Function()? onRetry,
   }) async {
     final body = await _sendWithAuthRetry(
       path,
       (token) {
-        final request = http.MultipartRequest('POST', _resolveUrl(path));
+        final request = http.MultipartRequest(method, _resolveUrl(path));
         if (token != null) {
           request.headers['Authorization'] = 'Bearer $token';
         }

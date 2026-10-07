@@ -15,7 +15,9 @@ final FutureProvider<List<WatchProgress>> watchProgressProvider =
       final getProgress = ref.watch(getWatchProgressProvider);
       final result = await getProgress(const NoParams());
       return await result.fold(
-        (failure) => throw Exception(failure.message),
+        // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
+        // ignore: only_throw_errors
+        (failure) => throw failure,
         (progress) => progress,
       );
     });

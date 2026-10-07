@@ -52,11 +52,31 @@ class AuthNetworkImage extends ConsumerWidget {
 
 /// Bearer-токен уходит только на хост приложения: для сторонних
 /// URL (например, внешние обложки) авторизация не прикладывается.
+///
+/// Сравниваем и порт: один и тот же хост на другом порту — это другой
+/// сервис, и отправлять ему наш токен нельзя. Относительные URL
+/// отклоняем: без схемы и хоста сравнивать не с чем, а токен в таком
+/// случае ушёл бы неизвестно куда.
 bool shouldAttachAuthHeader(String imageUrl, String? baseUrl, String? token) {
   if (token == null || token.isEmpty) return false;
   if (baseUrl == null) return false;
   final image = Uri.tryParse(imageUrl);
   final base = Uri.tryParse(baseUrl);
   if (image == null || base == null) return false;
-  return image.scheme == base.scheme && image.host == base.host;
+  if (!image.hasScheme || !base.hasScheme) return false;
+  if (image.host.isEmpty || base.host.isEmpty) return false;
+  return image.scheme == base.scheme &&
+      image.host == base.host &&
+      _portOf(image) == _portOf(base);
 }
+
+/// Порт с учётом схемы: отсутствующий порт — дефолтный для этой схемы.
+/// Неизвестным схемам дефолта нет — возвращаем -1, чтобы они никогда не
+/// совпали с чем-то осмысленным.
+int _portOf(Uri uri) => uri.hasPort ? uri.port : _defaultPortOf(uri.scheme);
+
+int _defaultPortOf(String scheme) => switch (scheme) {
+  'https' => 443,
+  'http' => 80,
+  _ => -1,
+};

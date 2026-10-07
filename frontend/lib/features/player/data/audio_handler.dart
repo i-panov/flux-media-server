@@ -6,7 +6,6 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/player/data/audio_engine.dart';
 import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
-import 'package:http/http.dart' as http;
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -15,7 +14,8 @@ import 'package:path_provider/path_provider.dart';
 /// Живёт рядом с хендлером, а не в audio_engine.dart: обложка нужна для
 /// MediaItem системного уведомления, к движку отношения не имеет. Тип
 /// вынесен, чтобы тесты подменяли сеть — инвариант «в критическом пути
-/// перехода сети нет» проверяется без реального HTTP.
+/// перехода сети нет» проверяется без реального HTTP, а само подключение
+/// сети вынесено в main.dart (общий клиент с настройками TLS).
 typedef ArtworkFetcher = Future<File?> Function(
   String url,
   Map<String, String>? httpHeaders,
@@ -69,8 +69,6 @@ class FluxAudioHandler extends BaseAudioHandler
   /// mediaId, поэтому лимит нужен, чтобы каталог не рос на всю сессию:
   /// на 7-м distinct-треке [_pruneArtwork] вытесняет самый старый файл.
   static const _maxCachedArtwork = 6;
-
-  static const _artTimeout = Duration(seconds: 10);
 
   /// Потолок ожидания стартовой уборки обложек. Уборка идёт по локальному
   /// каталогу и обычно занимает миллисекунды; грейс ограничивает ущерб,
@@ -401,37 +399,23 @@ class FluxAudioHandler extends BaseAudioHandler
   /// Downloads [artUri] with auth headers to a temp file.
   /// Falls back to null on failure — обложка не критична.
   ///
-  /// При внедрённом [_artworkFetcher] сеть не используется вовсе.
+  /// Сеть целиком в [_artworkFetcher]: его собирает `main.dart` на
+  /// общем клиенте приложения, поэтому здесь нет ни своих настроек
+  /// TLS, ни собственного http-клиента. В тестах подменяется фейком.
   Future<File?> _downloadArtwork(
     String artUri,
     Map<String, String>? httpHeaders,
   ) async {
-    final injected = _artworkFetcher;
-    if (injected != null) return await injected(artUri, httpHeaders);
-
-    final uri = Uri.tryParse(artUri);
-    if (uri == null || !uri.scheme.startsWith('http')) return null;
-
-    try {
-      final response = await http
-          .get(uri, headers: httpHeaders ?? {})
-          .timeout(_artTimeout);
-      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
-
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/${_artFileName(uri)}');
-      await file.writeAsBytes(response.bodyBytes);
-      return file;
-    } catch (e) {
-      AppLogger.warn('Artwork download failed: $e');
-      return null;
-    }
+    final fetcher = _artworkFetcher ?? _defaultArtworkFetcher;
+    return await fetcher(artUri, httpHeaders);
   }
 
-  String _artFileName(Uri uri) {
-    final hash = uri.toString().hashCode.abs().toRadixString(16);
-    return 'flux_art_${uri.pathSegments.last}_$hash.jpg';
-  }
+  /// Заглушка на случай создания хендлера без загрузчика (например, в
+  /// тестах, которые проверяют только маршрутизацию mpv-команд).
+  static Future<File?> _defaultArtworkFetcher(
+    String url,
+    Map<String, String>? httpHeaders,
+  ) async => null;
 
   /// Вытесняет самые старые обложки, чтобы не раздувать кеш.
   Future<void> _pruneArtwork() async {

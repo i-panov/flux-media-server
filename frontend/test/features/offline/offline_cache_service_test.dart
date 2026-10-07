@@ -65,6 +65,15 @@ class _FakeHttpClient implements HttpClient {
 
   final Future<http.StreamedResponse> Function(http.BaseRequest) _handler;
 
+  // Общий HTTP-клиент приложения настраивает эти параметры на
+  // `HttpClient` при создании; фейк их принимает и игнорирует.
+  @override
+  Duration? connectionTimeout;
+
+  @override
+  bool Function(X509Certificate certificate, String host, int port)?
+  badCertificateCallback;
+
   @override
   Future<HttpClientRequest> openUrl(String method, Uri url) async =>
       _FakeHttpClientRequest(method, url, _handler);
@@ -463,6 +472,93 @@ void main() {
           File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5').existsSync(),
           isFalse,
         );
+      },
+    );
+
+    test(
+      'cancelAndJoin waits for cleanup and allows immediate restart',
+      () async {
+        final requestStarted = Completer<void>();
+        final proceed = Completer<void>();
+        var calls = 0;
+        Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+          calls++;
+          if (calls == 1) {
+            requestStarted.complete();
+            await proceed.future;
+          }
+          return http.StreamedResponse(
+            Stream.fromIterable([
+              [1, 2],
+              [3, 4],
+            ]),
+            200,
+            contentLength: 4,
+          );
+        }
+
+        final future = HttpOverrides.runZoned(
+          () => service.download(_media(5)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
+        );
+
+        await requestStarted.future;
+        final cancelFuture = service.cancelAndJoin(5);
+        proceed.complete();
+        await expectLater(future, throwsA(isA<DownloadCancelledException>()));
+        // Возврат только после фактической чистки .part.
+        await cancelFuture;
+        expect(
+          File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5.part')
+              .existsSync(),
+          isFalse,
+        );
+
+        // Рестарт сразу после отмены: флаг активности уже снят.
+        final path = await HttpOverrides.runZoned(
+          () => service.download(_media(5)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
+        );
+        expect(calls, 2);
+        expect(path, endsWith('${_keyPrefix}user_7_flux_media_5'));
+      },
+    );
+
+    test(
+      'parallel download() of the same media joins the in-flight operation',
+      () async {
+        final requestStarted = Completer<void>();
+        final proceed = Completer<void>();
+        var calls = 0;
+        Future<http.StreamedResponse> handler(http.BaseRequest request) async {
+          calls++;
+          if (calls == 1) {
+            requestStarted.complete();
+            await proceed.future;
+          }
+          return http.StreamedResponse(
+            Stream.fromIterable([
+              [1, 2],
+              [3, 4],
+            ]),
+            200,
+            contentLength: 4,
+          );
+        }
+
+        Future<String> run(int id) => HttpOverrides.runZoned(
+          () => service.download(_media(id)),
+          createHttpClient: (_) => _FakeHttpClient(handler),
+        );
+        final first = run(6);
+        final second = run(6);
+        await requestStarted.future;
+        proceed.complete();
+
+        // Один сетевой запрос на двоих, оба получили один и тот же путь.
+        final paths = await Future.wait([first, second]);
+        expect(calls, 1);
+        expect(paths[0], paths[1]);
       },
     );
   });

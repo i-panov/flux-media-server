@@ -374,9 +374,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get startFromBeginning => 'Start over';
-
-  @override
   String get editMetadata => 'Edit Metadata';
 
   @override
@@ -557,7 +554,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trustSelfSignedHint =>
-      'Use only for private servers with your own certificate. Enables insecure HTTPS.';
+      'Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate.';
 
   @override
   String connectionFailed(String error) {

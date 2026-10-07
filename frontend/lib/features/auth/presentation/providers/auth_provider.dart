@@ -184,10 +184,7 @@ class AuthNotifier extends Notifier<AuthState> {
 }
 
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
-  return AuthRemoteDataSource(
-    ref.watch(authApiClientProvider),
-    refresher: ref.watch(authTokenRefresherProvider),
-  );
+  return AuthRemoteDataSource(ref.watch(authApiClientProvider));
 });
 
 final authRepositoryProvider = Provider<AuthRepositoryImpl>((ref) {

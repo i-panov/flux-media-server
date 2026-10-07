@@ -1,3 +1,5 @@
+import 'package:flux_media_server/shared/models/media.dart';
+
 /// Тип картинки медиа на сервере.
 enum MediaImageKind {
   thumb,
@@ -8,6 +10,22 @@ enum MediaImageKind {
     MediaImageKind.cover => 'cover',
   };
 }
+
+/// Какой рисунок показывать для медиа: обложка, если она загружена, иначе
+/// thumb. Раньше критерий жил в каждом виджете, и в `audio_track_row`
+/// thumb-трек запрашивал `/cover` (404 у медиа без обложки).
+MediaImageKind mediaImageKindFor(Media media) =>
+    (media.coverUrl?.isNotEmpty ?? false)
+    ? MediaImageKind.cover
+    : MediaImageKind.thumb;
+
+/// Есть ли у медиа хоть какая-то картинка на сервере.
+///
+/// Без неё запрашивать `/thumb` бессмысленно: сервер вернёт 404, а ряд
+/// покажет битую картинку вместо плейсхолдера.
+bool mediaHasImage(Media media) =>
+    (media.coverUrl?.isNotEmpty ?? false) ||
+    (media.thumbnailUrl?.isNotEmpty ?? false);
 
 /// Строит URL картинки медиа (`{baseUrl}/media/{id}/thumb|cover`) с
 /// cache-buster'ом для принудительной перезагрузки после смены обложки.

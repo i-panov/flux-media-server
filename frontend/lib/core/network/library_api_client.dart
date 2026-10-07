@@ -53,16 +53,6 @@ abstract class LibraryApiClient extends ChopperService {
   @GET(path: '/favorites')
   Future<Response<Map<String, dynamic>>> getFavorites();
 
-  @POST(path: '/favorites/artist')
-  Future<Response<Map<String, dynamic>>> addArtistFavorite(
-    @Body() Map<String, dynamic> body,
-  );
-
-  @DELETE(path: '/favorites/artist')
-  Future<Response<Map<String, dynamic>>> removeArtistFavorite(
-    @Query('artist_id') int artistId,
-  );
-
   // Artists
   @GET(path: '/artists')
   Future<Response<Map<String, dynamic>>> getArtists();
@@ -81,12 +71,6 @@ abstract class LibraryApiClient extends ChopperService {
 
   @GET(path: '/collections')
   Future<Response<List<dynamic>>> getCollections();
-
-  @PUT(path: '/collections/{id}')
-  Future<Response<Map<String, dynamic>>> updateCollection(
-    @Path('id') int id,
-    @Body() Map<String, dynamic> body,
-  );
 
   @DELETE(path: '/collections/{id}')
   Future<Response<Map<String, dynamic>>> deleteCollection(@Path('id') int id);

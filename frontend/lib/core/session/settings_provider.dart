@@ -100,6 +100,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _repository.setLocale(locale);
     state = SettingsState(settings: state.settings.copyWith(locale: locale));
   }
+
+  /// Доверие самоподписанным сертификатам. Сохраняется ДО смены адреса
+  /// сервера: общий HTTP-клиент пересоздаётся при смене serverUrl, и
+  /// флаг обязан быть уже в настройках к этому моменту.
+  Future<void> setTrustSelfSignedCertificates({required bool value}) async {
+    await _repository.setTrustSelfSignedCertificates(value: value);
+    state = SettingsState(
+      settings: state.settings.copyWith(trustSelfSignedCertificates: value),
+    );
+  }
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(

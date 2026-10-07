@@ -1,7 +1,6 @@
 import 'package:chopper/chopper.dart';
 import 'package:flux_media_server/core/network/api_service_factory.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart' show MultipartFile;
 
 part 'media_api_client.chopper.dart';
 
@@ -63,19 +62,8 @@ abstract class MediaApiClient extends ChopperService {
     @Body() Map<String, dynamic> body,
   );
 
-  @POST(path: '/media/upload')
-  @multipart
-  Future<Response<Map<String, dynamic>>> uploadMedia(
-    @Part('media_type') String mediaType,
-    @PartFile('file') MultipartFile file,
-  );
-
-  @PUT(path: '/media/{id}/cover')
-  @multipart
-  Future<Response<Map<String, dynamic>>> uploadCover(
-    @Path('id') int id,
-    @PartFile('cover') MultipartFile cover,
-  );
+  // Multipart-пути намеренно объявлены только в MediaRemoteDataSource:
+  // там нужен прогресс отправки и отмена, которых не даёт Chopper.
 
   // Progress
   @GET(path: '/progress')

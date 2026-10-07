@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -47,20 +48,10 @@ Future<void> changeMediaCover(
     r.fold(
       (failure) {
         if (failure is UploadCancelledFailure) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.failedToAdd(failure.message)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showErrorSnackBar(context, l.failedToAdd(failure.message));
       },
       (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.uploadSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
+        showSuccessSnackBar(context, l.uploadSuccess);
         // Серверный updatedAt даёт честный cache-buster для обложки —
         // тихий перезапрос деталей без мигания спиннером.
         unawaited(ref.read(mediaDetailProvider(mediaId).notifier).refresh());
@@ -108,12 +99,7 @@ Future<void> deleteMediaWithConfirm(
 
   result.fold(
     (failure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${l.errorLabel}: ${failure.message}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showFailureSnackBar(context, failure);
     },
     (_) {
       refreshMediaLists(ref);

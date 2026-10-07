@@ -93,6 +93,10 @@ abstract class VideoPlaybackSource {
   Stream<String> get errorStream;
   Stream<bool> get bufferingStream;
   Duration get position;
+
+  /// Текущая известная длительность (нулевая, пока файл не загружен).
+  /// Нужна UI для клампа перемотки в [0, duration].
+  Duration get duration;
   double get rate;
   Stream<double> get rateStream;
 }

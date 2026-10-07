@@ -10,6 +10,7 @@ import 'package:flux_media_server/core/network/library_api_client.dart';
 import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/utils/url_utils.dart';
+import 'package:http/http.dart' as http;
 
 final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
   return AuthInterceptor(ref);
@@ -80,8 +81,34 @@ final baseUrlProvider = Provider<String>((ref) {
 /// Общий низкоуровневый HTTP-клиент для всех Chopper-сервисов: один
 /// connection-pool и один набор таймаутов вместо трёх изолированных.
 /// Живёт столько же, сколько приложение; при смене baseUrl не закрывается.
+/// Пересоздаётся при смене флага доверия самоподписанным сертификатам:
+/// колбэк задаётся на этапе создания `HttpClient` и иначе не обновился бы.
 final httpClientProvider = Provider<TimeoutHttpClient>((ref) {
-  final client = TimeoutHttpClient();
+  final trustSelfSigned = ref.watch(
+    settingsProvider.select((s) => s.settings.trustSelfSignedCertificates),
+  );
+  final client = TimeoutHttpClient(
+    trustSelfSignedCertificates: trustSelfSigned,
+  );
+  ref.onDispose(client.close);
+  return client;
+});
+
+/// Клиент для прямых http-запросов в обход Chopper (скачивание файлов,
+/// загрузка обложек): там нужен прогресс/отмена, которых нет у Chopper.
+///
+/// Отдельный от [httpClientProvider] и общий для всех вызовов — закрывать
+/// его по окончании отдельной операции нельзя. Настройки TLS те же, что у
+/// Chopper-трафика: иначе скачивание падало бы с ошибкой сертификата там,
+/// где API-запросы проходят.
+final directHttpClientProvider = Provider<http.Client>((ref) {
+  final trustSelfSigned = ref.watch(
+    settingsProvider.select((s) => s.settings.trustSelfSignedCertificates),
+  );
+  final client = TimeoutHttpClient(
+    trustSelfSignedCertificates: trustSelfSigned,
+  );
+  // Без закрытия старый клиент оставался открытым при каждом тогле флага.
   ref.onDispose(client.close);
   return client;
 });

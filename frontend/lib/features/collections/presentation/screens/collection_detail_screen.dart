@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
-import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
+import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/remove_collection_item.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
@@ -183,9 +184,7 @@ class _CollectionDetailScreenState
     result.fold(
       (failure) {
         final l = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.failedToRemove(failure.message))),
-        );
+        showErrorSnackBar(context, l.failedToRemove(failure.message));
       },
       (_) {
         // Оптимистичное обновление списка — без refetch.
@@ -215,40 +214,15 @@ class _CollectionDetailScreenState
     final crossAxisCount = (MediaQuery.of(context).size.width / 180)
         .floor()
         .clamp(2, 6);
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
+    return SkeletonMediaGrid(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         childAspectRatio: 0.7,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
+      // Две «страницы» — столько же плашек, сколько в коллекции.
       itemCount: crossAxisCount * 2,
-      itemBuilder: (context, index) => const Card(
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: SkeletonWidget(
-                width: double.infinity,
-                height: double.infinity,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SkeletonWidget(height: 14, width: double.infinity),
-                  SizedBox(height: 6),
-                  SkeletonWidget(height: 10, width: 60),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -273,10 +247,9 @@ class _CollectionDetailScreenState
                 if (context.mounted) {
                   result.fold(
                     (failure) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l.failedToRemove(failure.message)),
-                        ),
+                      showErrorSnackBar(
+                        context,
+                        l.failedToRemove(failure.message),
                       );
                     },
                     (_) {
@@ -400,9 +373,7 @@ class _AddMediaDialogState extends ConsumerState<_AddMediaDialog> {
     setState(() => _adding = false);
     result.fold(
       (failure) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.failedToAdd(failure.message))));
+        showErrorSnackBar(context, l.failedToAdd(failure.message));
       },
       (_) {
         // Оптимистичное обновление списка — без refetch.

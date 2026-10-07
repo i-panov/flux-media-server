@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/auth_api_client.dart';
-import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flux_media_server/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:flux_media_server/shared/models/user.dart';
@@ -15,10 +14,6 @@ class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
   new()
     : super(
         AuthApiClient.create(baseUrl: 'http://localhost:8080/api').apiClient,
-        refresher: AuthTokenRefresher(
-          performRefresh: (_) async => null,
-          onRefreshFailure: () async {},
-        ),
       );
 
   // Canned responses / exceptions for each method.
@@ -26,7 +21,6 @@ class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
   ({String token, String refreshToken, User user}) Function(String, String)?
   onVerifyCode;
   User Function()? onGetCurrentUser;
-  ({String token, String refreshToken}) Function(String)? onRefreshToken;
 
   @override
   Future<String?> requestCode(String email) async {
@@ -51,16 +45,6 @@ class _FakeAuthRemoteDataSource extends AuthRemoteDataSource {
       throw const ServerException(message: 'not configured');
     }
     return onGetCurrentUser!();
-  }
-
-  @override
-  Future<({String token, String refreshToken})> refreshTokens(
-    String refreshToken,
-  ) async {
-    if (onRefreshToken == null) {
-      throw const ServerException(message: 'not configured');
-    }
-    return onRefreshToken!(refreshToken);
   }
 }
 
@@ -173,36 +157,6 @@ void main() {
 
       expect(result, isA<Left<Failure, User>>());
       expect(result.fold((l) => l, (_) => null), isA<AuthFailure>());
-    });
-  });
-
-  group('refreshToken', () {
-    test('returns Right(tokens) on success', () async {
-      datasource.onRefreshToken = (_) =>
-          (token: 'new-jwt', refreshToken: 'new-refresh');
-
-      final result = await repository.refreshToken('old-refresh');
-
-      expect(
-        result,
-        isA<Right<Failure, ({String token, String refreshToken})>>(),
-      );
-      final data = result.getOrElse((_) => (token: '', refreshToken: ''));
-      expect(data.token, 'new-jwt');
-      expect(data.refreshToken, 'new-refresh');
-    });
-
-    test('returns Left(ServerFailure) on ServerException', () async {
-      datasource.onRefreshToken = (_) =>
-          throw const ServerException(message: 'Invalid refresh token');
-
-      final result = await repository.refreshToken('old-refresh');
-
-      expect(
-        result,
-        isA<Left<Failure, ({String token, String refreshToken})>>(),
-      );
-      expect(result.fold((l) => l.message, (_) => ''), 'Invalid refresh token');
     });
   });
 }

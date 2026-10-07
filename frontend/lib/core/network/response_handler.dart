@@ -48,6 +48,18 @@ Failure _failureFor(Object e) {
   if (e is UploadCancelledException) return const UploadCancelledFailure();
   if (e is http.ClientException) return NetworkFailure(message: e.message);
   if (e is SocketException) return NetworkFailure(message: e.message);
+  if (e is HandshakeException || e is TlsException) {
+    // Отказ TLS (в т.ч. самоподписанный сертификат) — это сеть, а не
+    // серверная ошибка: иначе UI предлагал бы «повторить» там, где нужно
+    // включить доверие сертификату в настройках сервера. Детали из
+    // исключения сохраняем — без них диагностика упирается в стену.
+    final details = e.toString();
+    return NetworkFailure(
+      message: details.isEmpty
+          ? 'TLS handshake failed — check the server certificate'
+          : 'TLS handshake failed — check the server certificate ($details)',
+    );
+  }
   if (e is TimeoutException) {
     return NetworkFailure(message: e.message ?? 'Request timed out');
   }
@@ -56,6 +68,10 @@ Failure _failureFor(Object e) {
 
 /// Wraps a repository call with token-refresh retry logic.
 /// Retries once on [TokenRefreshedException], converts exceptions to [Failure].
+///
+/// Ловит и `Error` (например, ошибки приведения типов в теле ответа):
+/// иначе один кривой ответ ронял бы весь вызов вместо аккуратного
+/// `Left(ServerFailure)`.
 Future<Either<Failure, T>> safeRepositoryCall<T>(
   Future<T> Function() call,
 ) async {
@@ -67,8 +83,12 @@ Future<Either<Failure, T>> safeRepositoryCall<T>(
       return Right(await call());
     } on Exception catch (e) {
       return Left(_failureFor(e));
+    } catch (e) {
+      return Left(_failureFor(e));
     }
   } on Exception catch (e) {
+    return Left(_failureFor(e));
+  } catch (e) {
     return Left(_failureFor(e));
   }
 }

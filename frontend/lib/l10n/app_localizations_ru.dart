@@ -375,9 +375,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get startFromBeginning => 'Начать сначала';
-
-  @override
   String get editMetadata => 'Редактировать метаданные';
 
   @override
@@ -559,7 +556,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get trustSelfSignedHint =>
-      'Только для частных серверов с собственным сертификатом. Включает небезопасный HTTPS.';
+      'Только для частных серверов. Включает небезопасный HTTPS для запросов API; для потоков видео/аудио сертификат всё равно должен быть доверенным.';
 
   @override
   String connectionFailed(String error) {

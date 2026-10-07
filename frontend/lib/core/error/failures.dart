@@ -15,7 +15,15 @@ abstract class Failure {
           message == other.message;
 
   @override
-  int get hashCode => message.hashCode;
+  int get hashCode => Object.hash(runtimeType, message);
+
+  /// Читаемое сообщение вместо `Instance of 'ServerFailure'`.
+  ///
+  /// `Failure` попадает в `AsyncError` провайдеров как есть (без обёртки
+  /// в `Exception`), и UI печатает ошибку через `toString()`. Тип в логах
+  /// при этом виден через `runtimeType` — смотрите поле, а не строку.
+  @override
+  String toString() => message;
 }
 
 class ServerFailure extends Failure {
@@ -24,10 +32,6 @@ class ServerFailure extends Failure {
 
 class NetworkFailure extends Failure {
   const new({super.message = 'Network error occurred'});
-}
-
-class CacheFailure extends Failure {
-  const new({super.message = 'Cache error occurred'});
 }
 
 class AuthFailure extends Failure {

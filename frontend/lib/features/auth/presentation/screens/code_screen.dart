@@ -1,12 +1,17 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
+import 'package:flux_media_server/core/widgets/cooldown_button.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+
+/// Форматтер поля OTP-кода: только цифры.
+///
+/// Вынесен на уровень файла, чтобы контракт «буквы не проходят» был
+/// зафиксирован тестом, а не копией регулярки в нём.
+final codeInputFormatter = FilteringTextInputFormatter.allow(RegExp('[0-9]'));
 
 @RoutePage()
 class CodeScreen extends ConsumerStatefulWidget {
@@ -33,8 +38,8 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
   /// верификации (state в это время AuthError без debug-кода).
   String? _debugCode;
 
-  final ValueNotifier<int> _cooldown = ValueNotifier(0);
-  Timer? _cooldownTimer;
+  /// Не даёт спамить повторную отправку кода.
+  final _cooldown = CooldownController(_resendCooldown);
 
   @override
   void initState() {
@@ -52,7 +57,6 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
 
   @override
   void dispose() {
-    _cooldownTimer?.cancel();
     _cooldown.dispose();
     _codeController.dispose();
     super.dispose();
@@ -68,37 +72,35 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
     if (mounted) setState(() => _isVerifying = false);
   }
 
-  void _startCooldown() {
-    _cooldownTimer?.cancel();
-    _cooldown.value = _resendCooldown.inSeconds;
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_cooldown.value > 0) {
-        _cooldown.value--;
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
   Future<void> _resendCode() async {
-    if (_cooldown.value > 0 || _isVerifying) return;
+    if (_cooldown.isActive || _isVerifying) return;
     final sent = await ref
         .read(authProvider.notifier)
         .requestCode(widget.email);
     if (!mounted) return;
     // Cooldown — только если код реально отправлен; при ошибке (в т.ч.
     // сетевой) не блокируем повторную попытку.
-    if (sent) _startCooldown();
+    if (sent) _cooldown.start();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final authState = ref.watch(authProvider);
+
+    // Новый debug-код после resend: _debugCode из initState иначе
+    // показывал бы stale-код от первой отправки. Поле ввода не трогаем,
+    // если пользователь уже что-то набрал.
+    ref.listen(authProvider, (_, next) {
+      if (next is AuthCodeSent && next.debugCode != null && mounted) {
+        setState(() {
+          _debugCode = next.debugCode;
+          if (_codeController.text.isEmpty) {
+            _codeController.text = next.debugCode!;
+          }
+        });
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(title: Text(l.enterCode)),
@@ -158,11 +160,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   maxLength: 6,
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.done,
-                  inputFormatters: [
-                    // allow() вместо digitsOnly: пропускает вставку из
-                    // буфера обмена (digitsOnly блокирует вставку).
-                    FilteringTextInputFormatter.allow(RegExp(r'\d{0,6}')),
-                  ],
+                  inputFormatters: [codeInputFormatter],
                   onFieldSubmitted: (_) => _verifyCode(),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 24, letterSpacing: 8),
@@ -206,24 +204,11 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                ValueListenableBuilder<int>(
-                  valueListenable: _cooldown,
-                  builder: (context, seconds, _) {
-                    final enabled = seconds == 0 && !_isVerifying;
-                    return Semantics(
-                      label: l.resendCode,
-                      enabled: enabled,
-                      button: true,
-                      child: TextButton(
-                        onPressed: enabled ? _resendCode : null,
-                        child: Text(
-                          seconds > 0
-                              ? '${l.resendCode} (${seconds}s)'
-                              : l.resendCode,
-                        ),
-                      ),
-                    );
-                  },
+                CooldownTextButton(
+                  cooldown: _cooldown,
+                  onPressed: _resendCode,
+                  enabled: !_isVerifying,
+                  label: l.resendCode,
                 ),
                 TextButton(
                   onPressed: () => context.router.replace(const LoginRoute()),

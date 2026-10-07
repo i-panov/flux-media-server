@@ -13,7 +13,9 @@ final artistsProvider = FutureProvider<List<Artist>>((ref) async {
   final getArtists = ref.watch(getArtistsProvider);
   final result = await getArtists(const NoParams());
   return await result.fold(
-    (failure) => throw Exception(failure.message),
+    // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
+    // ignore: only_throw_errors
+    (failure) => throw failure,
     (artists) => artists,
   );
 });

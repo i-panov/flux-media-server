@@ -1,12 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/features/player/presentation/utils/playback_toggle.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -41,33 +41,29 @@ class AudioTrackRow extends ConsumerWidget {
   /// Клик по треку: текущий — пауза/продолжение (а не перезапуск
   /// с нуля), любой другой — запуск.
   void _handleTap(WidgetRef ref, ({int mediaId, bool isPaused})? playback) {
-    if (playback != null && playback.mediaId == media.id) {
-      final coordinator = ref.read(playbackCoordinatorProvider.notifier);
-      if (playback.isPaused) {
-        unawaited(coordinator.resume());
-      } else {
-        unawaited(coordinator.pause());
-      }
-    } else {
-      onPlay?.call();
-    }
+    togglePlayback(
+      ref,
+      media.id,
+      isPaused: playback?.isPaused ?? false,
+      onStartOther: (_) => onPlay?.call(),
+    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final baseUrl = ref.watch(baseUrlProvider);
-    final hasCover =
-        (media.coverUrl?.isNotEmpty ?? false) ||
-        (media.thumbnailUrl?.isNotEmpty ?? false);
-    final cacheBuster = media.updatedAt?.millisecondsSinceEpoch;
-    final buster = cacheBuster != null ? '?v=$cacheBuster' : '';
-    final imageUrl = hasCover
-        ? '$baseUrl/media/${media.id}/cover$buster'
-        : '$baseUrl/media/${media.id}/thumb$buster';
+    // Обложка или thumb — единая точка выбора на все экраны.
+    final imageUrl = buildMediaImageUrl(
+      baseUrl: baseUrl,
+      mediaId: media.id,
+      kind: mediaImageKindFor(media),
+      cacheBust: media.updatedAt?.millisecondsSinceEpoch,
+    );
+    final hasImage = mediaHasImage(media);
     final colorScheme = Theme.of(context).colorScheme;
     final l = AppLocalizations.of(context)!;
 
-    final downloadState = ref.watch(downloadNotifierProvider(media.id));
+    final downloadState = ref.watch(downloadStateProvider(media.id));
     final isDownloaded = downloadState is DownloadDownloaded;
     final isDownloading = downloadState is DownloadDownloading;
     final downloadProgress = switch (downloadState) {
@@ -113,7 +109,7 @@ class AudioTrackRow extends ConsumerWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (hasCover)
+                      if (hasImage)
                         AuthNetworkImage(
                           imageUrl: imageUrl,
                           width: 48,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/audio/presentation/utils/lyrics_sync_parser.dart';
 import 'package:flux_media_server/features/lyrics/domain/usecases/upsert_lyrics.dart';
 import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
@@ -128,6 +129,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
   }
 
   Future<void> _save() async {
+    final l = AppLocalizations.of(context)!;
     setState(() => _isSaving = true);
     final upsert = ref.read(upsertLyricsProvider);
 
@@ -140,12 +142,9 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isLyrics ? l.errorLoadingLyrics : l.errorLoadingTranslation,
-          ),
-        ),
+      showErrorSnackBar(
+        context,
+        _isLyrics ? l.errorLoadingLyrics : l.errorLoadingTranslation,
       );
       return;
     }
@@ -166,29 +165,25 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
     result.fold(
       (failure) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l.errorLabel}: ${failure.message}')),
-          );
+          showFailureSnackBar(context, failure);
         }
       },
       (_) {
         if (mounted) {
           ref.invalidate(lyricsProvider(widget.media.id));
           setState(() => _isEditing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_isLyrics ? l.lyricsSaved : l.translationSaved),
-            ),
+          showSuccessSnackBar(
+            context,
+            _isLyrics ? l.lyricsSaved : l.translationSaved,
           );
         }
       },
     );
   }
 
-  late final AppLocalizations l = AppLocalizations.of(context)!;
-
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final lyricsState = ref.watch(lyricsProvider(widget.media.id));
 
     if (_isEditing) {

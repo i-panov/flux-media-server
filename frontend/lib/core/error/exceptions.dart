@@ -4,12 +4,6 @@ class ServerException implements Exception {
   final String message;
 }
 
-class CacheException implements Exception {
-  const new({required this.message});
-
-  final String message;
-}
-
 class AuthException implements Exception {
   const new({required this.message});
 

@@ -9,6 +9,7 @@ sealed class AppSettings with _$AppSettings {
     String? authToken,
     String? refreshToken,
     @Default('en') String locale,
+    @Default(false) bool trustSelfSignedCertificates,
   }) = _AppSettings;
 
   /// Токены не должны попадать в логи: маскируем их в [toString].

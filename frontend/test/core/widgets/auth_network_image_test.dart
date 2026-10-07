@@ -45,6 +45,10 @@ class _FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<void> setLocale(String locale) async {}
+  @override
+  bool getTrustSelfSignedCertificates() => false;
+  @override
+  Future<void> setTrustSelfSignedCertificates({required bool value}) async {}
 }
 
 void main() {
@@ -81,6 +85,28 @@ void main() {
       expect(
         shouldAttachAuthHeader('http://host:8080/api/x', null, 'token'),
         isFalse,
+      );
+    });
+
+    test('does not attach the token to another port of the same host', () {
+      expect(
+        shouldAttachAuthHeader(
+          'http://host:9090/api/media/1/thumb',
+          baseUrl,
+          'token',
+        ),
+        isFalse,
+      );
+    });
+
+    test('treats an omitted default port as the same origin', () {
+      expect(
+        shouldAttachAuthHeader(
+          'https://host/media/1/thumb',
+          'https://host/api',
+          'token',
+        ),
+        isTrue,
       );
     });
   });

@@ -95,6 +95,14 @@ class _FakeSettingsRepository implements SettingsRepository {
 
   @override
   String getLocale() => _settings.locale;
+
+  @override
+  bool getTrustSelfSignedCertificates() => false;
+
+  @override
+  Future<void> setTrustSelfSignedCertificates({required bool value}) async {
+    _settings = _settings.copyWith(trustSelfSignedCertificates: value);
+  }
 }
 
 /// Реальный [AuthTokenRefresher] с фейковым HTTP-клиентом: повторяет

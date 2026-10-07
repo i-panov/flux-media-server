@@ -86,9 +86,11 @@ void main() {
       // Riverpod 3: без подписки autoDispose-провайдер диспоузится до
       // завершения future — держим его живым на время проверки.
       final sub = container.listen(lyricsProvider(5), (_, _) {});
+      // Сетевая ошибка остаётся сетевой: тип Failure не теряется,
+      // иначе UI не отличил бы её от «лирики нет».
       await expectLater(
         container.read(lyricsProvider(5).future),
-        throwsA(isA<Exception>()),
+        throwsA(isA<Failure>().having((f) => f, 'type', isA<NetworkFailure>())),
       );
       sub.close();
       final state = container.read(lyricsProvider(5));

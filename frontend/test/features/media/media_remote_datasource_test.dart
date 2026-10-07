@@ -170,6 +170,21 @@ void main() {
     });
 
     test(
+      'uses PUT, because the server registers only PUT on this path',
+      () async {
+        late http.Request captured;
+        final client = MockClient((request) async {
+          captured = request;
+          return http.Response('{"cover_url": "/api/media/5/cover"}', 200);
+        });
+
+        await _dataSource(client: client).uploadCover(5, _coverFile.path);
+
+        expect(captured.method, 'PUT');
+      },
+    );
+
+    test(
       'isCancelled before send aborts with UploadCancelledException',
       () async {
         final client = MockClient((_) async => http.Response('{}', 200));

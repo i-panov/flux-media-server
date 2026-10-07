@@ -10,4 +10,6 @@ abstract class SettingsRepository {
   Future<void> clearRefreshToken();
   String getLocale();
   Future<void> setLocale(String locale);
+  bool getTrustSelfSignedCertificates();
+  Future<void> setTrustSelfSignedCertificates({required bool value});
 }

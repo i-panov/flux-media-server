@@ -77,6 +77,12 @@ class OfflineCacheService {
   /// of the same file (which would corrupt the .part file).
   final Set<int> _activeDownloads = {};
 
+  /// In-flight загрузки по mediaId: повторный `download()` того же трека
+  /// присоединяется к уже идущей операции, а не открывает второй sink
+  /// в тот же .part-файл. Нужна и для `cancelAndJoin`, чтобы дождаться
+  /// фактического завершения отмены.
+  final Map<int, Future<String>> _inFlight = {};
+
   /// Загрузки, отменённые пользователем.
   final Set<int> _cancelledDownloads = {};
 
@@ -175,7 +181,23 @@ class OfflineCacheService {
   /// Downloads a media file for offline use with progress reporting.
   /// [onProgress] receives (bytesReceived, totalBytes).
   /// Returns the local file path on success.
+  ///
+  /// Повторный старт того же трека — не второй sink в тот же .part
+  /// (повреждение файла), а присоединение к уже идущей операции.
+  /// Регистрация синхронная: два вызова подряд без await между ними
+  /// обязаны увидеть один и тот же future, а не стартовать дважды.
   Future<String> download(
+    Media media, {
+    void Function(int received, int? total)? onProgress,
+  }) {
+    final existing = _inFlight[media.id];
+    if (existing != null) return existing;
+    final future = _startDownload(media, onProgress: onProgress);
+    _inFlight[media.id] = future;
+    return future;
+  }
+
+  Future<String> _startDownload(
     Media media, {
     void Function(int received, int? total)? onProgress,
   }) async {
@@ -191,6 +213,11 @@ class OfflineCacheService {
     try {
       return await _downloadInternal(media, onProgress: onProgress);
     } finally {
+      // remove возвращает сам future — он уже дождан строкой выше,
+      // поэтому await здесь бессмыслен, а unawaited врёт о «фоновой»
+      // задаче. Игнор точечный, только на эту строку.
+      // ignore: unawaited_futures
+      _inFlight.remove(media.id);
       _activeDownloads.remove(media.id);
       _cancelledDownloads.remove(media.id);
     }
@@ -210,7 +237,7 @@ class OfflineCacheService {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
-      final client = http.Client();
+      final client = _ref.read(directHttpClientProvider);
       final dir = await getApplicationDocumentsDirectory();
       final localFile = File('${dir.path}/${_fileName(media.id)}');
       final partFile = File('${localFile.path}.part');
@@ -322,17 +349,34 @@ class OfflineCacheService {
           throw const DownloadCancelledException();
         }
         rethrow;
-      } finally {
-        client.close();
       }
+      // Клиент общий (directHttpClientProvider), закрывать его здесь нельзя:
+      // параллельные скачивания используют тот же инстанс.
     }
     throw Exception('Download failed');
   }
 
   /// Отменяет активную загрузку [mediaId]. Следующая проверка в потоке
   /// прервёт её с [DownloadCancelledException], .part-файл подчистится.
+  /// Fire-and-forget вариант: фактического завершения не ждёт.
   void cancelDownload(int mediaId) {
     _cancelledDownloads.add(mediaId);
+  }
+
+  /// Отменяет активную загрузку и ждёт её фактического завершения
+  /// (освобождение .part-файла и снятие флага активности).
+  ///
+  /// Без ожидания рестарт сразу после отмены упирался бы в
+  /// «already in progress», а фидбек «отменено» показывался бы раньше
+  /// реальной чистки. Ошибки самой загрузки глотаются: отмена — не сбой.
+  Future<void> cancelAndJoin(int mediaId) async {
+    final inFlight = _inFlight[mediaId];
+    _cancelledDownloads.add(mediaId);
+    if (inFlight != null) {
+      try {
+        await inFlight;
+      } catch (_) {}
+    }
   }
 
   Future<String?> _refreshToken() async {

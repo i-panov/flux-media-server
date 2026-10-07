@@ -321,10 +321,8 @@
       }
     }
   },
-  "startFromBeginning": "Start over",
-  "@startFromBeginning": {},
-  "editMetadata": "Edit Metadata",
-  "@editMetadata": {},
+"editMetadata": "Edit Metadata",
+"@editMetadata": {},
   "artist": "Artist",
   "@artist": {},
   "album": "Album",
@@ -459,7 +457,7 @@
   "@cacheCleared": {},
   "trustSelfSignedCertificate": "Trust self-signed certificate",
   "@trustSelfSignedCertificate": {},
-  "trustSelfSignedHint": "Use only for private servers with your own certificate. Enables insecure HTTPS.",
+  "trustSelfSignedHint": "Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate.",
   "@trustSelfSignedHint": {},
   "connectionFailed": "Failed to connect to the server: {error}",
   "@connectionFailed": {

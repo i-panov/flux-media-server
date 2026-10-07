@@ -7,9 +7,6 @@ abstract class AuthRepository {
   Future<Either<Failure, ({String token, String refreshToken, User user})>>
   verifyCode(String email, String code);
   Future<Either<Failure, User>> getCurrentUser();
-  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
-    String refreshToken,
-  );
 
   /// Debug-код из последнего успешного requestCode (null, если сервер
   /// работает не в debug-режиме). Домен не возвращает его в результатах.

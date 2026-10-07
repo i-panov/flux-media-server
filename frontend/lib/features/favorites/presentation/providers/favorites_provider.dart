@@ -42,7 +42,10 @@ class FavoritesNotifier extends AsyncNotifier<List<Favorite>> {
     final getFavorites = ref.watch(getFavoritesProvider);
     final result = await getFavorites(const GetFavoritesParams());
     return await result.fold(
-      (failure) => throw Exception(failure.message),
+      // Тип Failure сохраняется в AsyncError (не заворачивается в Exception):
+      // UI различает network/auth/server по типу ошибки.
+      // ignore: only_throw_errors
+      (failure) => throw failure,
       (favorites) => favorites,
     );
   }

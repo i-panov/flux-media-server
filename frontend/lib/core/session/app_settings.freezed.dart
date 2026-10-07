@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$AppSettings {
 
- String? get serverUrl; String? get authToken; String? get refreshToken; String get locale;
+ String? get serverUrl; String? get authToken; String? get refreshToken; String get locale; bool get trustSelfSignedCertificates;
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -27,14 +27,14 @@ $AppSettingsCopyWith<AppSettings> get copyWith => _$AppSettingsCopyWithImpl<AppS
 @override
 bool operator ==(Object other) {
   final _this = this as AppSettings;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppSettings&&(identical(other.serverUrl, _this.serverUrl) || other.serverUrl == _this.serverUrl)&&(identical(other.authToken, _this.authToken) || other.authToken == _this.authToken)&&(identical(other.refreshToken, _this.refreshToken) || other.refreshToken == _this.refreshToken)&&(identical(other.locale, _this.locale) || other.locale == _this.locale));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppSettings&&(identical(other.serverUrl, _this.serverUrl) || other.serverUrl == _this.serverUrl)&&(identical(other.authToken, _this.authToken) || other.authToken == _this.authToken)&&(identical(other.refreshToken, _this.refreshToken) || other.refreshToken == _this.refreshToken)&&(identical(other.locale, _this.locale) || other.locale == _this.locale)&&(identical(other.trustSelfSignedCertificates, _this.trustSelfSignedCertificates) || other.trustSelfSignedCertificates == _this.trustSelfSignedCertificates));
 }
 
 
 @override
 int get hashCode {
   final _this = this as AppSettings;
-  return Object.hash(runtimeType,_this.serverUrl,_this.authToken,_this.refreshToken,_this.locale);
+  return Object.hash(runtimeType,_this.serverUrl,_this.authToken,_this.refreshToken,_this.locale,_this.trustSelfSignedCertificates);
 }
 
 
@@ -46,7 +46,7 @@ abstract mixin class $AppSettingsCopyWith<$Res>  {
   factory $AppSettingsCopyWith(AppSettings value, $Res Function(AppSettings) _then) = _$AppSettingsCopyWithImpl;
 @useResult
 $Res call({
- String? serverUrl, String? authToken, String? refreshToken, String locale
+ String? serverUrl, String? authToken, String? refreshToken, String locale, bool trustSelfSignedCertificates
 });
 
 
@@ -63,13 +63,14 @@ class _$AppSettingsCopyWithImpl<$Res>
 
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? serverUrl = freezed,Object? authToken = freezed,Object? refreshToken = freezed,Object? locale = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? serverUrl = freezed,Object? authToken = freezed,Object? refreshToken = freezed,Object? locale = null,Object? trustSelfSignedCertificates = null,}) {
   return _then(AppSettings(
 serverUrl: freezed == serverUrl ? _self.serverUrl : serverUrl // ignore: cast_nullable_to_non_nullable
 as String?,authToken: freezed == authToken ? _self.authToken : authToken // ignore: cast_nullable_to_non_nullable
 as String?,refreshToken: freezed == refreshToken ? _self.refreshToken : refreshToken // ignore: cast_nullable_to_non_nullable
 as String?,locale: null == locale ? _self.locale : locale // ignore: cast_nullable_to_non_nullable
-as String,
+as String,trustSelfSignedCertificates: null == trustSelfSignedCertificates ? _self.trustSelfSignedCertificates : trustSelfSignedCertificates // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -151,10 +152,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale,  bool trustSelfSignedCertificates)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AppSettings() when $default != null:
-return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale);case _:
+return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale,_that.trustSelfSignedCertificates);case _:
   return orElse();
 
 }
@@ -172,10 +173,10 @@ return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale)
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale,  bool trustSelfSignedCertificates)  $default,) {final _that = this;
 switch (_that) {
 case _AppSettings():
-return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale);}
+return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale,_that.trustSelfSignedCertificates);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -189,10 +190,10 @@ return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale)
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String? serverUrl,  String? authToken,  String? refreshToken,  String locale,  bool trustSelfSignedCertificates)?  $default,) {final _that = this;
 switch (_that) {
 case _AppSettings() when $default != null:
-return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale);case _:
+return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale,_that.trustSelfSignedCertificates);case _:
   return null;
 
 }
@@ -204,13 +205,14 @@ return $default(_that.serverUrl,_that.authToken,_that.refreshToken,_that.locale)
 
 
 class _AppSettings implements AppSettings {
-  const _AppSettings({this.serverUrl, this.authToken, this.refreshToken, this.locale = 'en'});
+  const _AppSettings({this.serverUrl, this.authToken, this.refreshToken, this.locale = 'en', this.trustSelfSignedCertificates = false});
   
 
 @override final  String? serverUrl;
 @override final  String? authToken;
 @override final  String? refreshToken;
 @override@JsonKey() final  String locale;
+@override@JsonKey() final  bool trustSelfSignedCertificates;
 
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
@@ -222,13 +224,13 @@ _$AppSettingsCopyWith<_AppSettings> get copyWith => __$AppSettingsCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppSettings&&(identical(other.serverUrl, serverUrl) || other.serverUrl == serverUrl)&&(identical(other.authToken, authToken) || other.authToken == authToken)&&(identical(other.refreshToken, refreshToken) || other.refreshToken == refreshToken)&&(identical(other.locale, locale) || other.locale == locale));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppSettings&&(identical(other.serverUrl, serverUrl) || other.serverUrl == serverUrl)&&(identical(other.authToken, authToken) || other.authToken == authToken)&&(identical(other.refreshToken, refreshToken) || other.refreshToken == refreshToken)&&(identical(other.locale, locale) || other.locale == locale)&&(identical(other.trustSelfSignedCertificates, trustSelfSignedCertificates) || other.trustSelfSignedCertificates == trustSelfSignedCertificates));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,serverUrl,authToken,refreshToken,locale);
+    return Object.hash(runtimeType,serverUrl,authToken,refreshToken,locale,trustSelfSignedCertificates);
 }
 
 
@@ -240,7 +242,7 @@ abstract mixin class _$AppSettingsCopyWith<$Res> implements $AppSettingsCopyWith
   factory _$AppSettingsCopyWith(_AppSettings value, $Res Function(_AppSettings) _then) = __$AppSettingsCopyWithImpl;
 @override @useResult
 $Res call({
- String? serverUrl, String? authToken, String? refreshToken, String locale
+ String? serverUrl, String? authToken, String? refreshToken, String locale, bool trustSelfSignedCertificates
 });
 
 
@@ -257,13 +259,14 @@ class __$AppSettingsCopyWithImpl<$Res>
 
 /// Create a copy of AppSettings
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? serverUrl = freezed,Object? authToken = freezed,Object? refreshToken = freezed,Object? locale = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? serverUrl = freezed,Object? authToken = freezed,Object? refreshToken = freezed,Object? locale = null,Object? trustSelfSignedCertificates = null,}) {
   return _then(_AppSettings(
 serverUrl: freezed == serverUrl ? _self.serverUrl : serverUrl // ignore: cast_nullable_to_non_nullable
 as String?,authToken: freezed == authToken ? _self.authToken : authToken // ignore: cast_nullable_to_non_nullable
 as String?,refreshToken: freezed == refreshToken ? _self.refreshToken : refreshToken // ignore: cast_nullable_to_non_nullable
 as String?,locale: null == locale ? _self.locale : locale // ignore: cast_nullable_to_non_nullable
-as String,
+as String,trustSelfSignedCertificates: null == trustSelfSignedCertificates ? _self.trustSelfSignedCertificates : trustSelfSignedCertificates // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

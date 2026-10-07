@@ -1,11 +1,12 @@
-import 'dart:io';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/network/server_health.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/utils/url_utils.dart';
+import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
@@ -28,6 +29,12 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
     // Load the current server URL from settings (loaded at app startup)
     final currentUrl = ref.read(settingsProvider).settings.serverUrl;
     _controller.text = currentUrl ?? 'http://localhost:8080';
+    // Стартуем с сохранённого значения: иначе сброс чекбокса при повторном
+    // открытии экрана молча отключал бы доверие сертификату.
+    _trustSelfSigned = ref
+        .read(settingsProvider)
+        .settings
+        .trustSelfSignedCertificates;
   }
 
   @override
@@ -48,38 +55,37 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
 
     setState(() => _isChecking = true);
     try {
+      // Флаг доверия НЕ сохраняем до проверки: опечатка в адресе не
+      // должна молча менять глобальный TLS-режим приложения. Локальный
+      // клиент health-check использует значение чекбокса напрямую.
       // Check if server is reachable. Health-check — на /api/health
       // (нормализованный адрес уже содержит сегмент /api).
-      final client = HttpClient()
-        // Самоподписанные сертификаты принимаем только при явном согласии
-        // пользователя (чекбокс ниже), иначе сервер «недоступен».
-        ..connectionTimeout = const Duration(seconds: 5)
-        ..badCertificateCallback = (cert, host, port) => _trustSelfSigned;
       try {
-        final request = await client.getUrl(Uri.parse('$normalized/health'));
-        final response = await request.close();
-        // Прочитать тело ответа, чтобы освободить соединение.
-        await response.drain<void>();
-
-        if (response.statusCode != HttpStatus.ok) {
-          throw Exception(l.serverStatusError(response.statusCode));
-        }
-      } finally {
-        // Закрываем клиент в любом случае, чтобы не было утечки сокетов.
-        client.close(force: true);
+        await checkServerHealth(
+          Uri.parse('$normalized/health'),
+          trustSelfSigned: _trustSelfSigned,
+        );
+      } on ServerHealthException catch (e) {
+        throw Exception(l.serverStatusError(e.statusCode));
       }
 
-      // Server is reachable, save URL and proceed
+      // Server is reachable: сохраняем флаг и адрес только после
+      // успешного health-check, затем выполняем полный logout как в
+      // настройках — иначе старый токен уедет на новый хост, а кеш и
+      // провайдеры сессии останутся от старого сервера.
+      await ref
+          .read(settingsProvider.notifier)
+          .setTrustSelfSignedCertificates(value: _trustSelfSigned);
       await ref.read(settingsProvider.notifier).setServerUrl(normalized);
+      await ref.read(authProvider.notifier).logout();
       if (!mounted) return;
       await context.router.replace(const LoginRoute());
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.connectionFailed(e.toString())),
-          backgroundColor: Colors.red.shade700,
-        ),
+      showTextSnackBar(
+        context,
+        l.connectionFailed(e.toString()),
+        isError: true,
       );
     } finally {
       if (mounted) {

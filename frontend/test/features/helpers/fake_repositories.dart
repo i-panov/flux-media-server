@@ -70,14 +70,6 @@ class FakeFavoritesRepository implements FavoritesRepository {
     removeFavoriteCalls.add(mediaId);
     return onRemoveFavorite!(mediaId);
   }
-
-  @override
-  Future<Either<Failure, Favorite>> addArtistFavorite(int artistId) async =>
-      const Left(ServerFailure(message: 'not used'));
-
-  @override
-  Future<Either<Failure, void>> removeArtistFavorite(int artistId) async =>
-      const Left(ServerFailure(message: 'not used'));
 }
 
 class FakeCollectionsRepository implements CollectionsRepository {
@@ -98,12 +90,6 @@ class FakeCollectionsRepository implements CollectionsRepository {
   Future<Either<Failure, Collection>> createCollection({
     required String name,
     required String type,
-  }) async => const Left(ServerFailure(message: 'not used'));
-
-  @override
-  Future<Either<Failure, Collection>> updateCollection(
-    int id, {
-    String? name,
   }) async => const Left(ServerFailure(message: 'not used'));
 
   @override

@@ -764,12 +764,6 @@ abstract class AppLocalizations {
   /// **'Continue from {formatted}'**
   String continueFrom(String formatted);
 
-  /// No description provided for @startFromBeginning.
-  ///
-  /// In en, this message translates to:
-  /// **'Start over'**
-  String get startFromBeginning;
-
   /// No description provided for @editMetadata.
   ///
   /// In en, this message translates to:
@@ -1109,7 +1103,7 @@ abstract class AppLocalizations {
   /// No description provided for @trustSelfSignedHint.
   ///
   /// In en, this message translates to:
-  /// **'Use only for private servers with your own certificate. Enables insecure HTTPS.'**
+  /// **'Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate.'**
   String get trustSelfSignedHint;
 
   /// No description provided for @connectionFailed.

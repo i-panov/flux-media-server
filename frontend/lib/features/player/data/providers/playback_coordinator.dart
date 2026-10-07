@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
@@ -411,7 +412,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
       artist: media.artists.isEmpty
           ? null
           : media.artists.map((a) => a.name).join(', '),
-      artUri: isLocal ? null : _coverUrlFor(media),
+      artUri: _coverUrlFor(media, isLocal: isLocal),
       duration: media.duration != null
           ? Duration(seconds: media.duration!)
           : null,
@@ -421,12 +422,25 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     );
   }
 
-  String? _coverUrlFor(Media media) {
+  /// Обложка для MediaItem уведомления; без рисунка — null.
+  ///
+  /// Уже скачанный трек ([_localPath]) показывается без обложки: локальный
+  /// файл не требует авторизации, а тянуть её заново незачем.
+  String? _coverUrlFor(Media media, {required bool isLocal}) {
+    if (isLocal) return null;
     if (media.coverUrl?.isNotEmpty ?? false) {
-      return '$_baseUrl/media/${media.id}/cover';
+      return buildMediaImageUrl(
+        baseUrl: _baseUrl,
+        mediaId: media.id,
+        kind: MediaImageKind.cover,
+      );
     }
     if (media.thumbnailUrl?.isNotEmpty ?? false) {
-      return '$_baseUrl/media/${media.id}/thumb';
+      return buildMediaImageUrl(
+        baseUrl: _baseUrl,
+        mediaId: media.id,
+        kind: MediaImageKind.thumb,
+      );
     }
     return null;
   }
@@ -847,15 +861,6 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     }
   }
 
-  /// Starts playback from the beginning (from the resume dialog).
-  Future<void> startFromBeginning() async {
-    if (state is PlaybackPlaying) {
-      final current = state as PlaybackPlaying;
-      await _videoPlayer.seek(Duration.zero);
-      state = current.copyWith(savedPosition: null);
-    }
-  }
-
   Future<void> setVolume(double volume) async {
     await _audioPlayer.setVolume(volume);
   }
@@ -898,10 +903,6 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     }
     _lastType = null;
     state = const PlaybackState.initial();
-  }
-
-  Future<void> reset() async {
-    await stop();
   }
 }
 

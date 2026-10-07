@@ -9,7 +9,6 @@ abstract class CollectionsRepository {
     required String name,
     required String type,
   });
-  Future<Either<Failure, Collection>> updateCollection(int id, {String? name});
   Future<Either<Failure, void>> deleteCollection(int id);
   Future<Either<Failure, CollectionItem>> addCollectionItem(
     int collectionId,

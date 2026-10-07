@@ -268,10 +268,8 @@
       }
     }
   },
-  "startFromBeginning": "Начать сначала",
-  "@startFromBeginning": {},
-  "editMetadata": "Редактировать метаданные",
-  "@editMetadata": {},
+"editMetadata": "Редактировать метаданные",
+"@editMetadata": {},
   "artist": "Исполнитель",
   "@artist": {},
   "album": "Альбом",
@@ -407,7 +405,7 @@
   "@clearCache": {},
   "trustSelfSignedCertificate": "Доверять самоподписанному сертификату",
   "@trustSelfSignedCertificate": {},
-  "trustSelfSignedHint": "Только для частных серверов с собственным сертификатом. Включает небезопасный HTTPS.",
+  "trustSelfSignedHint": "Только для частных серверов. Включает небезопасный HTTPS для запросов API; для потоков видео/аудио сертификат всё равно должен быть доверенным.",
   "@trustSelfSignedHint": {},
   "connectionFailed": "Не удалось подключиться к серверу: {error}",
   "@connectionFailed": {

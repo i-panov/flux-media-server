@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
@@ -73,12 +74,18 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     if (result.isEmpty) return;
     final file = result.first;
-    if (file.path == null) return;
+    final path = file.path;
+    if (path == null) return;
 
+    // Размер читаем асинхронно: lengthSync() блокирует UI-изолят и на
+    // крупном файле подвисает кадр (хеширование ради этого унесли в
+    // Isolate.run — до файла добрались только здесь).
+    final size = await File(path).length();
+    if (!mounted) return;
     setState(() {
-      _selectedFile = File(file.path!);
+      _selectedFile = File(path);
       _selectedFileName = file.name;
-      _selectedFileSize = file.lengthSync() ?? 0;
+      _selectedFileSize = size;
     });
   }
 
@@ -86,10 +93,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     setState(() => _cancelled = true);
   }
 
+  /// Фидбек с явным цветом: зелёный — успех, красный/оранжевый —
+  /// ошибка и отмена. Экран мог размонтироваться во время загрузки.
   void _showSnackBar(String message, Color color) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+    showTextSnackBar(context, message, color: color);
   }
 
   Future<void> _startUpload() async {

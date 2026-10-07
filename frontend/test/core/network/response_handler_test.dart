@@ -245,4 +245,20 @@ void main() {
       });
     });
   });
+
+  group('_failureFor TLS', () {
+    test(
+      'maps a handshake failure to NetworkFailure, not ServerFailure',
+      () async {
+        final result = await safeRepositoryCall<void>(
+          () async => throw const HandshakeException('self-signed certificate'),
+        );
+
+        expect(
+          result.fold<Failure?>((f) => f, (_) => null),
+          const TypeMatcher<NetworkFailure>(),
+        );
+      },
+    );
+  });
 }

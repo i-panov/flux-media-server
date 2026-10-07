@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
+import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
-import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -102,35 +102,40 @@ class MediaCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              // Favorite overlay
-              Positioned(
-                top: 4,
-                right: 4,
-                child: Semantics(
-                  button: true,
-                  label: l.favorites,
-                  child: Tooltip(
-                    message: l.favorites,
-                    child: Material(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        onTap: onFavorite,
+              // Favorite overlay. В офлайне обработчика нет — оверлей не рисуем:
+              // иначе на карточке висит 28dp зона тапа, которая ничего
+              // не делает и выглядит как рабочая кнопка.
+              if (onFavorite != null)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Semantics(
+                    button: true,
+                    label: l.favorites,
+                    child: Tooltip(
+                      message: l.favorites,
+                      child: Material(
+                        color: Colors.black54,
                         borderRadius: BorderRadius.circular(12),
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: Icon(
-                            isFavorite ? Icons.favorite : Icons.favorite_border,
-                            size: 16,
-                            color: isFavorite ? Colors.red : Colors.white,
+                        child: InkWell(
+                          onTap: onFavorite,
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: Icon(
+                              isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 16,
+                              color: isFavorite ? Colors.red : Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
               // Download overlay
               if (onDownload != null)
                 Positioned(

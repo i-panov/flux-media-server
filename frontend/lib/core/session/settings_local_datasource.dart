@@ -15,12 +15,15 @@ const String storageKeyPrefix = kDebugMode ? 'debug_' : 'release_';
 /// - In debug builds, on platforms where secure storage is unavailable
 ///   (e.g. iOS simulator), tokens fall back to SharedPreferences (insecure,
 ///   for development only).
-/// - In release builds the fallback is disabled entirely: any secure storage
-///   failure is rethrown instead of storing tokens in plaintext.
+/// - In profile and release builds the fallback is disabled entirely: any
+///   secure storage failure is rethrown instead of storing tokens in
+///   plaintext. Profile-сборки попадают сюда намеренно: у них
+///   `kReleaseMode == false`, поэтому условие «не release» в профиле
+///   включало бы фолбэк и токены утекли бы в plaintext.
 /// - Server URL and locale are always stored in SharedPreferences.
 class SettingsLocalDataSource {
   new(this._prefs, this._secureStorage, {bool? allowInsecureFallback})
-    : _allowInsecureFallback = allowInsecureFallback ?? !kReleaseMode;
+    : _allowInsecureFallback = allowInsecureFallback ?? kDebugMode;
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
@@ -32,6 +35,7 @@ class SettingsLocalDataSource {
   static const _keyRefreshToken = 'refresh_token';
   static const _keyRefreshTokenFallback = 'refresh_token_insecure';
   static const _keyLocale = 'locale';
+  static const _keyTrustSelfSigned = 'trust_self_signed_certificates';
 
   String _p(String key) => '$storageKeyPrefix$key';
 
@@ -52,6 +56,19 @@ class SettingsLocalDataSource {
     final success = await _prefs.setString(_p(_keyLocale), locale);
     if (!success) {
       throw Exception('Failed to save locale to SharedPreferences');
+    }
+  }
+
+  /// Доверие самоподписанным сертификатам (небезопасный HTTPS).
+  bool getTrustSelfSignedCertificates() =>
+      _prefs.getBool(_p(_keyTrustSelfSigned)) ?? false;
+
+  Future<void> setTrustSelfSignedCertificates({required bool value}) async {
+    final success = await _prefs.setBool(_p(_keyTrustSelfSigned), value);
+    if (!success) {
+      throw Exception(
+        'Failed to save trustSelfSignedCertificates to SharedPreferences',
+      );
     }
   }
 

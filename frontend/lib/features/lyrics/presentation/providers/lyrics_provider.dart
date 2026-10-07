@@ -60,7 +60,10 @@ final lyricsProvider = FutureProvider.autoDispose.family<LyricsLoadResult, int>(
           return LyricsLoadResult(lyrics: cached, fromCache: true);
         }
         // Сетевая ошибка не маскируется под «нет лирики».
-        throw Exception(failure.message);
+        // Тип Failure сохраняется в AsyncError, а не заворачивается в
+        // Exception: UI различает сетевую ошибку и «лирики нет».
+        // ignore: only_throw_errors
+        throw failure;
       },
       (lyrics) async {
         // Кеш-запись fire-and-forget: сбой сохранения не должен

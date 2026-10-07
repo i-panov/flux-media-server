@@ -24,14 +24,6 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
   );
 
   @override
-  Future<Either<Failure, Collection>> updateCollection(
-    int id, {
-    String? name,
-  }) => safeRepositoryCall(
-    () => remoteDataSource.updateCollection(id, name: name),
-  );
-
-  @override
   Future<Either<Failure, void>> deleteCollection(int id) =>
       safeRepositoryCall(() => remoteDataSource.deleteCollection(id));
 

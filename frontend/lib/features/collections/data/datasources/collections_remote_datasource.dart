@@ -36,14 +36,6 @@ class CollectionsRemoteDataSource {
     return _collectionFromBody(response, 'Failed to create collection');
   }
 
-  Future<Collection> updateCollection(int id, {String? name}) async {
-    final body = <String, dynamic>{};
-    if (name != null) body['name'] = name;
-    final response = await apiClient.updateCollection(id, body);
-    checkResponse(response, 'Failed to update collection');
-    return _collectionFromBody(response, 'Failed to update collection');
-  }
-
   Future<void> deleteCollection(int id) async {
     final response = await apiClient.deleteCollection(id);
     checkResponse(response, 'Failed to delete collection');

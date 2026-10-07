@@ -40,9 +40,4 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, User>> getCurrentUser() =>
       safeRepositoryCall(remoteDataSource.getCurrentUser);
-
-  @override
-  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
-    String refreshToken,
-  ) => safeRepositoryCall(() => remoteDataSource.refreshTokens(refreshToken));
 }

@@ -121,6 +121,9 @@ class _FakeAudioSource implements AudioPlaybackSource {
 class _FakeVideoSource implements VideoPlaybackSource {
   final positionCtl = StreamController<Duration>.broadcast();
   final durationCtl = StreamController<Duration>.broadcast();
+
+  /// Текущая длительность для UI-клампа перемотки.
+  Duration durationValue = Duration.zero;
   final playingCtl = StreamController<bool>.broadcast();
   final completedCtl = StreamController<bool>.broadcast();
   final errorCtl = StreamController<String>.broadcast();
@@ -174,6 +177,9 @@ class _FakeVideoSource implements VideoPlaybackSource {
 
   @override
   Stream<double> get rateStream => rateCtl.stream;
+
+  @override
+  Duration get duration => durationValue;
 
   void disposeStreams() {
     for (final c in [
@@ -308,6 +314,10 @@ class _FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<void> setLocale(String locale) async {}
+  @override
+  bool getTrustSelfSignedCertificates() => false;
+  @override
+  Future<void> setTrustSelfSignedCertificates({required bool value}) async {}
 }
 
 class _FakeOfflineCache extends OfflineCacheService {

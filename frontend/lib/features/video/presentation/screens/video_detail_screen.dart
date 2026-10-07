@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
@@ -85,28 +86,20 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
         .maybeWhen(loaded: (m) => m, orElse: () => null);
     if (media == null) return;
 
-    final downloadState = ref.read(downloadNotifierProvider(widget.mediaId));
+    final downloads = ref.read(downloadsStateProvider.notifier);
+    final downloadState = downloads.stateOf(widget.mediaId);
 
     if (downloadState is DownloadDownloaded) {
-      await ref
-          .read(downloadNotifierProvider(widget.mediaId).notifier)
-          .remove(widget.mediaId);
+      await downloads.remove(widget.mediaId);
     } else if (downloadState is DownloadDownloading) {
-      await ref
-          .read(downloadNotifierProvider(widget.mediaId).notifier)
-          .cancel(widget.mediaId);
+      await downloads.cancel(widget.mediaId);
     } else {
-      await ref
-          .read(downloadNotifierProvider(widget.mediaId).notifier)
-          .download(media);
+      await downloads.download(media);
 
       if (!mounted) return;
-      final newState = ref.read(downloadNotifierProvider(widget.mediaId));
+      final newState = downloads.stateOf(widget.mediaId);
       if (newState is DownloadError) {
-        final l = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l.errorLabel}: ${newState.message}')),
-        );
+        showErrorSnackBar(context, newState.message);
       }
     }
   }

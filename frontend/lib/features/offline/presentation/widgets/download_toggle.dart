@@ -17,14 +17,16 @@ Future<void> toggleDownload(
   required int mediaId,
   required String mediaType,
 }) async {
-  final downloadState = ref.read(downloadNotifierProvider(mediaId));
+  final downloads = ref.read(downloadsStateProvider.notifier);
+  final downloadState = downloads.stateOf(mediaId);
   if (downloadState is DownloadDownloaded) {
-    await ref.read(downloadNotifierProvider(mediaId).notifier).remove(mediaId);
+    await downloads.remove(mediaId);
     return;
   }
   if (downloadState is DownloadDownloading) {
-    // Повторный тап во время загрузки отменяет её.
-    await ref.read(downloadNotifierProvider(mediaId).notifier).cancel(mediaId);
+    // Повторный тап во время загрузки отменяет её. Ждём фактической
+    // чистки .part, и только потом показываем «отменено».
+    await downloads.cancel(mediaId);
     _showFeedback(_messengerMessage((l) => l.downloadCancelled));
     return;
   }
@@ -42,11 +44,11 @@ Future<void> toggleDownload(
   if (media == null) return;
 
   _showFeedback(_messengerMessage((l) => l.downloadStarted));
-  await ref.read(downloadNotifierProvider(mediaId).notifier).download(media);
+  await downloads.download(media);
 
   // После завершения download() состояние не может быть downloading:
   // notifier сам выставляет downloaded/idle/error.
-  final state = ref.read(downloadNotifierProvider(mediaId));
+  final state = downloads.stateOf(mediaId);
   if (state is DownloadDownloaded) {
     _showFeedback(_messengerMessage((l) => l.downloaded));
   } else if (state is DownloadError) {

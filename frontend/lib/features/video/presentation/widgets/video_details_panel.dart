@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
-import 'package:flux_media_server/features/media/presentation/utils/media_image_url.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -41,7 +41,7 @@ class VideoDetailsPanel extends ConsumerWidget {
     final l = AppLocalizations.of(context)!;
     final favoriteState = ref.watch(favoriteToggleProvider(media.id));
     final isFavorite = favoriteState.value;
-    final downloadState = ref.watch(downloadNotifierProvider(media.id));
+    final downloadState = ref.watch(downloadStateProvider(media.id));
 
     final downloadProgress = switch (downloadState) {
       DownloadDownloading(:final progress) => progress,

@@ -5,9 +5,9 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/audio/presentation/utils/download_batch.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
-import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/section_header.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/track_actions_mixin.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
@@ -18,6 +18,7 @@ import 'package:flux_media_server/features/media/presentation/providers/artists_
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
+import 'package:flux_media_server/features/media/presentation/widgets/media_list_scaffold.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
@@ -68,15 +69,12 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
       setState(() => _downloadTotal = pending.length);
       if (pending.isEmpty) return;
 
+      final downloads = ref.read(downloadsStateProvider.notifier);
       final result = await downloadTracksBatch(
         pending: pending,
-        download: (track) => ref
-            .read(downloadNotifierProvider(track.id).notifier)
-            .download(track),
-        isDownloaded: (id) =>
-            ref.read(downloadNotifierProvider(id)) is DownloadDownloaded,
-        isFailed: (id) =>
-            ref.read(downloadNotifierProvider(id)) is DownloadError,
+        download: downloads.download,
+        isDownloaded: (id) => downloads.stateOf(id) is DownloadDownloaded,
+        isFailed: (id) => downloads.stateOf(id) is DownloadError,
         onTrackDone: (done, fail) {
           // Живой прогресс в AppBar, а не только по завершении пачки.
           if (!mounted) return;
@@ -99,11 +97,12 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
             ? '${l.downloadedOfTotalTracks(downloaded, _downloadTotal)}, '
                   '${l.errorLabel}: $failed'
             : l.downloadedOfTotalTracks(downloaded, _downloadTotal);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+        showTextSnackBar(context, message);
       }
     }
   }
+
+  void _retry() => retryMediaListOf(ref, _mediaType);
 
   void _playTrack(List<Media> queue, int index) {
     unawaited(
@@ -204,21 +203,11 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
     );
     if (!mounted) return;
 
-    result.fold(
-      (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l.errorLabel}: ${failure.message}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      },
-      (_) {
-        // Имя меняется у всех треков — обновляем списки и страницу.
-        _refreshAfterArtistChange();
-        setState(() {});
-      },
-    );
+    result.fold((failure) => showFailureSnackBar(context, failure), (_) {
+      // Имя меняется у всех треков — обновляем списки и страницу.
+      _refreshAfterArtistChange();
+      setState(() {});
+    });
   }
 
   /// Замена обложки артиста.
@@ -237,25 +226,10 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
     );
     if (!mounted) return;
 
-    uploadResult.fold(
-      (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l.errorLabel}: ${failure.message}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      },
-      (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.uploadSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _refreshAfterArtistChange();
-      },
-    );
+    uploadResult.fold((failure) => showFailureSnackBar(context, failure), (_) {
+      showSuccessSnackBar(context, l.uploadSuccess);
+      _refreshAfterArtistChange();
+    });
   }
 
   /// Инвалидирует данные, зависящие от артиста: списки медиа (имена в
@@ -289,22 +263,14 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
     required bool favoritesLoading,
     required Set<int> favoriteIds,
   }) {
-    if (mediaListState.isLoading || favoritesLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (mediaListState.hasError || favoritesHasError) {
-      return ErrorRetryView(
-        message: mediaListState.hasError
-            ? mediaListState.error?.toString()
-            : ref.read(favoritesProvider).error?.toString(),
-        onRetry: () {
-          ref
-            ..invalidate(mediaListProvider(_mediaType))
-            ..invalidate(favoritesProvider);
-        },
-      );
-    }
+    final gate = mediaListStateGate(
+      ref,
+      mediaType: _mediaType,
+      favoritesHasError: favoritesHasError,
+      favoritesLoading: favoritesLoading,
+      onRetry: _retry,
+    );
+    if (gate != null) return gate;
 
     final mediaList =
         mediaListState.value ??
@@ -345,9 +311,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref
-          ..invalidate(mediaListProvider(_mediaType))
-          ..invalidate(favoritesProvider);
+        _retry();
         // Ошибка уже отражена в состоянии провайдера.
         try {
           await ref.read(mediaListProvider(_mediaType).future);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
 import 'package:flux_media_server/features/collections/domain/usecases/create_collection.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
@@ -107,23 +108,18 @@ class _AddToCollectionDialogState
       if (!mounted) return;
       result.fold(
         (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.failedToAdd(failure.message))),
-          );
+          showErrorSnackBar(context, l.failedToAdd(failure.message));
         },
         (_) {
           // Перечитываем элементы коллекции, чтобы показать новый элемент.
           ref.invalidate(collectionItemsFullProvider(collection.id));
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.addedToCollection(collection.name))),
-          );
+          showSuccessSnackBar(context, l.addedToCollection(collection.name));
         },
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l.failedToAdd(e.toString()))));
+        showErrorSnackBar(context, l.failedToAdd(e.toString()));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -146,9 +142,7 @@ class _AddToCollectionDialogState
       if (!mounted) return;
       collection.fold(
         (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.failedToAdd(failure.message))),
-          );
+          showErrorSnackBar(context, l.failedToAdd(failure.message));
         },
         (_) {
           ref.invalidate(collectionsProvider);
@@ -156,8 +150,7 @@ class _AddToCollectionDialogState
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l.failedToAdd(e.toString()))));
+        showErrorSnackBar(context, l.failedToAdd(e.toString()));
       }
     } finally {
       if (mounted) setState(() => _loading = false);

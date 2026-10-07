@@ -79,45 +79,6 @@ final class _$MediaApiClient extends MediaApiClient {
   }
 
   @override
-  Future<Response<Map<String, dynamic>>> uploadMedia(
-    String mediaType,
-    MultipartFile file,
-  ) {
-    final Uri $url = Uri.parse('/media/upload');
-    final List<PartValue> $parts = <PartValue>[
-      PartValue<String>('media_type', mediaType),
-      PartValueFile<MultipartFile>('file', file),
-    ];
-    final Request $request = Request(
-      'POST',
-      $url,
-      client.baseUrl,
-      parts: $parts,
-      multipart: true,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
-  Future<Response<Map<String, dynamic>>> uploadCover(
-    int id,
-    MultipartFile cover,
-  ) {
-    final Uri $url = Uri.parse('/media/${id}/cover');
-    final List<PartValue> $parts = <PartValue>[
-      PartValueFile<MultipartFile>('cover', cover),
-    ];
-    final Request $request = Request(
-      'PUT',
-      $url,
-      client.baseUrl,
-      parts: $parts,
-      multipart: true,
-    );
-    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
-  }
-
-  @override
   Future<Response<Map<String, dynamic>>> getProgress() {
     final Uri $url = Uri.parse('/progress');
     final Request $request = Request('GET', $url, client.baseUrl);

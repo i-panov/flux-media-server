@@ -4,23 +4,212 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
-import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
+import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/section_header.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/track_actions_mixin.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
+import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
+import 'package:flux_media_server/features/media/presentation/widgets/media_list_scaffold.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/downloads_provider.dart';
-import 'package:flux_media_server/features/video/presentation/utils/watch_progress.dart';
+import 'package:flux_media_server/features/video/presentation/utils/continue_watching.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/horizontal_video_row.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
+
+/// Сколько карточек показывать до кнопки «показать все».
+const _sectionLimit = 10;
+
+typedef _IdCallback = void Function(int mediaId);
+
+/// Разобранные данные экрана, общие для всех секций.
+///
+/// Раньше каждый из пяти виджетов секций заново строил `mediaById`,
+/// `favoriteIds`, `downloadedIds` и прогонял фильтр «продолжить просмотр»
+/// — четыре полных обхода списка на каждый rebuild.
+class _LibraryData {
+  const new({
+    required this.all,
+    required this.mediaById,
+    required this.continueWatching,
+    required this.favoriteIds,
+    required this.downloadedIds,
+  });
+
+  factory of(
+    List<Media> all,
+    ContinueWatching continueWatching,
+    Set<int> favoriteIds,
+    Set<int> downloadedIds,
+  ) => _LibraryData(
+    all: all,
+    mediaById: {for (final m in all) m.id: m},
+    continueWatching: continueWatching,
+    favoriteIds: favoriteIds,
+    downloadedIds: downloadedIds,
+  );
+
+  final List<Media> all;
+  final Map<int, Media> mediaById;
+  final ContinueWatching continueWatching;
+  final Set<int> favoriteIds;
+  final Set<int> downloadedIds;
+
+  /// «Недавно добавленные»: всё, кроме «продолжить просмотр».
+  ///
+  /// Полный список без лимита: первые 10 для показа отрезает
+  /// `_VideoSection`, иначе кнопка «показать все» никогда не появлялась.
+  List<Media> get recentlyAddedItems => _withoutContinueWatching;
+
+  /// «Избранное»: избранное, что не попало в две секции выше.
+  List<Media> get favoriteItems {
+    final exclude = {...continueWatching.ids, ...recentlyAddedIds};
+    return _exclude(
+      all,
+      exclude,
+    ).where((m) => favoriteIds.contains(m.id)).toList();
+  }
+
+  /// Медиа, которые ещё не показаны ни в одной секции, — основа сетки.
+  ///
+  /// Порядок секций важен: «продолжить просмотр» → «недавно добавленные» →
+  /// «избранное». Каждое следующее исключает предыдущие, поэтому элемент
+  /// не дублируется в двух секциях. В сетку уходит только то, что секции
+  /// не показали в свёрнутом виде (первые 10 каждой).
+  List<Media> gridItems() => _exclude(all, {
+    ...continueWatching.ids,
+    ...recentlyAddedVisibleIds,
+    ..._favoriteVisibleSectionIds(),
+  });
+
+  List<Media> get _withoutContinueWatching =>
+      _exclude(all, continueWatching.ids);
+
+  Set<int> get recentlyAddedIds => {for (final m in recentlyAddedItems) m.id};
+
+  /// Первые 10 «недавно добавленных» — то, что секции показывают
+  /// в свёрнутом виде. Остаток уходит в общую сетку.
+  Set<int> get recentlyAddedVisibleIds => {
+    for (final m in recentlyAddedItems.take(_sectionLimit)) m.id,
+  };
+
+  /// Первые 10 «избранных» — то, что секция показывает в свёрнутом виде.
+  Set<int> _favoriteVisibleSectionIds() => {
+    for (final m in favoriteItems.take(_sectionLimit)) m.id,
+  };
+
+  static List<Media> _exclude(List<Media> items, Set<int> exclude) =>
+      items.where((m) => !exclude.contains(m.id)).toList();
+}
+
+/// Горизонтальная секция со «свернуть/развернуть» и колбэками действий.
+class _VideoSection extends ConsumerStatefulWidget {
+  const new({
+    required this.title,
+    required this.icon,
+    required this.items,
+    required this.onFavoriteToggled,
+    required this.onDownloadToggled,
+    this.isOffline = false,
+    this.progressById = const {},
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Media> items;
+  final bool isOffline;
+  final Map<int, WatchProgress> progressById;
+  final _IdCallback onFavoriteToggled;
+  final _IdCallback onDownloadToggled;
+
+  @override
+  ConsumerState<_VideoSection> createState() => _VideoSectionState();
+}
+
+class _VideoSectionState extends ConsumerState<_VideoSection> {
+  bool _showAll = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final library = ref.watch(_libraryDataProvider);
+    final favoriteIds = library.favoriteIds;
+    final downloadedIds = library.downloadedIds;
+    final split = splitSection(widget.items, _sectionLimit);
+    final items = _showAll ? widget.items : split.visible;
+    if (items.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    return SliverToBoxAdapter(
+      child: HorizontalVideoRow(
+        title: widget.title,
+        icon: widget.icon,
+        items: items,
+        progressById: widget.progressById,
+        isFavoriteMap: {for (final id in favoriteIds) id: true},
+        // В офлайне избранное недоступно: обработчик не передаём вовсе.
+        onFavoriteToggled: widget.isOffline ? null : widget.onFavoriteToggled,
+        isDownloadedMap: {for (final id in downloadedIds) id: true},
+        onDownloadToggled: widget.onDownloadToggled,
+        onItemTapped: (id) =>
+            context.router.push(VideoDetailRoute(mediaId: id)),
+        trailing: split.rest.isNotEmpty && !_showAll
+            ? TextButton(
+                onPressed: () => setState(() => _showAll = true),
+                child: Text(context.l10n.showAll),
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+/// «Продолжить просмотр», посчитанный из списка и прогресса.
+///
+/// Отдельным провайдером, а не внутри [_libraryDataProvider]: сортировка
+/// по свежести — единственное O(n log n) место экрана, и тогл избранного
+/// не должен её пересчитывать.
+final _continueWatchingProvider = Provider<ContinueWatching>((ref) {
+  final mediaList = ref.watch(mediaListProvider('video'));
+  final progress = ref.watch(watchProgressProvider).value ?? const [];
+  return ContinueWatching.build(
+    mediaList.value?.items.toList() ?? const <Media>[],
+    progress,
+  );
+});
+
+/// Секции, вычисленные из списка и прогресса, — общие для всех секций и
+/// сетки. Считаются один раз на экран.
+final _libraryDataProvider = Provider<_LibraryData>((ref) {
+  final mediaList = ref.watch(mediaListProvider('video'));
+  final continueWatching = ref.watch(_continueWatchingProvider);
+  final favoriteIds =
+      ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
+  final downloadedIds = ref.watch(
+    downloadsProvider.select(
+      (s) =>
+          s.value
+              ?.where((m) => m.type == MediaType.video)
+              .map((m) => m.id)
+              .toSet() ??
+          const <int>{},
+    ),
+  );
+  return _LibraryData.of(
+    mediaList.value?.items.toList() ?? const <Media>[],
+    continueWatching,
+    favoriteIds,
+    downloadedIds,
+  );
+});
 
 @RoutePage()
 class VideoScreen extends ConsumerStatefulWidget {
@@ -31,68 +220,25 @@ class VideoScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoScreenState extends ConsumerState<VideoScreen>
-    with TrackActionsMixin<VideoScreen> {
-  static const _mediaType = 'video';
-  final ScrollController _scrollController = ScrollController();
-
-  /// Debounce live-поиска.
-  Timer? _searchDebounce;
-  final TextEditingController _searchController = TextEditingController();
-
+    with TrackActionsMixin<VideoScreen>, MediaListSearchMixin<VideoScreen> {
   @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-    // Восстанавливаем строку поиска из провайдера: query живёт в
-    // провайдере, а текст поля — в State; при пересоздании экрана
-    // поле иначе осталось бы пустым при уже отфильтрованном списке.
-    final savedQuery = ref.read(searchQueryProvider(_mediaType));
-    if (savedQuery.isNotEmpty) {
-      _searchController.text = savedQuery;
-    }
-  }
+  String get mediaType => 'video';
 
+  /// Видео-экран перезагружает ещё и прогресс с коллекциями поверх
+  /// базовых списка и избранного: секции «продолжить просмотр» и
+  /// «коллекции» иначе показали бы stale-данные после pull-to-refresh.
   @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    final position = _scrollController.position;
-    if (position.maxScrollExtent > 0 &&
-        position.pixels >= position.maxScrollExtent * 0.8) {
-      unawaited(ref.read(mediaListProvider(_mediaType).notifier).loadMore());
-    }
-  }
-
-  /// Live-поиск с debounce 300 мс.
-  void _onSearchChanged(String value) {
-    _searchDebounce?.cancel();
-    final query = value.trim();
-    if (query.isEmpty) {
-      ref.read(searchQueryProvider(_mediaType).notifier).query = '';
-    } else {
-      _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-        ref.read(searchQueryProvider(_mediaType).notifier).query = query;
-      });
-    }
-  }
-
-  void _clearSearch() {
-    _searchDebounce?.cancel();
-    _searchController.clear();
-    ref.read(searchQueryProvider(_mediaType).notifier).query = '';
+  void retryMediaList() {
+    super.retryMediaList();
+    ref
+      ..invalidate(watchProgressProvider)
+      ..invalidate(collectionsProvider);
   }
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final isNarrow = MediaQuery.of(context).size.width < 900;
-
-    final mediaListState = ref.watch(mediaListProvider(_mediaType));
+    final l = context.l10n;
+    final mediaListState = ref.watch(mediaListProvider(mediaType));
     final isOffline = ref.watch(isOfflineProvider);
     // Ошибки остальных провайдеров — по hasError: перестройка только при
     // переходе в ошибку, а не на каждое обновление данных секций.
@@ -105,33 +251,12 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
     final collectionsHasError = ref.watch(
       collectionsProvider.select((s) => s.hasError),
     );
-    final hasDownloadedVideo = ref.watch(
-      downloadsProvider.select(
-        (s) => s.value?.any((m) => m.type == MediaType.video) ?? false,
-      ),
-    );
+    final library = ref.watch(_libraryDataProvider);
+    final hasDownloadedVideo = library.downloadedIds.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: const SizedBox.shrink(),
-        title: Text(l.videoTab),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.upload_outlined),
-            tooltip: l.upload,
-            onPressed: () =>
-                context.router.push(UploadRoute(mediaType: 'video')),
-          ),
-          if (isNarrow)
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              tooltip: l.settings,
-              onPressed: () => context.router.push(const SettingsRoute()),
-            ),
-        ],
-      ),
+      appBar: MediaListAppBar(title: l.videoTab, mediaType: mediaType),
       body: _buildBody(
-        context: context,
         l: l,
         mediaListState: mediaListState,
         isOffline: isOffline,
@@ -140,17 +265,18 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
             secondaryHasError ||
             favoritesHasError ||
             collectionsHasError,
+        library: library,
         hasDownloadedVideo: hasDownloadedVideo,
       ),
     );
   }
 
   Widget _buildBody({
-    required BuildContext context,
     required AppLocalizations l,
     required AsyncValue<MediaListResult> mediaListState,
     required bool isOffline,
     required bool hasError,
+    required _LibraryData library,
     required bool hasDownloadedVideo,
   }) {
     // Show loading skeleton only on initial load, not during refresh.
@@ -166,165 +292,68 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
     if (!isOffline && hasError) {
       return ErrorRetryView(
         message: mediaListState.error?.toString(),
-        onRetry: () {
-          ref
-            ..invalidate(mediaListProvider(_mediaType))
-            ..invalidate(watchProgressProvider)
-            ..invalidate(favoritesProvider)
-            ..invalidate(collectionsProvider);
-        },
+        onRetry: retryMediaList,
       );
     }
 
-    final mediaItems = mediaListState.value?.items.toList() ?? const <Media>[];
+    final mediaItems = library.all;
 
     // Системный back при активном поиске сначала очищает поиск (возврат
     // к полному списку), а не «проглатывается» корневым PopScope
     // (выход из приложения на мобильных). ListenableBuilder: canPop
     // должен обновляться на каждый символ, а не при rebuild экрана —
     // иначе в окне до debounce back выходит из приложения.
-    return ListenableBuilder(
-      listenable: _searchController,
-      builder: (context, _) => PopScope(
-        canPop: _searchController.text.isEmpty,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _clearSearch();
-        },
-        child: RefreshIndicator(
-          onRefresh: () async {
-            ref
-              ..invalidate(mediaListProvider(_mediaType))
-              ..invalidate(watchProgressProvider)
-              ..invalidate(favoritesProvider)
-              ..invalidate(collectionsProvider);
-            // Ошибка уже отражена в состоянии провайдера.
-            try {
-              await ref.read(mediaListProvider(_mediaType).future);
-            } catch (_) {}
-          },
-          child: CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              // Search bar
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: SearchBar(
-                    controller: _searchController,
-                    hintText: l.searchMedia,
-                    leading: const Icon(Icons.search),
-                    trailing: [
-                      // ValueListenableBuilder вместо setState на каждый символ.
-                      ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: _searchController,
-                        builder: (context, value, _) => IconButton(
-                          icon: const Icon(Icons.close),
-                          tooltip: l.cancel,
-                          onPressed: value.text.isEmpty ? null : _clearSearch,
-                        ),
-                      ),
-                    ],
-                    onChanged: _onSearchChanged,
-                  ),
-                ),
-              ),
-              if (mediaItems.isEmpty && !hasDownloadedVideo)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.video_library_outlined,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          l.noMediaFound,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else ...[
-                _ContinueWatchingSection(
-                  mediaItems: mediaItems,
-                  isOffline: isOffline,
-                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                  onDownloadToggled: (id) =>
-                      toggleDownloadTrack(ref, _mediaType, id),
-                ),
-                _RecentlyAddedSection(
-                  mediaItems: mediaItems,
-                  isOffline: isOffline,
-                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                  onDownloadToggled: (id) =>
-                      toggleDownloadTrack(ref, _mediaType, id),
-                ),
-                _FavoritesSection(
-                  mediaItems: mediaItems,
-                  isOffline: isOffline,
-                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                  onDownloadToggled: (id) =>
-                      toggleDownloadTrack(ref, _mediaType, id),
-                ),
-                const _CollectionsSection(),
-                _DownloadsSection(
-                  isOffline: isOffline,
-                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                  onDownloadToggled: (id) =>
-                      toggleDownloadTrack(ref, _mediaType, id),
-                ),
-                _AllVideosGrid(
-                  mediaItems: mediaItems,
-                  isOffline: isOffline,
-                  onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-                  onDownloadToggled: (id) =>
-                      toggleDownloadTrack(ref, _mediaType, id),
-                ),
-              ],
-            ],
+    return searchableList(
+      slivers: [
+        if (mediaItems.isEmpty && !hasDownloadedVideo)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _EmptyLibrary(
+              icon: Icons.video_library_outlined,
+              message: l.noMediaFound,
+            ),
+          )
+        else ...[
+          _VideoSection(
+            title: l.continueWatching,
+            icon: Icons.history,
+            items: [for (final e in library.continueWatching.entries) e.media],
+            progressById: library.continueWatching.byId,
+            isOffline: isOffline,
+            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
           ),
-        ),
-      ),
+          _VideoSection(
+            title: l.recentlyAdded,
+            icon: Icons.new_releases,
+            items: library.recentlyAddedItems,
+            isOffline: isOffline,
+            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
+          ),
+          _VideoSection(
+            title: l.favorites,
+            icon: Icons.favorite,
+            items: library.favoriteItems,
+            isOffline: isOffline,
+            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
+          ),
+          const _CollectionsSection(),
+          const _DownloadsSection(),
+          _AllVideosGrid(
+            items: library.gridItems(),
+            isOffline: isOffline,
+            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
+            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
+          ),
+        ],
+      ],
     );
   }
 
   Widget _buildSkeletonGrid(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      gridDelegate: _videoGridDelegate(),
-      itemCount: 12,
-      itemBuilder: (context, index) => const Card(
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: SkeletonWidget(
-                width: double.infinity,
-                height: double.infinity,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SkeletonWidget(height: 14, width: double.infinity),
-                  SizedBox(height: 6),
-                  SkeletonWidget(height: 10, width: 60),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return SkeletonMediaGrid(gridDelegate: _videoGridDelegate(), itemCount: 12);
   }
 }
 
@@ -339,274 +368,27 @@ SliverGridDelegate _videoGridDelegate() {
   );
 }
 
-typedef _IdCallback = void Function(int mediaId);
+/// Пустое состояние библиотеки.
+class _EmptyLibrary extends StatelessWidget {
+  const new({required this.icon, required this.message});
 
-/// Продолжить просмотр: незавершённый прогресс для элементов текущего
-/// списка, отсортирован по updatedAt — свежие сверху.
-class _ContinueWatchingSection extends ConsumerStatefulWidget {
-  const new({
-    required this.mediaItems,
-    required this.isOffline,
-    required this.onFavoriteToggled,
-    required this.onDownloadToggled,
-  });
-
-  final List<Media> mediaItems;
-  final bool isOffline;
-  final _IdCallback onFavoriteToggled;
-  final _IdCallback onDownloadToggled;
-
-  @override
-  ConsumerState<_ContinueWatchingSection> createState() =>
-      _ContinueWatchingSectionState();
-}
-
-class _ContinueWatchingSectionState
-    extends ConsumerState<_ContinueWatchingSection> {
-  bool _showAll = false;
+  final IconData icon;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final watchProgress =
-        ref.watch(watchProgressProvider).value ?? const <WatchProgress>[];
-    final favoriteIds =
-        ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
-    final downloadedIds = ref.watch(
-      downloadsProvider.select(
-        (s) =>
-            s.value
-                ?.where((m) => m.type == MediaType.video)
-                .map((m) => m.id)
-                .toSet() ??
-            const <int>{},
-      ),
-    );
-
-    final mediaById = {for (final m in widget.mediaItems) m.id: m};
-    final mediaIds = widget.mediaItems.map((m) => m.id).toSet();
-    final continueWatching =
-        watchProgress.where((p) => mediaIds.contains(p.mediaId)).where((p) {
-          final duration = p.duration > 0
-              ? p.duration
-              : (mediaById[p.mediaId]?.duration ?? 0);
-          return shouldShowInContinueWatching(
-            position: p.position,
-            duration: duration,
-            completed: p.completed,
-          );
-        }).toList()..sort(
-          (a, b) => (b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0))
-              .compareTo(a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0)),
-        );
-    final items = _showAll ? continueWatching : continueWatching.take(10);
-    if (items.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-
-    return SliverToBoxAdapter(
-      child: HorizontalVideoRow(
-        title: l.continueWatching,
-        icon: Icons.history,
-        items: items.map((p) => mediaById[p.mediaId]!).toList(),
-        progressById: {for (final p in items) p.mediaId: p},
-        isFavoriteMap: {for (final id in favoriteIds) id: true},
-        onFavoriteToggled: widget.isOffline ? null : widget.onFavoriteToggled,
-        isDownloadedMap: {for (final id in downloadedIds) id: true},
-        onDownloadToggled: widget.onDownloadToggled,
-        onItemTapped: (id) =>
-            context.router.push(VideoDetailRoute(mediaId: id)),
-        trailing: continueWatching.length > 10 && !_showAll
-            ? TextButton(
-                onPressed: () => setState(() => _showAll = true),
-                child: Text(l.showAll),
-              )
-            : null,
-      ),
-    );
-  }
-}
-
-/// Недавно добавленные: первые элементы, не попавшие в «Продолжить просмотр».
-class _RecentlyAddedSection extends ConsumerStatefulWidget {
-  const new({
-    required this.mediaItems,
-    required this.isOffline,
-    required this.onFavoriteToggled,
-    required this.onDownloadToggled,
-  });
-
-  final List<Media> mediaItems;
-  final bool isOffline;
-  final _IdCallback onFavoriteToggled;
-  final _IdCallback onDownloadToggled;
-
-  @override
-  ConsumerState<_RecentlyAddedSection> createState() =>
-      _RecentlyAddedSectionState();
-}
-
-class _RecentlyAddedSectionState extends ConsumerState<_RecentlyAddedSection> {
-  bool _showAll = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final favoriteIds =
-        ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
-    final downloadedIds = ref.watch(
-      downloadsProvider.select(
-        (s) =>
-            s.value
-                ?.where((m) => m.type == MediaType.video)
-                .map((m) => m.id)
-                .toSet() ??
-            const <int>{},
-      ),
-    );
-    final mediaIds = widget.mediaItems.map((m) => m.id).toSet();
-    final mediaById = {for (final m in widget.mediaItems) m.id: m};
-    final continueWatchingIds =
-        ref
-            .watch(watchProgressProvider)
-            .value
-            ?.where((p) => mediaIds.contains(p.mediaId))
-            .where((p) {
-              final duration = p.duration > 0
-                  ? p.duration
-                  : (mediaById[p.mediaId]?.duration ?? 0);
-              return shouldShowInContinueWatching(
-                position: p.position,
-                duration: duration,
-                completed: p.completed,
-              );
-            })
-            .map((p) => p.mediaId)
-            .toSet() ??
-        const <int>{};
-
-    final allItems = widget.mediaItems
-        .where((m) => !continueWatchingIds.contains(m.id))
-        .toList();
-    final items = _showAll ? allItems : allItems.take(10).toList();
-    if (items.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-
-    return SliverToBoxAdapter(
-      child: HorizontalVideoRow(
-        title: l.recentlyAdded,
-        icon: Icons.new_releases,
-        items: items,
-        isFavoriteMap: {for (final id in favoriteIds) id: true},
-        onFavoriteToggled: widget.isOffline ? null : widget.onFavoriteToggled,
-        isDownloadedMap: {for (final id in downloadedIds) id: true},
-        onDownloadToggled: widget.onDownloadToggled,
-        onItemTapped: (id) =>
-            context.router.push(VideoDetailRoute(mediaId: id)),
-        trailing: allItems.length > 10 && !_showAll
-            ? TextButton(
-                onPressed: () => setState(() => _showAll = true),
-                child: Text(l.showAll),
-              )
-            : null,
-      ),
-    );
-  }
-}
-
-/// Избранные видео, не попавшие в предыдущие секции.
-class _FavoritesSection extends ConsumerStatefulWidget {
-  const new({
-    required this.mediaItems,
-    required this.isOffline,
-    required this.onFavoriteToggled,
-    required this.onDownloadToggled,
-  });
-
-  final List<Media> mediaItems;
-  final bool isOffline;
-  final _IdCallback onFavoriteToggled;
-  final _IdCallback onDownloadToggled;
-
-  @override
-  ConsumerState<_FavoritesSection> createState() => _FavoritesSectionState();
-}
-
-class _FavoritesSectionState extends ConsumerState<_FavoritesSection> {
-  bool _showAll = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final favoriteIds =
-        ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
-    final downloadedIds = ref.watch(
-      downloadsProvider.select(
-        (s) =>
-            s.value
-                ?.where((m) => m.type == MediaType.video)
-                .map((m) => m.id)
-                .toSet() ??
-            const <int>{},
-      ),
-    );
-    final mediaIds = widget.mediaItems.map((m) => m.id).toSet();
-    final mediaById = {for (final m in widget.mediaItems) m.id: m};
-    final continueWatchingIds =
-        ref
-            .watch(watchProgressProvider)
-            .value
-            ?.where((p) => mediaIds.contains(p.mediaId))
-            .where((p) {
-              final duration = p.duration > 0
-                  ? p.duration
-                  : (mediaById[p.mediaId]?.duration ?? 0);
-              return shouldShowInContinueWatching(
-                position: p.position,
-                duration: duration,
-                completed: p.completed,
-              );
-            })
-            .map((p) => p.mediaId)
-            .toSet() ??
-        const <int>{};
-    final recentlyAddedIds = widget.mediaItems
-        .where((m) => !continueWatchingIds.contains(m.id))
-        .take(10)
-        .map((m) => m.id)
-        .toSet();
-
-    final allItems = widget.mediaItems
-        .where(
-          (m) =>
-              favoriteIds.contains(m.id) &&
-              !continueWatchingIds.contains(m.id) &&
-              !recentlyAddedIds.contains(m.id),
-        )
-        .toList();
-    final items = _showAll ? allItems : allItems.take(10).toList();
-    if (items.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-
-    return SliverToBoxAdapter(
-      child: HorizontalVideoRow(
-        title: l.favorites,
-        icon: Icons.favorite,
-        items: items,
-        isFavoriteMap: {for (final id in favoriteIds) id: true},
-        onFavoriteToggled: widget.isOffline ? null : widget.onFavoriteToggled,
-        isDownloadedMap: {for (final id in downloadedIds) id: true},
-        onDownloadToggled: widget.onDownloadToggled,
-        onItemTapped: (id) =>
-            context.router.push(VideoDetailRoute(mediaId: id)),
-        trailing: allItems.length > 10 && !_showAll
-            ? TextButton(
-                onPressed: () => setState(() => _showAll = true),
-                child: Text(l.showAll),
-              )
-            : null,
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(color: Colors.grey),
+          ),
+        ],
       ),
     );
   }
@@ -646,22 +428,13 @@ class _CollectionsSection extends ConsumerWidget {
 }
 
 /// Скачанные видео.
-class _DownloadsSection extends ConsumerWidget {
-  const new({
-    required this.isOffline,
-    required this.onFavoriteToggled,
-    required this.onDownloadToggled,
-  });
-
-  final bool isOffline;
-  final _IdCallback onFavoriteToggled;
-  final _IdCallback onDownloadToggled;
+class _DownloadsSection extends ConsumerWidget with TrackActionsRef {
+  const new();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context)!;
-    final favoriteIds =
-        ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
+    final isOffline = ref.watch(isOfflineProvider);
+    final library = ref.watch(_libraryDataProvider);
     final downloadedVideo =
         (ref.watch(downloadsProvider).value ?? const <Media>[])
             .where((m) => m.type == MediaType.video)
@@ -672,7 +445,10 @@ class _DownloadsSection extends ConsumerWidget {
 
     return SliverMainAxisGroup(
       slivers: [
-        SliverSectionHeader(icon: Icons.download, title: l.downloads),
+        SliverSectionHeader(
+          icon: Icons.download,
+          title: context.l10n.downloads,
+        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           sliver: SliverGrid(
@@ -683,12 +459,17 @@ class _DownloadsSection extends ConsumerWidget {
                 media: media,
                 onTap: () =>
                     context.router.push(VideoDetailRoute(mediaId: media.id)),
-                isFavorite: favoriteIds.contains(media.id),
+                isFavorite: library.favoriteIds.contains(media.id),
+                // В офлайне избранное недоступно везде, не только тут.
                 onFavorite: isOffline
                     ? null
-                    : () => onFavoriteToggled(media.id),
+                    : () => unawaited(
+                        ref
+                            .read(favoriteToggleProvider(media.id).notifier)
+                            .toggle(),
+                      ),
                 isDownloaded: true,
-                onDownload: () => onDownloadToggled(media.id),
+                onDownload: () => toggleDownloadTrack(ref, 'video', media.id),
               );
             }, childCount: downloadedVideo.length),
           ),
@@ -701,74 +482,30 @@ class _DownloadsSection extends ConsumerWidget {
 /// Основная сетка: всё, что не попало в секции выше.
 class _AllVideosGrid extends ConsumerWidget {
   const new({
-    required this.mediaItems,
+    required this.items,
     required this.isOffline,
     required this.onFavoriteToggled,
     required this.onDownloadToggled,
   });
 
-  final List<Media> mediaItems;
+  final List<Media> items;
   final bool isOffline;
   final _IdCallback onFavoriteToggled;
   final _IdCallback onDownloadToggled;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final favoriteIds =
-        ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
-    final mediaIds = mediaItems.map((m) => m.id).toSet();
-    final mediaById = {for (final m in mediaItems) m.id: m};
-    final continueWatchingIds =
-        ref
-            .watch(watchProgressProvider)
-            .value
-            ?.where((p) => mediaIds.contains(p.mediaId))
-            .where((p) {
-              final duration = p.duration > 0
-                  ? p.duration
-                  : (mediaById[p.mediaId]?.duration ?? 0);
-              return shouldShowInContinueWatching(
-                position: p.position,
-                duration: duration,
-                completed: p.completed,
-              );
-            })
-            .map((p) => p.mediaId)
-            .toSet() ??
-        const <int>{};
-    final recentlyAdded = mediaItems
-        .where((m) => !continueWatchingIds.contains(m.id))
-        .take(10)
-        .toList();
-    final recentlyAddedIds = recentlyAdded.map((m) => m.id).toSet();
-    final favoriteVideos = mediaItems
-        .where(
-          (m) =>
-              favoriteIds.contains(m.id) &&
-              !continueWatchingIds.contains(m.id) &&
-              !recentlyAddedIds.contains(m.id),
-        )
-        .take(10)
-        .toList();
-
-    final highlightIds = {
-      ...continueWatchingIds,
-      ...recentlyAddedIds,
-      ...favoriteVideos.map((m) => m.id),
-    };
-    final gridItems = mediaItems
-        .where((m) => !highlightIds.contains(m.id))
-        .toList();
-    if (gridItems.isEmpty) {
+    if (items.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
+    final favoriteIds = ref.watch(_libraryDataProvider).favoriteIds;
 
     return SliverPadding(
       padding: const EdgeInsets.all(8),
       sliver: SliverGrid(
         gridDelegate: _videoGridDelegate(),
         delegate: SliverChildBuilderDelegate((context, index) {
-          final media = gridItems[index];
+          final media = items[index];
           return MediaCard(
             media: media,
             onTap: () =>
@@ -778,7 +515,7 @@ class _AllVideosGrid extends ConsumerWidget {
             onFavorite: isOffline ? null : () => onFavoriteToggled(media.id),
             onDownload: () => onDownloadToggled(media.id),
           );
-        }, childCount: gridItems.length),
+        }, childCount: items.length),
       ),
     );
   }
@@ -793,7 +530,7 @@ class _CollectionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
+    final l = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

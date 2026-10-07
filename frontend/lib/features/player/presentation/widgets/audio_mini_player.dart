@@ -7,11 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
+import 'package:flux_media_server/features/player/presentation/utils/playback_toggle.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -94,6 +96,7 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
     final favoriteState = ref.watch(favoriteToggleProvider(media.id));
     final isFavorite = favoriteState.value;
 
+    final hasCover = media.coverUrl?.isNotEmpty ?? false;
     final progress = (duration != null && duration > Duration.zero)
         ? position.inMicroseconds / duration.inMicroseconds
         : 0.0;
@@ -169,42 +172,27 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                 children: [
                   // Cover — tap toggles play/pause
                   GestureDetector(
-                    onTap: () {
-                      if (isPaused) {
-                        unawaited(
-                          ref
-                              .read(playbackCoordinatorProvider.notifier)
-                              .resume(),
-                        );
-                      } else {
-                        unawaited(
-                          ref
-                              .read(playbackCoordinatorProvider.notifier)
-                              .pause(),
-                        );
-                      }
-                    },
+                    onTap: () =>
+                        togglePlayback(ref, media.id, isPaused: isPaused),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(6),
                       child: SizedBox(
                         width: 36,
                         height: 36,
                         child: () {
-                          final hasCover =
-                              media.coverUrl != null &&
-                              media.coverUrl!.isNotEmpty;
                           if (!hasCover) {
                             return const Center(
                               child: AudioPlaceholder(size: 28),
                             );
                           }
-                          final cacheBuster =
-                              media.updatedAt?.millisecondsSinceEpoch;
-                          final buster = cacheBuster != null
-                              ? '?v=$cacheBuster'
-                              : '';
+                          final imageUrl = buildMediaImageUrl(
+                            baseUrl: baseUrl,
+                            mediaId: media.id,
+                            kind: MediaImageKind.cover,
+                            cacheBust: media.updatedAt?.millisecondsSinceEpoch,
+                          );
                           return AuthNetworkImage(
-                            imageUrl: '$baseUrl/media/${media.id}/cover$buster',
+                            imageUrl: imageUrl,
                             width: 36,
                             height: 36,
                             fit: BoxFit.cover,
@@ -269,21 +257,8 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
                   IconButton(
                     icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
                     tooltip: isPaused ? l.play : l.pause,
-                    onPressed: () {
-                      if (isPaused) {
-                        unawaited(
-                          ref
-                              .read(playbackCoordinatorProvider.notifier)
-                              .resume(),
-                        );
-                      } else {
-                        unawaited(
-                          ref
-                              .read(playbackCoordinatorProvider.notifier)
-                              .pause(),
-                        );
-                      }
-                    },
+                    onPressed: () =>
+                        togglePlayback(ref, media.id, isPaused: isPaused),
                     iconSize: 28,
                   ),
                   // Next track

@@ -16,6 +16,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       authToken: token,
       refreshToken: refreshToken,
       locale: _localDataSource.getLocale(),
+      trustSelfSignedCertificates: _localDataSource
+          .getTrustSelfSignedCertificates(),
     );
   }
 
@@ -41,4 +43,12 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   Future<void> setLocale(String locale) => _localDataSource.setLocale(locale);
+
+  @override
+  bool getTrustSelfSignedCertificates() =>
+      _localDataSource.getTrustSelfSignedCertificates();
+
+  @override
+  Future<void> setTrustSelfSignedCertificates({required bool value}) =>
+      _localDataSource.setTrustSelfSignedCertificates(value: value);
 }

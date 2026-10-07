@@ -18,9 +18,24 @@ class TimeoutHttpClient extends http.BaseClient {
   new({
     this.requestTimeout = const Duration(seconds: 30),
     this.uploadTimeout = const Duration(seconds: 120),
+    this.trustSelfSignedCertificates = false,
+    HttpClient Function()? httpClientFactory,
   }) : _inner = IOClient(
-         HttpClient()..connectionTimeout = const Duration(seconds: 10),
+         _createBaseClient(httpClientFactory)
+           ..connectionTimeout = const Duration(seconds: 10)
+           // Флаг доверия из настроек применяется ЗДЕСЬ, а не только на
+           // health-check в ServerSetupScreen: иначе проверка проходила бы,
+           // а все реальные запросы падали бы с ошибкой сертификата.
+           ..badCertificateCallback = trustSelfSignedCertificates
+               ? (cert, host, port) => true
+               : null,
        );
+
+  /// Фабрика базового клиента: точка расширения для тестов, чтобы
+  /// подсмотреть выставленный `badCertificateCallback` на настоящем
+  /// `HttpClient`. В проде всегда дефолтный конструктор.
+  static HttpClient _createBaseClient(HttpClient Function()? factory) =>
+      factory != null ? factory() : HttpClient();
 
   final http.Client _inner;
 
@@ -29,6 +44,14 @@ class TimeoutHttpClient extends http.BaseClient {
 
   /// Таймаут для multipart-загрузок.
   final Duration uploadTimeout;
+
+  /// Принимать самоподписанные сертификаты (небезопасный HTTPS).
+  ///
+  /// ВАЖНО: покрывает только трафик Dart-http. Потоки видео/аудио идёт
+  /// через mpv (media_kit), у которого нет настраиваемого TLS-колбэка,
+  /// поэтому воспроизведение с самоподписанным сертификатом всё равно
+  /// не заработает. Это ограничение отражено в подсказке настройки.
+  final bool trustSelfSignedCertificates;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) {
@@ -69,6 +92,8 @@ class TimeoutHttpClient extends http.BaseClient {
         ..persistentConnection = request.persistentConnection;
     }
     if (request is http.Request) {
+      // contentLength не переносим: у Request он вычисляется из bodyBytes
+      // и сеттер бросает UnsupportedError.
       return http.AbortableRequest(
           request.method,
           request.url,
@@ -81,6 +106,9 @@ class TimeoutHttpClient extends http.BaseClient {
         ..maxRedirects = request.maxRedirects
         ..persistentConnection = request.persistentConnection;
     }
+    // Неизвестный тип запроса: Abortable-обёртки для него нет, поэтому
+    // таймаут не сможет закрыть соединение — запрос уйдёт без триггера
+    // отмены.
     return request;
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flux_media_server/app.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
@@ -18,7 +19,6 @@ import 'package:flux_media_server/features/auth/presentation/providers/auth_prov
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
-import 'package:flux_media_server/main.dart';
 import 'package:flux_media_server/shared/models/user.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,11 +29,6 @@ class FakeAuthRepository implements AuthRepository {
   Function(String, String)?
   onVerifyCode;
   Future<Either<Failure, User>> Function()? onGetCurrentUser;
-  Future<Either<Failure, ({String token, String refreshToken})>> Function(
-    String,
-  )?
-  onRefreshToken;
-
   String? _lastDebugCode;
 
   @override
@@ -52,11 +47,6 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<Either<Failure, User>> getCurrentUser() => onGetCurrentUser!();
-
-  @override
-  Future<Either<Failure, ({String token, String refreshToken})>> refreshToken(
-    String refreshToken,
-  ) => onRefreshToken!(refreshToken);
 }
 
 class FakeOfflineCacheService extends OfflineCacheService {

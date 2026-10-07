@@ -38,17 +38,6 @@ class FavoritesRemoteDataSource {
     checkResponse(response, 'Failed to remove favorite');
   }
 
-  Future<Favorite> addArtistFavorite(int artistId) async {
-    final response = await apiClient.addArtistFavorite({'artist_id': artistId});
-    checkResponse(response, 'Failed to add artist favorite');
-    return _favoriteFromBody(response, 'Failed to add artist favorite');
-  }
-
-  Future<void> removeArtistFavorite(int artistId) async {
-    final response = await apiClient.removeArtistFavorite(artistId);
-    checkResponse(response, 'Failed to remove artist favorite');
-  }
-
   List<dynamic> _bodyListField(
     Response<dynamic> response,
     String field,
