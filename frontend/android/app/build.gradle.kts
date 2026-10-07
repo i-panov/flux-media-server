@@ -1,13 +1,34 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// ID приложения — из локального конфига local.properties (не в git),
+// иначе нейтральный. Персональные значения в репозиторий не попадают.
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
+}
+val appApplicationId: String =
+    localProperties.getProperty("app.applicationId", "app.lib.flux")
+
 android {
-    namespace = "ru.ithub24.flux"
+    // namespace фиксирован: от него зависит резолвинг .MainActivity
+    // в манифесте. Личность приложения задаёт applicationId ниже —
+    // они вправе различаться.
+    namespace = "app.lib.flux"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
+
+    buildFeatures {
+        // Нужен для BuildConfig.APPLICATION_ID: имя MethodChannel
+        // выводится из ID приложения, а не хардкодится.
+        buildConfig = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -16,7 +37,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "ru.ithub24.flux"
+        applicationId = appApplicationId
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

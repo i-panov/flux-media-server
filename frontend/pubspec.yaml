@@ -2,7 +2,7 @@ name: flux_media_server
 description: Flux Media Player Client
 publish_to: "none"
 version: 1.0.0+1
-applicationId: ru.ithub24.flux
+applicationId: app.lib.flux
 
 environment:
   sdk: ^3.13.0

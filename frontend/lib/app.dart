@@ -11,18 +11,27 @@ import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
-/// Канал запроса runtime-разрешения на уведомления (Android 13+).
-/// Реализация — в `MainActivity.kt`; на остальных платформах канала нет,
-/// поэтому вызов безопасно игнорируется.
-const MethodChannel _notificationChannel = MethodChannel(
-  'ru.ithub24.flux/notifications',
-);
+/// Имя канала запроса runtime-разрешения на уведомления (Android 13+).
+///
+/// Не хардкодится: выводится из applicationId так же, как на Kotlin-
+/// стороне (`BuildConfig.APPLICATION_ID`), задаётся из `main()` до
+/// `runApp` через [setNotificationChannelName]. Реализация — в
+/// `MainActivity.kt`; на остальных платформах канала нет, поэтому вызов
+/// безопасно игнорируется.
+String? _notificationChannelName;
+
+/// Задать имя канала уведомлений. Вызывается один раз из `main()`.
+void setNotificationChannelName(String name) {
+  _notificationChannelName = name;
+}
 
 Future<void> _requestNotificationPermission() async {
+  final channelName = _notificationChannelName;
+  if (channelName == null) return;
   try {
-    await _notificationChannel.invokeMethod<bool>(
-      'requestNotificationPermission',
-    );
+    await MethodChannel(
+      channelName,
+    ).invokeMethod<bool>('requestNotificationPermission');
   } on MissingPluginException {
     // Не Android — разрешение не требуется.
   } catch (e) {

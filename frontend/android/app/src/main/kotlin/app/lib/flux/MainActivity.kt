@@ -1,4 +1,4 @@
-package ru.ithub24.flux
+package app.lib.flux
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -12,7 +12,7 @@ class MainActivity : AudioServiceActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            NOTIFICATION_CHANNEL,
+            notificationChannel(),
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "requestNotificationPermission" ->
@@ -48,7 +48,10 @@ class MainActivity : AudioServiceActivity() {
     }
 
     private companion object {
-        const val NOTIFICATION_CHANNEL = "ru.ithub24.flux/notifications"
+        /// Имя канала выводится из ID приложения, а не хардкодится:
+        /// Dart-сторона собирает его так же из packageName.
+        fun notificationChannel() = "${BuildConfig.APPLICATION_ID}/notifications"
+
         const val NOTIFICATION_PERMISSION_REQUEST = 4711
     }
 }

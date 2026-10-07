@@ -13,3 +13,6 @@ backend/data/
 backend/configs/config.yaml
 backend/.env
 /.idea/
+
+# Internal planning docs (not for repo)
+docs/

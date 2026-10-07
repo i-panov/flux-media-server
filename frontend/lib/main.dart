@@ -17,12 +17,18 @@ import 'package:flux_media_server/features/player/data/providers/play_queue_prov
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+
+  // Имена каналов выводятся из applicationId, а не хардкодятся:
+  // Kotlin-сторона собирает их из BuildConfig так же.
+  final packageName = (await PackageInfo.fromPlatform()).packageName;
+  setNotificationChannelName('$packageName/notifications');
 
   // Загрузчик обложек для audio_service собирается ДО контейнера:
   // хендлер создаётся в фоновом изоляте, куда нельзя пробросить ни
@@ -39,8 +45,8 @@ void main() async {
   // Initialize audio_service for background playback + system media controls.
   final audioHandler = await AudioService.init(
     builder: () => FluxAudioHandler(artworkFetcher: artworkFetcher.call),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'ru.ithub24.flux.channel.audio',
+    config: AudioServiceConfig(
+      androidNotificationChannelId: '$packageName.channel.audio',
       androidNotificationChannelName: 'Flux Audio Playback',
       androidNotificationOngoing: true,
     ),
