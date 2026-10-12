@@ -914,6 +914,54 @@ abstract class AppLocalizations {
   /// **'Upload successful'**
   String get uploadSuccess;
 
+  /// No description provided for @extractAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Extract audio'**
+  String get extractAudio;
+
+  /// No description provided for @extractingAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting audio…'**
+  String get extractingAudio;
+
+  /// No description provided for @extractCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio extraction cancelled'**
+  String get extractCancelled;
+
+  /// No description provided for @openAudioTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Open audio track'**
+  String get openAudioTrack;
+
+  /// No description provided for @audioExtracted.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio track saved to library'**
+  String get audioExtracted;
+
+  /// No description provided for @extractAudioConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Extract audio?'**
+  String get extractAudioConfirmTitle;
+
+  /// No description provided for @extractAudioConfirmText.
+  ///
+  /// In en, this message translates to:
+  /// **'The audio track will be saved to the audio library at original quality.'**
+  String get extractAudioConfirmText;
+
+  /// No description provided for @extractFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to extract audio: {error}'**
+  String extractFailed(String error);
+
   /// No description provided for @changeCover.
   ///
   /// In en, this message translates to:

@@ -449,6 +449,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get uploadSuccess => 'Upload successful';
 
   @override
+  String get extractAudio => 'Extract audio';
+
+  @override
+  String get extractingAudio => 'Extracting audio…';
+
+  @override
+  String get extractCancelled => 'Audio extraction cancelled';
+
+  @override
+  String get openAudioTrack => 'Open audio track';
+
+  @override
+  String get audioExtracted => 'Audio track saved to library';
+
+  @override
+  String get extractAudioConfirmTitle => 'Extract audio?';
+
+  @override
+  String get extractAudioConfirmText =>
+      'The audio track will be saved to the audio library at original quality.';
+
+  @override
+  String extractFailed(String error) {
+    return 'Failed to extract audio: $error';
+  }
+
+  @override
   String get changeCover => 'Change cover';
 
   @override

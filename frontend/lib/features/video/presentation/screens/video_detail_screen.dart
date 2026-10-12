@@ -6,11 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/extract_controller.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
+import 'package:flux_media_server/features/video/presentation/providers/extracted_audio_provider.dart';
+import 'package:flux_media_server/features/video/presentation/utils/extract_audio_flow.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_details_panel.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_player_panel.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -122,6 +125,22 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
     await ref.read(playQueueProvider.notifier).setQueue([media]);
   }
 
+  /// Извлечение аудио: флоу в extract_audio_flow (тестируем отдельно —
+  /// экрану остаются только колбэки панели).
+  Future<void> _extractAudio() async {
+    await runExtractAudioFlow(ref, context, widget.mediaId);
+  }
+
+  /// Отмена летящего джоба из кнопки-переключателя панели.
+  Future<void> _cancelExtract() async {
+    ref.read(extractControllerProvider.notifier).cancel();
+  }
+
+  /// Переход к уже извлечённому треку: в очередь и играть (как _play).
+  Future<void> _openExtractedAudio(Media track) async {
+    await ref.read(playQueueProvider.notifier).setQueue([track]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -155,6 +174,17 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
   }
 
   Widget _buildLoaded(AppLocalizations l, Media media) {
+    // Связка с извлечённым треком — развилкой, а не .value: loading
+    // блокирует кнопку (нельзя решать вслепую), error оставляет кнопку
+    // (тап ретраит чтение + сервер перепроверяет в POST).
+    final extractedAsync = ref.watch(extractedAudioProvider(widget.mediaId));
+    final extractedTrack = extractedAsync.maybeWhen(
+      data: (m) => m,
+      orElse: () => null,
+    );
+    final isExtracting = ref.watch(
+      extractControllerProvider.select((s) => s.isExtracting),
+    );
     if (_isFullscreen) {
       return Scaffold(
         backgroundColor: Colors.black,
@@ -227,6 +257,13 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
                 onToggleFavorite: _toggleFavorite,
                 onAddToCollection: _addToCollection,
                 onDownload: _download,
+                onExtractAudio: _extractAudio,
+                onCancelExtract: _cancelExtract,
+                onOpenExtractedAudio: extractedTrack != null
+                    ? () => _openExtractedAudio(extractedTrack)
+                    : null,
+                isExtracting: isExtracting,
+                linkLoading: extractedAsync.isLoading,
                 onChangeCover: _changeCover,
                 onEditMetadata: () =>
                     showEditMetadataDialog(context, ref, media),

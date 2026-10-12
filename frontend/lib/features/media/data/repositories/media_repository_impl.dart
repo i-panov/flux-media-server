@@ -92,6 +92,50 @@ class MediaRepositoryImpl implements MediaRepository {
       safeRepositoryCall(() => remoteDataSource.cancelUploadJob(jobId));
 
   @override
+  Future<Either<Failure, ({int? jobId, Media? media})>> extractAudio(
+    int mediaId, {
+    bool Function()? isCancelled,
+  }) => safeRepositoryCall(() async {
+    final result = await remoteDataSource.extractAudio(
+      mediaId,
+      isCancelled: isCancelled,
+    );
+    return (
+      jobId: result.jobId,
+      media: result.media == null ? null : Media.fromJson(result.media!),
+    );
+  });
+
+  @override
+  Future<Either<Failure, UploadStatus>> getExtractStatus(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) => safeRepositoryCall(() async {
+    final status = await remoteDataSource.getExtractJobStatus(
+      jobId,
+      isCancelled: isCancelled,
+    );
+    return UploadStatus(
+      id: status.id,
+      status: status.status,
+      error: status.error,
+      media: status.media == null ? null : Media.fromJson(status.media!),
+    );
+  });
+
+  @override
+  Future<Either<Failure, void>> cancelExtract(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) => safeRepositoryCall(
+    () => remoteDataSource.cancelExtractJob(jobId, isCancelled: isCancelled),
+  );
+
+  @override
+  Future<Either<Failure, Media?>> getExtractedAudio(int mediaId) =>
+      safeRepositoryCall(() => remoteDataSource.getExtractedAudio(mediaId));
+
+  @override
   Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids) =>
       safeRepositoryCall(() async {
         final items = await remoteDataSource.getMediaBulk(ids);

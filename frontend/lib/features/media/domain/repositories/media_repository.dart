@@ -39,6 +39,26 @@ abstract class MediaRepository {
   Future<Either<Failure, UploadStatus>> getUploadStatus(int jobId);
   Future<Either<Failure, void>> cancelUpload(int jobId);
 
+  /// Ставит извлечение аудио из видео: либо сразу готовый трек (связка
+  /// уже есть), либо jobId для опроса через [getExtractStatus].
+  Future<Either<Failure, ({int? jobId, Media? media})>> extractAudio(
+    int mediaId, {
+    bool Function()? isCancelled,
+  });
+
+  Future<Either<Failure, UploadStatus>> getExtractStatus(
+    int jobId, {
+    bool Function()? isCancelled,
+  });
+
+  Future<Either<Failure, void>> cancelExtract(
+    int jobId, {
+    bool Function()? isCancelled,
+  });
+
+  /// Аудиотрек, извлечённый из видео (null — связки нет).
+  Future<Either<Failure, Media?>> getExtractedAudio(int mediaId);
+
   /// Пакетная загрузка медиа по id (для офлайн-кеша вместо N+1).
   Future<Either<Failure, List<Media>>> getMediaBulk(List<int> ids);
 

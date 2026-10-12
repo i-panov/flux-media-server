@@ -358,5 +358,134 @@ void main() {
         ),
       );
     });
+  group('MediaRemoteDataSource.getExtractedAudio over HTTP', () {
+    // Chopper-путь нельзя перехватить MockClient — поднимаем настоящий
+    // локальный HttpServer (паттерн server_health_test).
+    Future<HttpServer> serve(
+      Future<void> Function(HttpRequest) onRequest,
+    ) async {
+      final server = await HttpServer.bind('localhost', 0);
+      addTearDown(() => server.close(force: true));
+      server.listen(onRequest);
+      return server;
+    }
+
+    MediaRemoteDataSource dataSourceFor(HttpServer server) {
+      final bundle = MediaApiClient.create(
+        baseUrl: 'http://localhost:${server.port}/api',
+      );
+      addTearDown(bundle.httpClient.close);
+      return MediaRemoteDataSource(
+        bundle.apiClient,
+        uploadBaseUrl: 'http://localhost:${server.port}/api',
+        clientFactory: () => MockClient(
+          (_) async => throw StateError('unused on this path'),
+        ),
+      );
+    }
+
+    test('404 maps to null', () async {
+      final server = await serve((req) async {
+        req.response.statusCode = 404;
+        await req.response.close();
+      });
+
+      final media = await dataSourceFor(server).getExtractedAudio(7);
+
+      expect(media, isNull);
+    });
+
+    test('200 parses the linked track', () async {
+      final server = await serve((req) async {
+        expect(req.uri.path, '/api/media/7/extracted');
+        req.response
+          ..statusCode = 200
+          ..headers.contentType = ContentType.json
+          ..write(
+            '{"id":9,"title":"Clip","type":"audio","file_size":100}',
+          );
+        await req.response.close();
+      });
+
+      final media = await dataSourceFor(server).getExtractedAudio(7);
+
+      expect(media?.id, 9);
+      expect(media?.title, 'Clip');
+    });
+  });
+
+  group('MediaRemoteDataSource audio extraction', () {
+    test('extractAudio posts and returns the job id on 202', () async {
+      late http.Request captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response('{"job_id": 7}', 202);
+      });
+
+      final result = await _dataSource(
+        client: client,
+        authToken: () => 'token',
+      ).extractAudio(3);
+
+      expect(captured.method, 'POST');
+      expect(captured.url.path, '/api/media/3/extract');
+      expect(captured.headers['Authorization'], 'Bearer token');
+      expect(result, (jobId: 7, media: null));
+    });
+
+    test('extractAudio returns ready media on 200 (link exists)', () async {
+      const body = '{"id": 9, "title": "Clip"}';
+      final client = MockClient((_) async => http.Response(body, 200));
+
+      final result = await _dataSource(client: client).extractAudio(3);
+
+      expect(result.jobId, isNull);
+      expect(result.media!['id'], 9);
+    });
+
+    test('extractAudio rejects jobId==null && media==null', () async {
+      final client = MockClient((_) async => http.Response('{}', 200));
+
+      await expectLater(
+        _dataSource(client: client).extractAudio(3),
+        throwsA(isA<ServerException>()),
+      );
+    });
+
+    test('getExtractJobStatus maps error and media', () async {
+      const body =
+          '{"id": 7, "status": "error", "error": "ffmpeg failed", "media": null}';
+      final client = MockClient((request) async {
+        expect(request.url.path, '/api/media/extract/7');
+        return http.Response(body, 200);
+      });
+
+      final status = await _dataSource(client: client).getExtractJobStatus(7);
+
+      expect(status.status, 'error');
+      expect(status.error, 'ffmpeg failed');
+      expect(status.media, isNull);
+    });
+
+    test('cancelExtractJob accepts 204 and 409, rejects 404', () async {
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/extract/1')) {
+          return http.Response('', 204);
+        }
+        if (request.url.path.endsWith('/extract/2')) {
+          return http.Response('', 409);
+        }
+        return http.Response('{"error": "nope"}', 404);
+      });
+      final dataSource = _dataSource(client: client);
+
+      await dataSource.cancelExtractJob(1);
+      await dataSource.cancelExtractJob(2);
+      await expectLater(
+        dataSource.cancelExtractJob(3),
+        throwsA(isA<ServerException>()),
+      );
+    });
+  });
   });
 }

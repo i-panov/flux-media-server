@@ -30,6 +30,11 @@ class VideoDetailsPanel extends ConsumerWidget {
     this.onDownload,
     this.onAddToQueue,
     this.onPlay,
+    this.onExtractAudio,
+    this.onCancelExtract,
+    this.onOpenExtractedAudio,
+    this.isExtracting = false,
+    this.linkLoading = false,
     super.key,
   });
 
@@ -42,6 +47,25 @@ class VideoDetailsPanel extends ConsumerWidget {
   final Future<void> Function()? onDownload;
   final Future<void> Function()? onAddToQueue;
   final Future<void> Function()? onPlay;
+
+  /// Запустить извлечение аудио (связки ещё нет).
+  final Future<void> Function()? onExtractAudio;
+
+  /// Отменить летящий джоб извлечения. Показывается вместо запуска,
+  /// пока [isExtracting] — долгую операцию должно быть чем прервать.
+  final Future<void> Function()? onCancelExtract;
+
+  /// Перейти к уже извлечённому треку. Ровно один из двух колбэков
+  /// задаёт родитель: либо извлекаем, либо открываем готовое.
+  final Future<void> Function()? onOpenExtractedAudio;
+
+  /// Джоб извлечения в полёте: кнопка превращается в отмену.
+  final bool isExtracting;
+
+  /// Связка ещё грузится: извлечение недоступно (нельзя решать вслепую),
+  /// кнопка заблокирована. Ошибка чтения связки — НЕ блокер: сервер
+  /// перепроверит её в POST, поэтому onExtractAudio остаётся.
+  final bool linkLoading;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -178,6 +202,40 @@ class VideoDetailsPanel extends ConsumerWidget {
               ),
             ),
           ),
+          if (onOpenExtractedAudio != null || onExtractAudio != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: onOpenExtractedAudio != null
+                  ? Tooltip(
+                      message: l.openAudioTrack,
+                      child: OutlinedButton.icon(
+                        onPressed: () => onOpenExtractedAudio!.call(),
+                        icon: const Icon(Icons.audio_file_outlined),
+                        label: Text(l.openAudioTrack),
+                      ),
+                    )
+                  : isExtracting
+                  ? Tooltip(
+                      message: l.extractCancelled,
+                      child: OutlinedButton.icon(
+                        onPressed: () => onCancelExtract?.call(),
+                        icon: const Icon(Icons.close),
+                        label: Text(l.extractingAudio),
+                      ),
+                    )
+                  : Tooltip(
+                      message: l.extractAudio,
+                      child: OutlinedButton.icon(
+                        onPressed: linkLoading
+                            ? null
+                            : () => onExtractAudio?.call(),
+                        icon: const Icon(Icons.music_note_outlined),
+                        label: Text(l.extractAudio),
+                      ),
+                    ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [

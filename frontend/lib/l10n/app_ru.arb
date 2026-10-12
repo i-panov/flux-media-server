@@ -318,6 +318,28 @@
   "@fileAlreadyExists": {},
   "uploadSuccess": "Загрузка завершена",
   "@uploadSuccess": {},
+  "extractAudio": "Извлечь аудио",
+  "@extractAudio": {},
+  "extractingAudio": "Извлекается аудио…",
+  "@extractingAudio": {},
+  "extractCancelled": "Извлечение аудио отменено",
+  "@extractCancelled": {},
+  "openAudioTrack": "Открыть трек",
+  "@openAudioTrack": {},
+  "audioExtracted": "Аудиотрек сохранён в библиотеку",
+  "@audioExtracted": {},
+  "extractAudioConfirmTitle": "Извлечь аудио?",
+  "@extractAudioConfirmTitle": {},
+  "extractAudioConfirmText": "Аудиодорожка будет сохранена в аудиобиблиотеку в исходном качестве.",
+  "@extractAudioConfirmText": {},
+  "extractFailed": "Не удалось извлечь аудио: {error}",
+  "@extractFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "changeCover": "Заменить обложку",
   "@changeCover": {},
   "uploadingCover": "Загрузка обложки...",

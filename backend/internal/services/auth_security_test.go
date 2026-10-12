@@ -178,6 +178,13 @@ func TestSanitizeFilename(t *testing.T) {
 		{"dot only", ".", true},
 		{"empty", "", true},
 		{"nul byte", "file\x00.mp4", true},
+		{"newline", "file\n.mp4", true},
+		{"carriage return", "file\r.mp4", true},
+		{"tab", "file\t.mp4", true},
+		{"escape", "file\x1b.mp4", true},
+		{"del", "file\x7f.mp4", true},
+		{"non-utf8", "file\xff.mp4", true},
+		{"unicode letters ok", "фильм_名作.mp4", false},
 		{"hidden file ok", ".hidden.mp4", false},
 	}
 

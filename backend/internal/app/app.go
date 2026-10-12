@@ -63,16 +63,17 @@ func isUploadPath(method, path string) bool {
 
 // App holds all application dependencies and the Fiber instance.
 type App struct {
-	Fiber       *fiber.App
-	Config      *config.Config
-	OTPStore    *services.OTPStore
-	Watcher     *services.WatcherService
-	UploadQueue *services.UploadQueue
-	Version     string
-	sqlDB       *sql.DB
-	cleanupStop chan struct{}
-	cleanupOnce sync.Once
-	scanner     *services.ScannerService
+	Fiber        *fiber.App
+	Config       *config.Config
+	OTPStore     *services.OTPStore
+	Watcher      *services.WatcherService
+	UploadQueue  *services.UploadQueue
+	ExtractQueue *services.ExtractService
+	Version      string
+	sqlDB        *sql.DB
+	cleanupStop  chan struct{}
+	cleanupOnce  sync.Once
+	scanner      *services.ScannerService
 	// scanCancelFn отменяет фоновый первичный скан при Shutdown.
 	// nil, если фоновый скан не был запущен.
 	scanCancelFn context.CancelFunc
@@ -190,6 +191,17 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	uploadHandler := handlers.NewUploadHandler(mediaRepo, uploadQueue, cfg.Media, handlers.UploadConfig{
 		MaxFileSize: cfg.Server.MaxUploadSize,
 	})
+	// Очередь извлечения аудио из видео: отдельный воркер (ffmpeg тяжёлый),
+	// механика статусов — как у загрузок.
+	extractQueue := services.NewExtractService(
+		context.Background(),
+		mediaRepo,
+		thumbSvc,
+		cfg.Media.AudioPath,
+		services.DefaultExtractQueueWorkers,
+		services.DefaultExtractQueueLimit,
+	)
+	extractHandler := handlers.NewExtractHandler(mediaRepo, extractQueue)
 
 	// Ensure media directories exist.
 	if err := os.MkdirAll(cfg.Media.VideoPath, 0755); err != nil {
@@ -331,6 +343,23 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 
+	// Extract limiter — отдельный инстанс с тем же бюджетом: статусы
+	// опрашиваются раз в ~1.5с с клиента, и общий с upload бюджет
+	// съедался бы опросами. POST тяжёлый (ffmpeg), GET/DELETE лёгкие,
+	// но без лимита их можно дёргать в цикле.
+	extractRateLimiter := limiter.New(limiter.Config{
+		Max:        cfg.RateLimiter.Max,
+		Expiration: time.Duration(cfg.RateLimiter.Expiration) * time.Second,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return getClientIP(c)
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
+
 	// Public auth routes. All of them are rate-limited: verify-code without a
 	// limiter would allow brute-forcing the 6-digit OTP within its TTL.
 	auth := fiberApp.Group("/api/auth")
@@ -357,6 +386,13 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Post(uploadRouteSuffix, requireAdmin, uploadRateLimiter, uploadHandler.Upload)
 	media.Get("/uploads/:id", requireAdmin, uploadHandler.UploadStatus)
 	media.Delete("/uploads/:id", requireAdmin, uploadHandler.CancelUpload)
+	// Извлечение аудио: POST ставит джоб (202) или сразу отдаёт готовый
+	// трек (200); статусы — той же формы, что у загрузок. Тяжёлый лимитер
+	// тот же, что у загрузок: ffmpeg жрёт CPU не меньше multipart-парсинга.
+	media.Post("/:id/extract", requireAdmin, extractRateLimiter, extractHandler.Extract)
+	media.Get("/extract/:id", requireAdmin, extractRateLimiter, extractHandler.ExtractStatus)
+	media.Delete("/extract/:id", requireAdmin, extractRateLimiter, extractHandler.CancelExtract)
+	media.Get("/:id/extracted", requireAdmin, extractRateLimiter, extractHandler.Extracted)
 	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Put("/:id", requireAdmin, mediaHandler.Update)
 	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
@@ -468,6 +504,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		OTPStore:     otpStore,
 		Watcher:      watcherService,
 		UploadQueue:  uploadQueue,
+		ExtractQueue: extractQueue,
 		Version:      version,
 		sqlDB:        sqlDB,
 		cleanupStop:  cleanupStop,
@@ -527,6 +564,9 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 	}
 	if a.UploadQueue != nil {
 		a.UploadQueue.Stop()
+	}
+	if a.ExtractQueue != nil {
+		a.ExtractQueue.Stop()
 	}
 	a.OTPStore.Stop()
 

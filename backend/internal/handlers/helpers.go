@@ -14,7 +14,9 @@ import (
 // значения отклоняются — иначе uint(id) превратил бы -1 в огромное число.
 func parseIDParam(c *fiber.Ctx, name string) (uint, error) {
 	v, err := c.ParamsInt(name)
-	if err != nil || v < 0 {
+	// Ноль — тоже невалиден: автоинкремент начинается с 1, а пропуск
+	// нуля превращал бы кривой запрос в 404 вместо честного 400.
+	if err != nil || v <= 0 {
 		return 0, errors.New("invalid id")
 	}
 	return uint(v), nil

@@ -36,6 +36,10 @@ type MediaRepository interface {
 	// путей, где Metadata/Artists не нужны (сканирование больших библиотек).
 	FindByPathBasic(ctx context.Context, path string) (*models.Media, error)
 	FindByHash(ctx context.Context, hash string) (*models.Media, error)
+	// FindBySourceMediaID возвращает аудиотрек, извлечённый из видео
+	// mediaID (связка POST /extract). Отсутствие — gorm.ErrRecordNotFound
+	// (как у FindByHash), а не nil-пара: вызывающий различает через errors.Is.
+	FindBySourceMediaID(ctx context.Context, mediaID uint) (*models.Media, error)
 	FindByPathPrefix(ctx context.Context, prefix string, limit, offset int) ([]models.Media, int64, error)
 	Create(ctx context.Context, media *models.Media) error
 	// Update обновляет только непустые поля; ассоциации Artists заменяются

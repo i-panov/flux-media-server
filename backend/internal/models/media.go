@@ -34,12 +34,19 @@ type Media struct {
 	// SourceURL — ссылка на источник (например, страница YouTube).
 	// Заполняется только вручную через PUT /api/metadata/:mediaId,
 	// сканер и очередь загрузок её не трогают.
-	SourceURL  string         `json:"source_url"`
-	MetadataID *uint          `json:"metadata_id,omitempty"`
-	Metadata   *Metadata      `json:"metadata,omitempty"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	SourceURL string `json:"source_url"`
+	// SourceMediaID — ID видео, из которого извлечён этот аудиотрек
+	// (POST /api/media/:id/extract). NULL — обычное медиа. По связке
+	// экран видео показывает «перейти к треку» вместо кнопки извлечения.
+	// Индекс обычный, НЕ unique: soft-deleted строки остаются в таблице,
+	// и unique заблокировал бы повторное извлечение после удаления трека.
+	// Гонки закрыты дедупом in-flight джобов в ExtractService.
+	SourceMediaID *uint          `gorm:"index" json:"source_media_id,omitempty"`
+	MetadataID    *uint          `json:"metadata_id,omitempty"`
+	Metadata      *Metadata      `json:"metadata,omitempty"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 type Metadata struct {

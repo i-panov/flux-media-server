@@ -76,6 +76,15 @@ abstract class MediaApiClient extends ChopperService {
     @Path('mediaId') int mediaId,
   );
 
+  /// Аудиотрек, извлечённый из видео (404 — связки нет). Мгновенный GET
+  /// без прогресса/отмены — идёт через Chopper (с авто-refresh токена),
+  /// а POST/статус/отмена — через _sendJsonRequest (там нужны отмена
+  /// и двойная форма ответа).
+  @GET(path: '/media/{id}/extracted')
+  Future<Response<Map<String, dynamic>>> getExtractedAudio(
+    @Path('id') int id,
+  );
+
   @PUT(path: '/progress/{mediaId}')
   Future<Response<Map<String, dynamic>>> updateProgress(
     @Path('mediaId') int mediaId,

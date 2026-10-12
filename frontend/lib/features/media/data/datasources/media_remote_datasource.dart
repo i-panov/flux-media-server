@@ -241,6 +241,64 @@ class MediaRemoteDataSource {
     );
   }
 
+  /// Ставит извлечение аудиодорожки из видео в очередь.
+  /// 202 {job_id} — новый джоб (статус — через [getExtractJobStatus]);
+  /// 200 {media} — трек уже извлечён, опрашивать нечего.
+  Future<({int? jobId, Map<String, dynamic>? media})> extractAudio(
+    int mediaId, {
+    bool Function()? isCancelled,
+  }) async {
+    final body = await _sendJsonRequest(
+      'POST',
+      '/media/$mediaId/extract',
+      isCancelled: isCancelled,
+      acceptedStatuses: const {200, 202},
+    );
+    final jobId = body!['job_id'];
+    if (jobId is int) return (jobId: jobId, media: null);
+    // 200 отдаёт сам объект медиа (есть id, нет job_id).
+    if (body.containsKey('id')) return (jobId: null, media: body);
+    throw const ServerException(message: 'Unexpected server response');
+  }
+
+  /// Опрашивает статус джоба извлечения. Форма — как у upload-статуса
+  /// ({id, status, error, media}), фронт переиспользует модель.
+  Future<({int id, String status, String? error, Map<String, dynamic>? media})>
+  getExtractJobStatus(int jobId, {bool Function()? isCancelled}) async {
+    final body = await _sendJsonRequest(
+      'GET',
+      '/media/extract/$jobId',
+      isCancelled: isCancelled,
+    );
+    return (
+      id: body!['id'] as int,
+      status: body['status'] as String,
+      error: body['error'] as String?,
+      media: body['media'] as Map<String, dynamic>?,
+    );
+  }
+
+  /// Отменяет джоб извлечения (204). 409 = уже завершён — не ошибка.
+  Future<void> cancelExtractJob(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) async {
+    await _sendJsonRequest(
+      'DELETE',
+      '/media/extract/$jobId',
+      isCancelled: isCancelled,
+      acceptedStatuses: const {204, 409},
+    );
+  }
+
+  /// Аудиотрек, извлечённый из видео, или null (404 — связки нет).
+  Future<Media?> getExtractedAudio(int mediaId) async {
+    final response = await apiClient.getExtractedAudio(mediaId);
+    if (response.statusCode == 404) return null;
+    checkResponse(response, 'Failed to fetch extracted track');
+    return Media.fromJson(response.body!);
+  }
+
   /// Uploads a cover image for a media item.
   ///
   /// В отличие от [uploadFile] ответ тела не разбирается (сервер

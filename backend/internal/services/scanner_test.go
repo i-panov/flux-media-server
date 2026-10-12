@@ -436,3 +436,13 @@ func TestHandleFSEventsContextCancelled(t *testing.T) {
 		{Path: filepath.Join(tempDir, "b.mp4"), Op: fsnotify.Create},
 	})
 }
+
+func TestScannerSkipsExtractTmpFiles(t *testing.T) {
+	// Инвариант очереди извлечения: временные файлы dst.part-<jobID>
+	// лежат в сканируемой директории, но сканер их не видит —
+	// расширение не из таблиц.
+	assert.False(t, services.IsAllowedExtension(filepath.Ext("Clip.m4a.part-7")))
+	assert.False(t, services.IsAllowedExtension(filepath.Ext("Clip (2).flac.part-12")))
+	assert.True(t, services.IsAllowedExtension(".m4a"))
+	assert.True(t, services.IsAllowedExtension(".opus"))
+}

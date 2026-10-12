@@ -142,6 +142,17 @@ func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media
 	return &media, err
 }
 
+// FindBySourceMediaID ищет аудиотрек, извлечённый из видео mediaID.
+// Soft-deleted исключаются дефолтным скоупом gorm: удалённый трек
+// разрывает связку, и экран видео снова показывает кнопку извлечения.
+func (r *MediaStore) FindBySourceMediaID(ctx context.Context, mediaID uint) (*models.Media, error) {
+	var media models.Media
+	// Детерминированный порядок: дублей быть не должно (дедуп очереди),
+	// но без Order при дубле вернулся бы произвольный.
+	err := r.db.WithContext(ctx).Where("source_media_id = ?", mediaID).Order("id").First(&media).Error
+	return &media, err
+}
+
 func (r *MediaStore) FindByPathPrefix(ctx context.Context, prefix string, limit, offset int) ([]models.Media, int64, error) {
 	var media []models.Media
 	var total int64

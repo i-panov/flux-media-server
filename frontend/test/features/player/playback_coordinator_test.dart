@@ -369,6 +369,28 @@ class _FakeMediaRepository implements MediaRepository {
       Right(progress);
 
   @override
+  Future<Either<Failure, ({int? jobId, Media? media})>> extractAudio(
+    int mediaId, {
+    bool Function()? isCancelled,
+  }) async => const Right((jobId: null, media: null));
+
+  @override
+  Future<Either<Failure, UploadStatus>> getExtractStatus(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, void>> cancelExtract(
+    int jobId, {
+    bool Function()? isCancelled,
+  }) async => const Right(null);
+
+  @override
+  Future<Either<Failure, Media?>> getExtractedAudio(int mediaId) async =>
+      const Right(null);
+
+  @override
   Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId) async =>
       Right(progressById[mediaId]);
 

@@ -371,6 +371,28 @@
   "@fileAlreadyExists": {},
   "uploadSuccess": "Upload successful",
   "@uploadSuccess": {},
+  "extractAudio": "Extract audio",
+  "@extractAudio": {},
+  "extractingAudio": "Extracting audio…",
+  "@extractingAudio": {},
+  "extractCancelled": "Audio extraction cancelled",
+  "@extractCancelled": {},
+  "openAudioTrack": "Open audio track",
+  "@openAudioTrack": {},
+  "audioExtracted": "Audio track saved to library",
+  "@audioExtracted": {},
+  "extractAudioConfirmTitle": "Extract audio?",
+  "@extractAudioConfirmTitle": {},
+  "extractAudioConfirmText": "The audio track will be saved to the audio library at original quality.",
+  "@extractAudioConfirmText": {},
+  "extractFailed": "Failed to extract audio: {error}",
+  "@extractFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "changeCover": "Change cover",
   "@changeCover": {},
   "uploadingCover": "Uploading cover...",

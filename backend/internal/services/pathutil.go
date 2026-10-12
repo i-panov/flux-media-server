@@ -4,6 +4,8 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // ErrInvalidFilename is returned when a filename contains path separators,
@@ -11,13 +13,17 @@ import (
 var ErrInvalidFilename = errors.New("invalid filename")
 
 // SanitizeFilename validates a user-supplied filename and returns its base
-// name. It rejects names containing path separators, traversal sequences,
-// NUL bytes and control characters.
+// name. It rejects names containing path separators, traversal sequences
+// and control characters (включая \n\r\t: на диске они легальны, но
+// ломают логи/отображение и расползаются по shell-инвокациям).
 func SanitizeFilename(name string) (string, error) {
 	if name == "" {
 		return "", ErrInvalidFilename
 	}
-	if strings.ContainsRune(name, 0) {
+	if !utf8.ValidString(name) {
+		return "", ErrInvalidFilename
+	}
+	if strings.IndexFunc(name, unicode.IsControl) >= 0 {
 		return "", ErrInvalidFilename
 	}
 	if strings.ContainsAny(name, "/\\") {
@@ -42,10 +48,16 @@ func IsSubPath(baseDir, path string) bool {
 // LibraryPathFromName builds a library directory path from a user-supplied
 // name, ensuring the result stays inside baseDir.
 func LibraryPathFromName(baseDir, name string) (string, error) {
-	if strings.ContainsRune(name, 0) || strings.ContainsAny(name, "/\\") {
+	if name == "" || name == "." || name == ".." {
 		return "", ErrInvalidFilename
 	}
-	if name == "" || name == "." || name == ".." {
+	if !utf8.ValidString(name) {
+		return "", ErrInvalidFilename
+	}
+	if strings.IndexFunc(name, unicode.IsControl) >= 0 {
+		return "", ErrInvalidFilename
+	}
+	if strings.ContainsAny(name, "/\\") {
 		return "", ErrInvalidFilename
 	}
 	dirName := strings.ReplaceAll(name, " ", "_")

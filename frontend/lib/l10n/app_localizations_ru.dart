@@ -450,6 +450,33 @@ class AppLocalizationsRu extends AppLocalizations {
   String get uploadSuccess => 'Загрузка завершена';
 
   @override
+  String get extractAudio => 'Извлечь аудио';
+
+  @override
+  String get extractingAudio => 'Извлекается аудио…';
+
+  @override
+  String get extractCancelled => 'Извлечение аудио отменено';
+
+  @override
+  String get openAudioTrack => 'Открыть трек';
+
+  @override
+  String get audioExtracted => 'Аудиотрек сохранён в библиотеку';
+
+  @override
+  String get extractAudioConfirmTitle => 'Извлечь аудио?';
+
+  @override
+  String get extractAudioConfirmText =>
+      'Аудиодорожка будет сохранена в аудиобиблиотеку в исходном качестве.';
+
+  @override
+  String extractFailed(String error) {
+    return 'Не удалось извлечь аудио: $error';
+  }
+
+  @override
   String get changeCover => 'Заменить обложку';
 
   @override
