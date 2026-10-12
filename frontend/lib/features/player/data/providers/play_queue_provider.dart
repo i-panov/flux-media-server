@@ -137,6 +137,17 @@ class PlayQueueNotifier extends Notifier<PlayQueueState> {
     return await _guard(() => _coordinator.jump(index)) ?? false;
   }
 
+  /// Сдвигает currentIndex без запуска воспроизведения — для координатора
+  /// в legacy-режиме (поштучные видео/смешанные очереди, без mpv-плейлиста).
+  /// Нотифаерные next()/jumpTo() здесь звать нельзя: они звонят обратно
+  /// в координатор и замкнули бы рекурсию. Вызывать только ПОСЛЕ успешного
+  /// старта трека: при ошибке индекс обязан остаться на старом месте.
+  void moveIndex(int index) {
+    if (index < 0 || index >= state.items.length) return;
+    if (index == state.currentIndex) return;
+    state = state.copyWith(currentIndex: index);
+  }
+
   /// Removes item at [index] from the queue.
   void removeAt(int index) {
     if (index < 0 || index >= state.items.length) return;

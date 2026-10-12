@@ -535,6 +535,10 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     final next = queue.currentIndex + 1;
     if (next >= queue.items.length) return false;
     await _guardedStart(next);
+    // Индекс двигаем только после успешного старта: в legacy-режиме
+    // mpv-событий нет, и без этого очередь навсегда указывала бы на
+    // старый трек — автопродвижение зацикливалось на одном повторе.
+    ref.read(playQueueProvider.notifier).moveIndex(next);
     return true;
   }
 
@@ -543,11 +547,13 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     final prev = queue.currentIndex - 1;
     if (prev < 0) return false;
     await _guardedStart(prev);
+    ref.read(playQueueProvider.notifier).moveIndex(prev);
     return true;
   }
 
   Future<bool> _legacyJump(int index) async {
     await _guardedStart(index);
+    ref.read(playQueueProvider.notifier).moveIndex(index);
     return true;
   }
 

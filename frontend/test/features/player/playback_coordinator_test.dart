@@ -776,6 +776,77 @@ void main() {
       },
     );
 
+    test(
+      'legacy auto-advance moves the queue index and completes at the end',
+      () async {
+        // Регрессия: в legacy-режиме (без mpv-плейлиста) индекс очереди
+        // не двигался — EOF второго видео снова играл items[0 + 1], и
+        // очередь зацикливалась на повторе вместо completed.
+        await queue.setQueue([
+          _media(1, MediaType.video),
+          _media(2, MediaType.video),
+        ]);
+        video.durationCtl.add(const Duration(seconds: 100));
+        video.positionCtl.add(const Duration(seconds: 100));
+        await _settle();
+
+        video.completedCtl.add(true);
+        await _settle();
+
+        expect((readState() as PlaybackPlaying).media.id, 2);
+        expect(queue.state.currentIndex, 1);
+
+        video.completedCtl.add(true);
+        await _settle();
+
+        expect(readState(), isA<PlaybackCompleted>());
+        expect(queue.state.currentIndex, 1);
+      },
+    );
+
+    test('legacy next/previous/jump keep the queue index aligned', () async {
+      // Та же регрессия со стороны ручной навигации: переходы играли
+      // целевой трек, но currentIndex оставался старым, и следующий
+      // next()/EOF считался от него.
+      await queue.setQueue([
+        _media(1, MediaType.video),
+        _media(2, MediaType.video),
+        _media(3, MediaType.video),
+      ]);
+      await _settle();
+      expect(queue.state.currentIndex, 0);
+
+      await coordinator.jump(2);
+      expect((readState() as PlaybackPlaying).media.id, 3);
+      expect(queue.state.currentIndex, 2);
+
+      await coordinator.previous();
+      expect((readState() as PlaybackPlaying).media.id, 2);
+      expect(queue.state.currentIndex, 1);
+
+      await coordinator.next();
+      expect((readState() as PlaybackPlaying).media.id, 3);
+      expect(queue.state.currentIndex, 2);
+    });
+
+    test('legacy failed play does not move the queue index', () async {
+      // Индекс двигаем только после успешного старта: при сбое open()
+      // сдвиг записал бы запись, которой нет, и очередь разошлась бы
+      // с реальным воспроизведением.
+      await queue.setQueue([
+        _media(1, MediaType.video),
+        _media(2, MediaType.video),
+      ]);
+      video.openError = Exception('boom');
+      await _settle();
+
+      await expectLater(
+        coordinator.next(),
+        throwsA(isA<Exception>()),
+      );
+      expect(queue.state.currentIndex, 0);
+    });
+
     test('audio completion does not save progress', () async {
       await queue.setQueue([
         _media(1, MediaType.audio),
