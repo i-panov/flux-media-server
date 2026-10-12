@@ -80,6 +80,4 @@ class AudioPlayerDatasource implements AudioPlaybackSource {
 
   @override
   double get volume => _handler.volume;
-
-  Future<void> dispose() => _handler.dispose();
 }

@@ -797,11 +797,14 @@ final audioHandlerProvider = Provider<FluxAudioHandler>((ref) {
 });
 
 /// Provider for audio player datasource.
+///
+/// Без onDispose: хендлером владеет AudioService (main.dart), и его dispose
+/// должен происходить только там. Раньше делегировал dispose в хендлер —
+/// стоило бы провайдеру стать autoDispose/пересоздаваемым, и фоновый
+/// аудиохендлер был бы уничтожен вместе с datasource.
 final audioPlayerDatasourceProvider = Provider<AudioPlaybackSource>((ref) {
   final handler = ref.watch(audioHandlerProvider);
-  final ds = AudioPlayerDatasource(handler);
-  ref.onDispose(ds.dispose);
-  return ds;
+  return AudioPlayerDatasource(handler);
 });
 
 /// Provider for video player datasource.
