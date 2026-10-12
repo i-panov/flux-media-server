@@ -70,8 +70,12 @@ class _LibraryData {
   List<Media> get recentlyAddedItems => _withoutContinueWatching;
 
   /// «Избранное»: избранное, что не попало в две секции выше.
+  ///
+  /// Исключаем только ВИДИМЫЕ первые 10 «недавно добавленных» (как и сетка
+  /// ниже): исключение полного списка делало секцию всегда пустой, т.к.
+  /// recentlyAddedItems — это всё, кроме «продолжить просмотр».
   List<Media> get favoriteItems {
-    final exclude = {...continueWatching.ids, ...recentlyAddedIds};
+    final exclude = {...continueWatching.ids, ...recentlyAddedVisibleIds};
     return _exclude(
       all,
       exclude,
@@ -92,8 +96,6 @@ class _LibraryData {
 
   List<Media> get _withoutContinueWatching =>
       _exclude(all, continueWatching.ids);
-
-  Set<int> get recentlyAddedIds => {for (final m in recentlyAddedItems) m.id};
 
   /// Первые 10 «недавно добавленных» — то, что секции показывают
   /// в свёрнутом виде. Остаток уходит в общую сетку.
