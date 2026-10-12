@@ -71,7 +71,11 @@ class FakeAuthRepository implements AuthRepository {
 
 /// Фейк офлайн-кеша: считает вызовы clearUserCache без реального IO.
 class FakeOfflineCacheService extends OfflineCacheService {
-  new(Ref ref) : super(ref, 'http://localhost:8080/api');
+  new(Ref ref)
+    : super(
+        'http://localhost:8080/api',
+        prefs: ref.watch(sharedPreferencesProvider),
+      );
 
   int clearUserCacheCalls = 0;
 

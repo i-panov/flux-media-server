@@ -30,11 +30,44 @@ class DownloadCancelledException implements Exception {
 /// Files are stored in the app's documents directory, с префиксом
 /// `user_{id}_`, чтобы кеши разных пользователей не пересекались.
 class OfflineCacheService {
-  new(this._ref, this._baseUrl, {Future<int> Function(File)? fileSizeReader})
-    : _fileSizeReader = fileSizeReader ?? _defaultFileSizeReader;
+  new(
+    String baseUrl, {
+    required SharedPreferences prefs,
+    String? Function()? authTokenReader,
+    Future<String?> Function()? refreshAuth,
+    int? Function()? currentUserIdReader,
+    http.Client Function()? httpClientResolver,
+    Future<int> Function(File)? fileSizeReader,
+  })  : _baseUrl = baseUrl,
+        // Поле приватное (_prefs), а параметр обязан быть публичным (prefs):
+        // иначе подклассы из других библиотек не пробросят его через super.
+        // ignore: prefer_initializing_formals
+        _prefs = prefs,
+        _authTokenReader = authTokenReader ?? (() => null),
+        _refreshAuth = refreshAuth ?? (() async => null),
+        _currentUserIdReader = currentUserIdReader ?? (() => null),
+        _httpClientResolver =
+            httpClientResolver ?? (() => throw StateError('http client not configured')),
+        _fileSizeReader = fileSizeReader ?? _defaultFileSizeReader;
 
-  final Ref _ref;
   final String _baseUrl;
+  final SharedPreferences _prefs;
+
+  /// Текущий access-токен (или null). Колбэк вместо прямого чтения
+  /// провайдера: сервис не держит `Ref` и тестируется без контейнера.
+  final String? Function() _authTokenReader;
+
+  /// Обновляет токены и возвращает свежий access-токен (или null).
+  /// Single-flight параллельных 401 остаётся внутри сервиса.
+  final Future<String?> Function() _refreshAuth;
+
+  /// id текущего пользователя из состояния авторизации (или null,
+  /// если неизвестен — тогда id берётся из кеша prefs).
+  final int? Function() _currentUserIdReader;
+
+  /// HTTP-клиент для скачиваний. Резолвер, а не значение: общий клиент
+  /// пересоздаётся при смене TLS-настроек, фиксировать инстанс нельзя.
+  final http.Client Function() _httpClientResolver;
 
   /// Читатель размера файла на диске. Инжектируется в тестах, чтобы
   /// сымитировать расхождение размера после rename без подмены ФС.
@@ -67,11 +100,11 @@ class OfflineCacheService {
   String _lyricsKey(int mediaId) =>
       '${_prefix}user_${_resolvedUserId}_flux_lyrics_$mediaId';
 
-  String? get _authToken => _ref.read(settingsProvider).settings.authToken;
+  String? get _authToken => _authTokenReader();
 
   /// Выполняющийся refresh-запрос: параллельные 401-вызовы ждут его
   /// результат, а не отказываются мгновенно.
-  Future<bool>? _refreshInFlight;
+  Future<String?>? _refreshInFlight;
 
   /// Track active downloads by mediaId to prevent parallel downloads
   /// of the same file (which would corrupt the .part file).
@@ -92,17 +125,15 @@ class OfflineCacheService {
   /// Maximum total cache size: 5 GB.
   static const int _maxCacheBytes = 5 * 1024 * 1024 * 1024;
 
-  SharedPreferences get _prefs => _ref.read(sharedPreferencesProvider);
-
   /// Определяет id пользователя (из состояния авторизации или кеша prefs)
   /// и мигрирует легаси-файлы без user-префикса. Вызывается в начале
   /// каждой публичной операции.
   Future<void> _ensureUserId() async {
     if (_userId != null) return;
-    final authState = _ref.read(authProvider);
-    if (authState is AuthAuthenticated) {
-      _userId = authState.user.id;
-      await _prefs.setInt(_userIdKey, authState.user.id);
+    final currentId = _currentUserIdReader();
+    if (currentId != null) {
+      _userId = currentId;
+      await _prefs.setInt(_userIdKey, currentId);
     } else {
       _userId = _prefs.getInt(_userIdKey);
     }
@@ -237,7 +268,7 @@ class OfflineCacheService {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
-      final client = _ref.read(directHttpClientProvider);
+      final client = _httpClientResolver();
       final dir = await getApplicationDocumentsDirectory();
       final localFile = File('${dir.path}/${_fileName(media.id)}');
       final partFile = File('${localFile.path}.part');
@@ -379,28 +410,14 @@ class OfflineCacheService {
     }
   }
 
-  Future<String?> _refreshToken() async {
-    final refreshToken = _ref.read(settingsProvider).settings.refreshToken;
-    if (refreshToken == null) return null;
+  Future<String?> _refreshToken() {
     // Если другой поток уже выполняет refresh — ждём его результат.
-    final inFlight = _refreshInFlight;
-    final Future<bool> refreshFuture;
-    if (inFlight != null) {
-      refreshFuture = inFlight;
-    } else {
-      refreshFuture = _ref
-          .read(authTokenRefresherProvider)
-          .refresh(refreshToken);
-      _refreshInFlight = refreshFuture;
-    }
-    try {
-      final ok = await refreshFuture;
-      if (!ok) return null;
-      return _ref.read(settingsProvider).settings.authToken;
-    } finally {
-      _refreshInFlight = null;
-    }
+    return _refreshInFlight ??= _doRefresh().whenComplete(
+      () => _refreshInFlight = null,
+    );
   }
+
+  Future<String?> _doRefresh() => _refreshAuth();
 
   /// Saves media metadata to SharedPreferences for offline access.
   Future<void> saveMetadata(Media media) async {
@@ -656,5 +673,22 @@ class OfflineCacheService {
 
 /// Provider for the offline cache service.
 final offlineCacheServiceProvider = Provider<OfflineCacheService>((ref) {
-  return OfflineCacheService(ref, ref.watch(baseUrlProvider));
+  return OfflineCacheService(
+    ref.watch(baseUrlProvider),
+    prefs: ref.watch(sharedPreferencesProvider),
+    authTokenReader: () => ref.read(settingsProvider).settings.authToken,
+    refreshAuth: () async {
+      final refreshToken = ref.read(settingsProvider).settings.refreshToken;
+      final ok = await ref
+          .read(authTokenRefresherProvider)
+          .refresh(refreshToken);
+      if (!ok) return null;
+      return ref.read(settingsProvider).settings.authToken;
+    },
+    currentUserIdReader: () {
+      final state = ref.read(authProvider);
+      return state is AuthAuthenticated ? state.user.id : null;
+    },
+    httpClientResolver: () => ref.read(directHttpClientProvider),
+  );
 });

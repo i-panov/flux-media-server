@@ -18,7 +18,7 @@ Media _media(int id) => Media(
 
 /// Фейк кеш-сервиса: isCached завершается вручную, download мгновенный.
 class _ControllableCache extends OfflineCacheService {
-  new(super.ref, super.baseUrl);
+  new({required super.prefs}) : super('');
 
   final Completer<bool> isCachedCompleter = Completer<bool>();
   int downloadCalls = 0;
@@ -53,7 +53,7 @@ void main() {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         offlineCacheServiceProvider.overrideWith(
-          (ref) => cache = _ControllableCache(ref, ''),
+          (_) => cache = _ControllableCache(prefs: prefs),
         ),
       ],
     );

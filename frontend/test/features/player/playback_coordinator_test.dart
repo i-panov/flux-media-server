@@ -21,6 +21,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:media_kit/media_kit.dart' hide Media;
+import 'package:shared_preferences/shared_preferences.dart';
 
 Media _media(int id, MediaType type) =>
     Media(id: id, title: 'Media $id', year: 2024, type: type, fileSize: 1024);
@@ -495,7 +496,7 @@ class _FakeSettingsRepository implements SettingsRepository {
 }
 
 class _FakeOfflineCache extends OfflineCacheService {
-  new(super.ref, super.baseUrl);
+  new({required super.prefs}) : super('http://test/api');
 
   @override
   Future<String?> getLocalPath(int mediaId) async => null;
@@ -508,8 +509,11 @@ void main() {
   late ProviderContainer container;
   late PlaybackCoordinator coordinator;
   late PlayQueueNotifier queue;
+  late SharedPreferences prefs;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
     audio = _FakeAudioSource();
     video = _FakeVideoSource();
     repo = _FakeMediaRepository();
@@ -522,7 +526,7 @@ void main() {
         mediaRepositoryProvider.overrideWithValue(repo),
         settingsRepositoryProvider.overrideWithValue(_FakeSettingsRepository()),
         offlineCacheServiceProvider.overrideWith(
-          (ref) => _FakeOfflineCache(ref, 'http://test/api'),
+          (_) => _FakeOfflineCache(prefs: prefs),
         ),
       ],
     );
@@ -539,19 +543,20 @@ void main() {
   PlaybackState readState() => container.read(playbackCoordinatorProvider);
 
   /// Отдельный контейнер с произвольным кешем офлайн-файлов.
-  ProviderContainer containerWithCache(
-    OfflineCacheService Function(Ref ref) build,
-  ) => ProviderContainer(
-    overrides: [
-      audioPlayerDatasourceProvider.overrideWithValue(audio),
-      baseUrlProvider.overrideWithValue('http://test/api'),
-      playbackCoordinatorProvider.overrideWith(PlaybackCoordinator.new),
-      videoPlayerDatasourceProvider.overrideWithValue(video),
-      mediaRepositoryProvider.overrideWithValue(repo),
-      settingsRepositoryProvider.overrideWithValue(_FakeSettingsRepository()),
-      offlineCacheServiceProvider.overrideWith(build),
-    ],
-  );
+  ProviderContainer containerWithCache(OfflineCacheService Function() build) =>
+      ProviderContainer(
+        overrides: [
+          audioPlayerDatasourceProvider.overrideWithValue(audio),
+          baseUrlProvider.overrideWithValue('http://test/api'),
+          playbackCoordinatorProvider.overrideWith(PlaybackCoordinator.new),
+          videoPlayerDatasourceProvider.overrideWithValue(video),
+          mediaRepositoryProvider.overrideWithValue(repo),
+          settingsRepositoryProvider.overrideWithValue(
+            _FakeSettingsRepository(),
+          ),
+          offlineCacheServiceProvider.overrideWith((_) => build()),
+        ],
+      );
 
   group('PlaybackCoordinator queue start', () {
     test('starts audio playback as a single mpv playlist', () async {
@@ -606,7 +611,7 @@ void main() {
 
     test('offline cache lookup failure falls back to streaming', () async {
       final errorContainer = containerWithCache(
-        (ref) => _ThrowingCache(ref, 'http://test/api', Exception('boom')),
+        () => _ThrowingCache(Exception('boom'), prefs: prefs),
       );
       addTearDown(errorContainer.dispose);
 
@@ -1264,7 +1269,7 @@ void main() {
 }
 
 class _ThrowingCache extends OfflineCacheService {
-  new(super.ref, super.baseUrl, this._error);
+  new(this._error, {required super.prefs}) : super('http://test/api');
 
   final Exception _error;
 

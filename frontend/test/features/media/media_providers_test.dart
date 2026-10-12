@@ -36,7 +36,11 @@ typedef MediaListCall = ({
 
 /// Фейк офлайн-кеша без реального IO (path_provider в тестах недоступен).
 class FakeOfflineCacheService extends OfflineCacheService {
-  new(Ref ref) : super(ref, 'http://localhost:8080/api');
+  new(Ref ref)
+    : super(
+        'http://localhost:8080/api',
+        prefs: ref.watch(sharedPreferencesProvider),
+      );
 
   List<Media> cachedMedia = [];
   final List<Media> savedMedia = [];

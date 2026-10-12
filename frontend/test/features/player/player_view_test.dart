@@ -23,6 +23,7 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:media_kit/media_kit.dart' hide Media;
+import 'package:shared_preferences/shared_preferences.dart';
 
 Media _media(int id, MediaType type) =>
     Media(id: id, title: 'Media $id', year: 2024, type: type, fileSize: 1024);
@@ -321,7 +322,7 @@ class _FakeSettingsRepository implements SettingsRepository {
 }
 
 class _FakeOfflineCache extends OfflineCacheService {
-  new(super.ref, super.baseUrl);
+  new({required super.prefs}) : super('http://test/api');
 
   @override
   Future<String?> getLocalPath(int mediaId) async => null;
@@ -347,8 +348,11 @@ void main() {
   late _FakeAudioSource audio;
   late _FakeVideoSource video;
   late ProviderContainer container;
+  late SharedPreferences prefs;
 
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
     audio = _FakeAudioSource();
     video = _FakeVideoSource();
     container = ProviderContainer(
@@ -360,7 +364,7 @@ void main() {
         mediaRepositoryProvider.overrideWithValue(_FakeMediaRepository()),
         settingsRepositoryProvider.overrideWithValue(_FakeSettingsRepository()),
         offlineCacheServiceProvider.overrideWith(
-          (ref) => _FakeOfflineCache(ref, 'http://test/api'),
+          (_) => _FakeOfflineCache(prefs: prefs),
         ),
       ],
     );

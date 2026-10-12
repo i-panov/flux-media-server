@@ -47,7 +47,11 @@ class FakeAuthRepository implements AuthRepository {
 }
 
 class FakeOfflineCacheService extends OfflineCacheService {
-  new(Ref ref) : super(ref, 'http://localhost:8080/api');
+  new(Ref ref)
+    : super(
+        'http://localhost:8080/api',
+        prefs: ref.watch(sharedPreferencesProvider),
+      );
 
   @override
   Future<void> clearUserCache() async {}

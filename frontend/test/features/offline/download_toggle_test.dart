@@ -21,7 +21,7 @@ Media _media(int id) => Media(
 
 /// Кеш-сервис, который фиксирует, какой Media передали в download.
 class _RecordingCache extends OfflineCacheService {
-  new(super.ref, super.baseUrl);
+  new({required super.prefs}) : super('');
 
   Media? downloadedMedia;
 
@@ -103,7 +103,7 @@ void main() {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         offlineCacheServiceProvider.overrideWith(
-          (ref) => cache = _RecordingCache(ref, ''),
+          (_) => cache = _RecordingCache(prefs: prefs),
         ),
         mediaRepositoryProvider.overrideWith((ref) => repository),
       ],

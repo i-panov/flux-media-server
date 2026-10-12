@@ -56,7 +56,48 @@ class _FakeAuthNotifier extends AuthNotifier {
   }
 }
 
-final _refProvider = Provider<Ref>((ref) => ref);
+/// Собирает сервис без зависимости от `Ref`: userId — из auth-стейта
+/// контейнера, HTTP — через `http.Client()` (перехватывается HttpOverrides
+/// в зоне теста), токены — из настроек контейнера.
+OfflineCacheService _makeService(
+  ProviderContainer container,
+  SharedPreferences prefs, {
+  Future<int> Function(File)? fileSizeReader,
+}) {
+  return OfflineCacheService(
+    'http://localhost:8080/api',
+    prefs: prefs,
+    authTokenReader: () {
+      try {
+        return container.read(settingsProvider).settings.authToken;
+      } on Exception {
+        // Контейнер без settingsRepository — токена нет.
+        return null;
+      }
+    },
+    refreshAuth: () async {
+      try {
+        final refreshToken = container
+            .read(settingsProvider)
+            .settings
+            .refreshToken;
+        final ok = await container
+            .read(authTokenRefresherProvider)
+            .refresh(refreshToken);
+        if (!ok) return null;
+        return container.read(settingsProvider).settings.authToken;
+      } on Exception {
+        return null;
+      }
+    },
+    currentUserIdReader: () {
+      final state = container.read(authProvider);
+      return state is AuthAuthenticated ? state.user.id : null;
+    },
+    httpClientResolver: http.Client.new,
+    fileSizeReader: fileSizeReader,
+  );
+}
 
 /// Фейковый стек HTTP поверх [HttpOverrides]: перехватывает создаваемые
 /// внутри [OfflineCacheService] клиенты http.Client() без сети.
@@ -236,8 +277,7 @@ void main() {
         ),
       ],
     );
-    final ref = container.read(_refProvider);
-    service = OfflineCacheService(ref, 'http://localhost:8080/api');
+    service = _makeService(container, prefs);
   });
 
   tearDown(() async {
@@ -332,10 +372,7 @@ void main() {
         ],
       );
       addTearDown(container2.dispose);
-      final svc = OfflineCacheService(
-        container2.read(_refProvider),
-        'http://localhost:8080/api',
-      );
+      final svc = _makeService(container2, prefs);
       final file = File('${tempDir.path}/${_keyPrefix}user_7_flux_media_5')
         ..writeAsStringSync('x');
       await prefs.setInt('${_keyPrefix}flux_current_user_id', 7);
@@ -641,9 +678,9 @@ void main() {
         );
       }
 
-      final svc = OfflineCacheService(
-        container.read(_refProvider),
-        'http://localhost:8080/api',
+      final svc = _makeService(
+        container,
+        prefs,
         // Имитация расхождения размера на диске после rename.
         fileSizeReader: (_) async => 4,
       );
@@ -704,10 +741,7 @@ void main() {
       await container2
           .read(settingsProvider.notifier)
           .setTokens('old-token', 'refresh-1');
-      final svc = OfflineCacheService(
-        container2.read(_refProvider),
-        'http://localhost:8080/api',
-      );
+      final svc = _makeService(container2, prefs);
 
       Future<http.StreamedResponse> handler(http.BaseRequest request) async {
         if (request.headers['Authorization'] == 'Bearer old-token') {
@@ -770,10 +804,7 @@ void main() {
       await container2
           .read(settingsProvider.notifier)
           .setTokens('old-token', 'refresh-1');
-      final svc = OfflineCacheService(
-        container2.read(_refProvider),
-        'http://localhost:8080/api',
-      );
+      final svc = _makeService(container2, prefs);
 
       Future<http.StreamedResponse> handler(http.BaseRequest request) async {
         if (request.headers['Authorization'] == 'Bearer old-token') {

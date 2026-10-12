@@ -47,7 +47,7 @@ class _FakeMediaRepository implements MediaRepository {
 }
 
 class _FakeCache extends OfflineCacheService {
-  new(super.ref, super.baseUrl);
+  new({required super.prefs}) : super('');
 
   @override
   Future<bool> isCached(int mediaId) async => false;
@@ -92,7 +92,9 @@ void main() {
         authProvider.overrideWith(_FakeAuthNotifier.new),
         favoritesRepositoryProvider.overrideWithValue(favoritesRepo),
         mediaRepositoryProvider.overrideWithValue(mediaRepo),
-        offlineCacheServiceProvider.overrideWith((ref) => _FakeCache(ref, '')),
+        offlineCacheServiceProvider.overrideWith(
+          (_) => _FakeCache(prefs: prefs),
+        ),
         playbackCoordinatorProvider.overrideWith(_IdleCoordinator.new),
       ],
     );
