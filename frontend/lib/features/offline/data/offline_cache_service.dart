@@ -6,12 +6,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flux_media_server/features/offline/data/cache_naming.dart';
 import 'package:flux_media_server/shared/models/lyrics.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:http/http.dart' as http;
@@ -75,30 +75,15 @@ class OfflineCacheService {
 
   static Future<int> _defaultFileSizeReader(File file) => file.length();
 
-  /// Prefix for file names so debug and release builds don't share
-  /// cached files.
-  static const String _prefix = kDebugMode ? 'debug_' : 'release_';
-
-  /// Ключ в prefs с id текущего пользователя (для привязки кеша).
-  static const String _userIdKey = '${_prefix}flux_current_user_id';
-
   /// Кэшированный id пользователя (null, пока не определён).
   int? _userId;
 
   /// Выполнена ли очистка осиротевших .part-файлов (один раз за сессию).
   bool _partsCleaned = false;
 
-  /// Идентификатор активного пользователя или 0, если неизвестен.
-  int get _resolvedUserId => _userId ?? 0;
-
-  String _fileName(int mediaId) =>
-      '${_prefix}user_${_resolvedUserId}_flux_media_$mediaId';
-
-  String _metaKey(int mediaId) =>
-      '${_prefix}user_${_resolvedUserId}_flux_meta_$mediaId';
-
-  String _lyricsKey(int mediaId) =>
-      '${_prefix}user_${_resolvedUserId}_flux_lyrics_$mediaId';
+  /// Именование файлов/ключей для текущего пользователя
+  /// (0, если id неизвестен — как и было до выделения).
+  CacheNaming get _naming => CacheNaming(userId: _userId ?? 0);
 
   String? get _authToken => _authTokenReader();
 
@@ -133,9 +118,9 @@ class OfflineCacheService {
     final currentId = _currentUserIdReader();
     if (currentId != null) {
       _userId = currentId;
-      await _prefs.setInt(_userIdKey, currentId);
+      await _prefs.setInt(_naming.userIdKey, currentId);
     } else {
-      _userId = _prefs.getInt(_userIdKey);
+      _userId = _prefs.getInt(_naming.userIdKey);
     }
     await _migrateLegacyFiles();
     // Сироты .part удаляем один раз, до начала активных загрузок:
@@ -148,7 +133,7 @@ class OfflineCacheService {
   Future<void> _migrateLegacyFiles() async {
     final uid = _userId;
     if (uid == null) return;
-    final migratedKey = '${_prefix}flux_migrated_user_$uid';
+    final migratedKey = _naming.migratedKey(uid);
     if (_prefs.getBool(migratedKey) ?? false) return;
     try {
       final dir = await getApplicationDocumentsDirectory();
@@ -159,13 +144,13 @@ class OfflineCacheService {
         final name = e.uri.pathSegments.last;
         // Файлы с user-префиксом (включая чужие `debug_user_9_*`) не трогаем:
         // мигрируем только файлы без неймспейса пользователя.
-        if (name.startsWith('${_prefix}user_')) continue;
-        if (!name.startsWith(_prefix)) continue;
+        if (name.startsWith(_naming.anyUserPrefix)) continue;
+        if (!name.startsWith(_naming.prefix)) continue;
         final match = idPattern.firstMatch(name);
         if (match == null) continue;
         final id = int.parse(match.group(1)!);
         final legacy = File(e.path);
-        final target = File('${dir.path}/${_fileName(id)}');
+        final target = File('${dir.path}/${_naming.fileName(id)}');
         if (legacy.path != target.path) {
           if (await target.exists()) {
             await legacy.delete();
@@ -174,16 +159,16 @@ class OfflineCacheService {
           }
         }
         // Переносим метаданные и лирику в ключи с user-префиксом.
-        final oldMetaKey = '${_prefix}flux_meta_$id';
+        final oldMetaKey = _naming.legacyMetaKey(id);
         final meta = _prefs.getString(oldMetaKey);
-        if (meta != null && !_prefs.containsKey(_metaKey(id))) {
-          await _prefs.setString(_metaKey(id), meta);
+        if (meta != null && !_prefs.containsKey(_naming.metaKey(id))) {
+          await _prefs.setString(_naming.metaKey(id), meta);
         }
         await _prefs.remove(oldMetaKey);
-        final oldLyricsKey = '${_prefix}flux_lyrics_$id';
+        final oldLyricsKey = _naming.legacyLyricsKey(id);
         final lyrics = _prefs.getString(oldLyricsKey);
-        if (lyrics != null && !_prefs.containsKey(_lyricsKey(id))) {
-          await _prefs.setString(_lyricsKey(id), lyrics);
+        if (lyrics != null && !_prefs.containsKey(_naming.lyricsKey(id))) {
+          await _prefs.setString(_naming.lyricsKey(id), lyrics);
         }
         await _prefs.remove(oldLyricsKey);
       }
@@ -199,7 +184,7 @@ class OfflineCacheService {
     try {
       await _ensureUserId();
       final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/${_fileName(mediaId)}');
+      final file = File('${dir.path}/${_naming.fileName(mediaId)}');
       if (await file.exists()) {
         return file.path;
       }
@@ -270,7 +255,7 @@ class OfflineCacheService {
 
       final client = _httpClientResolver();
       final dir = await getApplicationDocumentsDirectory();
-      final localFile = File('${dir.path}/${_fileName(media.id)}');
+      final localFile = File('${dir.path}/${_naming.fileName(media.id)}');
       final partFile = File('${localFile.path}.part');
 
       try {
@@ -423,7 +408,7 @@ class OfflineCacheService {
   Future<void> saveMetadata(Media media) async {
     try {
       await _ensureUserId();
-      await _prefs.setString(_metaKey(media.id), jsonEncode(media.toJson()));
+      await _prefs.setString(_naming.metaKey(media.id), jsonEncode(media.toJson()));
     } catch (e) {
       AppLogger.error('Error saving metadata', e);
     }
@@ -433,7 +418,7 @@ class OfflineCacheService {
   Future<void> saveLyrics(int mediaId, Lyrics lyrics) async {
     try {
       await _ensureUserId();
-      await _prefs.setString(_lyricsKey(mediaId), jsonEncode(lyrics.toJson()));
+      await _prefs.setString(_naming.lyricsKey(mediaId), jsonEncode(lyrics.toJson()));
     } catch (e) {
       AppLogger.error('Error saving lyrics', e);
     }
@@ -443,7 +428,7 @@ class OfflineCacheService {
   Future<Lyrics?> getCachedLyrics(int mediaId) async {
     try {
       await _ensureUserId();
-      final jsonStr = _prefs.getString(_lyricsKey(mediaId));
+      final jsonStr = _prefs.getString(_naming.lyricsKey(mediaId));
       if (jsonStr == null) return null;
       return Lyrics.fromJson(jsonDecode(jsonStr) as Map<String, dynamic>);
     } catch (e) {
@@ -458,17 +443,17 @@ class OfflineCacheService {
     try {
       await _ensureUserId();
       final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/${_fileName(mediaId)}');
+      final file = File('${dir.path}/${_naming.fileName(mediaId)}');
       if (await file.exists()) {
         await file.delete();
       }
       // Clean up partial download file.
-      final partFile = File('${dir.path}/${_fileName(mediaId)}.part');
+      final partFile = File('${dir.path}/${_naming.fileName(mediaId)}.part');
       if (await partFile.exists()) {
         await partFile.delete();
       }
-      await _prefs.remove(_metaKey(mediaId));
-      await _prefs.remove(_lyricsKey(mediaId));
+      await _prefs.remove(_naming.metaKey(mediaId));
+      await _prefs.remove(_naming.lyricsKey(mediaId));
       // Лимит кеша проверяется только после download — удаление само по
       // себе уменьшает занятое место и не требует полного скана.
     } catch (e) {
@@ -486,7 +471,7 @@ class OfflineCacheService {
   Future<List<File>> _listCachedFiles({bool includeParts = false}) async {
     final dir = await getApplicationDocumentsDirectory();
     final entries = await dir.list().toList();
-    final prefix = '${_prefix}user_${_resolvedUserId}_';
+    final prefix = _naming.userFilePrefix;
     final idPattern = RegExp(r'flux_media_(\d+)(?:\.part)?$');
     final files = <File>[];
     for (final e in entries) {
@@ -569,7 +554,7 @@ class OfflineCacheService {
       final ids = await getCachedIds();
       final mediaList = <Media>[];
       for (final id in ids) {
-        final jsonStr = _prefs.getString(_metaKey(id));
+        final jsonStr = _prefs.getString(_naming.metaKey(id));
         if (jsonStr == null) continue;
         try {
           final json = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -602,18 +587,18 @@ class OfflineCacheService {
             // Best-effort: файл мог быть удалён параллельно.
           }
         }
-        final migratedKey = '${_prefix}flux_migrated_user_$uid';
+        final migratedKey = _naming.migratedKey(uid);
         await _prefs.remove(migratedKey);
       }
       // Удаляем метаданные/лирику пользователя из prefs.
-      final keyPrefix = '${_prefix}user_${uid ?? 0}_';
+      final keyPrefix = CacheNaming(userId: uid ?? 0).userFilePrefix;
       for (final key in _prefs.getKeys().toList()) {
         if (key.startsWith(keyPrefix) &&
             (key.contains('flux_meta_') || key.contains('flux_lyrics_'))) {
           await _prefs.remove(key);
         }
       }
-      await _prefs.remove(_userIdKey);
+      await _prefs.remove(_naming.userIdKey);
       _userId = null;
       // Закрываем окно параллельной записи: активные загрузки больше
       // не имеют права писать в кеш текущего пользователя.
