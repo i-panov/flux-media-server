@@ -8,7 +8,7 @@ import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/section_header.dart';
-import 'package:flux_media_server/features/audio/presentation/widgets/track_actions_mixin.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/track_actions.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
@@ -220,7 +220,7 @@ class VideoScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoScreenState extends ConsumerState<VideoScreen>
-    with TrackActionsMixin<VideoScreen>, MediaListSearchMixin<VideoScreen> {
+    with MediaListSearchMixin<VideoScreen> {
   @override
   String get mediaType => 'video';
 
@@ -320,32 +320,32 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
             items: [for (final e in library.continueWatching.entries) e.media],
             progressById: library.continueWatching.byId,
             isOffline: isOffline,
-            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
+            onFavoriteToggled: (id) => ref.toggleFavoriteTrack(id),
+            onDownloadToggled: (id) => ref.toggleDownloadTrack(mediaType, id),
           ),
           _VideoSection(
             title: l.recentlyAdded,
             icon: Icons.new_releases,
             items: library.recentlyAddedItems,
             isOffline: isOffline,
-            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
+            onFavoriteToggled: (id) => ref.toggleFavoriteTrack(id),
+            onDownloadToggled: (id) => ref.toggleDownloadTrack(mediaType, id),
           ),
           _VideoSection(
             title: l.favorites,
             icon: Icons.favorite,
             items: library.favoriteItems,
             isOffline: isOffline,
-            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
+            onFavoriteToggled: (id) => ref.toggleFavoriteTrack(id),
+            onDownloadToggled: (id) => ref.toggleDownloadTrack(mediaType, id),
           ),
           const _CollectionsSection(),
           const _DownloadsSection(),
           _AllVideosGrid(
             items: library.gridItems(),
             isOffline: isOffline,
-            onFavoriteToggled: (id) => toggleFavoriteTrack(ref, id),
-            onDownloadToggled: (id) => toggleDownloadTrack(ref, mediaType, id),
+            onFavoriteToggled: (id) => ref.toggleFavoriteTrack(id),
+            onDownloadToggled: (id) => ref.toggleDownloadTrack(mediaType, id),
           ),
         ],
       ],
@@ -428,7 +428,7 @@ class _CollectionsSection extends ConsumerWidget {
 }
 
 /// Скачанные видео.
-class _DownloadsSection extends ConsumerWidget with TrackActionsRef {
+class _DownloadsSection extends ConsumerWidget {
   const new();
 
   @override
@@ -469,7 +469,7 @@ class _DownloadsSection extends ConsumerWidget with TrackActionsRef {
                             .toggle(),
                       ),
                 isDownloaded: true,
-                onDownload: () => toggleDownloadTrack(ref, 'video', media.id),
+                onDownload: () => ref.toggleDownloadTrack('video', media.id),
               );
             }, childCount: downloadedVideo.length),
           ),

@@ -42,13 +42,17 @@ class LyricsLoadResult {
 /// Fetches lyrics for a media item. Returns null if no lyrics exist.
 /// Falls back to locally cached lyrics when the server is unreachable.
 ///
-/// keepAlive: переключение вкладок (лирика/перевод) не должно вызывать
-/// повторный GET на каждое переключение.
+/// Обычный autoDispose без ручного keepAlive: соседние вкладки TabBarView
+/// держат свои виджеты смонтированными (offstage), поэтому подписки живы и
+/// переключение лирика/перевод повторного GET не вызывает. Прыжок через
+/// вкладку (лирика → очередь) старую страницу размонтирует и autoDispose
+/// сбросится — будет один лишний GET при возврате. Трейд-офф осознанный:
+/// держать копию на каждый mediaId до конца сеанса хуже.
+///
+/// Ручной `ref.keepAlive()` с закрытием линка только в `onDispose`
+/// фактически отключал автоочистку навсегда — так было до рефакторинга.
 final lyricsProvider = FutureProvider.autoDispose.family<LyricsLoadResult, int>(
   (ref, mediaId) async {
-    final keepAlive = ref.keepAlive();
-    ref.onDispose(keepAlive.close);
-
     final getLyrics = ref.watch(getLyricsProvider);
     final result = await getLyrics(mediaId);
     return await result.fold(

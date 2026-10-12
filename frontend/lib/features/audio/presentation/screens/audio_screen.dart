@@ -10,7 +10,7 @@ import 'package:flux_media_server/features/audio/presentation/utils/play_queue_u
 import 'package:flux_media_server/features/audio/presentation/widgets/artist_card.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/section_header.dart';
-import 'package:flux_media_server/features/audio/presentation/widgets/track_actions_mixin.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/track_actions.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
@@ -34,7 +34,7 @@ class AudioScreen extends ConsumerStatefulWidget {
 }
 
 class _AudioScreenState extends ConsumerState<AudioScreen>
-    with TrackActionsMixin<AudioScreen>, MediaListSearchMixin<AudioScreen> {
+    with MediaListSearchMixin<AudioScreen> {
   bool _showAllLiked = false;
 
   @override
@@ -137,13 +137,11 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                   media: downloadedAudio[index],
                   onPlay: () =>
                       _playTrack(downloadedAudio[index], downloadedAudio),
-                  onDownload: () => toggleDownloadTrack(
-                    ref,
+                  onDownload: () => ref.toggleDownloadTrack(
                     mediaType,
                     downloadedAudio[index].id,
                   ),
-                  onAddToQueue: () =>
-                      addTrackToQueue(ref, downloadedAudio[index]),
+                  onAddToQueue: () => addTrackToQueue(downloadedAudio[index]),
                   onChangeCover: () =>
                       changeMediaCover(context, ref, downloadedAudio[index].id),
                   onDelete: () => deleteMediaWithConfirm(
@@ -236,10 +234,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                 isFavorite: true,
                 onPlay: () => _playTrack(likedToShow[index], allTracks),
                 onFavorite: () =>
-                    toggleFavoriteTrack(ref, likedToShow[index].id),
+                    ref.toggleFavoriteTrack(likedToShow[index].id),
                 onDownload: () =>
-                    toggleDownloadTrack(ref, mediaType, likedToShow[index].id),
-                onAddToQueue: () => addTrackToQueue(ref, likedToShow[index]),
+                    ref.toggleDownloadTrack(mediaType, likedToShow[index].id),
+                onAddToQueue: () => addTrackToQueue(likedToShow[index]),
                 onAddToCollection: () => showAddToCollectionDialog(
                   context,
                   likedToShow[index].id,
@@ -299,14 +297,12 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                 isFavorite: favoriteIds.contains(downloadedAudio[index].id),
                 onPlay: () => _playTrack(downloadedAudio[index], allTracks),
                 onFavorite: () =>
-                    toggleFavoriteTrack(ref, downloadedAudio[index].id),
-                onDownload: () => toggleDownloadTrack(
-                  ref,
+                    ref.toggleFavoriteTrack(downloadedAudio[index].id),
+                onDownload: () => ref.toggleDownloadTrack(
                   mediaType,
                   downloadedAudio[index].id,
                 ),
-                onAddToQueue: () =>
-                    addTrackToQueue(ref, downloadedAudio[index]),
+                onAddToQueue: () => addTrackToQueue(downloadedAudio[index]),
                 onAddToCollection: () => showAddToCollectionDialog(
                   context,
                   downloadedAudio[index].id,
@@ -336,10 +332,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
               media: allTracks[index],
               isFavorite: favoriteIds.contains(allTracks[index].id),
               onPlay: () => _playTrack(allTracks[index], allTracks),
-              onFavorite: () => toggleFavoriteTrack(ref, allTracks[index].id),
+              onFavorite: () => ref.toggleFavoriteTrack(allTracks[index].id),
               onDownload: () =>
-                  toggleDownloadTrack(ref, mediaType, allTracks[index].id),
-              onAddToQueue: () => addTrackToQueue(ref, allTracks[index]),
+                  ref.toggleDownloadTrack(mediaType, allTracks[index].id),
+              onAddToQueue: () => addTrackToQueue(allTracks[index]),
               onAddToCollection: () => showAddToCollectionDialog(
                 context,
                 allTracks[index].id,

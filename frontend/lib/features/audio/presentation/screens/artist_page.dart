@@ -8,8 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/audio/presentation/utils/download_batch.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/audio_track_row.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/rename_artist_dialog.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/section_header.dart';
-import 'package:flux_media_server/features/audio/presentation/widgets/track_actions_mixin.dart';
+import 'package:flux_media_server/features/audio/presentation/widgets/track_actions.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/domain/usecases/update_artist_name.dart';
@@ -36,8 +37,7 @@ class ArtistPage extends ConsumerStatefulWidget {
   ConsumerState<ArtistPage> createState() => _ArtistPageState();
 }
 
-class _ArtistPageState extends ConsumerState<ArtistPage>
-    with TrackActionsMixin<ArtistPage> {
+class _ArtistPageState extends ConsumerState<ArtistPage> {
   static const _mediaType = 'audio';
   bool _downloadingAll = false;
   int _downloadedCount = 0;
@@ -168,32 +168,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
 
   /// Диалог переименования артиста: имя обновляется у всех его треков.
   Future<void> _renameArtist() async {
-    final l = AppLocalizations.of(context)!;
-    final controller = TextEditingController(text: widget.artistName);
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.editArtistName),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(labelText: l.artistName),
-          textInputAction: TextInputAction.done,
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text(l.save),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
+    final newName = await showRenameArtistDialog(context, widget.artistName);
     if (newName == null || newName.isEmpty || newName == widget.artistName) {
       return;
     }
@@ -241,16 +216,18 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
       ..invalidate(artistsProvider);
   }
 
+  /// Треки артиста из загруженного списка.
+  List<Media> _artistTracks(MediaListResult mediaList) => mediaList.items
+      .where(
+        (m) =>
+            m.type == MediaType.audio &&
+            m.artists.any((a) => a.id == widget.artistId),
+      )
+      .toList();
+
   VoidCallback? _buildDownloadAll(AsyncValue<MediaListResult> mediaListState) {
     if (mediaListState.value == null) return null;
-    final mediaList = mediaListState.value!;
-    final tracks = mediaList.items
-        .where(
-          (m) =>
-              m.type == MediaType.audio &&
-              m.artists.any((a) => a.id == widget.artistId),
-        )
-        .toList();
+    final tracks = _artistTracks(mediaListState.value!);
     if (tracks.isEmpty) return null;
     return () => _downloadAll(tracks);
   }
@@ -276,13 +253,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
         mediaListState.value ??
         MediaListResult(items: <Media>[].toIList(), total: 0);
 
-    final allTracks = mediaList.items
-        .where(
-          (m) =>
-              m.type == MediaType.audio &&
-              m.artists.any((a) => a.id == widget.artistId),
-        )
-        .toList();
+    final allTracks = _artistTracks(mediaList);
 
     if (allTracks.isEmpty) {
       return Center(
@@ -321,56 +292,11 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
         slivers: [
           if (likedTracks.isNotEmpty) ...[
             SliverSectionHeader(icon: Icons.favorite, title: l.likedTracks),
-            SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final track = likedTracks[index];
-                return AudioTrackRow(
-                  media: track,
-                  isFavorite: true,
-                  onPlay: () => _playTrack(likedTracks, index),
-                  onFavorite: () => toggleFavoriteTrack(ref, track.id),
-                  onDownload: () =>
-                      toggleDownloadTrack(ref, _mediaType, track.id),
-                  onAddToQueue: () => addTrackToQueue(ref, track),
-                  onAddToCollection: () => showAddToCollectionDialog(
-                    context,
-                    track.id,
-                    mediaType: 'audio',
-                  ),
-                  onEditMetadata: () =>
-                      showEditMetadataDialog(context, ref, track),
-                  onChangeCover: () => changeMediaCover(context, ref, track.id),
-                  onDelete: () =>
-                      deleteMediaWithConfirm(context, ref, track.id),
-                );
-              }, childCount: likedTracks.length),
-            ),
+            _trackSliver(likedTracks, isFavorite: true),
           ],
           if (otherTracks.isNotEmpty) ...[
             SliverSectionHeader(icon: Icons.music_note, title: l.allTracks),
-            SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final track = otherTracks[index];
-                return AudioTrackRow(
-                  media: track,
-                  onPlay: () => _playTrack(otherTracks, index),
-                  onFavorite: () => toggleFavoriteTrack(ref, track.id),
-                  onDownload: () =>
-                      toggleDownloadTrack(ref, _mediaType, track.id),
-                  onAddToQueue: () => addTrackToQueue(ref, track),
-                  onAddToCollection: () => showAddToCollectionDialog(
-                    context,
-                    track.id,
-                    mediaType: 'audio',
-                  ),
-                  onEditMetadata: () =>
-                      showEditMetadataDialog(context, ref, track),
-                  onChangeCover: () => changeMediaCover(context, ref, track.id),
-                  onDelete: () =>
-                      deleteMediaWithConfirm(context, ref, track.id),
-                );
-              }, childCount: otherTracks.length),
-            ),
+            _trackSliver(otherTracks, isFavorite: false),
           ],
           // Вместо бесконечного скролла (который догружал весь аудио-список
           // ради фильтра по артисту) — явная кнопка «загрузить ещё».
@@ -388,6 +314,29 @@ class _ArtistPageState extends ConsumerState<ArtistPage>
             ),
         ],
       ),
+    );
+  }
+
+  /// Список треков с полными действиями. Очередь для воспроизведения —
+  /// тот же список, поэтому индекс строки совпадает с индексом в очереди.
+  Widget _trackSliver(List<Media> tracks, {required bool isFavorite}) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final track = tracks[index];
+        return AudioTrackRow(
+          media: track,
+          isFavorite: isFavorite,
+          onPlay: () => _playTrack(tracks, index),
+          onFavorite: () => ref.toggleFavoriteTrack(track.id),
+          onDownload: () => ref.toggleDownloadTrack(_mediaType, track.id),
+          onAddToQueue: () => addTrackToQueue(track),
+          onAddToCollection: () =>
+              showAddToCollectionDialog(context, track.id, mediaType: 'audio'),
+          onEditMetadata: () => showEditMetadataDialog(context, ref, track),
+          onChangeCover: () => changeMediaCover(context, ref, track.id),
+          onDelete: () => deleteMediaWithConfirm(context, ref, track.id),
+        );
+      }, childCount: tracks.length),
     );
   }
 }

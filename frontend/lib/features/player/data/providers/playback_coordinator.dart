@@ -892,14 +892,12 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     // Останавливаем физический плеер независимо от состояния (в т.ч.
     // loading/completed): при loading видео уже может играть после open(),
     // а при completed аудио нужно убрать системное уведомление.
-    switch (_lastType) {
-      case MediaType.audio:
-        await _audioPlayer.stop();
-      case MediaType.video:
-        await _videoPlayer.stop();
-      case MediaType.unknown:
-      case null:
-        break;
+    // if/else вместо switch: пустые case-ветки switch читаются как
+    // забытый break/fallthrough, хотя в Dart 3 его нет.
+    if (_lastType == MediaType.audio) {
+      await _audioPlayer.stop();
+    } else if (_lastType == MediaType.video) {
+      await _videoPlayer.stop();
     }
     _lastType = null;
     state = const PlaybackState.initial();

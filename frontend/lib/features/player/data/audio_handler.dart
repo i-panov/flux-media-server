@@ -451,7 +451,13 @@ class FluxAudioHandler extends BaseAudioHandler
         if (!name.startsWith('flux_art_') || known.contains(entity.path)) {
           continue;
         }
-        if (entity.lastModifiedSync().isAfter(_startedAt)) continue;
+        // Асинхронно: синхронный lastModifiedSync() блокировал UI-изолят
+        // на каталогах с мусором (то же правило, что и avoid_slow_async_io
+        // в offline_cache_service).
+        // ignore: avoid_slow_async_io
+        final stat = await entity.stat();
+        if (stat.type == FileSystemEntityType.notFound) continue;
+        if (stat.modified.isAfter(_startedAt)) continue;
         await entity.delete();
       }
     } catch (e) {
