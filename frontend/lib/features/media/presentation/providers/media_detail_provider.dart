@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -23,7 +22,6 @@ class MediaDetailNotifier extends Notifier<MediaDetailState> {
 
   final int mediaId;
 
-  late final GetMediaDetail _getMediaDetail;
 
   /// Замена `mounted` из StateNotifier: нотифаер может быть автоутилизирован
   /// во время полёта запроса (уход с экрана).
@@ -31,7 +29,6 @@ class MediaDetailNotifier extends Notifier<MediaDetailState> {
 
   @override
   MediaDetailState build() {
-    _getMediaDetail = ref.watch(getMediaDetailUseCaseProvider);
     ref.onDispose(() => _disposed = true);
     // Первичную загрузку запускаем из build(): Notifier запрещает
     // модификацию состояния, если провайдер создан и изменён в фазе
@@ -50,7 +47,7 @@ class MediaDetailNotifier extends Notifier<MediaDetailState> {
     if (_disposed) return;
     final generation = ++_generation;
     state = const MediaDetailState.loading();
-    final result = await _getMediaDetail(id);
+    final result = await ref.read(mediaRepositoryProvider).getMediaDetail(id);
     if (_disposed || generation != _generation) return;
     await result.fold<Future<void>>(
       (failure) async {
@@ -87,7 +84,9 @@ class MediaDetailNotifier extends Notifier<MediaDetailState> {
     final current = state;
     if (current is! MediaDetailLoaded) return;
     final generation = ++_generation;
-    final result = await _getMediaDetail(current.media.id);
+    final result = await ref
+        .read(mediaRepositoryProvider)
+        .getMediaDetail(current.media.id);
     if (_disposed || generation != _generation) return;
     result.fold(
       (failure) {
@@ -101,10 +100,6 @@ class MediaDetailNotifier extends Notifier<MediaDetailState> {
     );
   }
 }
-
-final getMediaDetailUseCaseProvider = Provider<GetMediaDetail>((ref) {
-  return GetMediaDetail(ref.watch(mediaRepositoryProvider));
-});
 
 final mediaDetailProvider = NotifierProvider.autoDispose
     .family<MediaDetailNotifier, MediaDetailState, int>(

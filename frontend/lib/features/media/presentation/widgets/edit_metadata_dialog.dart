@@ -5,7 +5,6 @@ import 'package:flux_media_server/core/utils/filename_parser.dart';
 import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
-import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
 import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -169,10 +168,9 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     if (_isSaving || !_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
-    final updateMetadata = ref.read(updateMetadataProvider);
-    final result = await updateMetadata(
-      UpdateMetadataParams(mediaId: widget.media.id, edit: _collectData()),
-    );
+    final result = await ref
+        .read(mediaRepositoryProvider)
+        .updateMetadata(widget.media.id, _collectData());
 
     if (!mounted) return;
     setState(() => _isSaving = false);

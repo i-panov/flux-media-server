@@ -11,7 +11,6 @@ import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
@@ -136,8 +135,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
       // Check duplicate — ошибка сети не должна молча превращаться
       // в «дубликатов нет»: показываем ошибку и прерываемся.
-      final checkMediaHash = ref.read(checkMediaHashProvider);
-      final checkResult = await checkMediaHash(hash.toString());
+      final checkResult = await ref
+          .read(mediaRepositoryProvider)
+          .checkHash(hash.toString());
       final exists = checkResult.fold((failure) {
         _showSnackBar('${l.errorLabel}: ${failure.message}', Colors.red);
         return null;
@@ -152,13 +152,13 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
       if (mounted) setState(() => _phase = l.uploading);
 
-      final uploadMedia = ref.read(uploadMediaProvider);
-      final result = await uploadMedia(
-        UploadMediaParams(
-          filePath: file.path,
-          mediaType: widget.mediaType,
-          fileName: _selectedFileName!,
-          onProgress: (sent, total) {
+      final result = await ref
+          .read(mediaRepositoryProvider)
+          .uploadFile(
+            filePath: file.path,
+            mediaType: widget.mediaType,
+            fileName: _selectedFileName!,
+            onProgress: (sent, total) {
             // Троттлинг: финальное обновление проходим всегда.
             final now = DateTime.now();
             final isFinal = sent >= (total ?? sent);
@@ -175,8 +175,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             }
           },
           isCancelled: () => _cancelled,
-        ),
-      );
+          );
 
       if (!mounted) return;
 
@@ -236,7 +235,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       await Future<void>.delayed(_statusPollInterval);
       if (_cancelled || !mounted) break;
 
-      final result = await ref.read(getUploadStatusProvider)(jobId);
+      final result = await ref
+          .read(mediaRepositoryProvider)
+          .getUploadStatus(jobId);
       if (_cancelled || !mounted) break;
 
       final shouldStop = result.fold(
@@ -289,7 +290,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   Future<void> _cancelJob(int jobId) async {
-    final result = await ref.read(cancelUploadProvider)(jobId);
+    final result = await ref
+        .read(mediaRepositoryProvider)
+        .cancelUpload(jobId);
     result.fold(
       (failure) =>
           AppLogger.error('Failed to cancel upload job $jobId', failure),

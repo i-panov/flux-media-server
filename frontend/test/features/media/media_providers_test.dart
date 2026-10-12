@@ -9,7 +9,6 @@ import 'package:flux_media_server/features/media/domain/models/metadata_edit.dar
 import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_media_detail.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
@@ -402,9 +401,6 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
           mediaRepositoryProvider.overrideWithValue(fakeRepo),
           offlineCacheServiceProvider.overrideWith(FakeOfflineCacheService.new),
-          getMediaDetailUseCaseProvider.overrideWithValue(
-            GetMediaDetail(fakeRepo),
-          ),
         ],
       );
       fakeCache = container.read(

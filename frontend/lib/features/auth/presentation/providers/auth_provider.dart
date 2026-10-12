@@ -3,12 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
-import 'package:flux_media_server/core/usecases/usecase.dart';
 import 'package:flux_media_server/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flux_media_server/features/auth/data/repositories/auth_repository_impl.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
+import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
@@ -39,15 +36,11 @@ sealed class AuthState with _$AuthState {
 }
 
 class AuthNotifier extends Notifier<AuthState> {
-  late final RequestCode _requestCode;
-  late final VerifyCode _verifyCode;
-  late final GetCurrentUser _getCurrentUser;
+  late final AuthRepository _repository;
 
   @override
   AuthState build() {
-    _requestCode = ref.watch(requestCodeProvider);
-    _verifyCode = ref.watch(verifyCodeProvider);
-    _getCurrentUser = ref.watch(getCurrentUserProvider);
+    _repository = ref.watch(authRepositoryProvider);
     return const AuthState.initial();
   }
 
@@ -71,7 +64,7 @@ class AuthNotifier extends Notifier<AuthState> {
     _requestInFlight = true;
     final Either<Failure, Unit> result;
     try {
-      result = await _requestCode(email);
+      result = await _repository.requestCode(email);
     } finally {
       _requestInFlight = false;
     }
@@ -87,7 +80,7 @@ class AuthNotifier extends Notifier<AuthState> {
         lastRequestedEmail = email;
         state = AuthState.codeSent(
           email: email,
-          debugCode: _requestCode.lastDebugCode,
+          debugCode: _repository.lastDebugCode,
         );
         return true;
       },
@@ -98,9 +91,7 @@ class AuthNotifier extends Notifier<AuthState> {
   /// splash размонтировал бы Navigator и CodeScreen (потеря cooldown
   /// и состояния формы) — локальную загрузку показывает сам экран.
   Future<void> verifyCode(String email, String code) async {
-    final result = await _verifyCode(
-      VerifyCodeParams(email: email, code: code),
-    );
+    final result = await _repository.verifyCode(email, code);
     await result.fold<Future<void>>(
       (failure) async {
         state = AuthState.error(
@@ -121,7 +112,7 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> checkAuthStatus() async {
     final generation = ++_generation;
     state = const AuthState.loading();
-    final result = await _getCurrentUser(const NoParams());
+    final result = await _repository.getCurrentUser();
     // Ответ проверки, начатой до logout/повторной проверки, устарел.
     if (generation != _generation) return;
     await result.fold<Future<void>>(
@@ -187,20 +178,8 @@ final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
   return AuthRemoteDataSource(ref.watch(authApiClientProvider));
 });
 
-final authRepositoryProvider = Provider<AuthRepositoryImpl>((ref) {
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepositoryImpl(ref.watch(authRemoteDataSourceProvider));
-});
-
-final requestCodeProvider = Provider<RequestCode>((ref) {
-  return RequestCode(ref.watch(authRepositoryProvider));
-});
-
-final verifyCodeProvider = Provider<VerifyCode>((ref) {
-  return VerifyCode(ref.watch(authRepositoryProvider));
-});
-
-final getCurrentUserProvider = Provider<GetCurrentUser>((ref) {
-  return GetCurrentUser(ref.watch(authRepositoryProvider));
 });
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(

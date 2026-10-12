@@ -76,20 +76,19 @@ class FavoriteToggleNotifier extends Notifier<AsyncValue<bool>> {
       // Не-autoDispose зависимости захватываются до await: даже если
       // нотифаер будет автоутилизирован, источник истины обновится.
       final favorites = ref.read(favoritesProvider.notifier);
-      final addFavorite = ref.read(addFavoriteProvider);
-      final removeFavorite = ref.read(removeFavoriteProvider);
+      final repository = ref.read(favoritesRepositoryProvider);
 
       final currentState = await _isFavorited();
       if (!_disposed) state = AsyncValue.data(!currentState);
 
       if (currentState) {
-        final result = await removeFavorite(mediaId);
+        final result = await repository.removeFavorite(mediaId);
         result.fold((failure) {
           AppLogger.error('Failed to remove favorite $mediaId', failure);
           if (!_disposed) _syncFromProvider();
         }, (_) => favorites.removeLocal(mediaId));
       } else {
-        final result = await addFavorite(mediaId);
+        final result = await repository.addFavorite(mediaId);
         result.fold((failure) {
           AppLogger.error('Failed to add favorite $mediaId', failure);
           if (!_disposed) _syncFromProvider();

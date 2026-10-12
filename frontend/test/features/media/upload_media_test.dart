@@ -8,7 +8,6 @@ import 'package:flux_media_server/features/media/domain/models/metadata_edit.dar
 import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
@@ -169,73 +168,6 @@ class _StubUploadDataSource extends MediaRemoteDataSource {
 }
 
 void main() {
-  group('UploadMedia use case', () {
-    late FakeMediaRepository fakeRepo;
-    late UploadMedia uploadMedia;
-
-    setUp(() {
-      fakeRepo = FakeMediaRepository();
-      uploadMedia = UploadMedia(fakeRepo);
-    });
-
-    test(
-      'passes file params and progress callback to the repository',
-      () async {
-        fakeRepo.onUploadFile =
-            ({
-              required filePath,
-              required mediaType,
-              required fileName,
-              onProgress,
-              isCancelled,
-            }) async {
-              onProgress?.call(10, 100);
-              onProgress?.call(20, 100);
-              return const Right(UploadResult(jobId: 42));
-            };
-
-        final result = await uploadMedia(
-          UploadMediaParams(
-            filePath: '/tmp/movie.mp4',
-            mediaType: 'video',
-            fileName: 'movie.mp4',
-            onProgress: (sent, total) {
-              fakeRepo.progressEvents.add((sent, total));
-            },
-          ),
-        );
-
-        expect(result.isRight(), isTrue);
-        expect(result.getRight().toNullable()?.jobId, 42);
-        expect(fakeRepo.lastFilePath, '/tmp/movie.mp4');
-        expect(fakeRepo.lastMediaType, 'video');
-        expect(fakeRepo.lastFileName, 'movie.mp4');
-        expect(fakeRepo.progressEvents, [(10, 100), (20, 100)]);
-      },
-    );
-
-    test('returns Left on repository failure', () async {
-      fakeRepo.onUploadFile = ({
-        required filePath,
-        required mediaType,
-        required fileName,
-        onProgress,
-        isCancelled,
-      }) async => const Left(ServerFailure(message: 'Too large'));
-
-      final result = await uploadMedia(
-        const UploadMediaParams(
-          filePath: '/tmp/movie.mp4',
-          mediaType: 'video',
-          fileName: 'movie.mp4',
-        ),
-      );
-
-      expect(result.isLeft(), isTrue);
-      expect(result.fold((l) => l.message, (_) => ''), 'Too large');
-    });
-  });
-
   group('MediaRepositoryImpl upload cancellation chain', () {
     test(
       'cancellation becomes UploadCancelledFailure, not ServerFailure',

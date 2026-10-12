@@ -7,7 +7,6 @@ import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
-import 'package:flux_media_server/features/collections/domain/usecases/remove_collection_item.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_media_dialog.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/collection_grid_tile.dart';
@@ -131,13 +130,9 @@ class _CollectionDetailScreenState
     );
     if (confirmed != true || !mounted) return;
 
-    final removeCollectionItem = ref.read(removeCollectionItemProvider);
-    final result = await removeCollectionItem(
-      RemoveCollectionItemParams(
-        collectionId: widget.collection.id,
-        mediaId: media.id,
-      ),
-    );
+    final result = await ref
+        .read(collectionsRepositoryProvider)
+        .removeCollectionItem(widget.collection.id, media.id);
     if (!mounted) return;
     result.fold(
       (failure) {
@@ -191,8 +186,9 @@ class _CollectionDetailScreenState
             TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
-                final deleteCollection = ref.read(deleteCollectionProvider);
-                final result = await deleteCollection(widget.collection.id);
+                final result = await ref
+                    .read(collectionsRepositoryProvider)
+                    .deleteCollection(widget.collection.id);
                 if (context.mounted) {
                   result.fold(
                     (failure) {

@@ -13,8 +13,6 @@ import 'package:flux_media_server/features/audio/presentation/widgets/section_he
 import 'package:flux_media_server/features/audio/presentation/widgets/track_actions.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
-import 'package:flux_media_server/features/media/domain/usecases/update_artist_name.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_artist_cover.dart';
 import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
@@ -173,9 +171,9 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
       return;
     }
 
-    final result = await ref.read(updateArtistNameProvider)(
-      UpdateArtistNameParams(artistId: widget.artistId, name: newName),
-    );
+    final result = await ref
+        .read(mediaRepositoryProvider)
+        .updateArtistName(widget.artistId, newName);
     if (!mounted) return;
 
     result.fold((failure) => showFailureSnackBar(context, failure), (_) {
@@ -196,9 +194,9 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
     final file = result.first;
     if (file.path == null) return;
 
-    final uploadResult = await ref.read(uploadArtistCoverProvider)(
-      UploadArtistCoverParams(artistId: widget.artistId, filePath: file.path!),
-    );
+    final uploadResult = await ref
+        .read(mediaRepositoryProvider)
+        .uploadArtistCover(widget.artistId, file.path!);
     if (!mounted) return;
 
     uploadResult.fold((failure) => showFailureSnackBar(context, failure), (_) {

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
-import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
@@ -125,13 +124,9 @@ class _AddMediaDialogState extends ConsumerState<AddMediaDialog> {
   Future<void> _add(Media media) async {
     final l = context.l10n;
     setState(() => _adding = true);
-    final addCollectionItem = ref.read(addCollectionItemProvider);
-    final result = await addCollectionItem(
-      AddCollectionItemParams(
-        collectionId: widget.collection.id,
-        mediaId: media.id,
-      ),
-    );
+    final result = await ref
+        .read(collectionsRepositoryProvider)
+        .addCollectionItem(widget.collection.id, media.id);
     if (!mounted) return;
     setState(() => _adding = false);
     result.fold(

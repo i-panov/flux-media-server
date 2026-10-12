@@ -7,8 +7,6 @@ import 'package:flux_media_server/features/lyrics/data/datasources/lyrics_remote
 import 'package:flux_media_server/features/lyrics/data/repositories/lyrics_repository_impl.dart';
 import 'package:flux_media_server/features/lyrics/data/repositories/offline_lyrics_cache_repository.dart';
 import 'package:flux_media_server/features/lyrics/domain/repositories/lyrics_repository.dart';
-import 'package:flux_media_server/features/lyrics/domain/usecases/get_lyrics.dart';
-import 'package:flux_media_server/features/lyrics/domain/usecases/upsert_lyrics.dart';
 import 'package:flux_media_server/shared/models/lyrics.dart';
 
 final lyricsRemoteDataSourceProvider = Provider<LyricsRemoteDataSource>((ref) {
@@ -17,14 +15,6 @@ final lyricsRemoteDataSourceProvider = Provider<LyricsRemoteDataSource>((ref) {
 
 final lyricsRepositoryProvider = Provider<LyricsRepository>((ref) {
   return LyricsRepositoryImpl(ref.watch(lyricsRemoteDataSourceProvider));
-});
-
-final getLyricsProvider = Provider<GetLyrics>((ref) {
-  return GetLyrics(ref.watch(lyricsRepositoryProvider));
-});
-
-final upsertLyricsProvider = Provider<UpsertLyrics>((ref) {
-  return UpsertLyrics(ref.watch(lyricsRepositoryProvider));
 });
 
 /// Результат загрузки лирики.
@@ -53,8 +43,7 @@ class LyricsLoadResult {
 /// фактически отключал автоочистку навсегда — так было до рефакторинга.
 final lyricsProvider = FutureProvider.autoDispose.family<LyricsLoadResult, int>(
   (ref, mediaId) async {
-    final getLyrics = ref.watch(getLyricsProvider);
-    final result = await getLyrics(mediaId);
+    final result = await ref.watch(lyricsRepositoryProvider).getLyrics(mediaId);
     return await result.fold(
       (failure) async {
         // API failed — try local cache (offline mode).

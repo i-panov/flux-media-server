@@ -7,17 +7,6 @@ import 'package:flux_media_server/features/auth/presentation/providers/is_offlin
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
-import 'package:flux_media_server/features/media/domain/usecases/cancel_upload.dart';
-import 'package:flux_media_server/features/media/domain/usecases/check_media_hash.dart';
-import 'package:flux_media_server/features/media/domain/usecases/delete_media.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_artists.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_upload_status.dart';
-import 'package:flux_media_server/features/media/domain/usecases/update_artist_name.dart';
-import 'package:flux_media_server/features/media/domain/usecases/update_metadata.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_artist_cover.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_media.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
 /// Инвалидирует списки медиа обоих типов после мутаций (загрузка,
@@ -54,50 +43,6 @@ final mediaRemoteDataSourceProvider = Provider<MediaRemoteDataSource>((ref) {
 
 final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
   return MediaRepositoryImpl(ref.watch(mediaRemoteDataSourceProvider));
-});
-
-final getMediaListProvider = Provider<GetMediaList>((ref) {
-  return GetMediaList(ref.watch(mediaRepositoryProvider));
-});
-
-final getArtistsProvider = Provider<GetArtists>((ref) {
-  return GetArtists(ref.watch(mediaRepositoryProvider));
-});
-
-final updateArtistNameProvider = Provider<UpdateArtistName>((ref) {
-  return UpdateArtistName(ref.watch(mediaRepositoryProvider));
-});
-
-final uploadArtistCoverProvider = Provider<UploadArtistCover>((ref) {
-  return UploadArtistCover(ref.watch(mediaRepositoryProvider));
-});
-
-final checkMediaHashProvider = Provider<CheckMediaHash>((ref) {
-  return CheckMediaHash(ref.watch(mediaRepositoryProvider));
-});
-
-final uploadMediaProvider = Provider<UploadMedia>((ref) {
-  return UploadMedia(ref.watch(mediaRepositoryProvider));
-});
-
-final getUploadStatusProvider = Provider<GetUploadStatus>((ref) {
-  return GetUploadStatus(ref.watch(mediaRepositoryProvider));
-});
-
-final cancelUploadProvider = Provider<CancelUpload>((ref) {
-  return CancelUpload(ref.watch(mediaRepositoryProvider));
-});
-
-final uploadCoverProvider = Provider<UploadCover>((ref) {
-  return UploadCover(ref.watch(mediaRepositoryProvider));
-});
-
-final deleteMediaProvider = Provider<DeleteMedia>((ref) {
-  return DeleteMedia(ref.watch(mediaRepositoryProvider));
-});
-
-final updateMetadataProvider = Provider<UpdateMetadata>((ref) {
-  return UpdateMetadata(ref.watch(mediaRepositoryProvider));
 });
 
 /// Текущий поисковый запрос, ограниченный типом медиа ('video'/'audio').
@@ -161,16 +106,10 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
     // иначе незавершённый loadMore заблокирует подгрузку нового списка.
     _isLoadingMore = false;
 
-    final getMediaList = ref.watch(getMediaListProvider);
     final q = ref.watch(searchQueryProvider(type));
-    final result = await getMediaList(
-      GetMediaListParams(
-        limit: _pageSize,
-        offset: 0,
-        q: q.isEmpty ? null : q,
-        type: type,
-      ),
-    );
+    final result = await ref
+        .watch(mediaRepositoryProvider)
+        .getMediaList(limit: _pageSize, offset: 0, q: q.isEmpty ? null : q, type: type);
     return await result.fold(
       (failure) {
         // Сеть пропала после запуска: включаем офлайн-режим, чтобы
@@ -204,15 +143,14 @@ class MediaListNotifier extends AsyncNotifier<MediaListResult> {
     final qAtCall = ref.read(searchQueryProvider(type));
     _isLoadingMore = true;
 
-    final getMediaList = ref.read(getMediaListProvider);
-    final result = await getMediaList(
-      GetMediaListParams(
-        limit: _pageSize,
-        offset: current.items.length,
-        q: qAtCall.isEmpty ? null : qAtCall,
-        type: type,
-      ),
-    );
+    final result = await ref
+        .read(mediaRepositoryProvider)
+        .getMediaList(
+          limit: _pageSize,
+          offset: current.items.length,
+          q: qAtCall.isEmpty ? null : qAtCall,
+          type: type,
+        );
 
     _isLoadingMore = false;
 

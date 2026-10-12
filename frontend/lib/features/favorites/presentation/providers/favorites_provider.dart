@@ -3,9 +3,6 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/features/favorites/data/datasources/favorites_remote_datasource.dart';
 import 'package:flux_media_server/features/favorites/data/repositories/favorites_repository_impl.dart';
 import 'package:flux_media_server/features/favorites/domain/repositories/favorites_repository.dart';
-import 'package:flux_media_server/features/favorites/domain/usecases/add_favorite.dart';
-import 'package:flux_media_server/features/favorites/domain/usecases/get_favorites.dart';
-import 'package:flux_media_server/features/favorites/domain/usecases/remove_favorite.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
 
 final favoritesRemoteDataSourceProvider = Provider<FavoritesRemoteDataSource>((
@@ -18,18 +15,6 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
   return FavoritesRepositoryImpl(ref.watch(favoritesRemoteDataSourceProvider));
 });
 
-final getFavoritesProvider = Provider<GetFavorites>((ref) {
-  return GetFavorites(ref.watch(favoritesRepositoryProvider));
-});
-
-final addFavoriteProvider = Provider<AddFavorite>((ref) {
-  return AddFavorite(ref.watch(favoritesRepositoryProvider));
-});
-
-final removeFavoriteProvider = Provider<RemoveFavorite>((ref) {
-  return RemoveFavorite(ref.watch(favoritesRepositoryProvider));
-});
-
 /// Избранное текущего пользователя — единый источник истины.
 ///
 /// keepAlive (не autoDispose): нотифаер не пересоздаётся при toggle с
@@ -39,8 +24,9 @@ final removeFavoriteProvider = Provider<RemoveFavorite>((ref) {
 class FavoritesNotifier extends AsyncNotifier<List<Favorite>> {
   @override
   Future<List<Favorite>> build() async {
-    final getFavorites = ref.watch(getFavoritesProvider);
-    final result = await getFavorites(const GetFavoritesParams());
+    final result = await ref
+        .watch(favoritesRepositoryProvider)
+        .getFavorites();
     return await result.fold(
       // Тип Failure сохраняется в AsyncError (не заворачивается в Exception):
       // UI различает network/auth/server по типу ошибки.

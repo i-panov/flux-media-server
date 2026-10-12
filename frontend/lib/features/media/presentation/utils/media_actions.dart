@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
-import 'package:flux_media_server/features/media/domain/usecases/upload_cover.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -35,13 +34,9 @@ Future<void> changeMediaCover(
 
   onUploadStarted?.call();
   try {
-    final r = await ref.read(uploadCoverProvider)(
-      UploadCoverParams(
-        mediaId: mediaId,
-        filePath: file.path!,
-        isCancelled: isCancelled,
-      ),
-    );
+    final r = await ref
+        .read(mediaRepositoryProvider)
+        .uploadCover(mediaId, file.path!, isCancelled: isCancelled);
 
     if (!context.mounted) return;
 
@@ -94,7 +89,7 @@ Future<void> deleteMediaWithConfirm(
   );
   if (confirmed != true) return;
 
-  final result = await ref.read(deleteMediaProvider)(mediaId);
+  final result = await ref.read(mediaRepositoryProvider).deleteMedia(mediaId);
   if (!context.mounted) return;
 
   result.fold(

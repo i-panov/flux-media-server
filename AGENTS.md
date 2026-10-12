@@ -53,7 +53,8 @@ flutter run        # run app
 ### Frontend structure (`frontend/lib/`)
 
 - Feature-based with three layers: `data/` → `domain/` → `presentation/`
-- `core/` — network (Chopper client), providers, router (auto_route + AuthGuard), error handling, use cases, utils
+- `core/` — network (Chopper client), providers, router (auto_route + AuthGuard), error handling, utils
+- `domain/` per feature holds repository interfaces + domain models; presentation calls repositories directly (no use-case layer — pass-through use cases were removed as ceremony; add one only when real business logic appears)
 - `shared/models/` — shared data models
 - `features/` — auth, library, media, player, settings
 

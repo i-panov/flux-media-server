@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
-import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
-import 'package:flux_media_server/features/collections/domain/usecases/create_collection.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
@@ -98,13 +96,9 @@ class _AddToCollectionDialogState
     final l = AppLocalizations.of(context)!;
     setState(() => _loading = true);
     try {
-      final addCollectionItem = ref.read(addCollectionItemProvider);
-      final result = await addCollectionItem(
-        AddCollectionItemParams(
-          collectionId: collection.id,
-          mediaId: widget.mediaId,
-        ),
-      );
+      final result = await ref
+          .read(collectionsRepositoryProvider)
+          .addCollectionItem(collection.id, widget.mediaId);
       if (!mounted) return;
       result.fold(
         (failure) {
@@ -135,10 +129,9 @@ class _AddToCollectionDialogState
 
     setState(() => _loading = true);
     try {
-      final createCollection = ref.read(createCollectionProvider);
-      final collection = await createCollection(
-        CreateCollectionParams(name: name, type: widget.mediaType),
-      );
+      final collection = await ref
+          .read(collectionsRepositoryProvider)
+          .createCollection(name: name, type: widget.mediaType);
       if (!mounted) return;
       collection.fold(
         (failure) {

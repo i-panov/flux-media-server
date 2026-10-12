@@ -1,10 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
-import 'package:flux_media_server/features/collections/domain/usecases/add_collection_item.dart';
-import 'package:flux_media_server/features/collections/domain/usecases/remove_collection_item.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
-import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../helpers/fake_repositories.dart';
@@ -129,64 +126,6 @@ void main() {
       await container.read(collectionItemsFullProvider(5).future);
 
       expect(fakeRepo.getItemsFullCalls, 2);
-    });
-  });
-
-  group('AddCollectionItem', () {
-    test('passes collectionId and mediaId to the repository', () async {
-      fakeRepo.onAddItem = (collectionId, mediaId) async => Right(
-        CollectionItem(id: 1, collectionId: collectionId, mediaId: mediaId),
-      );
-
-      final useCase = AddCollectionItem(fakeRepo);
-      final result = await useCase(
-        const AddCollectionItemParams(collectionId: 3, mediaId: 42),
-      );
-
-      expect(fakeRepo.addItemCalls, [(3, 42)]);
-      expect(result.isRight(), isTrue);
-      final item = result.getOrElse((_) => const CollectionItem(id: 0));
-      expect(item.collectionId, 3);
-      expect(item.mediaId, 42);
-    });
-
-    test('propagates repository failure', () async {
-      fakeRepo.onAddItem = (_, _) async =>
-          const Left(ServerFailure(message: 'Conflict'));
-
-      final useCase = AddCollectionItem(fakeRepo);
-      final result = await useCase(
-        const AddCollectionItemParams(collectionId: 3, mediaId: 42),
-      );
-
-      expect(result.isLeft(), isTrue);
-      expect(result.fold((l) => l.message, (_) => ''), 'Conflict');
-    });
-  });
-
-  group('RemoveCollectionItem', () {
-    test('passes collectionId and mediaId to the repository', () async {
-      fakeRepo.onRemoveItem = (_, _) async => const Right(null);
-
-      final useCase = RemoveCollectionItem(fakeRepo);
-      final result = await useCase(
-        const RemoveCollectionItemParams(collectionId: 3, mediaId: 42),
-      );
-
-      expect(fakeRepo.removeItemCalls, [(3, 42)]);
-      expect(result.isRight(), isTrue);
-    });
-
-    test('propagates repository failure', () async {
-      fakeRepo.onRemoveItem = (_, _) async =>
-          const Left(ServerFailure(message: 'Not found'));
-
-      final useCase = RemoveCollectionItem(fakeRepo);
-      final result = await useCase(
-        const RemoveCollectionItemParams(collectionId: 3, mediaId: 42),
-      );
-
-      expect(result.isLeft(), isTrue);
     });
   });
 }

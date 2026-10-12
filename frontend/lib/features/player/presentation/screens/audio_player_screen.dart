@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/audio/presentation/utils/lyrics_sync_parser.dart';
-import 'package:flux_media_server/features/lyrics/domain/usecases/upsert_lyrics.dart';
 import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
@@ -131,7 +130,7 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
   Future<void> _save() async {
     final l = AppLocalizations.of(context)!;
     setState(() => _isSaving = true);
-    final upsert = ref.read(upsertLyricsProvider);
+    final lyricsRepository = ref.read(lyricsRepositoryProvider);
 
     // CRITICAL #12: при ошибке загрузки существующего документа прерываем
     // сохранение — иначе translation/sync_data затираются пустыми значениями.
@@ -149,16 +148,12 @@ class _EditableTextTabState extends ConsumerState<_EditableTextTab> {
       return;
     }
 
-    final result = await upsert(
-      UpsertLyricsParams(
-        mediaId: widget.media.id,
-        lyricsText: _isLyrics ? _controller.text : (existing?.lyricsText ?? ''),
-        translation: _isLyrics
-            ? (existing?.translation ?? '')
-            : _controller.text,
-        syncData: existing?.syncData ?? '',
-        source: existing?.source ?? 'user',
-      ),
+    final result = await lyricsRepository.upsertLyrics(
+      widget.media.id,
+      lyricsText: _isLyrics ? _controller.text : (existing?.lyricsText ?? ''),
+      translation: _isLyrics ? (existing?.translation ?? '') : _controller.text,
+      syncData: existing?.syncData ?? '',
+      source: existing?.source ?? 'user',
     );
     if (!mounted) return;
     setState(() => _isSaving = false);

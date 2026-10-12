@@ -80,7 +80,10 @@ void main() {
     testWidgets('удаление элемента подтверждает и убирает плитку', (
       tester,
     ) async {
-      repo.onGetItemsFull = (_) async => Right([_media(1, 'One'), _media(2, 'Two')]);
+      repo.onGetItemsFull = (_) async =>
+          Right([_media(1, 'One'), _media(2, 'Two')]);
+      // Два разных поля, каскад синтаксически невозможен.
+      // ignore: cascade_invocations
       repo.onRemoveItem = (_, _) async => const Right(null);
       await _pumpScreen(tester, prefs, repo);
       await tester.pump(const Duration(milliseconds: 100));

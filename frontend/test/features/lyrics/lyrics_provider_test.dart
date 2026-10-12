@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/lyrics/data/repositories/offline_lyrics_cache_repository.dart';
-import 'package:flux_media_server/features/lyrics/domain/usecases/get_lyrics.dart';
 import 'package:flux_media_server/features/lyrics/presentation/providers/lyrics_provider.dart';
 import 'package:fpdart/fpdart.dart';
 
@@ -18,7 +17,7 @@ void main() {
     fakeCache = FakeLyricsCacheRepository();
     container = ProviderContainer(
       overrides: [
-        getLyricsProvider.overrideWithValue(GetLyrics(fakeRepo)),
+        lyricsRepositoryProvider.overrideWithValue(fakeRepo),
         lyricsCacheRepositoryProvider.overrideWithValue(fakeCache),
       ],
       // Riverpod 3 ретраит упавшие build-и по умолчанию: отключаем,

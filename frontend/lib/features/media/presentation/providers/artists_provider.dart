@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/usecases/usecase.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 
@@ -10,8 +9,7 @@ import 'package:flux_media_server/shared/models/artist.dart';
 /// меняется. Раньше autoDispose + keepAlive противоречили друг другу —
 /// keepAlive отменял автоочистку, а инвалидации после мутаций не было.
 final artistsProvider = FutureProvider<List<Artist>>((ref) async {
-  final getArtists = ref.watch(getArtistsProvider);
-  final result = await getArtists(const NoParams());
+  final result = await ref.watch(mediaRepositoryProvider).getArtists();
   return await result.fold(
     // Тип Failure сохраняется в AsyncError (не заворачивается в Exception).
     // ignore: only_throw_errors

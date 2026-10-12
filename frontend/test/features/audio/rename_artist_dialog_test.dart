@@ -13,11 +13,11 @@ Future<String?> _pumpDialog(WidgetTester tester, String currentName) {
 }
 
 Widget _host() {
-  return MaterialApp(
-    locale: const Locale('en'),
+  return const MaterialApp(
+    locale: Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: const Scaffold(body: SizedBox.shrink()),
+    home: Scaffold(body: SizedBox.shrink()),
   );
 }
 

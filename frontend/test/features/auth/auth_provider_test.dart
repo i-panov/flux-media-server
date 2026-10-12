@@ -11,9 +11,6 @@ import 'package:flux_media_server/core/network/interceptors/token_refresh_interc
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/auth/domain/repositories/auth_repository.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/get_current_user.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/request_code.dart';
-import 'package:flux_media_server/features/auth/domain/usecases/verify_code.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/shared/models/user.dart';
@@ -129,9 +126,7 @@ void main() {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         offlineCacheServiceProvider.overrideWith(FakeOfflineCacheService.new),
-        requestCodeProvider.overrideWithValue(RequestCode(fakeRepo)),
-        verifyCodeProvider.overrideWithValue(VerifyCode(fakeRepo)),
-        getCurrentUserProvider.overrideWithValue(GetCurrentUser(fakeRepo)),
+        authRepositoryProvider.overrideWithValue(fakeRepo),
         // Фейковый refresher: не ходит в сеть, refresh всегда неудачен.
         authTokenRefresherProvider.overrideWith(
           (ref) => AuthTokenRefresher(

@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
-import 'package:flux_media_server/features/media/domain/usecases/get_media_list.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/offline/presentation/widgets/download_toggle.dart';
@@ -107,7 +106,6 @@ void main() {
           (ref) => cache = _RecordingCache(ref, ''),
         ),
         mediaRepositoryProvider.overrideWith((ref) => repository),
-        getMediaListProvider.overrideWithValue(GetMediaList(repository)),
       ],
     );
   });
