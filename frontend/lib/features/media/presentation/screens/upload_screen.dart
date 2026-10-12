@@ -1,17 +1,14 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:auto_route/auto_route.dart';
-import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
-import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
 @RoutePage()
@@ -25,36 +22,9 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
-  /// Лимит сервера по умолчанию (configs/config.yaml: max_upload_size).
-  static const int _maxUploadSizeBytes = 2 * 1024 * 1024 * 1024;
-
-  /// Интервал опроса статуса асинхронного upload-джоба.
-  static const _statusPollInterval = Duration(milliseconds: 1500);
-
-  /// Сколько подряд неудачных опросов статуса допустимо, прежде чем
-  /// показать ошибку (сеть может моргнуть).
-  static const _maxStatusPollFailures = 3;
-
-  bool _isUploading = false;
   File? _selectedFile;
   String? _selectedFileName;
   int? _selectedFileSize;
-
-  /// Флаг отмены: хэширование и загрузка прерываются.
-  bool _cancelled = false;
-
-  /// Прогресс загрузки (null, пока неизвестен размер).
-  int? _sentBytes;
-  int? _totalBytes;
-
-  /// Троттлинг прогресса: setState на каждый ~64КБ chunk давал бы
-  /// десятки тысяч rebuild'ов.
-  static const _progressThrottle = Duration(milliseconds: 150);
-  DateTime _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
-
-  /// Текущая фаза: хэширование / проверка дубликата / загрузка /
-  /// обработка сервером.
-  String? _phase;
 
   String _formatSize(int bytes) {
     if (bytes > 1024 * 1024) {
@@ -89,14 +59,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   void _cancelUpload() {
-    setState(() => _cancelled = true);
-  }
-
-  /// Фидбек с явным цветом: зелёный — успех, красный/оранжевый —
-  /// ошибка и отмена. Экран мог размонтироваться во время загрузки.
-  void _showSnackBar(String message, Color color) {
-    if (!mounted) return;
-    showTextSnackBar(context, message, color: color);
+    ref.read(uploadControllerProvider.notifier).cancel();
   }
 
   Future<void> _startUpload() async {
@@ -105,213 +68,77 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
     final l = AppLocalizations.of(context)!;
     final fileSize = _selectedFileSize ?? await file.length();
+    if (!mounted) return;
+
     if (fileSize == 0) {
       _showSnackBar(l.uploadFileEmpty, Colors.red);
       return;
     }
-    if (fileSize > _maxUploadSizeBytes) {
+    // Лимит — из контроллера, а не локальный хардкод: две копии дефолта
+    // разъехались бы при первой же настройке.
+    final maxSize = ref.read(uploadControllerProvider.notifier).maxUploadSizeBytes;
+    if (fileSize > maxSize) {
       _showSnackBar(l.uploadFileTooLarge, Colors.red);
       return;
     }
 
-    setState(() {
-      _cancelled = false;
-      _sentBytes = null;
-      _totalBytes = null;
-      _phase = l.hashingFile;
-      _isUploading = true;
-    });
-
-    try {
-      // SHA-256 в фоновом изоляте: на файлах в 2+ ГБ синхронное
-      // хэширование в UI-изоляте замораживало интерфейс.
-      final filePath = file.path;
-      final hash = await Isolate.run(
-        () => sha256.bind(File(filePath).openRead()).first,
-      );
-      if (_cancelled) throw const _UploadCancelled();
-
-      if (mounted) setState(() => _phase = l.checkingDuplicates);
-
-      // Check duplicate — ошибка сети не должна молча превращаться
-      // в «дубликатов нет»: показываем ошибку и прерываемся.
-      final checkResult = await ref
-          .read(mediaRepositoryProvider)
-          .checkHash(hash.toString());
-      final exists = checkResult.fold((failure) {
-        _showSnackBar('${l.errorLabel}: ${failure.message}', Colors.red);
-        return null;
-      }, (data) => data.exists);
-      if (exists == null) return;
-      if (_cancelled) throw const _UploadCancelled();
-
-      if (exists) {
-        _showSnackBar(l.fileAlreadyExists, Colors.orange);
-        return;
-      }
-
-      if (mounted) setState(() => _phase = l.uploading);
-
-      final result = await ref
-          .read(mediaRepositoryProvider)
-          .uploadFile(
-            filePath: file.path,
-            mediaType: widget.mediaType,
-            fileName: _selectedFileName!,
-            onProgress: (sent, total) {
-            // Троттлинг: финальное обновление проходим всегда.
-            final now = DateTime.now();
-            final isFinal = sent >= (total ?? sent);
-            if (!isFinal &&
-                now.difference(_lastProgressUpdate) < _progressThrottle) {
-              return;
-            }
-            _lastProgressUpdate = now;
-            if (mounted) {
-              setState(() {
-                _sentBytes = sent;
-                _totalBytes = total;
-              });
-            }
-          },
-          isCancelled: () => _cancelled,
-          );
-
-      if (!mounted) return;
-
-      if (_cancelled) {
-        _showSnackBar(l.uploadCancelled, Colors.orange);
-        return;
-      }
-
-      final jobId = result.fold((failure) {
-        if (failure is UploadCancelledFailure) {
-          _showSnackBar(l.uploadCancelled, Colors.orange);
-        } else {
-          _showSnackBar(l.failedToAdd(failure.message), Colors.red);
-        }
-        return null;
-      }, (r) => r.jobId);
-      if (jobId == null) return;
-
-      // Отмена ровно между POST и первым опросом: джоб уже создан на
-      // сервере — отменяем его явно.
-      if (_cancelled) {
-        _showSnackBar(l.uploadCancelled, Colors.orange);
-        await _cancelJob(jobId);
-        return;
-      }
-
-      if (mounted) setState(() => _phase = l.serverProcessing);
-      await _pollUploadStatus(jobId);
-    } on _UploadCancelled {
-      _showSnackBar(l.uploadCancelled, Colors.orange);
-    } catch (e, st) {
-      AppLogger.error('Upload failed', e, st);
-      _showSnackBar(
-        _cancelled ? l.uploadCancelled : l.failedToAdd(l.errorLabel),
-        _cancelled ? Colors.orange : Colors.red,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-          _phase = null;
-        });
-      }
-    }
-  }
-
-  /// Опрашивает статус джоба каждые ~1.5 с до done/error/отмены.
-  ///
-  /// При отмене — DELETE джоба на сервере. Уход с экрана проверяется
-  /// через [mounted] + [_cancelled]: цикл не трогает состояние после
-  /// dispose.
-  Future<void> _pollUploadStatus(int jobId) async {
-    final l = AppLocalizations.of(context)!;
-    var consecutiveFailures = 0;
-
-    while (!_cancelled && mounted) {
-      await Future<void>.delayed(_statusPollInterval);
-      if (_cancelled || !mounted) break;
-
-      final result = await ref
-          .read(mediaRepositoryProvider)
-          .getUploadStatus(jobId);
-      if (_cancelled || !mounted) break;
-
-      final shouldStop = result.fold(
-        (failure) {
-          if (failure is UploadCancelledFailure) return true;
-          consecutiveFailures++;
-          if (consecutiveFailures >= _maxStatusPollFailures) {
-            _showSnackBar(l.failedToAdd(failure.message), Colors.red);
-            return true;
-          }
-          return false;
-        },
-        (status) {
-          consecutiveFailures = 0;
-          if (status.isError) {
-            _showSnackBar(
-              status.error ?? l.failedToAdd(l.errorLabel),
-              Colors.red,
-            );
-            return true;
-          }
-          if (status.isDone) {
-            // Готово: медиа уже на сервере — инвалидируем списки,
-            // чтобы карточка появилась, и закрываем экран. SnackBar
-            // показываем через глобальный ключ: экран закрывается, и
-            // контекстный SnackBar был бы уничтожен вместе с ним.
-            refreshMediaLists(ref);
-            scaffoldMessengerKey.currentState?.showSnackBar(
-              SnackBar(
-                content: Text(l.uploadSuccess),
-                backgroundColor: Colors.green,
-              ),
-            );
-            unawaited(context.router.maybePop());
-            return true;
-          }
-          // queued/processing — продолжаем опрос.
-          return false;
-        },
-      );
-      if (shouldStop) break;
-    }
-
-    // Пользователь отменил во время обработки — отменяем джоб на
-    // сервере, чтобы файл не сохранился в библиотеке.
-    if (_cancelled && mounted) {
-      _showSnackBar(l.uploadCancelled, Colors.orange);
-      await _cancelJob(jobId);
-    }
-  }
-
-  Future<void> _cancelJob(int jobId) async {
-    final result = await ref
-        .read(mediaRepositoryProvider)
-        .cancelUpload(jobId);
-    result.fold(
-      (failure) =>
-          AppLogger.error('Failed to cancel upload job $jobId', failure),
-      (_) {},
+    final started = await ref.read(uploadControllerProvider.notifier).start(
+      filePath: file.path,
+      mediaType: widget.mediaType,
+      fileName: _selectedFileName,
+      fileSize: fileSize,
+      onSuccess: () => _onUploadSuccess(l),
     );
+    if (!mounted) return;
+
+    // Фидбек с явным цветом: зелёный — успех, красный/оранжевый —
+    // ошибка и отмена. Экран мог размонтироваться во время загрузки.
+    // errorMessage гарантирован контроллером на любом реальном сбое
+    // (см. инвариант UploadState.errorMessage), поэтому ветка без
+    // сообщения — это дубликат, а не замаскированная ошибка.
+    final state = ref.read(uploadControllerProvider);
+    if (state.cancelled) {
+      _showSnackBar(l.uploadCancelled, Colors.orange);
+    } else if (!started) {
+      final message = state.errorMessage;
+      if (message != null) {
+        _showSnackBar(message, Colors.red);
+      } else {
+        _showSnackBar(l.fileAlreadyExists, Colors.orange);
+      }
+    }
+  }
+
+  Future<void> _onUploadSuccess(AppLocalizations l) async {
+    // Контроллер мог завершить уже после ухода с экрана (autoDispose
+    // прерывает poll, но гонка возможна): мёртвый контекст не трогаем.
+    if (!context.mounted) return;
+    refreshMediaLists(ref);
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(l.uploadSuccess),
+        backgroundColor: Colors.green,
+      ),
+    );
+    await context.router.maybePop();
+  }
+
+  void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+    showTextSnackBar(context, message, color: color);
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final progress = (_totalBytes != null && _totalBytes! > 0)
-        ? (_sentBytes ?? 0) / _totalBytes!
-        : null;
+    final state = ref.watch(uploadControllerProvider);
+    final progress = state.progress;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l.uploadMedia),
         actions: [
-          if (_isUploading)
+          if (state.isUploading)
             IconButton(
               onPressed: _cancelUpload,
               icon: const Icon(Icons.close),
@@ -335,7 +162,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: _isUploading ? null : _pickFile,
+                onPressed: state.isUploading ? null : _pickFile,
                 icon: Icon(
                   _selectedFile != null
                       ? Icons.check_circle
@@ -357,7 +184,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             ),
           ],
 
-          if (_isUploading) ...[
+          if (state.isUploading) ...[
             const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -366,11 +193,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   // Честный индикатор: детерминированный при известном
                   // размере, иначе — неопределённый спиннер.
                   if (progress != null)
-                    LinearProgressIndicator(value: progress.clamp(0.0, 1.0))
+                    LinearProgressIndicator(value: progress)
                   else
                     const CircularProgressIndicator(),
                   const SizedBox(height: 8),
-                  Text(_phase ?? l.uploading),
+                  Text(_phaseLabel(state.phase) ?? l.uploading),
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: _cancelUpload,
@@ -406,9 +233,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       ),
     );
   }
-}
 
-/// Внутренний маркер отмены (отличаем от сетевых ошибок).
-class _UploadCancelled implements Exception {
-  const new();
+  String? _phaseLabel(UploadPhase? phase) {
+    final l = AppLocalizations.of(context)!;
+    return switch (phase) {
+      UploadPhase.hashing => l.hashingFile,
+      UploadPhase.checking => l.checkingDuplicates,
+      UploadPhase.uploading => l.uploading,
+      UploadPhase.processing => l.serverProcessing,
+      null => null,
+    };
+  }
 }

@@ -32,6 +32,8 @@ const _speedStep = 0.5;
 const _seekStep = Duration(seconds: 10);
 
 /// Видеоконтроллер живёт столько же, сколько видео-плеер (синглтон).
+/// Без onDispose: у VideoController нет dispose, а плеер чистит
+/// videoPlayerDatasourceProvider.
 final videoControllerProvider = Provider<VideoController>((ref) {
   final datasource = ref.watch(videoPlayerDatasourceProvider);
   return VideoController(
@@ -47,6 +49,8 @@ MaterialVideoControlsThemeData _buildMobileControlsTheme(
   required List<Widget> topButtonBar,
   required List<Widget> bottomButtonBar,
 }) {
+  // Явно, а не через copyWith: у copyWith нет padding/bottomButtonBarMargin,
+  // а молчаливое выпадение отступов хуже дублирования семи полей сикбара.
   const base = _seekBarBaseTheme;
   return MaterialVideoControlsThemeData(
     seekBarHeight: base.seekBarHeight,
@@ -102,29 +106,19 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (widget.isFullscreen) {
-      _enterFullscreenChrome();
+      _setFullscreenChrome(true);
     }
     // Создаём VideoController сразу: нативная текстура должна
     // прикрепиться к плееру до старта open().
     ref.read(videoControllerProvider);
   }
 
-  void _enterFullscreenChrome() {
+  void _setFullscreenChrome(bool fullscreen) {
     unawaited(
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+      SystemChrome.setEnabledSystemUIMode(
+        fullscreen ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+      ),
     );
-    unawaited(
-      SystemChrome.setPreferredOrientations(const [
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]),
-    );
-  }
-
-  void _exitFullscreenChrome() {
-    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     unawaited(
       SystemChrome.setPreferredOrientations(const [
         DeviceOrientation.portraitUp,
@@ -139,9 +133,9 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
   void didUpdateWidget(VideoPlayerPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isFullscreen && !oldWidget.isFullscreen) {
-      _enterFullscreenChrome();
+      _setFullscreenChrome(true);
     } else if (!widget.isFullscreen && oldWidget.isFullscreen) {
-      _exitFullscreenChrome();
+      _setFullscreenChrome(false);
     }
   }
 
@@ -161,7 +155,7 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     WidgetsBinding.instance.removeObserver(this);
     _resumeTimer?.cancel();
     if (widget.isFullscreen) {
-      _exitFullscreenChrome();
+      _setFullscreenChrome(false);
     }
     super.dispose();
   }
