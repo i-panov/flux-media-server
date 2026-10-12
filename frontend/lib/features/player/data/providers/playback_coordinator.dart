@@ -1,18 +1,19 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
-import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/datasources/video_player_datasource.dart';
+import 'package:flux_media_server/features/player/data/playback_entry_factory.dart';
+import 'package:flux_media_server/features/player/data/progress_saver.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
+import 'package:flux_media_server/features/player/data/resume_policy.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -47,11 +48,23 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     implements PlaybackController {
   late final AudioPlaybackSource _audioPlayer;
   late final String _baseUrl;
+  late final ProgressSaver _progressSaver;
+  late final ResumePolicy _resumePolicy;
+  late final PlaybackEntryFactory _entryFactory;
 
   @override
   PlaybackState build() {
     _audioPlayer = ref.watch(audioPlayerDatasourceProvider);
     _baseUrl = ref.watch(baseUrlProvider);
+    final mediaRepository = ref.watch(mediaRepositoryProvider);
+    _progressSaver = ProgressSaver(repository: mediaRepository);
+    _resumePolicy = ResumePolicy(repository: mediaRepository);
+    _entryFactory = PlaybackEntryFactory(
+      baseUrl: _baseUrl,
+      tokenReader: () => ref.read(settingsProvider).settings.authToken,
+      localPathFor: (id) =>
+          ref.read(offlineCacheServiceProvider).getLocalPath(id),
+    );
     _subscribeAudioStreams();
     // Токен протухает на час, а mpv берёт Authorization из плейлиста в
     // момент загрузки каждого файла. Без перезагрузки плейлиста длинная
@@ -68,18 +81,11 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     ref.onDispose(() {
       _disposed = true;
       _cancelSubscriptions();
-      _cancelProgressTimer();
+      _progressSaver.stopAutoSave();
       unawaited(_playlistIndexCtl.close());
     });
     return const PlaybackState.initial();
   }
-
-  /// Порог для resume-оверлея: позиции не больше этого значения
-  /// применяются сразу (видео продолжается без диалога).
-  static const _resumeThreshold = Duration(seconds: 5);
-
-  /// Интервал автосохранения прогресса во время воспроизведения.
-  static const _progressSaveInterval = Duration(seconds: 10);
 
   /// Потолок на открытие/запуск медиа. Без него зависший player.open()
   /// навсегда блокирует [_playChain]: ни один следующий play() не дойдёт
@@ -100,7 +106,6 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   /// Используется для ленивого чтения токена (чтобы его обновление не
   /// сбрасывало состояние воспроизведения) и координации с видеоплеером.
   final List<StreamSubscription<dynamic>> _subscriptions = [];
-  Timer? _progressTimer;
 
   final StreamController<int> _playlistIndexCtl =
       StreamController<int>.broadcast();
@@ -138,13 +143,6 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   VideoPlaybackSource get _videoPlayer =>
       ref.read(videoPlayerDatasourceProvider);
 
-  /// Сериализует сохранения прогресса: параллельные вызовы (completed
-  /// при завершении трека, save таймера, сохранения предыдущего трека
-  /// при переключении) выполняются строго по очереди, чтобы более
-  /// позднее сохранение не перезаписало более раннее (гонка
-  /// completed:true vs completed:false).
-  Future<void> _saveChain = Future.value();
-
   void _cancelSubscriptions() {
     for (final sub in _subscriptions) {
       unawaited(sub.cancel());
@@ -152,11 +150,6 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     _subscriptions.clear();
     _audioSubscribed = false;
     _videoSubscribed = false;
-  }
-
-  void _cancelProgressTimer() {
-    _progressTimer?.cancel();
-    _progressTimer = null;
   }
 
   /// Serializes concurrent play() calls through a Future chain: each call
@@ -266,7 +259,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   @override
   Future<void> enqueue(List<Media> items) async {
     if (items.isEmpty || !_audioPlaylistActive) return;
-    final entries = await _buildEntries(items);
+    final entries = await _entryFactory.buildEntries(items);
     await _serialize(() async {
       await _audioPlayer.appendToPlaylist(entries);
     });
@@ -279,7 +272,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     final allAudio = queue.items.every((m) => m.type == MediaType.audio);
 
     final generation = ++_playGeneration;
-    _cancelProgressTimer();
+    _progressSaver.stopAutoSave();
     // Тип известен до загрузки: stop() должен остановить нужный плеер,
     // даже если вызов придёт посередине открытия.
     _lastType = queue.items[index].type;
@@ -293,13 +286,13 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     // проверка `state is PlaybackPlaying` уже не сработает.
     final previous = state;
     if (previous is PlaybackPlaying && previous.media.type == MediaType.video) {
-      await _saveProgress(
+      await _progressSaver.save(
         previous.media.id,
         previous.position,
         previous.duration ?? Duration.zero,
       );
     }
-    // _saveProgress ходит в сеть — за это окно мог прийти stop().
+    // save ходит в сеть — за это окно мог прийти stop().
     // Без проверки generation следующая строка затерела бы
     // PlaybackInitial на loading, и состояние залипло бы навсегда.
     if (generation != _playGeneration) return;
@@ -308,7 +301,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
 
     try {
       if (allAudio) {
-        final entries = await _buildEntries(queue.items);
+        final entries = await _entryFactory.buildEntries(queue.items);
         if (generation != _playGeneration) return;
         // Взаимное исключение: старт аудио сам останавливает видео.
         await _videoPlayer.stop();
@@ -332,7 +325,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
         await _playSingle(queue.items[index]);
         if (generation != _playGeneration) return;
       }
-      _startProgressTimer();
+      _progressSaver.startAutoSave(_progressSnapshot);
       AppLogger.info('Queue started: index=$index of ${queue.items.length}');
     } finally {
       _loadingQueue = false;
@@ -343,7 +336,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   /// не используется, переход между треками остаётся поштучным.
   Future<void> _playSingle(Media media) async {
     final generation = _playGeneration;
-    final entries = await _buildEntries([media]);
+    final entries = await _entryFactory.buildEntries([media]);
     if (generation != _playGeneration || entries.isEmpty) return;
     final entry = entries.first;
     _lastType = media.type;
@@ -371,75 +364,33 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     _subscribeVideoStreams();
 
     // Загружаем сохранённую позицию для диалога resume (только видео).
-    final resumePosition = await _loadSavedPosition(media.id);
+    final resumePosition = await _resumePolicy.loadSavedPosition(media.id);
     if (generation != _playGeneration) return;
-    final saved = resumePosition != null && resumePosition > _resumeThreshold
-        ? resumePosition
-        : null;
+    final resume = ResumePolicy.split(resumePosition);
 
     state = PlaybackState.playing(
       media: media,
       type: MediaType.video,
-      savedPosition: saved,
+      savedPosition: resume.overlay,
     );
 
-    if (resumePosition != null && resumePosition <= _resumeThreshold) {
-      await _videoPlayer.seek(resumePosition);
+    if (resume.autoSeek != null) {
+      await _videoPlayer.seek(resume.autoSeek!);
     }
   }
 
-  /// Готовит элементы плейлиста: локальный файл, если трек скачан,
-  /// иначе URL потока с текущим токеном.
-  Future<List<AudioQueueEntry>> _buildEntries(List<Media> items) async {
-    final token = _currentToken;
-    return await Future.wait(items.map((media) => _buildEntry(media, token)));
-  }
-
-  Future<AudioQueueEntry> _buildEntry(Media media, String? token) async {
-    String? localPath;
-    try {
-      localPath = await ref
-          .read(offlineCacheServiceProvider)
-          .getLocalPath(media.id);
-    } catch (e) {
-      AppLogger.warn('Offline cache lookup failed for ${media.id}: $e');
-    }
-    final isLocal = localPath != null;
-    return AudioQueueEntry(
-      mediaId: media.id,
-      url: localPath ?? '$_baseUrl/media/${media.id}/stream',
-      title: media.title,
-      artist: media.artists.isEmpty
-          ? null
-          : media.artists.map((a) => a.name).join(', '),
-      artUri: _coverUrlFor(media, isLocal: isLocal),
-      duration: media.duration != null
-          ? Duration(seconds: media.duration!)
-          : null,
-      httpHeaders: (!isLocal && token != null)
-          ? <String, String>{'Authorization': 'Bearer $token'}
-          : null,
-    );
-  }
-
-  /// Обложка для MediaItem уведомления; без рисунка — null.
-  ///
-  /// Уже скачанный трек ([_localPath]) показывается без обложки: локальный
-  /// файл не требует авторизации, а тянуть её заново незачем.
-  String? _coverUrlFor(Media media, {required bool isLocal}) {
-    if (isLocal) return null;
-    if (media.coverUrl?.isNotEmpty ?? false) {
-      return buildMediaImageUrl(
-        baseUrl: _baseUrl,
-        mediaId: media.id,
-        kind: MediaImageKind.cover,
-      );
-    }
-    if (media.thumbnailUrl?.isNotEmpty ?? false) {
-      return buildMediaImageUrl(
-        baseUrl: _baseUrl,
-        mediaId: media.id,
-        kind: MediaImageKind.thumb,
+  /// Снимок для автосейва прогресса: только играющее непоставленное
+  /// на паузу видео. Всё остальное (аудио, пауза, загрузка) сейвер
+  /// пропускает сам по null.
+  ({int mediaId, Duration position, Duration duration})? _progressSnapshot() {
+    final current = state;
+    if (current is PlaybackPlaying &&
+        !current.isPaused &&
+        current.media.type == MediaType.video) {
+      return (
+        mediaId: current.media.id,
+        position: current.position,
+        duration: current.duration ?? Duration.zero,
       );
     }
     return null;
@@ -570,7 +521,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
         ++_playGeneration;
         state = const PlaybackState.loading();
         await _playSingle(media);
-        _startProgressTimer();
+        _progressSaver.startAutoSave(_progressSnapshot);
       });
     } catch (e, s) {
       AppLogger.error('Single media play failed for ${media.id}', e, s);
@@ -640,7 +591,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
       // из состояния loading, и _startQueue не сохраняет предыдущий
       // трек повторно.
       unawaited(
-        _saveProgress(
+        _progressSaver.save(
           current.media.id,
           current.duration ?? current.position,
           current.duration ?? Duration.zero,
@@ -648,7 +599,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
         ),
       );
     }
-    _cancelProgressTimer();
+    _progressSaver.stopAutoSave();
 
     // Пользователь переключил трек — EOF уже не нашего: игнорируем.
     if (state is PlaybackLoading) return;
@@ -725,77 +676,6 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     // directly if it needs a buffering indicator.
   }
 
-  /// Returns the saved watch position for [mediaId], or null if there is
-  /// none (or the media was already completed).
-  Future<Duration?> _loadSavedPosition(int mediaId) async {
-    final result = await ref.read(mediaRepositoryProvider).getProgress();
-    return await result.fold((_) async => null, (progressList) async {
-      for (final p in progressList) {
-        if (p.mediaId == mediaId && p.position > 0) {
-          return Duration(seconds: p.position);
-        }
-      }
-      return null;
-    });
-  }
-
-  /// Saves watch progress to the backend. Best-effort: errors are logged
-  /// and ignored. Отправляет duration и completed — бэкенд их принимает
-  /// и сохраняет. Вызовы сериализуются через [_saveChain].
-  Future<void> _saveProgress(
-    int mediaId,
-    Duration position,
-    Duration duration, {
-    bool? completed,
-  }) {
-    final result = _saveChain.then(
-      (_) => _doSaveProgress(mediaId, position, duration, completed: completed),
-    );
-    _saveChain = result.catchError((_) {});
-    return result;
-  }
-
-  Future<void> _doSaveProgress(
-    int mediaId,
-    Duration position,
-    Duration duration, {
-    bool? completed,
-  }) async {
-    if (position <= Duration.zero) return;
-    try {
-      await ref
-          .read(mediaRepositoryProvider)
-          .updateProgress(
-            mediaId,
-            position: position.inSeconds,
-            duration: duration.inSeconds,
-            completed: completed ?? false,
-          );
-    } on Exception catch (e) {
-      developer.log('Failed to save progress: $e');
-    }
-  }
-
-  /// Periodically persists watch progress while playing.
-  void _startProgressTimer() {
-    _cancelProgressTimer();
-    _progressTimer = Timer.periodic(_progressSaveInterval, (_) {
-      final current = state;
-      // Периодическое сохранение — только для видео.
-      if (current is PlaybackPlaying &&
-          !current.isPaused &&
-          current.media.type == MediaType.video) {
-        unawaited(
-          _saveProgress(
-            current.media.id,
-            current.position,
-            current.duration ?? Duration.zero,
-          ),
-        );
-      }
-    });
-  }
-
   Future<void> pause() async {
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
@@ -806,7 +686,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
       }
       state = current.copyWith(isPaused: true);
       if (current.media.type == MediaType.video) {
-        await _saveProgress(
+        await _progressSaver.save(
           current.media.id,
           current.position,
           current.duration ?? Duration.zero,
@@ -870,7 +750,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     // Прерываем незавершённые операции: начатая загрузка на ближайшей
     // проверке поколения выйдет и не запустит воспроизведение после stop.
     _playGeneration++;
-    _cancelProgressTimer();
+    _progressSaver.stopAutoSave();
     _audioPlaylistActive = false;
     _playlistToken = null;
     // Сбрасываем и playing-сигнал: после stop() движок пришлёт playing:false
@@ -882,7 +762,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     if (state is PlaybackPlaying) {
       final current = state as PlaybackPlaying;
       if (current.media.type == MediaType.video) {
-        await _saveProgress(
+        await _progressSaver.save(
           current.media.id,
           current.position,
           current.duration ?? Duration.zero,
