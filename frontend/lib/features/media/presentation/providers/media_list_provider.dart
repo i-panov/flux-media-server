@@ -29,6 +29,9 @@ final mediaRemoteDataSourceProvider = Provider<MediaRemoteDataSource>((ref) {
     ref.watch(mediaApiClientProvider),
     libraryApiClient: ref.watch(libraryApiClientProvider),
     uploadBaseUrl: ref.watch(baseUrlProvider),
+    // Общий клиент с TLS-настройками приложения, а не голый http.Client:
+    // иначе upload/cover падали бы на самоподписанных сертах.
+    clientFactory: () => ref.read(directHttpClientProvider),
     authToken: () => ref.read(settingsProvider).settings.authToken,
     refreshAuth: () async {
       final refreshToken = ref.read(settingsProvider).settings.refreshToken;

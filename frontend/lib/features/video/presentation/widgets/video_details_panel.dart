@@ -195,7 +195,10 @@ class VideoDetailsPanel extends ConsumerWidget {
                           ? Icons.favorite
                           : Icons.favorite_border,
                       color: isFavorite == null
-                          ? null
+                          // Первичная загрузка состояния: приглушённый
+                          // серый вместо мигания «не избранное» (как в
+                          // мини-плеере, но под тёмную подложку панели).
+                          ? Colors.white38
                           : (isFavorite ? Colors.red : null),
                     ),
                     label: Text(l.favorites),

@@ -367,6 +367,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	progress := api.Group("/progress")
 	progress.Get("", progressHandler.List)
+	progress.Get("/:mediaId", progressHandler.GetOne)
 	progress.Put("/:mediaId", progressHandler.Update)
 	progress.Delete("/:mediaId", progressHandler.Delete)
 

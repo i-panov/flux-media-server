@@ -33,6 +33,10 @@ class FakeMediaRepository implements MediaRepository {
       onGetProgress!();
 
   @override
+  Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId) async =>
+      const Right(null);
+
+  @override
   Future<Either<Failure, ({List<Media> items, int total})>> getMediaList({
     String? type,
     int? year,

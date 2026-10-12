@@ -572,7 +572,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trustSelfSignedHint =>
-      'Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate.';
+      'Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate. Notification artwork applies after app restart.';
 
   @override
   String connectionFailed(String error) {

@@ -84,7 +84,7 @@ void main() {
 
   UploadController makeController() {
     return container.read(uploadControllerProvider.notifier)
-      ..hasher = (_) async => 'hash-1';
+      ..hasher = (_, _) async => 'hash-1';
   }
 
   Future<bool> start(UploadController controller) {
@@ -122,7 +122,7 @@ void main() {
     );
   });
 
-  test('пустой файл не стартует', () async {
+  test('пустой файл: false с errorMessage, а не молча', () async {
     final started = await makeController().start(
       filePath: '/tmp/empty.mp3',
       mediaType: 'audio',
@@ -132,9 +132,13 @@ void main() {
     );
     expect(started, isFalse);
     expect(successCalls, isEmpty);
+    expect(
+      container.read(uploadControllerProvider).errorMessage,
+      isNotNull,
+    );
   });
 
-  test('файл больше лимита не стартует', () async {
+  test('файл больше лимита: false с errorMessage, а не молча', () async {
     final started = await makeController().start(
       filePath: '/tmp/big.mp3',
       mediaType: 'video',
@@ -144,6 +148,26 @@ void main() {
     );
     expect(started, isFalse);
     expect(successCalls, isEmpty);
+    expect(
+      container.read(uploadControllerProvider).errorMessage,
+      isNotNull,
+    );
+  });
+
+  test('null fileName: false с errorMessage, а не краш на !', () async {
+    final started = await makeController().start(
+      filePath: '/tmp/file.mp3',
+      mediaType: 'audio',
+      fileName: null,
+      fileSize: 100,
+      onSuccess: () async => successCalls.add('ok'),
+    );
+    expect(started, isFalse);
+    expect(successCalls, isEmpty);
+    expect(
+      container.read(uploadControllerProvider).errorMessage,
+      isNotNull,
+    );
   });
 
   test('ошибка upload возвращает false с errorMessage', () async {
@@ -199,6 +223,28 @@ void main() {
     expect(
       container.read(uploadControllerProvider).errorMessage,
       isNotNull,
+    );
+  });
+
+  test('отмена хэшера (null) трактуется как отмена загрузки', () async {
+    final controller = container.read(uploadControllerProvider.notifier)
+      ..hasher = (_, _) async => null;
+
+    final started = await controller.start(
+      filePath: '/tmp/file.mp3',
+      mediaType: 'audio',
+      fileName: 'file.mp3',
+      fileSize: 100,
+      onSuccess: () async => successCalls.add('ok'),
+    );
+
+    expect(started, isFalse);
+    expect(successCalls, isEmpty);
+    expect(container.read(uploadControllerProvider).cancelled, isTrue);
+    // Не дубликат и не молчаливый сбой: флаг отмены выставлен.
+    expect(
+      container.read(uploadControllerProvider).errorMessage,
+      isNull,
     );
   });
 

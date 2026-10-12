@@ -27,10 +27,12 @@ final networkStatusProvider = NotifierProvider<NetworkStatusNotifier, bool>(
 /// isOffline), либо какой-то запрос приложения упал из-за отсутствия
 /// сети ([networkStatusProvider]). Офлайн-режим показывает только
 /// скачанный контент и баннер с повторной проверкой.
+///
+/// Флаги объединяются через ||: раньше ветка AuthError возвращала только
+/// authState.isOffline и игнорировала networkStatus (упавший список при
+/// не-сетевой ошибке auth прятал баннер), а вне AuthError — наоборот.
 final isOfflineProvider = Provider<bool>((ref) {
   final authState = ref.watch(authProvider);
-  if (authState is AuthError) {
-    return authState.isOffline;
-  }
-  return ref.watch(networkStatusProvider);
+  final authOffline = authState is AuthError && authState.isOffline;
+  return authOffline || ref.watch(networkStatusProvider);
 });

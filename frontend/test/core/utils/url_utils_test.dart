@@ -120,10 +120,12 @@ void main() {
       );
     });
 
-    test('keeps subpath that already contains api', () {
+    test('appends /api unless it is already the trailing segment', () {
+      // Контракт baseUrl — ровно один хвостовой api: /api/v2 валидным
+      // адресом не является (API лежит в /api/media, а не /api/v2/media).
       expect(
         normalizeServerUrl('http://host:8080/api/v2'),
-        'http://host:8080/api/v2',
+        'http://host:8080/api/v2/api',
       );
     });
 

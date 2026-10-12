@@ -69,6 +69,13 @@ abstract class MediaApiClient extends ChopperService {
   @GET(path: '/progress')
   Future<Response<Map<String, dynamic>>> getProgress();
 
+  /// Позиция одного видео для resume-диалога: весь список ради одного
+  /// mediaId — лишний трафик и задержка перед стартом.
+  @GET(path: '/progress/{mediaId}')
+  Future<Response<Map<String, dynamic>>> getProgressById(
+    @Path('mediaId') int mediaId,
+  );
+
   @PUT(path: '/progress/{mediaId}')
   Future<Response<Map<String, dynamic>>> updateProgress(
     @Path('mediaId') int mediaId,

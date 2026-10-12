@@ -203,6 +203,10 @@ class _FakeMediaRepository implements MediaRepository {
       const Right([]);
 
   @override
+  Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId) async =>
+      const Right(null);
+
+  @override
   Future<Either<Failure, WatchProgress>> updateProgress(
     int mediaId, {
     int? position,

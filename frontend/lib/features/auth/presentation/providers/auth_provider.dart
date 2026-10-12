@@ -36,7 +36,9 @@ sealed class AuthState with _$AuthState {
 }
 
 class AuthNotifier extends Notifier<AuthState> {
-  late final AuthRepository _repository;
+  // Не final: build() перезапускается при смене зависимости —
+  // повторное присваивание late final дало бы LateInitializationError.
+  late AuthRepository _repository;
 
   @override
   AuthState build() {

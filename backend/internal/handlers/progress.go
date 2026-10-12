@@ -52,6 +52,27 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 	return response.Paginated(c, progress, total, limit, offset)
 }
 
+/// GetOne возвращает прогресс текущего пользователя для одного медиа.
+/// Нужен resume-диалогу видеоплеера: тянуть весь список ради одного
+/// mediaId — лишний трафик и задержка перед стартом.
+func (h *ProgressHandler) GetOne(c *fiber.Ctx) error {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+	mediaID, err := parseIDParam(c, "mediaId")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
+	}
+
+	progress, err := h.progressRepo.FindByUserAndMedia(c.UserContext(), userID, mediaID)
+	if err != nil {
+		return repoError(c, err, "Progress not found", "Failed to fetch progress")
+	}
+
+	return c.JSON(progress)
+}
+
 func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {

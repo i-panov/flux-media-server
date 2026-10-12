@@ -6,6 +6,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/painting.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
@@ -604,8 +606,46 @@ class OfflineCacheService {
       // не имеют права писать в кеш текущего пользователя.
       _activeDownloads.clear();
       _cancelledDownloads.clear();
+      // Кеш картинок — тоже per-user данные: CachedNetworkImage кеширует
+      // по URL без учёта заголовка, и без evict user B увидел бы
+      // миниатюры user A из дискового кеша без сети.
+      await _evictImageCaches();
     } catch (e) {
       AppLogger.error('Error clearing user cache', e);
+    }
+  }
+
+  /// Чистит кеши картинок текущего пользователя: дисковый кеш
+  /// CachedNetworkImage, декодированные кадры в памяти и flux_art_*-
+  /// обложки системных уведомлений. Всё best-effort.
+  Future<void> _evictImageCaches() async {
+    // Bare catch-all осознанно: path_provider/cache_manager кидают
+    // платформенные ошибки (не Exception), а evict — best-effort.
+    try {
+      await DefaultCacheManager().emptyCache();
+    } catch (_) {
+      // Нет временного каталога (тест без path_provider) — нечего чистить.
+    }
+    try {
+      PaintingBinding.instance.imageCache.clear();
+      // StateError без биндинга — тоже мимо: чистить нечего.
+      // ignore: avoid_catching_errors
+    } on Error catch (_) {
+      // Нет Flutter-биндинга (чистый Dart-тест) — чистить нечего.
+    }
+    try {
+      final temp = await getTemporaryDirectory();
+      await for (final entity in temp.list()) {
+        if (entity is! File) continue;
+        if (!entity.uri.pathSegments.last.startsWith('flux_art_')) continue;
+        try {
+          await entity.delete();
+        } on Exception {
+          // Best-effort: файл мог быть удалён параллельно.
+        }
+      }
+    } catch (_) {
+      // Нет временного каталога (тест без path_provider) — нечего чистить.
     }
   }
 

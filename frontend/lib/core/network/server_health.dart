@@ -24,9 +24,13 @@ Future<void> checkServerHealth(
         : null;
   try {
     final request = await client.getUrl(healthUri);
-    final response = await request.close();
+    // Таймаут и на чтение ответа: зависший health иначе повесил бы
+    // ServerSetupScreen навсегда (connectionTimeout — только на коннект).
+    final response = await request
+        .close()
+        .timeout(const Duration(seconds: 10));
     // Прочитать тело ответа, чтобы освободить соединение.
-    await response.drain<void>();
+    await response.drain<void>().timeout(const Duration(seconds: 10));
 
     if (response.statusCode != HttpStatus.ok) {
       throw ServerHealthException(response.statusCode);

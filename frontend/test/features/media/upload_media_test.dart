@@ -93,6 +93,10 @@ class FakeMediaRepository implements MediaRepository {
       const Left(ServerFailure(message: 'not used'));
 
   @override
+  Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId) async =>
+      const Right(null);
+
+  @override
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
     MetadataEdit edit,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 
 /// Сохранение прогресса просмотра на сервер.
@@ -47,7 +48,11 @@ class ProgressSaver {
     final result = _saveChain.then(
       (_) => _doSave(mediaId, position, duration, completed: completed),
     );
-    _saveChain = result.catchError((_) {});
+    // Ошибки (не-исключения) из цепочки не должны теряться молча:
+    // иначе потеря completed:true нигде не отразится.
+    _saveChain = result.catchError((Object e) {
+      AppLogger.error('Progress save chain failed', e);
+    });
     return result;
   }
 

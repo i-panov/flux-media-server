@@ -46,14 +46,25 @@ sealed class PlaybackState with _$PlaybackState {
 /// доиграл», пришедшее в это окно, терялось безвозвратно.
 class PlaybackCoordinator extends Notifier<PlaybackState>
     implements PlaybackController {
-  late final AudioPlaybackSource _audioPlayer;
-  late final String _baseUrl;
-  late final ProgressSaver _progressSaver;
-  late final ResumePolicy _resumePolicy;
-  late final PlaybackEntryFactory _entryFactory;
+  // Не final осознанно: build() перезапускается при смене сервера
+  // (baseUrl/mediaRepository меняются) — повторное присваивание
+  // late final уронило бы приложение LateInitializationError.
+  late AudioPlaybackSource _audioPlayer;
+  late String _baseUrl;
+  late ProgressSaver _progressSaver;
+  late ResumePolicy _resumePolicy;
+  late PlaybackEntryFactory _entryFactory;
+
+  /// build() уже выполнялся: повторный запуск — это смена сервера,
+  /// а не старт. Старый контекст воспроизведения мёртв (токены/URL
+  /// от другого сервера), очередь перезапускается через [_abortForServerSwitch].
+  bool _alive = false;
 
   @override
   PlaybackState build() {
+    _disposed = false;
+    final isRebuild = _alive;
+    _alive = true;
     _audioPlayer = ref.watch(audioPlayerDatasourceProvider);
     _baseUrl = ref.watch(baseUrlProvider);
     final mediaRepository = ref.watch(mediaRepositoryProvider);
@@ -65,6 +76,7 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
       localPathFor: (id) =>
           ref.read(offlineCacheServiceProvider).getLocalPath(id),
     );
+    // once-only через флаг; после cancel при rebuild — переподписка.
     _subscribeAudioStreams();
     // Токен протухает на час, а mpv берёт Authorization из плейлиста в
     // момент загрузки каждого файла. Без перезагрузки плейлиста длинная
@@ -78,13 +90,45 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     });
     // В Notifier (Riverpod 2.x) нет переопределяемого dispose() —
     // cleanup при утилизации провайдера делаем через onDispose.
+    // Контроллер индекса НЕ закрываем: очередь держит долгоживущую
+    // подписку на него через rebuild'ы, а broadcast-контроллер без
+    // событий ресурсов не держит.
     ref.onDispose(() {
       _disposed = true;
       _cancelSubscriptions();
       _progressSaver.stopAutoSave();
-      unawaited(_playlistIndexCtl.close());
     });
+    if (isRebuild) unawaited(_abortForServerSwitch());
     return const PlaybackState.initial();
+  }
+
+  /// Смена сервера посреди воспроизведения: прерываем незавершённые
+  /// операции и останавливаем оба плеера. Прогресс НЕ сохраняем —
+  /// писать позицию старого сервера на новый нельзя.
+  ///
+  /// Идёт через [_serialize]: иначе стопы аборта перемежались бы с
+  /// тут же начатым стартом (стирали бы только что загруженный
+  /// плейлист). Состояние сбрасываем в конце: старый старт, уже
+  /// стоявший в цепочке, мог успеть выставить playing после build.
+  Future<void> _abortForServerSwitch() {
+    return _serialize(() async {
+      ++_playGeneration;
+      _audioPlaylistActive = false;
+      _playlistToken = null;
+      _lastPlayingSignal = false;
+      _lastType = null;
+      try {
+        await _audioPlayer.stop();
+      } catch (e) {
+        AppLogger.warn('Audio stop after server switch failed: $e');
+      }
+      try {
+        await _videoPlayer.stop();
+      } catch (e) {
+        AppLogger.warn('Video stop after server switch failed: $e');
+      }
+      if (!_disposed) state = const PlaybackState.initial();
+    });
   }
 
   /// Потолок на открытие/запуск медиа. Без него зависший player.open()
@@ -400,6 +444,13 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
 
   /// mpv обновил токен в фоне (плановая проверка сессии, смена сервера):
   /// перезагружаем плейлист с новым Authorization, сохраняя позицию.
+  ///
+  /// Осознанно перезагрузкой, а не ленивым обновлением заголовков:
+  /// mpv берёт httpHeaders из плейлиста в момент загрузки каждого файла,
+  /// и «обновить будущие элементы» без переоткрытия нельзя — следующий
+  /// трек упал бы с 401, а пути восстановления из 401 у плеера нет
+  /// (ошибка сразу уходит в UI). Цена — один loading-флэш на редкое
+  /// событие смены токена; надёжность очереди важнее.
   void _onTokenChanged() {
     if (!_audioPlaylistActive) return;
     if (state is! PlaybackPlaying) return;

@@ -5,7 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 
-/// Protects routes that require authentication.
+/// Protects routes that require authentication (гейт навигации).
+///
+/// Параллельно есть драйвер в FluxApp._handleAuthStateChange: он уводит
+/// на экраны при смене состояния (логин/логаут), а гард проверяет доступ
+/// в момент навигации. См. комментарий у драйвера, почему нужны оба.
 class AuthGuard extends AutoRouteGuard {
   new(this._container);
 

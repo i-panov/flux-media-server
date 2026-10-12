@@ -7,7 +7,17 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 /// Раньше каждая строка на экране начиналась с `AppLocalizations.of(context)!`
 /// — это и шум, и риск `!` на пустом контексте.
 extension AppLocalizationsX on BuildContext {
-  AppLocalizations get l10n => AppLocalizations.of(this)!;
+  AppLocalizations get l10n {
+    final l = AppLocalizations.of(this);
+    // Null возможен только без MaterialApp с делегатами выше — в этом
+    // приложении и тестах недостижимо, но дебагу нужен понятный текст,
+    // а не «Null check operator used on a null value».
+    assert(
+      l != null,
+      'l10n used outside MaterialApp with AppLocalizations delegates',
+    );
+    return l!;
+  }
 }
 
 extension DurationExtensions on Duration {

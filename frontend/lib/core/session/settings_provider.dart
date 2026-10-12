@@ -38,7 +38,9 @@ sealed class SettingsState with _$SettingsState {
 }
 
 class SettingsNotifier extends Notifier<SettingsState> {
-  late final SettingsRepository _repository;
+  // Не final: build() перезапускается при смене зависимости —
+  // повторное присваивание late final дало бы LateInitializationError.
+  late SettingsRepository _repository;
 
   @override
   SettingsState build() {

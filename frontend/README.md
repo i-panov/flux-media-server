@@ -1,6 +1,17 @@
 # frontend
 
-A new Flutter project.
+Flux media server — Flutter client.
+
+## Notes
+
+- Debug and release builds keep separate local data (server URL, login,
+  offline cache): switching build flavors "loses" the server/login —
+  this is intentional, re-enter them in the new flavor.
+- Server URL contract: exactly one trailing `/api`
+  (e.g. `http://host:8080/api`).
+- Self-signed certificates require the explicit opt-in toggle.
+  Notification artwork picks the toggle up only after app restart
+  (the background audio handler snapshots it at startup).
 
 ## Getting Started
 

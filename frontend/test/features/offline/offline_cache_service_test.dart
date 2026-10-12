@@ -263,6 +263,10 @@ void main() {
           if (methodCall.method == 'getApplicationDocumentsDirectory') {
             return tempDir.path;
           }
+          // Eviction обложек уведомлений чистит временный каталог тоже.
+          if (methodCall.method == 'getTemporaryDirectory') {
+            return tempDir.path;
+          }
           return null;
         });
     SharedPreferences.setMockInitialValues({});
@@ -397,6 +401,21 @@ void main() {
       expect(otherFile.existsSync(), isTrue);
       expect(prefs.containsKey('${_keyPrefix}user_9_flux_meta_5'), isTrue);
       expect(prefs.containsKey('${_keyPrefix}user_7_flux_meta_5'), isFalse);
+    });
+
+    test('evicts notification artwork files on logout', () async {
+      // CachedNetworkImage кеширует по URL без заголовка: без evict user B
+      // увидел бы миниатюры user A. Обложки уведомлений лежат во временном
+      // каталоге и тоже уходят при clearUserCache.
+      final art = File('${tempDir.path}/flux_art_7_5.jpg')
+        ..writeAsStringSync('x');
+      final other = File('${tempDir.path}/not_art.txt')
+        ..writeAsStringSync('x');
+
+      await service.clearUserCache();
+
+      expect(art.existsSync(), isFalse);
+      expect(other.existsSync(), isTrue);
     });
   });
 

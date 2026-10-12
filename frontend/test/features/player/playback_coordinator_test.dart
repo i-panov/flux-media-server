@@ -354,6 +354,9 @@ class _FakeVideoSource implements VideoPlaybackSource {
 class _FakeMediaRepository implements MediaRepository {
   List<WatchProgress> progress = [];
 
+  /// Поштучные записи для getProgressById (путь resume-диалога).
+  final Map<int, WatchProgress> progressById = {};
+
   /// (mediaId, position, duration, completed) в порядке вызовов.
   final List<({int mediaId, int position, int duration, bool? completed})>
   updates = [];
@@ -364,6 +367,10 @@ class _FakeMediaRepository implements MediaRepository {
   @override
   Future<Either<Failure, List<WatchProgress>>> getProgress() async =>
       Right(progress);
+
+  @override
+  Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId) async =>
+      Right(progressById[mediaId]);
 
   @override
   Future<Either<Failure, WatchProgress>> updateProgress(
@@ -541,6 +548,22 @@ void main() {
   });
 
   PlaybackState readState() => container.read(playbackCoordinatorProvider);
+
+  /// Пересобирает контейнер с новым baseUrl (эмуляция смены сервера).
+  /// updateOverrides заменяет весь список — дублируем setUp один в один.
+  void switchServer(String baseUrl) {
+    container.updateOverrides([
+      audioPlayerDatasourceProvider.overrideWithValue(audio),
+      baseUrlProvider.overrideWithValue(baseUrl),
+      playbackCoordinatorProvider.overrideWith(PlaybackCoordinator.new),
+      videoPlayerDatasourceProvider.overrideWithValue(video),
+      mediaRepositoryProvider.overrideWithValue(repo),
+      settingsRepositoryProvider.overrideWithValue(_FakeSettingsRepository()),
+      offlineCacheServiceProvider.overrideWith(
+        (_) => _FakeOfflineCache(prefs: prefs),
+      ),
+    ]);
+  }
 
   /// Отдельный контейнер с произвольным кешем офлайн-файлов.
   ProviderContainer containerWithCache(OfflineCacheService Function() build) =>
@@ -845,6 +868,57 @@ void main() {
         throwsA(isA<Exception>()),
       );
       expect(queue.state.currentIndex, 0);
+    });
+
+    group('server switch rebuild', () {
+      test('rebuild does not throw and resets to initial', () async {
+        // Регрессия: повторный build() падал LateInitializationError на
+        // late final полях при смене baseUrl.
+        await queue.setQueue([_media(1, MediaType.audio)]);
+        expect(readState(), isA<PlaybackPlaying>());
+
+        switchServer('http://new/api');
+        await _settle();
+
+        expect(readState(), isA<PlaybackInitial>());
+      });
+
+      test('new baseUrl is used for entries after the switch', () async {
+        // Фабрика записей пересоздаётся: тихий запрос на старый сервер
+        // после смены — мимо.
+        switchServer('http://new/api');
+        await _settle();
+
+        await queue.setQueue([
+          _media(1, MediaType.audio),
+          _media(2, MediaType.audio),
+        ]);
+
+        expect(audio.playlist.map((e) => e.url), [
+          'http://new/api/media/1/stream',
+          'http://new/api/media/2/stream',
+        ]);
+      });
+
+      test('queue index stream survives the rebuild', () async {
+        // Контроллер индекса не закрывается в onDispose: очередь слушает
+        // его через rebuild'ы, закрытие оборвало бы авто-переходы.
+        await queue.setQueue([
+          _media(1, MediaType.audio),
+          _media(2, MediaType.audio),
+        ]);
+        switchServer('http://new/api');
+        // Форсируем rebuild до событий плеера: updateOverrides ленивый,
+        // иначе completed обработался бы ещё старой проводкой.
+        expect(readState(), isA<PlaybackInitial>());
+        await _settle();
+
+        audio.emitCompleted();
+        await _settle();
+
+        expect(queue.state.currentIndex, 1);
+        expect((readState() as PlaybackPlaying).media.id, 2);
+      });
     });
 
     test('audio completion does not save progress', () async {
@@ -1244,7 +1318,11 @@ void main() {
 
   group('PlaybackCoordinator resume logic', () {
     test('resumes immediately when saved position <= 5s', () async {
-      repo.progress = [const WatchProgress(userId: 1, mediaId: 9, position: 4)];
+      repo.progressById[9] = const WatchProgress(
+        userId: 1,
+        mediaId: 9,
+        position: 4,
+      );
 
       await queue.setQueue([_media(9, MediaType.video)]);
 
@@ -1254,9 +1332,11 @@ void main() {
     });
 
     test('shows resume overlay when saved position > 5s', () async {
-      repo.progress = [
-        const WatchProgress(userId: 1, mediaId: 9, position: 30),
-      ];
+      repo.progressById[9] = const WatchProgress(
+        userId: 1,
+        mediaId: 9,
+        position: 30,
+      );
 
       await queue.setQueue([_media(9, MediaType.video)]);
 
@@ -1266,9 +1346,11 @@ void main() {
     });
 
     test('seekToSavedPosition seeks and clears the overlay', () async {
-      repo.progress = [
-        const WatchProgress(userId: 1, mediaId: 9, position: 30),
-      ];
+      repo.progressById[9] = const WatchProgress(
+        userId: 1,
+        mediaId: 9,
+        position: 30,
+      );
       await queue.setQueue([_media(9, MediaType.video)]);
       video.seekCalls.clear();
 

@@ -43,6 +43,7 @@ func setupProgressTestApp(t *testing.T) *fiber.App {
 	})
 
 	app.Get("/api/progress", handler.List)
+	app.Get("/api/progress/:mediaId", handler.GetOne)
 	app.Put("/api/progress/:mediaId", handler.Update)
 	app.Delete("/api/progress/:mediaId", handler.Delete)
 
@@ -76,6 +77,39 @@ func TestProgressHandler_UpdateStoresDurationAndCompleted(t *testing.T) {
 	resp, err = app.Test(req)
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
+func TestProgressHandler_GetOneReturnsSingleProgress(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"position":  42,
+		"duration":  100,
+		"completed": false,
+	})
+	req := httptest.NewRequest("PUT", "/api/progress/1", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	req = httptest.NewRequest("GET", "/api/progress/1", nil)
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var progress models.WatchProgress
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&progress))
+	assert.Equal(t, 42, progress.Position)
+	assert.Equal(t, 100, progress.Duration)
+}
+
+func TestProgressHandler_GetOneNotFound(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress/999", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 }
 
 func TestProgressHandler_UpdateMediaNotFound(t *testing.T) {

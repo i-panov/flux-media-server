@@ -86,6 +86,13 @@ final class _$MediaApiClient extends MediaApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> getProgressById(int mediaId) {
+    final Uri $url = Uri.parse('/progress/${mediaId}');
+    final Request $request = Request('GET', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> updateProgress(
     int mediaId,
     Map<String, dynamic> body,

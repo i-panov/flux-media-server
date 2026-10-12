@@ -38,6 +38,11 @@ class AuthNetworkImage extends ConsumerWidget {
     return CachedNetworkImage(
       // Пересоздание загрузки при смене токена: после refresh старый
       // 401-ответ не должен показываться навсегда.
+      //
+      // Осознанно ValueKey, а не cacheKey с версией токена: смена любого
+      // из них всё равно дёргает refetch с плейсхолдером (мерцание то же),
+      // а key проще и уже покрыт поведением «старый 401 не залипает».
+      // Refresh почасовой — частое мерцание недостижимо.
       key: ValueKey<String?>(headers?['Authorization']),
       imageUrl: imageUrl,
       fit: fit,

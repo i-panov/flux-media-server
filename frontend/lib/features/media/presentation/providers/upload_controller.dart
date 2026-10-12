@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +21,16 @@ class UploadState {
     this.cancelled = false,
     this.errorMessage,
   });
+
+  /// Сброс в покой после завершения (успех/отмена/дубликат/сбой).
+  /// Отдельный конструкт, а не copyWith(phase: null): copyWith не умеет
+  /// сбрасывать nullable-поля (?? this.phase). Static, а не factory:
+  /// const-фабрика триггерит unnecessary_type_name_in_constructor
+  /// при кодстайле `const new(...)`, а значения всё равно runtime.
+  // ignore: prefer_constructors_over_static_methods
+  static UploadState idle({String? errorMessage, bool cancelled = false}) {
+    return UploadState(errorMessage: errorMessage, cancelled: cancelled);
+  }
 
   final bool isUploading;
   final UploadPhase? phase;
@@ -61,21 +70,50 @@ class UploadState {
   }
 }
 
-/// Хэширует файл в фоновом изоляте. Инжектируется в тестах, чтобы не
-/// поднимать Isolate.
-typedef FileHasher = Future<String> Function(String path);
+/// Хэширует файл. Возвращает null, если хэширование отменено.
+/// Второй параметр — проверка отмены: хэш 2 ГБ длится секунды, и флаг
+/// отмены должен срабатывать внутри, а не после.
+typedef FileHasher = Future<String?> Function(
+  String path,
+  bool Function() isCancelled,
+);
 
 /// Колбэк успешной загрузки: инвалидация списков, снэкбар, закрытие экрана.
 /// Передаётся в [UploadController.start] — экрану нужны свежие ref/context,
 /// хранить замыкание в поле контроллера нельзя (stale-контекст).
 typedef UploadSuccessCallback = Future<void> Function();
 
-/// Хэшер по умолчанию: SHA-256 в фоновом изоляте (на файлах в 2+ ГБ
-/// синхронное хэширование в UI-изоляте замораживало интерфейс).
-Future<String> _defaultHasher(String path) async =>
-    (await Isolate.run(
-      () => sha256.bind(File(path).openRead()).first,
-    )).toString();
+/// Хэшер по умолчанию: читает файл чанками в текущем изоляте.
+/// Чанками, а не Isolate.run целиком: между чанками проверяем отмену
+/// и отдаём управление event loop — UI не висит даже на 2 ГБ, а отмена
+/// во время hashing срабатывает сразу, а не после всего файла.
+Future<String?> _defaultHasher(
+  String path,
+  bool Function() isCancelled,
+) async {
+  final collector = _DigestCollector();
+  final sink = sha256.startChunkedConversion(collector);
+  try {
+    await for (final chunk in File(path).openRead()) {
+      if (isCancelled()) return null;
+      sink.add(chunk);
+    }
+  } finally {
+    sink.close();
+  }
+  return collector.digest?.toString();
+}
+
+/// Приёмник hex-digest для чанкового хэширования.
+class _DigestCollector implements Sink<Digest> {
+  Digest? digest;
+
+  @override
+  void add(Digest data) => digest = data;
+
+  @override
+  void close() {}
+}
 
 /// Оркестратор загрузки: hash → проверка дубликата → upload → опрос статуса
 /// → отмена джоба. Вынесен из `_UploadScreenState`: ~150 строк логики
@@ -131,8 +169,23 @@ class UploadController extends Notifier<UploadState> {
     required int fileSize,
     required UploadSuccessCallback onSuccess,
   }) async {
-    if (fileSize == 0) return false;
-    if (fileSize > maxUploadSizeBytes) return false;
+    // Backstop-проверки с сырым английским текстом (как Failure.message):
+    // экран до этого показывает локализованные uploadFileEmpty/
+    // uploadFileTooLarge и сюда не доходит. errorMessage обязателен —
+    // иначе нарушился бы инвариант UploadState.errorMessage и экран
+    // показал бы «дубликат».
+    if (fileSize == 0) {
+      state = state.copyWith(errorMessage: 'Cannot upload an empty file');
+      return false;
+    }
+    if (fileSize > maxUploadSizeBytes) {
+      state = state.copyWith(errorMessage: 'File exceeds the upload size limit');
+      return false;
+    }
+    if (fileName == null) {
+      state = state.copyWith(errorMessage: 'Missing file name');
+      return false;
+    }
 
     _cancelled = false;
     _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
@@ -142,7 +195,13 @@ class UploadController extends Notifier<UploadState> {
     );
 
     try {
-      final hash = await _hasher(filePath);
+      final hash = await _hasher(filePath, () => _cancelled);
+      // null от хэшера — тоже отмена: единственный легитимный
+      // производитель null — сработавшая проверка isCancelled внутри.
+      if (hash == null) {
+        _cancelled = true;
+        return false;
+      }
       if (_cancelled || _disposed) return false;
 
       state = state.copyWith(phase: UploadPhase.checking);
@@ -163,7 +222,7 @@ class UploadController extends Notifier<UploadState> {
       final result = await _repository.uploadFile(
         filePath: filePath,
         mediaType: mediaType,
-        fileName: fileName!,
+        fileName: fileName,
         onProgress: _onProgress,
         isCancelled: () => _cancelled,
       );
@@ -206,14 +265,13 @@ class UploadController extends Notifier<UploadState> {
     } finally {
       // Сбрасываем ошибку при успехе, оставляем при сбое — экран читает
       // errorMessage для фидбека. cancelled сохраняем: экран отличает
-      // отмену от сетевой ошибки по этому флагу. Конструируем напрямую:
-      // через copyWith(phase: null) фазу не сбросить (?? this.phase).
+      // отмену от сетевой ошибки по этому флагу.
       // После dispose состояние не трогаем — провайдер мёртв.
       if (!_disposed) {
         final hadError = state.errorMessage != null;
-        // sent/total тоже сбрасываем: прогресс нужен только во время
-        // загрузки, а stale-значения после успеха ничему не служат.
-        state = UploadState(
+        // sent/total/phase тоже сбрасываем: прогресс нужен только во
+        // время загрузки, а stale-значения после успеха ничему не служат.
+        state = UploadState.idle(
           errorMessage: hadError ? state.errorMessage : null,
           cancelled: _cancelled,
         );

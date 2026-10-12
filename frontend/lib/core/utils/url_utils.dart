@@ -56,7 +56,12 @@ String normalizeServerUrl(String input) {
   final uri = Uri.parse(value);
   // pathSegments уже отбрасывает пустые сегменты от двойных слэшей.
   final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-  if (!segments.contains('api')) {
+  // Контракт: ровно один хвостовой 'api'. Путь вроде /api/v2 валидным
+  // baseUrl не является (Chopper собрал бы /api/v2/media/... вместо
+  // /api/media/...) — дописываем api и туда. Query/fragment/userInfo
+  // Uri-конструктор ниже отбрасывает молча и осознанно: учётные данные
+  // в адресе сервера не нужны и утекли бы в логи.
+  if (segments.isEmpty || segments.last != 'api') {
     segments.add('api');
   }
   final normalized = Uri(

@@ -469,7 +469,7 @@
   "@cacheCleared": {},
   "trustSelfSignedCertificate": "Trust self-signed certificate",
   "@trustSelfSignedCertificate": {},
-  "trustSelfSignedHint": "Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate.",
+  "trustSelfSignedHint": "Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate. Notification artwork applies after app restart.",
   "@trustSelfSignedHint": {},
   "connectionFailed": "Failed to connect to the server: {error}",
   "@connectionFailed": {

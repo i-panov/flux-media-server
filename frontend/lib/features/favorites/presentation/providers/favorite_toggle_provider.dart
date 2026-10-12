@@ -37,6 +37,13 @@ class FavoriteToggleNotifier extends Notifier<AsyncValue<bool>> {
           loading: () => const AsyncValue<bool>.loading(),
           error: (e, st) {
             AppLogger.error('Failed to load favorite ids', e);
+            // Осознанный фолбэк, а не заглушка: при сетевом сбое строки
+            // остаются интерактивными (toggle перечитывает источник
+            // истины и самоперелечивается), а иконка показывает
+            // нейтральное «не избранное». Альтернатива — error на каждой
+            // строке без пути повтора (перезагрузки ids ничто не триггерит).
+            // Поведение зафиксировано тестом
+            // favorite_toggle_provider_test.dart.
             return const AsyncValue<bool>.data(false);
           },
         );
@@ -50,7 +57,13 @@ class FavoriteToggleNotifier extends Notifier<AsyncValue<bool>> {
       loading: () => state,
       error: (e, _) {
         AppLogger.error('Failed to load favorite ids', e);
-        return state;
+        // Без предыдущего значения (первичная загрузка) — тот же
+        // осознанный фолбэк, что в build: иначе иконка залипла бы
+        // в loading навсегда, т.к. build видит только loading,
+        // а эта ветка — уже итог.
+        return state.hasValue
+            ? state
+            : const AsyncValue<bool>.data(false);
       },
     );
   }

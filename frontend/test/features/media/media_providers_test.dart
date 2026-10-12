@@ -132,6 +132,10 @@ class FakeMediaRepository implements MediaRepository {
       const Right([]);
 
   @override
+  Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId) async =>
+      const Right(null);
+
+  @override
   Future<Either<Failure, Media>> updateMetadata(
     int mediaId,
     MetadataEdit edit,

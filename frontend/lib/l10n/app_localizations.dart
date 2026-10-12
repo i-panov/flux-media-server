@@ -1139,7 +1139,7 @@ abstract class AppLocalizations {
   /// No description provided for @trustSelfSignedHint.
   ///
   /// In en, this message translates to:
-  /// **'Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate.'**
+  /// **'Private servers only. Enables insecure HTTPS for API requests; video/audio streaming still requires a trusted certificate. Notification artwork applies after app restart.'**
   String get trustSelfSignedHint;
 
   /// No description provided for @connectionFailed.

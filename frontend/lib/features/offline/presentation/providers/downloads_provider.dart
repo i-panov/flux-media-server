@@ -9,8 +9,10 @@ import 'package:flux_media_server/shared/models/media.dart';
 
 class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
   /// Защита от параллельных refresh (тики инвалидатора могут прийти
-  /// подряд).
+  /// подряд). Тик во время активного refresh не теряется, а ставит
+  /// dirty-флаг: по завершении refresh повторяется ещё раз.
   bool _isRefreshing = false;
+  bool _dirty = false;
 
   @override
   AsyncValue<List<Media>> build() {
@@ -28,8 +30,22 @@ class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
   /// In offline mode reads locally stored JSON metadata (no API calls).
   /// In online mode fetches fresh data from the API.
   Future<void> refresh() async {
-    if (_isRefreshing) return;
+    if (_isRefreshing) {
+      _dirty = true;
+      return;
+    }
     _isRefreshing = true;
+    try {
+      do {
+        _dirty = false;
+        await _loadOnce();
+      } while (_dirty);
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  Future<void> _loadOnce() async {
     // Фоновая перезагрузка: при уже загруженных данных не ставим
     // loading (иначе секция мигает на каждый тик инвалидатора).
     final hasData = state.hasValue;
@@ -126,8 +142,6 @@ class DownloadsNotifier extends Notifier<AsyncValue<List<Media>>> {
         }
       } catch (_) {}
       state = AsyncValue.error(e, st);
-    } finally {
-      _isRefreshing = false;
     }
   }
 }

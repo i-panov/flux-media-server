@@ -44,6 +44,11 @@ abstract class MediaRepository {
 
   Future<Either<Failure, List<WatchProgress>>> getProgress();
 
+  /// Позиция одного видео для resume-диалога (null — не смотрели).
+  /// Отдельно от getProgress: весь список ради одного mediaId — лишний
+  /// трафик и задержка перед стартом воспроизведения.
+  Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId);
+
   Future<Either<Failure, Media>> updateMetadata(int mediaId, MetadataEdit edit);
 
   Future<Either<Failure, WatchProgress>> updateProgress(

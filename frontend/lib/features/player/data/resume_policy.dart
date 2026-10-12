@@ -19,16 +19,16 @@ class ResumePolicy {
 
   /// Returns the saved watch position for [mediaId], or null if there is
   /// none (or the media was already completed).
-  Future<Duration?> loadSavedPosition(int mediaId) async {
-    final result = await repository.getProgress();
-    return await result.fold((_) async => null, (progressList) async {
-      for (final p in progressList) {
-        if (p.mediaId == mediaId && p.position > 0) {
-          return Duration(seconds: p.position);
-        }
-      }
-      return null;
-    });
+  ///
+  /// Точечный запрос, а не весь список: вызывается перед стартом каждого
+  /// видео, и лишний трафик здесь — задержка воспроизведения.
+  Future<Duration?> loadSavedPosition(int mediaId) {
+    return repository.getProgressById(mediaId).then(
+      (result) => result.fold((_) => null, (progress) {
+        if (progress == null || progress.position <= 0) return null;
+        return Duration(seconds: progress.position);
+      }),
+    );
   }
 
   /// Раскладывает сохранённую позицию на два действия.

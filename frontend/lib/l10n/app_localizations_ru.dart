@@ -574,7 +574,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get trustSelfSignedHint =>
-      'Только для частных серверов. Включает небезопасный HTTPS для запросов API; для потоков видео/аудио сертификат всё равно должен быть доверенным.';
+      'Только для частных серверов. Включает небезопасный HTTPS для запросов API; для потоков видео/аудио сертификат всё равно должен быть доверенным. Обложки в уведомлениях применятся после перезапуска приложения.';
 
   @override
   String connectionFailed(String error) {

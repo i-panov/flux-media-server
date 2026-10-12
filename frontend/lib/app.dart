@@ -90,7 +90,15 @@ class _FluxAppState extends ConsumerState<FluxApp> {
   bool get _hasServerUrl =>
       ref.read(settingsProvider).settings.serverUrl != null;
 
-  /// Общий обработчик переходов состояния авторизации.
+  /// Общий обработчик переходов состояния авторизации (драйвер).
+  ///
+  /// Не путать с [AuthGuard]: гард — это гейт в момент навигации (не пускает
+  /// без сессии), а это — драйвер при смене состояния (уводит на нужный
+  /// экран после логина/логаута/экспайра). Убирать одно из двух нельзя:
+  /// без драйвера после логина остались бы на экране логина, без гейта —
+  /// открыли бы MainRoute прямой навигацией без сессии. Двойного replace
+  /// нет: гард срабатывает только внутри резолвера навигации, драйвер —
+  /// только на смене состояния, и оба ведут на один и тот же маршрут.
   void _handleAuthStateChange(AuthState? previous, AuthState next) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;

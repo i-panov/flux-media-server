@@ -45,14 +45,16 @@ abstract class PlaybackController {
 /// mpv: переход между треками инициирует mpv, поэтому считать его в
 /// Dart («+1») значило бы расходиться с реальным воспроизведением.
 class PlayQueueNotifier extends Notifier<PlayQueueState> {
-  late final PlaybackController _coordinator;
-  StreamSubscription<int>? _indexSub;
+  // Не final: при rebuild поле перезаписалось бы поверх живой подписки.
+  late PlaybackController _coordinator;
 
   @override
   PlayQueueState build() {
     _coordinator = ref.watch(playbackControllerProvider);
-    _indexSub = _coordinator.playlistIndexStream.listen(_onMpvIndex);
-    ref.onDispose(() => unawaited(_indexSub?.cancel()));
+    // Локальная переменная в замыкании, а не поле: при перезапуске build()
+    // onDispose старого билда закрыл бы уже НОВУЮ подписку, а старая утекла бы.
+    final sub = _coordinator.playlistIndexStream.listen(_onMpvIndex);
+    ref.onDispose(() => unawaited(sub.cancel()));
     return const PlayQueueState();
   }
 

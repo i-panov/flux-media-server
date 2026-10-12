@@ -60,6 +60,12 @@ class MediaRemoteDataSource {
   /// (settingsProvider + authTokenRefresherProvider), чтобы не плодить
   /// второй путь аутентификации.
   /// [clientFactory] инъектируется в тестах.
+  ///
+  /// В проде — резолвер общего клиента (directHttpClientProvider): он уже
+  /// несёт trustSelfSigned и таймауты, иначе upload/cover падали бы с
+  /// TLS-ошибкой там, где Chopper-запросы проходят. Datasource клиент НЕ
+  /// закрывает и НЕ владеет им: тот же инстанс параллечески качает
+  /// офлайн-файлы (см. комментарий у directHttpClientProvider).
   new(
     this.apiClient, {
     this._libraryApiClient,
@@ -463,7 +469,9 @@ class MediaRemoteDataSource {
         }
         return body;
       } finally {
-        client.close();
+        // Клиент общий (directHttpClientProvider), закрывать его здесь
+        // нельзя: параллельные скачивания используют тот же инстанс.
+        // Владение — у владельца фабрики, не у datasource.
       }
     }
     throw ServerException(message: defaultErrorMessage);
@@ -478,6 +486,16 @@ class MediaRemoteDataSource {
     return items
         .map((e) => WatchProgress.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Fetches watch progress for a single media item, or null if none saved.
+  /// 404 — норма (ещё не смотрели), а не сбой: отсутствие записи значит
+  /// «начинать с нуля», а не ошибку.
+  Future<WatchProgress?> getProgressById(int mediaId) async {
+    final response = await apiClient.getProgressById(mediaId);
+    if (response.statusCode == 404) return null;
+    checkResponse(response, 'Failed to fetch progress');
+    return WatchProgress.fromJson(response.body!);
   }
 
   /// Updates metadata for a media item.

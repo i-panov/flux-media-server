@@ -14,6 +14,10 @@ class _FakeRepository implements MediaRepository {
   updates = [];
 
   List<WatchProgress> storedProgress = [];
+
+  /// Поштучные записи для getProgressById (новый путь loadSavedPosition).
+  final Map<int, WatchProgress> storedById = {};
+  Failure? progressByIdFailure;
   int updateCalls = 0;
   bool failUpdates = false;
 
@@ -48,6 +52,13 @@ class _FakeRepository implements MediaRepository {
   @override
   Future<Either<Failure, List<WatchProgress>>> getProgress() async =>
       Right(storedProgress);
+
+  @override
+  Future<Either<Failure, WatchProgress?>> getProgressById(int mediaId) async {
+    final failure = progressByIdFailure;
+    if (failure != null) return Left(failure);
+    return Right(storedById[mediaId]);
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -233,14 +244,12 @@ void main() {
   group('ResumePolicy.loadSavedPosition', () {
     test('возвращает позицию для нужного mediaId', () async {
       final repo = _FakeRepository()
-        ..storedProgress = [
-          const WatchProgress(
-            userId: 1,
-            mediaId: 9,
-            position: 42,
-            duration: 100,
-          ),
-        ];
+        ..storedById[9] = const WatchProgress(
+          userId: 1,
+          mediaId: 9,
+          position: 42,
+          duration: 100,
+        );
       final policy = ResumePolicy(repository: repo);
 
       expect(
@@ -251,13 +260,23 @@ void main() {
 
     test('null при отсутствии записи и при нулевой позиции', () async {
       final repo = _FakeRepository()
-        ..storedProgress = [
-          const WatchProgress(userId: 1, mediaId: 9, position: 0),
-        ];
+        ..storedById[9] = const WatchProgress(
+          userId: 1,
+          mediaId: 9,
+          position: 0,
+        );
       final policy = ResumePolicy(repository: repo);
 
       expect(await policy.loadSavedPosition(9), isNull);
       expect(await policy.loadSavedPosition(404), isNull);
+    });
+
+    test('ошибка сети превращается в null, а не в исключение', () async {
+      final repo = _FakeRepository()
+        ..progressByIdFailure = const ServerFailure(message: 'boom');
+      final policy = ResumePolicy(repository: repo);
+
+      expect(await policy.loadSavedPosition(9), isNull);
     });
   });
 }
