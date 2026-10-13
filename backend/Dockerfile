@@ -34,7 +34,7 @@ EXPOSE 8095
 VOLUME ["/app/data"]
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8095/api/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8095/api/health || exit 1
 
 ENTRYPOINT ["./flux-server"]
 CMD ["-config", "/app/configs/config.yaml"]
