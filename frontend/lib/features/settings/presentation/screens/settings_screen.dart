@@ -373,9 +373,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${l.version}: $_appVersion'),
+                  Text('${l.clientVersion}: $_appVersion'),
                   Text(
-                    '${l.backendVersion}: ${ref.watch(backendVersionProvider).value ?? '—'}',
+                    '${l.serverVersion}: ${ref.watch(backendVersionProvider).value ?? '—'}',
                   ),
                 ],
               ),

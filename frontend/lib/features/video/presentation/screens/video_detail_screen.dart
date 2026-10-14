@@ -213,6 +213,9 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
         elevation: 0,
         leading: IconButton(
           color: Colors.white,
+          // Только pop, без паузы: она происходит в dispose панели
+          // (shouldPauseOnPanelDispose) — см. комментарий там. Если гвард
+          // тронут, встроенный «назад» снова начнёт играть в никуда.
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.maybePop(),
         ),

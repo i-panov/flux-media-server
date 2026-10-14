@@ -224,17 +224,17 @@ abstract class AppLocalizations {
   /// **'About'**
   String get about;
 
-  /// No description provided for @version.
+  /// No description provided for @clientVersion.
   ///
   /// In en, this message translates to:
-  /// **'Version'**
-  String get version;
+  /// **'Client version'**
+  String get clientVersion;
 
-  /// No description provided for @backendVersion.
+  /// No description provided for @serverVersion.
   ///
   /// In en, this message translates to:
-  /// **'Backend version'**
-  String get backendVersion;
+  /// **'Server version'**
+  String get serverVersion;
 
   /// No description provided for @play.
   ///

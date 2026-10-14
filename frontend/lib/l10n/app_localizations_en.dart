@@ -73,10 +73,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get about => 'About';
 
   @override
-  String get version => 'Version';
+  String get clientVersion => 'Client version';
 
   @override
-  String get backendVersion => 'Backend version';
+  String get serverVersion => 'Server version';
 
   @override
   String get play => 'Play';

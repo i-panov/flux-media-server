@@ -191,8 +191,11 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
     final isMobile = Platform.isAndroid || Platform.isIOS;
     final mobileTheme = _buildMobileControlsTheme(
       MediaQuery.of(context),
+      // Встроенный режим: назад есть в апп-баре экрана, дублировать
+      // в плеере незачем. В fullscreen кнопка остаётся — это выход
+      // из fullscreen, а не с экрана.
       topButtonBar: [
-        _BackButton(onClose: widget.onClose),
+        if (widget.isFullscreen) _BackButton(onClose: widget.onClose),
         if (showResumeControl(view.kind, view.type, savedPosition))
           _ResumeButton(savedPosition: savedPosition!),
       ],
@@ -211,7 +214,7 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
 
     final desktopTheme = const MaterialDesktopVideoControlsThemeData().copyWith(
       topButtonBar: [
-        _BackButton(onClose: widget.onClose),
+        if (widget.isFullscreen) _BackButton(onClose: widget.onClose),
         if (showResumeControl(view.kind, view.type, savedPosition))
           _ResumeButton(savedPosition: savedPosition!),
       ],
@@ -293,11 +296,11 @@ bool showResumeControl(
       savedPosition != null;
 }
 
-/// Кнопка «продолжить с …» в баре контролов.
+/// Кнопка «продолжить с …» в топ-баре контролов.
 ///
-/// Аккуратно с вёрсткой (был инцидент с прилипанием): отступы с обеих
-/// сторон, ширина ужата с ellipsis — на узких экранах текст обрежется,
-/// а не распрёт ряд и не налезет на соседей.
+/// Flexible + ellipsis вместо фиксированной maxWidth (была 180 и давила
+/// соседей в нижнем баре): текст занимает свободное место и только
+/// в крайнем случае режется. Не возвращать фикс — будет тот же инцидент.
 class _ResumeButton extends ConsumerWidget {
   const new({required this.savedPosition});
 
@@ -306,10 +309,11 @@ class _ResumeButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context)!;
+    // Flexible вместо фиксированной ширины: в топ-баре места много,
+    // текст занимает свободное и только в крайнем случае режется.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 180),
+      child: Flexible(
         child: TextButton.icon(
           style: TextButton.styleFrom(
             foregroundColor: Colors.white,

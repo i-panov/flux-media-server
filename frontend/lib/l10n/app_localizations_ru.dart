@@ -73,10 +73,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get about => 'О приложении';
 
   @override
-  String get version => 'Версия';
+  String get clientVersion => 'Версия клиента';
 
   @override
-  String get backendVersion => 'Версия бэкенда';
+  String get serverVersion => 'Версия сервера';
 
   @override
   String get play => 'Воспроизвести';
