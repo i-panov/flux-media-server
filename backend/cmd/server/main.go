@@ -14,7 +14,11 @@ import (
 	"flux/internal/config"
 )
 
-var version = "dev"
+// Версия бэкенда: видна в /api/health и флаге -version.
+// Инкрементится патчем при каждом коммите, затрагивающем backend/
+// (правило AGENTS.md). Перекрывается ldflags -X main.version=... при
+// необходимости, дефолт обязан быть осмысленным, а не "dev".
+var version = "1.0.0"
 
 func main() {
 	var (

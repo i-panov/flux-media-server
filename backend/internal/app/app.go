@@ -311,8 +311,14 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	}))
 
 	// Health check — единственный канонический эндпоинт /api/health
-	// (его используют фронтенд и Dockerfile HEALTHCHECK).
-	fiberApp.Get("/api/health", handlers.HealthCheck)
+	// (его используют фронтенд и Dockerfile HEALTHCHECK). Версия внутри —
+	// для сверки свежести бэкенда из приложения (Настройки → О приложении).
+	fiberApp.Get("/api/health", func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"status":  "ok",
+			"version": version,
+		})
+	})
 
 	// Auth rate limiter — parameters from config.
 	authRateLimiter := limiter.New(limiter.Config{

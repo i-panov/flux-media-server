@@ -106,9 +106,26 @@ class VideoPlayerPanel extends ConsumerStatefulWidget {
 }
 
 class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
+  /// Координатор захвачен в initState: в dispose() обращаться к `ref`
+  /// нельзя — виджет уже демонтируется, и чтение может бросить,
+  /// похоронив паузу вместе с исключением.
+  late final PlaybackCoordinator _coordinator;
+
+  /// Последнее известное состояние (через listen ниже): решение о паузе
+  /// в dispose принимается по нему, а не чтением провайдера.
+  PlaybackState _lastPlayback = const PlaybackState.initial();
+
+  ProviderSubscription<PlaybackState>? _playbackSub;
+
   @override
   void initState() {
     super.initState();
+    _coordinator = ref.read(playbackCoordinatorProvider.notifier);
+    _playbackSub = ref.listenManual(
+      playbackCoordinatorProvider,
+      (_, next) => _lastPlayback = next,
+      fireImmediately: true,
+    );
     if (widget.isFullscreen) {
       _setFullscreenChrome(true);
     }
@@ -144,6 +161,8 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
   // дёргают напрямую audio-движок) — известное ограничение.
   @override
   void dispose() {
+    _playbackSub?.close();
+    _playbackSub = null;
     if (widget.isFullscreen) {
       _setFullscreenChrome(false);
     }
@@ -152,13 +171,10 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
     // карточка подхватывала бы старый трек из синглтон-плеера.
     // Паузим только своё неподоставленное видео — фоновое аудио и чужой
     // трек не трогаем. Заодно сохраняется прогресс для resume.
-    if (shouldPauseOnPanelDispose(
-      ref.read(playbackCoordinatorProvider),
-      widget.media.id,
-    )) {
-      unawaited(
-        ref.read(playbackCoordinatorProvider.notifier).pause(),
-      );
+    // Ни одного ref.read здесь: виджет демонтируется, чтение может
+    // бросить и похоронить паузу — всё захвачено в initState.
+    if (shouldPauseOnPanelDispose(_lastPlayback, widget.media.id)) {
+      unawaited(_coordinator.pause());
     }
     super.dispose();
   }
@@ -175,10 +191,12 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
     final isMobile = Platform.isAndroid || Platform.isIOS;
     final mobileTheme = _buildMobileControlsTheme(
       MediaQuery.of(context),
-      topButtonBar: [_BackButton(onClose: widget.onClose)],
-      bottomButtonBar: [
+      topButtonBar: [
+        _BackButton(onClose: widget.onClose),
         if (showResumeControl(view.kind, view.type, savedPosition))
           _ResumeButton(savedPosition: savedPosition!),
+      ],
+      bottomButtonBar: [
         const Spacer(),
         const _SeekButton(direction: -1),
         const _SeekButton(direction: 1),
@@ -192,10 +210,12 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
     );
 
     final desktopTheme = const MaterialDesktopVideoControlsThemeData().copyWith(
-      topButtonBar: [_BackButton(onClose: widget.onClose)],
-      bottomButtonBar: [
+      topButtonBar: [
+        _BackButton(onClose: widget.onClose),
         if (showResumeControl(view.kind, view.type, savedPosition))
           _ResumeButton(savedPosition: savedPosition!),
+      ],
+      bottomButtonBar: [
         const MaterialDesktopSkipPreviousButton(),
         const MaterialDesktopPlayOrPauseButton(),
         const MaterialDesktopSkipNextButton(),
@@ -230,7 +250,11 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
       fit: StackFit.expand,
       children: [
         body,
-        if (view.kind != PlayerViewKind.playing) _Poster(media: widget.media),
+        // Живой кадр — только если играет именно это видео: иначе новая
+        // карточка показывала бы чужой трек из синглтон-плеера (постер +
+        // play вместо этого).
+        if (!isOwnPlayingVideo(view, widget.media.id))
+          _Poster(media: widget.media),
       ],
     );
 
@@ -243,6 +267,14 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
       child: ColoredBox(color: Colors.black, child: posterOrBody),
     );
   }
+}
+
+/// Показывать ли живой кадр плеера: играет именно это медиа.
+/// Иначе — постер (чужой трек из общего плеера не подменяет карточку).
+bool isOwnPlayingVideo(PlayerView view, int mediaId) {
+  return view.kind == PlayerViewKind.playing &&
+      view.type == MediaType.video &&
+      view.media?.id == mediaId;
 }
 
 /// Показывать ли кнопку resume в панели контролов: только для играющего

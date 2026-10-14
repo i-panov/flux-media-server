@@ -11,6 +11,7 @@ import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/settings/presentation/providers/backend_version_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -369,7 +370,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('${l.version}: $_appVersion'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${l.version}: $_appVersion'),
+                  Text(
+                    '${l.backendVersion}: ${ref.watch(backendVersionProvider).value ?? '—'}',
+                  ),
+                ],
+              ),
             ),
           ),
         ],

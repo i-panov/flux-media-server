@@ -136,9 +136,13 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
     ref.read(extractControllerProvider.notifier).cancel();
   }
 
-  /// Переход к уже извлечённому треку: в очередь и играть (как _play).
+  /// Переход к уже извлечённому треку: в очередь и играть (как _play),
+  /// затем назад к списку — там виден мини-плеер с управлением.
+  /// На вкладку «Аудио» не прыгаем: уважаем контекст браузинга.
+  /// Координатор от экрана не зависит, dispose-проверка аудио не тронет.
   Future<void> _openExtractedAudio(Media track) async {
-    await ref.read(playQueueProvider.notifier).setQueue([track]);
+    unawaited(ref.read(playQueueProvider.notifier).setQueue([track]));
+    if (mounted) await context.router.maybePop();
   }
 
   @override

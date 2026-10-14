@@ -44,6 +44,8 @@
   "@about": {},
   "version": "Version",
   "@version": {},
+  "backendVersion": "Backend version",
+  "@backendVersion": {},
   "play": "Play",
   "@play": {},
   "previous": "Previous",

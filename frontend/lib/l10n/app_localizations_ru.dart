@@ -76,6 +76,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get version => 'Версия';
 
   @override
+  String get backendVersion => 'Версия бэкенда';
+
+  @override
   String get play => 'Воспроизвести';
 
   @override

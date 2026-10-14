@@ -97,6 +97,7 @@ func TestHealthEndpoint(t *testing.T) {
 	var body map[string]string
 	parseResp(t, resp, &body)
 	assert.Equal(t, "ok", body["status"])
+	assert.NotEmpty(t, body["version"])
 }
 
 func TestLegacyHealthEndpointGone(t *testing.T) {

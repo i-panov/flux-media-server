@@ -230,6 +230,12 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get version;
 
+  /// No description provided for @backendVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend version'**
+  String get backendVersion;
+
   /// No description provided for @play.
   ///
   /// In en, this message translates to:

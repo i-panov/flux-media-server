@@ -66,6 +66,12 @@ flutter run        # run app
 - Frontend tests mock platform channels (flutter_secure_storage) and override Riverpod providers
 - Frontend auth states: `AuthInitial` → `AuthCodeSent` → `AuthAuthenticated` / `AuthError`
 
+## Версионирование
+- Каждый коммит, затрагивающий `frontend/`, инкрементирует patch в `frontend/pubspec.yaml` (`1.0.x`) и build-номер после `+`: от него зависит Android versionCode — без этого новый APK не встанет поверх старого.
+- Каждый коммит, затрагивающий `backend/`, инкрементирует patch дефолта `version` в `backend/cmd/server/main.go` (`1.0.x`).
+- Версия приложения видна в Настройки → О приложении, версия бэкенда — там же из `GET /api/health` (поле `version`): свежесть обоих концов сверяется по ним.
+- Флаги `-version` (сервер) и ldflags `-X main.version=...` продолжают работать поверх дефолта.
+
 ## Config
 
 Backend reads `configs/config.yaml` (fallback: `$CONFIG_PATH` env var). See `configs/config.example.yaml` for schema.

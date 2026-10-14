@@ -19,7 +19,8 @@ Media _track(int id) => Media(
 );
 
 void main() {
-  group('shouldPauseOnPanelDispose', () {    test('своё играющее видео — пауза', () {
+  group('shouldPauseOnPanelDispose', () {
+    test('своё играющее видео — пауза', () {
       expect(
         shouldPauseOnPanelDispose(
           PlaybackState.playing(media: _video(7), type: MediaType.video),
@@ -76,6 +77,53 @@ void main() {
       expect(
         shouldPauseOnPanelDispose(
           const PlaybackState.error(message: 'boom'),
+          7,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('isOwnPlayingVideo', () {
+    PlayerView playing(int id) => PlayerView(
+      kind: PlayerViewKind.playing,
+      media: _video(id),
+      type: MediaType.video,
+      isPaused: false,
+      savedPosition: null,
+      errorMessage: null,
+    );
+
+    test('своё играющее видео — живой кадр', () {
+      expect(isOwnPlayingVideo(playing(7), 7), isTrue);
+    });
+
+    test('чужое видео, пауза, не-playing — постер', () {
+      expect(isOwnPlayingVideo(playing(9), 7), isFalse);
+      expect(
+        isOwnPlayingVideo(
+          PlayerView(
+            kind: PlayerViewKind.playing,
+            media: _video(7),
+            type: MediaType.video,
+            isPaused: true,
+            savedPosition: null,
+            errorMessage: null,
+          ),
+          7,
+        ),
+        isTrue,
+      );
+      expect(
+        isOwnPlayingVideo(
+          const PlayerView(
+            kind: PlayerViewKind.initial,
+            media: null,
+            type: null,
+            isPaused: false,
+            savedPosition: null,
+            errorMessage: null,
+          ),
           7,
         ),
         isFalse,
