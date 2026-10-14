@@ -40,30 +40,24 @@ bool _isHttpUrl(String input, {required int? maxLength}) {
 /// - обрезает пробелы по краям;
 /// - добавляет схему `http://`, если её нет;
 /// - отбрасывает дублирующиеся слэши;
-/// - добавляет сегмент `api`, если его ещё нет в пути;
 /// - убирает конечный слэш.
 ///
-/// Хранимое значение является полным baseUrl API (включает `/api`),
-/// поэтому Chopper-сервисы объявляют пути относительно него
-/// (например `/auth/request-code`), а health-check выполняется
-/// по адресу `$result/health` (= `.../api/health`).
-String normalizeServerUrl(String input) {
+/// Хранится ровно то, что ввёл пользователь (без навязанного `/api`):
+/// сегмент API подставляет [normalizeServerUrl] динамически при каждом
+/// построении baseUrl. Query/fragment/userInfo отбрасываются молча и
+/// осознанно: учётные данные в адресе сервера не нужны и утекли бы в логи.
+String normalizeServerAddress(String input) {
   var value = input.trim();
   if (value.isEmpty) return value;
   if (!value.contains('://')) {
     value = 'http://$value';
   }
-  final uri = Uri.parse(value);
+  // tryParse, а не parse: кривой ввод ("http://[invalid") возвращается
+  // как есть, а не FormatException наружу.
+  final uri = Uri.tryParse(value);
+  if (uri == null || uri.host.isEmpty) return input.trim();
   // pathSegments уже отбрасывает пустые сегменты от двойных слэшей.
   final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-  // Контракт: ровно один хвостовой 'api'. Путь вроде /api/v2 валидным
-  // baseUrl не является (Chopper собрал бы /api/v2/media/... вместо
-  // /api/media/...) — дописываем api и туда. Query/fragment/userInfo
-  // Uri-конструктор ниже отбрасывает молча и осознанно: учётные данные
-  // в адресе сервера не нужны и утекли бы в логи.
-  if (segments.isEmpty || segments.last != 'api') {
-    segments.add('api');
-  }
   final normalized = Uri(
     scheme: uri.scheme,
     // userInfo намеренно не сохраняется (дефолт null): учётные данные
@@ -73,6 +67,62 @@ String normalizeServerUrl(String input) {
     pathSegments: segments,
   );
   var result = normalized.toString();
+  while (result.endsWith('/')) {
+    result = result.substring(0, result.length - 1);
+  }
+  return result;
+}
+
+/// Срезает ровно один хвостовой сегмент `api` с адреса (миграция
+/// старых хранимых значений). Сравнение регистронезависимое (роуты
+/// case-sensitive: `.../API` валидным baseUrl не было и не будет —
+/// normalizeServerUrl всё равно допишет строчный `api`).
+/// Query/fragment/userInfo отбрасываются ВСЕГДА, а не только в api-ветке:
+/// в хранимом адресе им не место (токен в stored-строке светить нельзя).
+/// Кривой ввод возвращается как есть (триммированный), а не исключением.
+String stripApiSuffix(String input) {
+  final trimmed = input.trim();
+  final uri = Uri.tryParse(trimmed);
+  if (uri == null) return trimmed;
+  final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (segments.isNotEmpty && segments.last.toLowerCase() == 'api') {
+    segments.removeLast();
+  }
+  var result = Uri(
+    scheme: uri.scheme,
+    host: uri.host,
+    port: uri.hasPort ? uri.port : null,
+    pathSegments: segments,
+  ).toString();
+  while (result.endsWith('/')) {
+    result = result.substring(0, result.length - 1);
+  }
+  return result;
+}
+
+/// Строит полный baseUrl API из адреса сервера: [normalizeServerAddress]
+/// плюс ровно один хвостовой сегмент `api`.
+///
+/// Вызывается динамически при каждом построении baseUrl (baseUrlProvider),
+/// а не хранится: экран показывает введённое, дубли исключены
+/// идемпотентностью (хранимые старые значения с `/api` работают как были).
+/// Путь вроде /api/v2 валидным baseUrl не является (Chopper собрал бы
+/// /api/v2/media/... вместо /api/media/...) — дописываем api и туда.
+String normalizeServerUrl(String input) {
+  final address = normalizeServerAddress(input);
+  if (address.isEmpty) return address;
+  // Адрес уже проверен выше; tryParse — на случай гонки форматов.
+  final uri = Uri.tryParse(address);
+  if (uri == null) return input;
+  final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (segments.isEmpty || segments.last.toLowerCase() != 'api') {
+    segments.add('api');
+  } else {
+    // Кривой регистр чиним в каноничный: .../API валидным baseUrl
+    // не был (case-sensitive роуты), а .../API/api — тем более.
+    segments[segments.length - 1] = 'api';
+  }
+  var result = uri.replace(pathSegments: segments).toString();
   while (result.endsWith('/')) {
     result = result.substring(0, result.length - 1);
   }

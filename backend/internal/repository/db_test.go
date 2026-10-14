@@ -140,3 +140,57 @@ func TestMediaStore_ArtistsNotDuplicatedAcrossMedia(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got.Artists, 2)
 }
+
+// Regression test: старые БД несут legacy unique-индекс на
+// media.file_path (снят из модели ради soft-delete). Без дропа файл
+// после удаления записи уже не импортировался: поиск его не видел,
+// а INSERT бился об UNIQUE на каждом старте скана.
+func TestRunMigrationsDropsLegacyUniqueFilePathIndex(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	// Эмулируем старую схему: вешаем уникальный индекс поверх.
+	require.NoError(t, db.Exec("CREATE UNIQUE INDEX idx_legacy_fp ON media(file_path)").Error)
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	// Создаём и soft-delete'им запись — как удаление трека в UI.
+	m := &models.Media{Title: "Old", Type: models.MediaTypeAudio, FilePath: "/a.mp3"}
+	require.NoError(t, store.Create(ctx, m))
+	require.NoError(t, store.Delete(ctx, m.ID))
+
+	// Прогоняем миграции заново (идемпотентно) и проверяем вставку.
+	require.NoError(t, RunMigrations(db))
+	require.NoError(t, AutoMigrate(db))
+
+	// Прямой ассёрт: уникального индекса по file_path больше нет вообще
+	// (а не только «вставка проходит»).
+	var indexes []struct {
+		Name   string
+		Unique bool `gorm:"column:unique"`
+	}
+	require.NoError(t, db.Raw("PRAGMA index_list(media)").Scan(&indexes).Error)
+	for _, idx := range indexes {
+		if !idx.Unique {
+			continue
+		}
+		var cols []struct {
+			Name string
+		}
+		require.NoError(t, db.Raw("PRAGMA index_info("+idx.Name+")").Scan(&cols).Error)
+		assert.False(
+			t,
+			len(cols) == 1 && cols[0].Name == "file_path",
+			"legacy unique index %s still present", idx.Name,
+		)
+	}
+
+	fresh := &models.Media{Title: "New", Type: models.MediaTypeAudio, FilePath: "/a.mp3"}
+	require.NoError(t, store.Create(ctx, fresh))
+
+	found, err := store.FindByPath(ctx, "/a.mp3")
+	require.NoError(t, err)
+	assert.Equal(t, fresh.ID, found.ID)
+}

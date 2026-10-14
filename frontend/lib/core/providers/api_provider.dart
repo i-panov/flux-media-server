@@ -65,17 +65,19 @@ final authTokenRefresherProvider = Provider<AuthTokenRefresher>((ref) {
   );
 });
 
-/// BaseUrl API. Хранится в настройках уже нормализованным (включает
-/// сегмент `/api`), здесь никакой магии с путями нет.
-/// Нормализация применяется и здесь: у ранее сохранённых адресов
-/// (записанных до рефакторинга) сегмента `/api` может не быть,
-/// и без него запросы уходили бы мимо API (404).
+/// BaseUrl API. В настройках хранится сырой введённый адрес (без
+/// навязанного `/api`), сегмент подставляет normalizeServerUrl здесь —
+/// динамически и идемпотентно (старые значения с суффиксом работают).
 /// Меняется только при реальной смене serverUrl.
 final baseUrlProvider = Provider<String>((ref) {
   final serverUrl = ref.watch(
     settingsProvider.select((s) => s.settings.serverUrl),
   );
-  return normalizeServerUrl(serverUrl ?? defaultServerAddress);
+  // Пустая строка — как отсутствие: Chopper с пустым baseUrl не жилец.
+  if (serverUrl == null || serverUrl.isEmpty) {
+    return normalizeServerUrl(defaultServerAddress);
+  }
+  return normalizeServerUrl(serverUrl);
 });
 
 /// Общий низкоуровневый HTTP-клиент для всех Chopper-сервисов: один

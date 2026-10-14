@@ -130,17 +130,16 @@ class VideoDetailsPanel extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            () {
-              final parts = <String>[
-                if (hasMediaYear(media.year)) '${media.year}',
-                media.type.value,
-              ];
-              return parts.join(' · ');
-            }(),
-            style: Theme.of(context).textTheme.bodyLarge
-                ?.copyWith(color: Colors.white70),
-          ),
+          // Подзаголовок — только год: тип («video») на экране видео
+          // избыточен, контекст и так ясен.
+          if (hasMediaYear(media.year)) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${media.year}',
+              style: Theme.of(context).textTheme.bodyLarge
+                  ?.copyWith(color: Colors.white70),
+            ),
+          ],
           if (media.artists.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
@@ -237,79 +236,70 @@ class VideoDetailsPanel extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 12),
+          // Три быстрых действия — только иконки: текстовые кнопки
+          // не влезали в ширину смартфона, надписи переносились.
+          // Discoverability — через tooltip (он же семантический лейбл
+          // для скринридера, как в media_card/audio_track_row): тултип
+          // называет ДЕЙСТВИЕ тапа, а не состояние.
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                child: Tooltip(
-                  message: l.favorites,
-                  child: OutlinedButton.icon(
-                    onPressed: isFavorite == null
-                        ? null
-                        : onToggleFavorite == null
-                        ? null
-                        : () => onToggleFavorite?.call(),
-                    icon: Icon(
-                      (isFavorite ?? false)
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      color: isFavorite == null
-                          // Первичная загрузка состояния: приглушённый
-                          // серый вместо мигания «не избранное» (как в
-                          // мини-плеере, но под тёмную подложку панели).
-                          ? Colors.white38
-                          : (isFavorite ? Colors.red : null),
-                    ),
-                    label: Text(l.favorites),
-                  ),
+              IconButton(
+                tooltip: l.favorites,
+                onPressed: isFavorite == null
+                    ? null
+                    : onToggleFavorite == null
+                    ? null
+                    : () => onToggleFavorite?.call(),
+                icon: Icon(
+                  (isFavorite ?? false)
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: isFavorite == null
+                      // Первичная загрузка состояния: приглушённый
+                      // серый вместо мигания «не избранное» (как в
+                      // мини-плеере, но под тёмную подложку панели).
+                      ? Colors.white38
+                      : (isFavorite ? Colors.red : Colors.white),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Tooltip(
-                  message: l.myCollections,
-                  child: OutlinedButton.icon(
-                    onPressed: () => onAddToCollection?.call(),
-                    icon: const Icon(Icons.add_to_queue),
-                    label: Text(l.myCollections),
-                  ),
-                ),
+              IconButton(
+                tooltip: l.myCollections,
+                onPressed: () => onAddToCollection?.call(),
+                icon: const Icon(Icons.add_to_queue, color: Colors.white),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Tooltip(
-                  message: isDownloading ? l.cancel : l.download,
-                  child: OutlinedButton.icon(
-                    onPressed: () => onDownload?.call(),
-                    icon: isDownloading
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              value: downloadProgress > 0
-                                  ? downloadProgress
-                                  : null,
-                            ),
-                          )
-                        : Icon(
-                            downloadState is DownloadDownloaded
-                                ? Icons.check_circle
-                                : Icons.cloud_download,
-                            color: downloadState is DownloadDownloaded
-                                ? Theme.of(context).colorScheme.primary
+              IconButton(
+                tooltip: isDownloading
+                    ? l.cancel
+                    : downloadState is DownloadDownloaded
+                    ? l.downloaded
+                    : downloadState is DownloadError
+                    ? l.errorLabel
+                    : l.download,
+                onPressed: () => onDownload?.call(),
+                icon: isDownloading
+                    ? ExcludeSemantics(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: downloadProgress > 0
+                                ? downloadProgress
                                 : null,
                           ),
-                    label: Text(switch (downloadState) {
-                      DownloadDownloading(:final progress) =>
-                        progress > 0
-                            ? '${(progress * 100).toInt()}%'
-                            : l.downloading,
-                      DownloadDownloaded() => l.downloaded,
-                      DownloadError() => l.errorLabel,
-                      _ => l.download,
-                    }),
-                  ),
-                ),
+                        ),
+                      )
+                    : downloadState is DownloadDownloaded
+                    ? const Icon(
+                        Icons.check_circle,
+                        // Белый вместо primary: primary на near-black
+                        // подложке не дотягивает до контраста 4.5:1.
+                        color: Colors.white,
+                      )
+                    : downloadState is DownloadError
+                    ? const Icon(Icons.error_outline, color: Colors.white)
+                    : const Icon(Icons.cloud_download, color: Colors.white),
               ),
             ],
           ),

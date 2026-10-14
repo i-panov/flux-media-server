@@ -20,25 +20,31 @@ func TestExtractTargetFor(t *testing.T) {
 	cases := []struct {
 		codec      string
 		ext        string
+		format     string
 		encodeFLAC bool
 	}{
-		{"aac", ".m4a", false},
-		{"mp3", ".mp3", false},
-		{"opus", ".opus", false},
-		{"vorbis", ".ogg", false},
-		{"flac", ".flac", false},
-		{"alac", ".m4a", false},
-		{"wav", ".wav", false},
-		{"pcm_s16le", ".wav", false},
-		{"ac3", ".flac", true},
-		{"eac3", ".flac", true},
-		{"truehd", ".flac", true},
+		{"aac", ".m4a", "mp4", false},
+		{"mp3", ".mp3", "mp3", false},
+		{"opus", ".opus", "opus", false},
+		{"vorbis", ".ogg", "ogg", false},
+		{"flac", ".flac", "flac", false},
+		{"alac", ".m4a", "mp4", false},
+		{"wav", ".wav", "wav", false},
+		{"pcm_s16le", ".wav", "wav", false},
+		{"ac3", ".flac", "flac", true},
+		{"eac3", ".flac", "flac", true},
+		{"dts", ".flac", "flac", true},
+		{"dts_hd", ".flac", "flac", true},
+		{"truehd", ".flac", "flac", true},
+		{"AAC", ".m4a", "mp4", false},
+		{"Opus", ".opus", "opus", false},
 		// Неизвестный кодек — lossless-фолбэк вместо падения.
-		{"siren", ".flac", true},
+		{"siren", ".flac", "flac", true},
 	}
 	for _, tc := range cases {
 		target := extractTargetFor(tc.codec)
 		assert.Equal(t, tc.ext, target.ext, "codec %s", tc.codec)
+		assert.Equal(t, tc.format, target.format, "codec %s", tc.codec)
 		assert.Equal(t, tc.encodeFLAC, target.encodeFLAC, "codec %s", tc.codec)
 	}
 }
@@ -396,4 +402,21 @@ func TestTruncateFilename(t *testing.T) {
 	require.NotPanics(t, func() {
 		_ = []rune(got)
 	})
+}
+
+func TestFFmpegArgs(t *testing.T) {
+	// Проверяем собранные args без бинарника: -f обязателен (tmp-файл
+	// с суффиксом .part-N ffmpeg иначе не опознаёт), -map режет лишние
+	// дорожки, -n запрещает молчаливую перезапись.
+	copyArgs := ffmpegArgs("/v/clip.mkv", "/a/clip.m4a.part-3", extractTargetFor("aac"))
+	assert.Equal(t, []string{
+		"-i", "/v/clip.mkv", "-vn", "-n", "-f", "mp4",
+		"-map", "0:a:0", "-c:a", "copy", "/a/clip.m4a.part-3",
+	}, copyArgs)
+
+	flacArgs := ffmpegArgs("/v/clip.mkv", "/a/clip.flac.part-3", extractTargetFor("truehd"))
+	assert.Equal(t, []string{
+		"-i", "/v/clip.mkv", "-vn", "-n", "-f", "flac",
+		"-map", "0:a:0", "-c:a", "flac", "/a/clip.flac.part-3",
+	}, flacArgs)
 }

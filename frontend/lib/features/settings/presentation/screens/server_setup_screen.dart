@@ -50,7 +50,9 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final url = _controller.text.trim();
-    // Нормализуем один раз: храним полный baseUrl API (с /api).
+    // Храним введённое как есть; полный baseUrl с /api строится
+    // динамически (normalizeServerUrl) — и здесь для health-check.
+    final address = normalizeServerAddress(url);
     final normalized = normalizeServerUrl(url);
 
     setState(() => _isChecking = true);
@@ -76,7 +78,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
       await ref
           .read(settingsProvider.notifier)
           .setTrustSelfSignedCertificates(value: _trustSelfSigned);
-      await ref.read(settingsProvider.notifier).setServerUrl(normalized);
+      await ref.read(settingsProvider.notifier).setServerUrl(address);
       await ref.read(authProvider.notifier).logout();
       if (!mounted) return;
       await context.router.replace(const LoginRoute());

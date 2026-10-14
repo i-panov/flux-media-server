@@ -4,6 +4,9 @@ import 'package:flux_media_server/core/session/app_settings.dart';
 abstract class SettingsRepository {
   Future<AppSettings> getSettings();
   Future<void> setServerUrl(String url);
+  /// Одноразовая миграция хвостового `/api` выполнена (флаг в prefs).
+  bool isServerUrlMigrationDone();
+  Future<void> setServerUrlMigrationDone();
   Future<void> setAuthToken(String token);
   Future<void> clearAuthToken();
   Future<void> setRefreshToken(String token);

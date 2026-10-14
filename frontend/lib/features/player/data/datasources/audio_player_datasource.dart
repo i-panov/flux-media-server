@@ -39,11 +39,15 @@ class AudioPlayerDatasource implements AudioPlaybackSource {
   @override
   Future<void> play() => _handler.playDirect();
 
+  /// Пауза мимо делегатов уведомления: координатор сам обновляет
+  /// состояние, а handler.pause() ушёл бы в onPause → обратно сюда.
+  /// (Та же причина, что у play()/playDirect().)
   @override
-  Future<void> pause() => _handler.pause();
+  Future<void> pause() => _handler.pauseDirect();
 
+  /// Останов мимо делегатов — см. [pause].
   @override
-  Future<void> stop() => _handler.stop();
+  Future<void> stop() => _handler.stopDirect();
 
   @override
   Future<void> seek(Duration position) => _handler.seek(position);

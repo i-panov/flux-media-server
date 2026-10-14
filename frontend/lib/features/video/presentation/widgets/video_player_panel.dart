@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
@@ -76,6 +77,16 @@ MaterialVideoControlsThemeData _buildMobileControlsTheme(
   );
 }
 
+/// Паузить ли видео при сносе панели (системный «назад»):
+/// только своё играющее непоставленное видео. Чистая функция ради
+/// тестируемости — сама панель требует нативный libmpv.
+bool shouldPauseOnPanelDispose(PlaybackState playback, int mediaId) {
+  return playback is PlaybackPlaying &&
+      playback.type == MediaType.video &&
+      playback.media.id == mediaId &&
+      !playback.isPaused;
+}
+
 class VideoPlayerPanel extends ConsumerStatefulWidget {
   const new({
     required this.media,
@@ -94,17 +105,10 @@ class VideoPlayerPanel extends ConsumerStatefulWidget {
   ConsumerState<VideoPlayerPanel> createState() => _VideoPlayerPanelState();
 }
 
-class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
-    with WidgetsBindingObserver {
-  /// В fullscreen: показываем resume-оверлей над контролами.
-  bool _showResumeButton = false;
-  Timer? _resumeTimer;
-  static const _resumeHideDelay = Duration(seconds: 5);
-
+class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     if (widget.isFullscreen) {
       _setFullscreenChrome(true);
     }
@@ -114,18 +118,14 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
   }
 
   void _setFullscreenChrome(bool fullscreen) {
+    // Только системный UI (immersive vs edge-to-edge): ориентации не
+    // трогаем вовсе — приложение нигде не лочит portrait (ни манифест,
+    // ни main), и выставление «всех ориентаций» было бы no-op'ом,
+    // маскирующимся под восстановление состояния.
     unawaited(
       SystemChrome.setEnabledSystemUIMode(
         fullscreen ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
       ),
-    );
-    unawaited(
-      SystemChrome.setPreferredOrientations(const [
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]),
     );
   }
 
@@ -139,69 +139,46 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     }
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) return;
-    final playback = ref.read(playbackCoordinatorProvider);
-    if (playback is PlaybackPlaying &&
-        playback.type == MediaType.video &&
-        !playback.isPaused) {
-      unawaited(ref.read(playbackCoordinatorProvider.notifier).pause());
-    }
-  }
-
+  // Видео продолжает играть в фоне осознанно (как аудио): автопаузы
+  // при сворачивании нет. Звонок фоновое видео не прерывает (прерывания
+  // дёргают напрямую audio-движок) — известное ограничение.
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _resumeTimer?.cancel();
     if (widget.isFullscreen) {
       _setFullscreenChrome(false);
+    }
+    // Системный «назад» сносит роут мимо экранной кнопки (та ставит
+    // на паузу сама): без этого видео играло бы в никуда, а новая
+    // карточка подхватывала бы старый трек из синглтон-плеера.
+    // Паузим только своё неподоставленное видео — фоновое аудио и чужой
+    // трек не трогаем. Заодно сохраняется прогресс для resume.
+    if (shouldPauseOnPanelDispose(
+      ref.read(playbackCoordinatorProvider),
+      widget.media.id,
+    )) {
+      unawaited(
+        ref.read(playbackCoordinatorProvider.notifier).pause(),
+      );
     }
     super.dispose();
   }
 
-  void _showResumeOverlay(Duration savedPosition) {
-    _resumeTimer?.cancel();
-    _resumeTimer = null;
-    setState(() => _showResumeButton = true);
-    _resumeTimer = Timer(_resumeHideDelay, () {
-      _resumeTimer = null;
-      if (mounted) setState(() => _showResumeButton = false);
-    });
-  }
-
-  void _onResumeTap() {
-    _resumeTimer?.cancel();
-    _resumeTimer = null;
-    setState(() => _showResumeButton = false);
-    unawaited(
-      ref.read(playbackCoordinatorProvider.notifier).seekToSavedPosition(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
     final view = ref.watch(
       playbackCoordinatorProvider.select(playerViewFromPlaybackState),
     );
 
     // Resume overlay.
-    if (view.kind == PlayerViewKind.playing &&
-        view.type == MediaType.video &&
-        view.savedPosition != null &&
-        !_showResumeButton &&
-        _resumeTimer == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showResumeOverlay(view.savedPosition!);
-      });
-    }
+    final savedPosition = view.savedPosition;
 
     final isMobile = Platform.isAndroid || Platform.isIOS;
     final mobileTheme = _buildMobileControlsTheme(
       MediaQuery.of(context),
       topButtonBar: [_BackButton(onClose: widget.onClose)],
       bottomButtonBar: [
+        if (showResumeControl(view.kind, view.type, savedPosition))
+          _ResumeButton(savedPosition: savedPosition!),
         const Spacer(),
         const _SeekButton(direction: -1),
         const _SeekButton(direction: 1),
@@ -217,6 +194,8 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     final desktopTheme = const MaterialDesktopVideoControlsThemeData().copyWith(
       topButtonBar: [_BackButton(onClose: widget.onClose)],
       bottomButtonBar: [
+        if (showResumeControl(view.kind, view.type, savedPosition))
+          _ResumeButton(savedPosition: savedPosition!),
         const MaterialDesktopSkipPreviousButton(),
         const MaterialDesktopPlayOrPauseButton(),
         const MaterialDesktopSkipNextButton(),
@@ -252,54 +231,6 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
       children: [
         body,
         if (view.kind != PlayerViewKind.playing) _Poster(media: widget.media),
-        if (_showResumeButton && view.savedPosition != null)
-          Positioned(
-            bottom: 100,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: AnimatedOpacity(
-                opacity: _showResumeButton ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: _onResumeTap,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.history,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            l.continueFrom(view.savedPosition!.formatted),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
 
@@ -310,6 +241,69 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel>
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: ColoredBox(color: Colors.black, child: posterOrBody),
+    );
+  }
+}
+
+/// Показывать ли кнопку resume в панели контролов: только для играющего
+/// видео с сохранённой позицией. Живёт вместе с контролами (прячется
+/// с ними) — вместо бывшего висящего оверлея с собственным таймером.
+///
+/// isPaused осознанно НЕ в сигнатуре: кнопка теперь делает seek+play,
+/// поэтому на паузе работает корректно, а не «выглядит сломанной».
+bool showResumeControl(
+  PlayerViewKind kind,
+  MediaType? type,
+  Duration? savedPosition,
+) {
+  return kind == PlayerViewKind.playing &&
+      type == MediaType.video &&
+      savedPosition != null;
+}
+
+/// Кнопка «продолжить с …» в баре контролов.
+///
+/// Аккуратно с вёрсткой (был инцидент с прилипанием): отступы с обеих
+/// сторон, ширина ужата с ellipsis — на узких экранах текст обрежется,
+/// а не распрёт ряд и не налезет на соседей.
+class _ResumeButton extends ConsumerWidget {
+  const new({required this.savedPosition});
+
+  final Duration savedPosition;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 180),
+        child: TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          // «Продолжить» обязано играть: один seek без play на паузе
+          // выглядел бы как «кнопка не сработала». Ошибки глушим в лог:
+          // необработанный async-гэп из кнопки роняет зону.
+          onPressed: () async {
+            final coordinator = ref.read(
+              playbackCoordinatorProvider.notifier,
+            );
+            try {
+              await coordinator.seekToSavedPosition();
+              await coordinator.resume();
+            } catch (e) {
+              AppLogger.error('Resume from saved position failed', e);
+            }
+          },
+          icon: const Icon(Icons.history, size: 20),
+          label: Text(
+            l.continueFrom(savedPosition.formatted),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,7 @@ import 'package:flux_media_server/features/favorites/presentation/providers/favo
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
+import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_details_panel.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -24,6 +27,7 @@ Media _video() => const Media(
   type: MediaType.video,
   fileSize: 1024,
   duration: 100,
+  year: 2024,
 );
 
 class _FakeMediaRepository implements MediaRepository {
@@ -77,7 +81,7 @@ void main() {
       ..onGetFavorites = () async => const Right([]);
   });
 
-  ProviderContainer makeContainer() {
+  ProviderContainer makeContainer({DownloadState? downloadState}) {
     final container = ProviderContainer(
       retry: (_, _) => null,
       overrides: [
@@ -90,6 +94,8 @@ void main() {
           (_) => _FakeCache(prefs: prefs),
         ),
         playbackCoordinatorProvider.overrideWith(_IdleCoordinator.new),
+        if (downloadState != null)
+          downloadStateProvider(7).overrideWithValue(downloadState),
       ],
     );
     addTearDown(container.dispose);
@@ -101,12 +107,14 @@ void main() {
     Future<void> Function()? onExtractAudio,
     Future<void> Function()? onCancelExtract,
     Future<void> Function()? onOpenExtractedAudio,
+    Future<void> Function()? onDownload,
     bool isExtracting = false,
     bool linkLoading = false,
+    DownloadState? downloadState,
   }) {
     return tester.pumpWidget(
       UncontrolledProviderScope(
-        container: makeContainer(),
+        container: makeContainer(downloadState: downloadState),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -118,6 +126,7 @@ void main() {
                 onExtractAudio: onExtractAudio,
                 onCancelExtract: onCancelExtract,
                 onOpenExtractedAudio: onOpenExtractedAudio,
+                onDownload: onDownload,
                 isExtracting: isExtracting,
                 linkLoading: linkLoading,
               ),
@@ -203,6 +212,108 @@ void main() {
 
       expect(find.text('Extract audio'), findsNothing);
       expect(find.text('Open audio track'), findsNothing);
+    });
+
+    testWidgets('ряд действий — иконки без текстов', (tester) async {
+      await pumpPanel(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Тексты не влезали в ширину смартфона — только иконки с тултипами.
+      expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+      expect(find.byIcon(Icons.add_to_queue), findsOneWidget);
+      expect(find.byIcon(Icons.cloud_download), findsOneWidget);
+      expect(find.text('Favorites'), findsNothing);
+      expect(find.text('My Collections'), findsNothing);
+    });
+
+    testWidgets('без избранного кнопка задизейблена серым', (tester) async {
+      // favoriteToggle в loading (ids ещё летят): isFavorite == null —
+      // кнопка disabled, иконка приглушена, а не «не избранное».
+      final gate = Completer<void>();
+      favoritesRepo.onGetFavorites = () async {
+        await gate.future;
+        return const Right([]);
+      };
+      await pumpPanel(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final button = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.favorite_border),
+      );
+      expect(button.onPressed, isNull);
+      final icon = tester.widget<Icon>(find.byIcon(Icons.favorite_border));
+      expect(icon.color, Colors.white38);
+
+      gate.complete();
+      await tester.pump(const Duration(milliseconds: 100));
+    });
+
+    testWidgets('год в подзаголовке, типа нет', (tester) async {
+      await pumpPanel(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Год — единственное в подзаголовке; «video» убрано как шум.
+      expect(find.text('2024'), findsOneWidget);
+      expect(find.textContaining('video'), findsNothing);
+    });
+
+    testWidgets('тултипы называют действие', (tester) async {
+      await pumpPanel(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byTooltip('Favorites'), findsOneWidget);
+      expect(find.byTooltip('My Collections'), findsOneWidget);
+      expect(find.byTooltip('Download'), findsOneWidget);
+    });
+
+    testWidgets('загрузка: спиннер без семантики, тап — отмена', (
+      tester,
+    ) async {
+      var calls = 0;
+      await pumpPanel(
+        tester,
+        onDownload: () async => calls++,
+        downloadState: const DownloadDownloading(progress: 0.5),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // Спиннер исключён из семантики — скринридер его не анонсирует.
+      expect(
+        find.ancestor(
+          of: find.byType(CircularProgressIndicator),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Cancel'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Cancel'));
+      await tester.pump();
+      expect(calls, 1);
+    });
+
+    testWidgets('ошибка загрузки видна иконкой и тултипом', (tester) async {
+      await pumpPanel(
+        tester,
+        downloadState: const DownloadError('boom'),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+      expect(find.byTooltip('Error'), findsOneWidget);
+    });
+
+    testWidgets('скачанное — белый чек, не primary', (tester) async {
+      await pumpPanel(
+        tester,
+        downloadState: const DownloadDownloaded(),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final icon = tester.widget<Icon>(find.byIcon(Icons.check_circle));
+      expect(icon.color, Colors.white);
+      expect(find.byTooltip('Downloaded'), findsOneWidget);
     });
   });
 }

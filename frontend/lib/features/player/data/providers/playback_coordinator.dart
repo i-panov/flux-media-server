@@ -13,28 +13,11 @@ import 'package:flux_media_server/features/player/data/playback_entry_factory.da
 import 'package:flux_media_server/features/player/data/progress_saver.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
+import 'package:flux_media_server/features/player/data/providers/player_state.dart';
 import 'package:flux_media_server/features/player/data/resume_policy.dart';
 import 'package:flux_media_server/shared/models/media.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 
-part 'playback_coordinator.freezed.dart';
-
-@freezed
-sealed class PlaybackState with _$PlaybackState {
-  const factory initial() = PlaybackInitial;
-  const factory playing({
-    required Media media,
-    required MediaType type,
-    @Default(false) bool isPaused,
-    @Default(Duration.zero) Duration position,
-    Duration? duration,
-    @Default(1.0) double speed,
-    Duration? savedPosition,
-  }) = PlaybackPlaying;
-  const factory completed() = PlaybackCompleted;
-  const factory loading() = PlaybackLoading;
-  const factory error({required String message}) = PlaybackError;
-}
+export 'player_state.dart';
 
 /// Manages unified playback across audio and video.
 /// Handles mutual exclusion: starting video stops audio and vice versa.

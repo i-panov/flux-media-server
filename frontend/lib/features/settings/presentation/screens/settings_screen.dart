@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/network/server_health.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/core/utils/extensions.dart';
@@ -90,6 +91,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       showErrorSnackBar(context, l.invalidServerUrl);
+      return;
+    }
+
+    // Health-check перед сохранением (как в setup-экране): опечатка
+    // иначе выкидывала бы из сессии с logout без возможности откатить.
+    try {
+      await checkServerHealth(
+        Uri.parse('${normalizeServerUrl(url)}/health'),
+        trustSelfSigned: ref
+            .read(settingsProvider)
+            .settings
+            .trustSelfSignedCertificates,
+      );
+    } on ServerHealthException catch (e) {
+      if (!mounted) return;
+      showErrorSnackBar(context, l.serverStatusError(e.statusCode));
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      showErrorSnackBar(context, l.failedToSaveSettings(e.toString()));
       return;
     }
 
@@ -297,16 +318,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: _logout,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Кто залогинен: вход по почте, иначе непонятно под кем сидим.
+                  // Вне AuthAuthenticated (гость/офлайн-ошибка) прячем.
+                  // Select только на email: перестройка на каждый чих auth
+                  // здесь ни к чему.
+                  if (ref.watch(
+                        authProvider.select(
+                          (s) => s is AuthAuthenticated ? s.user.email : null,
+                        ),
+                      )
+                      case final String email)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_circle_outlined),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              email,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _logout,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                      child: Text(l.logout),
+                    ),
                   ),
-                  child: Text(l.logout),
-                ),
+                ],
               ),
             ),
           ),

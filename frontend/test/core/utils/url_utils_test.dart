@@ -2,6 +2,65 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/utils/url_utils.dart';
 
 void main() {
+  group('normalizeServerAddress', () {
+    test('stores the typed address without /api suffix', () {
+      expect(
+        normalizeServerAddress('http://localhost:8080'),
+        'http://localhost:8080',
+      );
+      expect(
+        normalizeServerAddress('  localhost:8080/ '),
+        'http://localhost:8080',
+      );
+      expect(
+        normalizeServerAddress('https://host:8080/api'),
+        'https://host:8080/api',
+      );
+      expect(normalizeServerAddress('http://host/flux//'), 'http://host/flux');
+      expect(normalizeServerAddress(''), '');
+    });
+  });
+
+  group('stripApiSuffix', () {
+    test('cuts exactly one trailing api segment', () {
+      expect(stripApiSuffix('http://host:8080/api'), 'http://host:8080');
+      expect(stripApiSuffix('http://host:8080'), 'http://host:8080');
+      expect(stripApiSuffix('http://host:8080/api/v2'), 'http://host:8080/api/v2');
+    });
+
+    test('handles case, slashes, double api and query', () {
+      // Регистр не важен: .../API валидным baseUrl не был.
+      expect(stripApiSuffix('http://host:8080/API'), 'http://host:8080');
+      // Висячий слэш после api.
+      expect(stripApiSuffix('http://host:8080/api/'), 'http://host:8080');
+      // Ровно один сегмент за раз (двойной api — два прогона).
+      expect(stripApiSuffix('http://host:8080/api/api'), 'http://host:8080/api');
+      // Query/fragment/userInfo в хранимом адресе не живут.
+      expect(
+        stripApiSuffix('http://host:8080/api?token=abc#frag'),
+        'http://host:8080',
+      );
+      expect(stripApiSuffix('http://user:pass@host:8080/api'), 'http://host:8080');
+      // Кривой ввод возвращается как есть, а не исключением.
+      expect(stripApiSuffix('http://[invalid'), 'http://[invalid');
+      expect(stripApiSuffix(''), '');
+    });
+  });
+
+  group('normalizeServerUrl', () {
+    test('appends /api dynamically and idempotently', () {
+      expect(normalizeServerUrl('http://host:8080'), 'http://host:8080/api');
+      expect(
+        normalizeServerUrl('http://host:8080/api'),
+        'http://host:8080/api',
+      );
+    });
+
+    test('canonicalizes api case', () {
+      expect(normalizeServerUrl('http://host:8080/API'), 'http://host:8080/api');
+    });
+  });
+
   group('isValidServerUrl', () {
     test('accepts http/https URLs with host', () {
       expect(isValidServerUrl('http://localhost:8080'), isTrue);

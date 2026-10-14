@@ -128,6 +128,15 @@ func RunMigrations(db *gorm.DB) error {
 			}
 		}
 
+		// media: старый unique-индекс на file_path (снят из модели в пользу
+		// обычного — unique конфликтовал с soft-delete: файл после
+		// удаления записи уже не импортировался, сканер сыпал UNIQUE
+		// constraint failed на каждом старте). AutoMigrate старые индексы
+		// не дропает, чистим здесь — дальше создастся обычный.
+		if err := dropUniqueIndexesOnColumn(tx, "media", "file_path"); err != nil {
+			return fmt.Errorf("migrate media indexes: %w", err)
+		}
+
 		// metadatas: unique external_id broke manual metadata updates (empty
 		// external IDs collided after the first row).
 		if err := dropUniqueIndexesOnColumn(tx, "metadatas", "external_id"); err != nil {
@@ -403,6 +412,13 @@ func dropUniqueIndexesOnColumn(db *gorm.DB, table, column string) error {
 
 	for _, idx := range indexes {
 		if !idx.Unique {
+			continue
+		}
+		// Системные автоиндексы inline-ограничений (UNIQUE в CREATE TABLE)
+		// дропать нельзя: DROP INDEX на них уронит миграцию и старт
+		// сервера целиком. Сейчас таких нет (GORM создаёт отдельные
+		// индексы), guard — на будущее.
+		if strings.HasPrefix(idx.Name, "sqlite_autoindex_") {
 			continue
 		}
 		var cols []struct {

@@ -94,6 +94,12 @@ class _FakeSettingsRepository implements SettingsRepository {
   }
 
   @override
+  bool isServerUrlMigrationDone() => true;
+
+  @override
+  Future<void> setServerUrlMigrationDone() async {}
+
+  @override
   String getLocale() => _settings.locale;
 
   @override

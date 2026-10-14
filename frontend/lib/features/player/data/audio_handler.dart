@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:audio_service/audio_service.dart';
+import 'package:audio_service/audio_service.dart' hide PlaybackState;
 import 'package:audio_session/audio_session.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/player/data/audio_engine.dart';
 import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
+import 'package:flux_media_server/features/player/data/providers/player_state.dart';
+import 'package:flux_media_server/shared/models/media_type.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -60,6 +62,16 @@ class FluxAudioHandler extends BaseAudioHandler
   /// реальным воспроизведением (например, play после completed должен
   /// перезапускать трек, а не играть «в фоне» с состоянием completed).
   Future<void> Function()? onPlay;
+
+  /// Делегат для pause из системного уведомления. Маршрутизируется через
+  /// координатор: прямой engine.pause() увёл бы мимо состояния UI
+  /// (isPaused, сохранение прогресса видео). Координатор зовёт
+  /// [pauseDirect], а не [pause], чтобы не замкнуться обратно сюда.
+  Future<void> Function()? onPause;
+
+  /// Делегат для stop (свайп уведомления). Маршрутизируется через
+  /// координатор по той же причине; прямой путь — [stopDirect].
+  Future<void> Function()? onStop;
 
   /// Whether the current track is favorited (for notification icon).
   bool isFavorite = false;
@@ -130,6 +142,23 @@ class FluxAudioHandler extends BaseAudioHandler
     MediaControl.skipToNext,
   ];
 
+  /// Контролы уведомления для видео: только play/pause. Skip-кнопок нет
+  /// осознанно: у видео нет «следующего» в смысле очереди mpv, и skip
+  /// прыгнул бы по аудиоочереди — чужому контексту.
+  static const List<MediaControl> _controlsVideoPlaying = [
+    MediaControl.pause,
+  ];
+
+  static const List<MediaControl> _controlsVideoPaused = [
+    MediaControl.play,
+  ];
+
+  /// Уведомление сейчас показывает видео (поставлено через
+  /// [syncVideoNotification]). Пока флаг взведён, скрываем его только
+  /// явным hide — состояния аудио/Dart его не трогают, иначе порушили
+  /// бы чужое уведомление.
+  bool _videoNotificationActive = false;
+
   Future<void> _init() async {
     // Подписки на потоки media_kit делаем синхронно и первыми: они
     // привязаны к engine, и их нельзя терять из-за await на
@@ -176,7 +205,15 @@ class FluxAudioHandler extends BaseAudioHandler
   }
 
   void _subscribePlayerStreams() {
+    // Все четыре слушателя ниже — только для аудио-уведомления. Пока
+    // уведомление показывает видео (_videoNotificationActive), запоздалые
+    // события только что остановленного audio-движка (старт видео делает
+    // await _audioPlayer.stop()) перезаписали бы контролы поверх
+    // видео-варианта без skip — а skipToNext ушёл бы в чужую аудиоочередь.
+    // Флаг защищает направление audio streams → video, зеркально флагу
+    // в syncVideoNotification (video → audio).
     engine.playingStream.listen((playing) {
+      if (_videoNotificationActive) return;
       final controls = playing ? _controlsPlaying : _controlsPaused;
       final state = playbackState.value.copyWith(
         playing: playing,
@@ -194,10 +231,12 @@ class FluxAudioHandler extends BaseAudioHandler
     });
 
     engine.positionStream.listen((position) {
+      if (_videoNotificationActive) return;
       playbackState.add(playbackState.value.copyWith(updatePosition: position));
     });
 
     engine.durationStream.listen((duration) {
+      if (_videoNotificationActive) return;
       final item = mediaItem.value;
       if (item != null) {
         mediaItem.add(item.copyWith(duration: duration));
@@ -205,6 +244,7 @@ class FluxAudioHandler extends BaseAudioHandler
     });
 
     engine.completedStream.listen((completed) {
+      if (_videoNotificationActive) return;
       if (completed) {
         playbackState.add(
           playbackState.value.copyWith(
@@ -359,6 +399,56 @@ class FluxAudioHandler extends BaseAudioHandler
     );
   }
 
+  /// Синхронизирует системное уведомление с состоянием видео.
+  /// Вызывается из main.dart подпиской на координатор (второй
+  /// audio_service-хендлер невозможен — root handler один).
+  ///
+  /// Правила владения:
+  /// - играющее/пауза видео → показать/обновить (только play/pause,
+  ///   без skip; обложки нет — грузить её с авторизацией в уведомление
+  ///   нечем, см. _loadArtworkFor для аудио);
+  /// - всё остальное → скрыть, но ТОЛЬКО если уведомление наше
+  ///   ([_videoNotificationActive]): чужое (аудио) не трогаем — им
+  ///   владеют потоки движка.
+  void syncVideoNotification(PlaybackState state) {
+    final playing = state;
+    if (playing is PlaybackPlaying && playing.type == MediaType.video) {
+      _videoNotificationActive = true;
+      final id = 'video:${playing.media.id}';
+      final prev = mediaItem.value;
+      if (prev?.id != id ||
+          prev?.title != playing.media.title ||
+          prev?.duration != playing.duration) {
+        mediaItem.add(
+          MediaItem(
+            id: id,
+            title: playing.media.title,
+            duration: playing.duration,
+          ),
+        );
+      }
+      final paused = playing.isPaused;
+      playbackState.add(
+        playbackState.value.copyWith(
+          playing: !paused,
+          controls: paused ? _controlsVideoPaused : _controlsVideoPlaying,
+          systemActions: const {},
+          processingState: AudioProcessingState.ready,
+          updatePosition: playing.position,
+        ),
+      );
+      return;
+    }
+    if (!_videoNotificationActive) return;
+    _videoNotificationActive = false;
+    playbackState.add(
+      playbackState.value.copyWith(
+        playing: false,
+        processingState: AudioProcessingState.idle,
+      ),
+    );
+  }
+
   /// Скачивает обложку трека (в фоне) и обновляет уведомление.
   ///
   /// Вне критического пути: вызывается через unawaited и никогда не
@@ -496,12 +586,33 @@ class FluxAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> pause() async {
-    await engine.pause();
+    // Шторка/гарнитура идут через координатор (см. onPause): состояние
+    // UI (isPaused, прогресс видео) обязано обновиться вместе с паузой.
+    if (onPause != null) {
+      await onPause!();
+    } else {
+      await pauseDirect();
+    }
   }
+
+  /// Пауза мимо делегатов — для координатора и внутренних вызовов.
+  /// Без неё coordinator.pause() замкнулся бы сам на себя через onPause
+  /// (та же причина, что у play()/playDirect()).
+  Future<void> pauseDirect() => engine.pause();
 
   @override
   Future<void> stop() async {
+    if (onStop != null) {
+      await onStop!();
+    } else {
+      await stopDirect();
+    }
+  }
+
+  /// Останов мимо делегатов — для координатора. См. [pauseDirect].
+  Future<void> stopDirect() async {
     _wasPlayingBeforeInterruption = false;
+    _videoNotificationActive = false;
     await engine.stop();
     _entries = const [];
     _index = -1;

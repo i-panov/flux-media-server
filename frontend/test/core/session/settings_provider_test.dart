@@ -50,6 +50,12 @@ class _FlakySettingsRepository implements SettingsRepository {
 
   @override
   Future<void> setLocale(String locale) async {}
+
+  @override
+  bool isServerUrlMigrationDone() => true;
+
+  @override
+  Future<void> setServerUrlMigrationDone() async {}
   @override
   bool getTrustSelfSignedCertificates() => false;
   @override

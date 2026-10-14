@@ -36,17 +36,29 @@ class SettingsLocalDataSource {
   static const _keyRefreshTokenFallback = 'refresh_token_insecure';
   static const _keyLocale = 'locale';
   static const _keyTrustSelfSigned = 'trust_self_signed_certificates';
+  static const _keyServerUrlMigrated = 'server_url_migrated_v1';
 
   String _p(String key) => '$storageKeyPrefix$key';
 
   String? getServerUrl() => _prefs.getString(_p(_keyServerUrl));
 
   Future<void> setServerUrl(String url) async {
-    // Нормализация (единый формат, сегмент /api) выполняется один раз
-    // в SettingsNotifier.setServerUrl — хранилище сохраняет как получил.
+    // Нормализация выполняется в SettingsNotifier.setServerUrl —
+    // хранилище сохраняет как получил.
     final success = await _prefs.setString(_p(_keyServerUrl), url);
     if (!success) {
       throw Exception('Failed to save server URL to SharedPreferences');
+    }
+  }
+
+  /// Одноразовая миграция хвостового `/api` выполнена (см. init()).
+  bool isServerUrlMigrationDone() =>
+      _prefs.getBool(_p(_keyServerUrlMigrated)) ?? false;
+
+  Future<void> setServerUrlMigrationDone() async {
+    final success = await _prefs.setBool(_p(_keyServerUrlMigrated), true);
+    if (!success) {
+      throw Exception('Failed to save server URL migration flag');
     }
   }
 

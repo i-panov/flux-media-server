@@ -64,8 +64,11 @@ var (
 // extractTarget — куда класть извлечённую дорожку. Stream copy сохраняет
 // исходное качество 1:1 и идёт со скоростью IO; encodeFLAC — lossless-
 // фолбэк для кодеков, которые нельзя скопировать в аудио-контейнер.
+// format — явный muxer для флага -f: угадывать контейнер по расширению
+// tmp-файла (.part-N) ffmpeg не умеет и падает с Invalid argument.
 type extractTarget struct {
 	ext        string
+	format     string
 	encodeFLAC bool
 }
 
@@ -74,26 +77,26 @@ type extractTarget struct {
 func extractTargetFor(codec string) extractTarget {
 	switch strings.ToLower(codec) {
 	case "aac":
-		return extractTarget{ext: ".m4a"}
+		return extractTarget{ext: ".m4a", format: "mp4"}
 	case "mp3":
-		return extractTarget{ext: ".mp3"}
+		return extractTarget{ext: ".mp3", format: "mp3"}
 	case "opus":
-		return extractTarget{ext: ".opus"}
+		return extractTarget{ext: ".opus", format: "opus"}
 	case "vorbis":
-		return extractTarget{ext: ".ogg"}
+		return extractTarget{ext: ".ogg", format: "ogg"}
 	case "flac":
-		return extractTarget{ext: ".flac"}
+		return extractTarget{ext: ".flac", format: "flac"}
 	case "alac":
-		return extractTarget{ext: ".m4a"}
+		return extractTarget{ext: ".m4a", format: "mp4"}
 	case "wav":
-		return extractTarget{ext: ".wav"}
+		return extractTarget{ext: ".wav", format: "wav"}
 	case "ac3", "eac3", "dts", "dts_hd", "truehd":
-		return extractTarget{ext: ".flac", encodeFLAC: true}
+		return extractTarget{ext: ".flac", format: "flac", encodeFLAC: true}
 	default:
 		if strings.HasPrefix(strings.ToLower(codec), "pcm_") {
-			return extractTarget{ext: ".wav"}
+			return extractTarget{ext: ".wav", format: "wav"}
 		}
-		return extractTarget{ext: ".flac", encodeFLAC: true}
+		return extractTarget{ext: ".flac", format: "flac", encodeFLAC: true}
 	}
 }
 
@@ -377,7 +380,7 @@ func (q *ExtractService) process(job *ExtractJob) {
 		return
 	}
 
-	if err := q.runFFmpeg(jobCtx, source.FilePath, tmpPath, target.encodeFLAC, duration); err != nil {
+	if err := q.runFFmpeg(jobCtx, source.FilePath, tmpPath, target, duration); err != nil {
 		os.Remove(tmpPath)
 		if cancelled := q.markCancelled(job); cancelled {
 			return
@@ -517,12 +520,27 @@ func (q *ExtractService) markCancelled(job *ExtractJob) bool {
 	return job.Status == extractJobCancelled
 }
 
+// ffmpegArgs собирает аргументы извлечения (чистая функция —
+// тестируется без бинарника, в отличие от runFFmpeg).
+func ffmpegArgs(src, dst string, target extractTarget) []string {
+	args := []string{"-i", src, "-vn", "-n", "-f", target.format}
+	// Только первая аудиодорожка: без -map copy тащил бы все дорожки
+	// (комментарии, дубляж), а сборка .m4a из AAC+DTS падала бы.
+	args = append(args, "-map", "0:a:0")
+	if target.encodeFLAC {
+		args = append(args, "-c:a", "flac")
+	} else {
+		args = append(args, "-c:a", "copy")
+	}
+	return append(args, dst)
+}
+
 // runFFmpeg извлекает аудиодорожку: stream copy (качество 1:1) либо
 // FLAC-encode для несовместимых кодеков. Таймаут масштабируется от
 // длительности, но упёрт в потолок: зависший ffmpeg не должен держать
 // воркер дольше часа. Контекст — per-job: отмена убивает процесс.
 // `-n` вместо `-y`: перезапись — только через commitFile после проверок.
-func (q *ExtractService) runFFmpeg(ctx context.Context, src, dst string, encodeFLAC bool, durationSecs float64) error {
+func (q *ExtractService) runFFmpeg(ctx context.Context, src, dst string, target extractTarget, durationSecs float64) error {
 	timeout := 10 * time.Minute
 	if scaled := time.Duration(durationSecs*3)*time.Second + 2*time.Minute; scaled > timeout {
 		timeout = scaled
@@ -533,14 +551,7 @@ func (q *ExtractService) runFFmpeg(ctx context.Context, src, dst string, encodeF
 	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	args := []string{"-i", src, "-vn", "-n"}
-	if encodeFLAC {
-		args = append(args, "-c:a", "flac")
-	} else {
-		args = append(args, "-c:a", "copy")
-	}
-	args = append(args, dst)
-	cmd := exec.CommandContext(cmdCtx, "ffmpeg", args...)
+	cmd := exec.CommandContext(cmdCtx, "ffmpeg", ffmpegArgs(src, dst, target)...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

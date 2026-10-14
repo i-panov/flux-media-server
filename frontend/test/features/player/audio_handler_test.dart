@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:audio_service/audio_service.dart' hide PlaybackState;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/features/player/data/audio_engine.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/datasources/audio_player_datasource.dart';
 import 'package:flux_media_server/features/player/data/providers/player_sources.dart';
+import 'package:flux_media_server/features/player/data/providers/player_state.dart';
+import 'package:flux_media_server/shared/models/media.dart' as app;
 import 'package:media_kit/media_kit.dart';
 
 /// Подмена mpv-плеера: обычный объект, никакой нативной платформы.
@@ -348,8 +351,162 @@ void main() {
       // onPlay (рекурсия), а из loading не сделал бы ничего.
       expect(onPlayCalls, 0);
     });
+
+    test('pause()/stop() идут в onPause/onStop, иначе в движок', () async {
+      final handler = build();
+      var onPauseCalls = 0;
+      var onStopCalls = 0;
+      handler
+        ..onPause = (() async => onPauseCalls++)
+        ..onStop = (() async => onStopCalls++);
+
+      await handler.pause();
+      await handler.stop();
+      expect(onPauseCalls, 1);
+      expect(onStopCalls, 1);
+      expect(engine.pauseCalls, 0);
+      expect(engine.stopCalls, 0);
+
+      final bare = build();
+      await bare.pause();
+      await bare.stop();
+      expect(engine.pauseCalls, 1);
+      expect(engine.stopCalls, 1);
+    });
+
+    test('pauseDirect()/stopDirect() всегда идут в движок', () async {
+      final handler = build();
+      var onPauseCalls = 0;
+      var onStopCalls = 0;
+      handler
+        ..onPause = (() async => onPauseCalls++)
+        ..onStop = (() async => onStopCalls++);
+
+      await handler.pauseDirect();
+      await handler.stopDirect();
+      expect(engine.pauseCalls, 1);
+      expect(engine.stopCalls, 1);
+      expect(onPauseCalls, 0);
+      expect(onStopCalls, 0);
+    });
+
+    test('datasource.pause()/stop() идут в движок, а не в делегаты',
+        () async {
+      // Иначе coordinator.pause()/stop() замкнулись бы сами на себя
+      // через onPause/onStop (та же причина, что у play/playDirect).
+      final handler = build();
+      var onPauseCalls = 0;
+      var onStopCalls = 0;
+      handler
+        ..onPause = (() async => onPauseCalls++)
+        ..onStop = (() async => onStopCalls++);
+      final datasource = AudioPlayerDatasource(handler);
+
+      await datasource.pause();
+      await datasource.stop();
+      expect(engine.pauseCalls, 1);
+      expect(engine.stopCalls, 1);
+      expect(onPauseCalls, 0);
+      expect(onStopCalls, 0);
+    });
   });
 
+  group('FluxAudioHandler video notification', () {
+    app.Media video(int id) => app.Media(
+      id: id,
+      title: 'Video $id',
+      type: app.MediaType.video,
+      fileSize: 1,
+      duration: 100,
+    );
+
+    test('играющее видео показывается без skip-кнопок', () {
+      final handler = build()
+        ..syncVideoNotification(
+          PlaybackState.playing(
+            media: video(7),
+            type: app.MediaType.video,
+            position: const Duration(seconds: 10),
+            duration: const Duration(seconds: 100),
+          ),
+        );
+
+      final item = handler.mediaItem.value;
+      expect(item?.title, 'Video 7');
+      expect(item?.id, 'video:7');
+      final state = handler.playbackState.value;
+      expect(state.playing, isTrue);
+      expect(state.controls, [MediaControl.pause]);
+    });
+
+    test('пауза видео обновляет контролы, запись живёт', () {
+      final handler = build()
+        ..syncVideoNotification(
+          PlaybackState.playing(media: video(7), type: app.MediaType.video),
+        )
+        ..syncVideoNotification(
+          PlaybackState.playing(
+            media: video(7),
+            type: app.MediaType.video,
+            isPaused: true,
+          ),
+        );
+
+      final state = handler.playbackState.value;
+      expect(state.playing, isFalse);
+      expect(state.controls, [MediaControl.play]);
+      expect(handler.mediaItem.value?.title, 'Video 7');
+    });
+
+    test('не-видео состояния чужое уведомление не трогают', () {
+      final handler = build()
+        ..syncVideoNotification(const PlaybackState.initial())
+        ..syncVideoNotification(
+          const PlaybackState.playing(
+            media: app.Media(
+              id: 3,
+              title: 'Track 3',
+              type: app.MediaType.audio,
+              fileSize: 1,
+            ),
+            type: app.MediaType.audio,
+          ),
+        );
+
+      // Ничего не показали (mediaItem пуст) и не скрывали.
+      expect(handler.mediaItem.value, isNull);
+    });
+
+    test('конец видео гасит только наше уведомление', () {
+      final handler = build()
+        ..syncVideoNotification(
+          PlaybackState.playing(media: video(7), type: app.MediaType.video),
+        );
+      expect(handler.mediaItem.value, isNotNull);
+
+      handler.syncVideoNotification(const PlaybackState.initial());
+
+      expect(handler.playbackState.value.playing, isFalse);
+    });
+
+    test('запоздалый engine.playing не возвращает skip в видео', () async {
+      // P0-регрессия: старт видео делает await _audioPlayer.stop(), и его
+      // playing:false прилетает уже поверх видео-контролов без skip —
+      // без гварда skipToNext ушёл бы в чужую аудиоочередь.
+      final handler = build()
+        ..syncVideoNotification(
+          PlaybackState.playing(media: video(7), type: app.MediaType.video),
+        );
+
+      engine.playingCtl.add(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        handler.playbackState.value.controls,
+        [MediaControl.pause],
+      );
+    });
+  });
   group('FluxAudioHandler playlist metadata', () {
     test('loadPlaylist ставит MediaItem сразу и публикует индекс', () async {
       final handler = build();

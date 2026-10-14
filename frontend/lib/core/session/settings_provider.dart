@@ -4,6 +4,7 @@ import 'package:flux_media_server/core/session/app_settings.dart';
 import 'package:flux_media_server/core/session/settings_local_datasource.dart';
 import 'package:flux_media_server/core/session/settings_repository.dart';
 import 'package:flux_media_server/core/session/settings_repository_impl.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/core/utils/url_utils.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,16 +49,53 @@ class SettingsNotifier extends Notifier<SettingsState> {
     return const SettingsState(settings: AppSettings());
   }
 
+  /// Поколение асинхронных init: setServerUrl посреди стартовой
+  /// загрузки не должен затираться её устаревшим результатом.
+  int _generation = 0;
+
   /// Loads settings from the repository. Called at app startup.
   Future<void> init() async {
-    final settings = await _repository.getSettings();
+    final generation = ++_generation;
+    var settings = await _repository.getSettings();
+    if (generation != _generation) return;
+    // Миграция: раньше хранился полный baseUrl с хвостовым `/api` —
+    // срезаем ОДИН раз по флагу (без флага реверс-прокси вида
+    // https://ex.com/api резался бы при каждом старте, и UI показывал
+    // бы не то, что вводили). Ошибка записи флага/адреса не должна
+    // ронять старт приложения (main без try) — логируем и едем дальше
+    // со значением как есть.
+    if (!_repository.isServerUrlMigrationDone()) {
+      try {
+        final stored = settings.serverUrl;
+        if (stored != null) {
+          final stripped = stripApiSuffix(stored);
+          if (stripped != stored) {
+            // Пока считали/писали, мог прийти ручной setServerUrl:
+            // его значение новее, поверх не пишем (флаг всё равно
+            // взводим ниже — миграция одноразовая).
+            if (generation != _generation) return;
+            await _repository.setServerUrl(stripped);
+            settings = settings.copyWith(serverUrl: stripped);
+          }
+        }
+        await _repository.setServerUrlMigrationDone();
+      } catch (e) {
+        AppLogger.error('Server URL migration failed', e);
+      }
+    }
+    if (generation != _generation) return;
     state = SettingsState(settings: settings);
   }
 
   Future<void> setServerUrl(String url) async {
-    // Нормализуем один раз при сохранении — храним полный baseUrl API.
-    final normalized = normalizeServerUrl(url);
+    // Храним введённый адрес как есть (лёгкая нормализация без /api) —
+    // сегмент API подставляет normalizeServerUrl динамически.
+    // Поколение как в init: ручное сохранение посреди чужого await
+    // не должно перемежаться с миграцией.
+    final generation = ++_generation;
+    final normalized = normalizeServerAddress(url);
     await _repository.setServerUrl(normalized);
+    if (generation != _generation) return;
     state = SettingsState(
       settings: state.settings.copyWith(serverUrl: normalized),
     );

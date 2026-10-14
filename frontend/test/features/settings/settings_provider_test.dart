@@ -235,9 +235,42 @@ void main() {
       await fresh.read(settingsProvider.notifier).init();
 
       final settings = fresh.read(settingsProvider).settings;
-      expect(settings.serverUrl, 'http://host:9000/api');
+      expect(settings.serverUrl, 'http://host:9000');
       expect(settings.authToken, 'a');
       expect(settings.refreshToken, 'r');
+    });
+
+    test('init strips legacy /api suffix once', () async {
+      // Старые установки хранили полный baseUrl: миграция срезает
+      // хвостовой /api при загрузке и перезаписывает значение.
+      await container
+          .read(settingsRepositoryProvider)
+          .setServerUrl('http://host:9000/api');
+      await container.read(settingsProvider.notifier).init();
+
+      expect(
+        container.read(settingsProvider).settings.serverUrl,
+        'http://host:9000',
+      );
+      final stored = await container
+          .read(settingsRepositoryProvider)
+          .getSettings();
+      expect(stored.serverUrl, 'http://host:9000');
+    });
+
+    test('second init does not strip an intentional /api (one-shot)', () async {
+      // Реверс-прокси https://ex.com/api введён осознанно: флаг уже
+      // взведён первым init — повторная резка запрещена.
+      await container.read(settingsProvider.notifier).init();
+      await container
+          .read(settingsRepositoryProvider)
+          .setServerUrl('https://ex.com/api');
+      await container.read(settingsProvider.notifier).init();
+
+      expect(
+        container.read(settingsProvider).settings.serverUrl,
+        'https://ex.com/api',
+      );
     });
 
     test('setTokens persists both tokens', () async {
@@ -261,13 +294,13 @@ void main() {
       expect(settings.refreshToken, isNull);
     });
 
-    test('setServerUrl normalizes the value', () async {
+    test('setServerUrl stores the typed address without /api', () async {
       await container
           .read(settingsProvider.notifier)
-          .setServerUrl('http://host:8080');
+          .setServerUrl('http://host:8080/');
 
       final settings = container.read(settingsProvider).settings;
-      expect(settings.serverUrl, 'http://host:8080/api');
+      expect(settings.serverUrl, 'http://host:8080');
     });
 
     test('setLocale updates only locale (no extra token IO)', () async {

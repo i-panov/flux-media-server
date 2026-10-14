@@ -25,6 +25,14 @@ class SettingsRepositoryImpl implements SettingsRepository {
   Future<void> setServerUrl(String url) => _localDataSource.setServerUrl(url);
 
   @override
+  bool isServerUrlMigrationDone() =>
+      _localDataSource.isServerUrlMigrationDone();
+
+  @override
+  Future<void> setServerUrlMigrationDone() =>
+      _localDataSource.setServerUrlMigrationDone();
+
+  @override
   Future<void> setAuthToken(String token) =>
       _localDataSource.setAuthToken(token);
 

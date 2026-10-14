@@ -15,7 +15,6 @@ import 'package:flux_media_server/features/player/data/artwork_fetcher.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
-import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,20 +70,29 @@ void main() async {
 
   // Wire up audio handler callbacks to the play queue.
   final queue = container.read(playQueueProvider.notifier);
+  // Видео тоже идёт через это уведомление (второй audio_service-хендлер
+  // невозможен): координатор пушит туда метаданные через
+  // syncVideoNotification ниже, а команды возвращаются сюда же.
+  // Пауза/стоп идут через координатор, а не в движок напрямую, иначе
+  // состояние UI (isPaused, прогресс) разойдётся с реальным.
   audioHandler
     ..onNext = queue.next
     ..onPrevious = queue.previous
     ..onPlay = () async {
       final playback = container.read(playbackCoordinatorProvider);
-      if (playback is PlaybackPlaying &&
-          playback.type == MediaType.audio &&
-          playback.isPaused) {
+      if (playback is PlaybackPlaying && playback.isPaused) {
         await container.read(playbackCoordinatorProvider.notifier).resume();
       } else if (playback is PlaybackCompleted) {
         // Перезапускаем текущий трек: прямой player.play() оставил бы
         // UI в состоянии completed, а музыка играла бы «в фоне».
         await queue.playCurrent();
       }
+    }
+    ..onPause = () async {
+      await container.read(playbackCoordinatorProvider.notifier).pause();
+    }
+    ..onStop = () async {
+      await container.read(playbackCoordinatorProvider.notifier).stop();
     }
     ..onToggleFavorite = () {
       final state = container.read(playbackCoordinatorProvider);
@@ -96,6 +104,13 @@ void main() async {
         );
       }
     };
+
+  // Видео в системном уведомлении: координатор состоянием не владеет
+  // наружу, поэтому транслируем его сюда подпиской (контейнер живёт
+  // всё время приложения — отписываться не нужно).
+  container.listen(playbackCoordinatorProvider, (_, state) {
+    audioHandler.syncVideoNotification(state);
+  });
 
   final settings = container.read(settingsProvider).settings;
   if (settings.serverUrl != null && settings.authToken != null) {
