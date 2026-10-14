@@ -36,8 +36,26 @@
   "@loggedOut": {},
   "language": "Language",
   "@language": {},
-  "downloads": "Downloads",
+  "downloads": "Offline",
   "@downloads": {},
+  "saveOffline": "Save offline",
+  "@saveOffline": {},
+  "saveFile": "Download",
+  "@saveFile": {},
+  "preparingFile": "Preparing file...",
+  "@preparingFile": {},
+  "fileSaved": "File saved",
+  "@fileSaved": {},
+  "saveNotSupported": "Saving is not supported on this platform",
+  "@saveNotSupported": {},
+  "fileSaveFailed": "Failed to save: {error}",
+  "@fileSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "clearCache": "Clear cache",
   "@clearCache": {},
   "about": "About",
@@ -114,8 +132,6 @@
   "@replay": {},
   "edit": "Edit",
   "@edit": {},
-  "download": "Download",
-  "@download": {},
   "addToCollection": "Add to Collection",
   "@addToCollection": {},
   "connect": "Connect",
@@ -274,7 +290,7 @@
   },
   "allTracks": "All Tracks",
   "@allTracks": {},
-  "downloadedOfTotalTracks": "Downloaded {done}/{total} tracks",
+  "downloadedOfTotalTracks": "Saved {done}/{total} tracks",
   "@downloadedOfTotalTracks": {
     "placeholders": {
       "done": {
@@ -295,13 +311,13 @@
   },
   "done": "Done",
   "@done": {},
-  "downloading": "Downloading...",
+  "downloading": "Saving...",
   "@downloading": {},
-  "downloaded": "Downloaded",
+  "downloaded": "Offline",
   "@downloaded": {},
-  "downloadStarted": "Download started",
+  "downloadStarted": "Offline save started",
   "@downloadStarted": {},
-  "downloadCancelled": "Download cancelled",
+  "downloadCancelled": "Save cancelled",
   "@downloadCancelled": {},
   "downloadFailed": "Error: {error}",
   "@downloadFailed": {

@@ -20,6 +20,7 @@ class AudioTrackRow extends ConsumerWidget {
     this.onPlay,
     this.onFavorite,
     this.onDownload,
+    this.onSaveToFiles,
     this.onAddToQueue,
     this.onAddToCollection,
     this.onEditMetadata,
@@ -32,6 +33,7 @@ class AudioTrackRow extends ConsumerWidget {
   final VoidCallback? onPlay;
   final VoidCallback? onFavorite;
   final VoidCallback? onDownload;
+  final VoidCallback? onSaveToFiles;
   final VoidCallback? onAddToQueue;
   final VoidCallback? onAddToCollection;
   final VoidCallback? onEditMetadata;
@@ -210,7 +212,7 @@ class AudioTrackRow extends ConsumerWidget {
                     ? l.downloaded
                     : isDownloading
                     ? l.downloading
-                    : l.download,
+                    : l.saveOffline,
               ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 20),
@@ -218,6 +220,8 @@ class AudioTrackRow extends ConsumerWidget {
                 switch (value) {
                   case 'play':
                     onPlay?.call();
+                  case 'save_to_files':
+                    onSaveToFiles?.call();
                   case 'add_to_queue':
                     onAddToQueue?.call();
                   case 'add_to_collection':
@@ -235,6 +239,11 @@ class AudioTrackRow extends ConsumerWidget {
               itemBuilder: (context) => [
                 if (onPlay != null)
                   PopupMenuItem(value: 'play', child: Text(l.play)),
+                if (onSaveToFiles != null)
+                  PopupMenuItem(
+                    value: 'save_to_files',
+                    child: Text(l.saveFile),
+                  ),
                 if (onAddToQueue != null)
                   PopupMenuItem(
                     value: 'add_to_queue',

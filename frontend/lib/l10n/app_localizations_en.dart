@@ -64,7 +64,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
-  String get downloads => 'Downloads';
+  String get downloads => 'Offline';
+
+  @override
+  String get saveOffline => 'Save offline';
+
+  @override
+  String get saveFile => 'Download';
+
+  @override
+  String get preparingFile => 'Preparing file...';
+
+  @override
+  String get fileSaved => 'File saved';
+
+  @override
+  String get saveNotSupported => 'Saving is not supported on this platform';
+
+  @override
+  String fileSaveFailed(String error) {
+    return 'Failed to save: $error';
+  }
 
   @override
   String get clearCache => 'Clear cache';
@@ -173,9 +193,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get edit => 'Edit';
-
-  @override
-  String get download => 'Download';
 
   @override
   String get addToCollection => 'Add to Collection';
@@ -337,7 +354,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String downloadedOfTotalTracks(int done, int total) {
-    return 'Downloaded $done/$total tracks';
+    return 'Saved $done/$total tracks';
   }
 
   @override
@@ -349,16 +366,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get done => 'Done';
 
   @override
-  String get downloading => 'Downloading...';
+  String get downloading => 'Saving...';
 
   @override
-  String get downloaded => 'Downloaded';
+  String get downloaded => 'Offline';
 
   @override
-  String get downloadStarted => 'Download started';
+  String get downloadStarted => 'Offline save started';
 
   @override
-  String get downloadCancelled => 'Download cancelled';
+  String get downloadCancelled => 'Save cancelled';
 
   @override
   String downloadFailed(String error) {

@@ -11,6 +11,7 @@ import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/auth/presentation/auth_guard.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/offline/data/file_export_service.dart';
 import 'package:flux_media_server/features/player/data/artwork_fetcher.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
@@ -28,6 +29,7 @@ void main() async {
   // Kotlin-сторона собирает их из BuildConfig так же.
   final packageName = (await PackageInfo.fromPlatform()).packageName;
   setNotificationChannelName('$packageName/notifications');
+  setFileChannelName('$packageName/files');
 
   // Загрузчик обложек для audio_service собирается ДО контейнера:
   // хендлер создаётся в фоновом изоляте, куда нельзя пробросить ни

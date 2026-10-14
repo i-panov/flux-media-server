@@ -148,7 +148,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
           else
             IconButton(
               icon: const Icon(Icons.download),
-              tooltip: l.download,
+              tooltip: l.saveOffline,
               onPressed: _buildDownloadAll(mediaListState),
             ),
         ],
@@ -327,6 +327,7 @@ class _ArtistPageState extends ConsumerState<ArtistPage> {
           onPlay: () => _playTrack(tracks, index),
           onFavorite: () => ref.toggleFavoriteTrack(track.id),
           onDownload: () => ref.toggleDownloadTrack(_mediaType, track.id),
+          onSaveToFiles: () => saveTrackToFiles(_mediaType, track.id),
           onAddToQueue: () => addTrackToQueue(track),
           onAddToCollection: () =>
               showAddToCollectionDialog(context, track.id, mediaType: 'audio'),

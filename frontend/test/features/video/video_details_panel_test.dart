@@ -108,6 +108,7 @@ void main() {
     Future<void> Function()? onCancelExtract,
     Future<void> Function()? onOpenExtractedAudio,
     Future<void> Function()? onDownload,
+    Future<void> Function()? onSaveToFiles,
     bool isExtracting = false,
     bool linkLoading = false,
     DownloadState? downloadState,
@@ -127,6 +128,7 @@ void main() {
                 onCancelExtract: onCancelExtract,
                 onOpenExtractedAudio: onOpenExtractedAudio,
                 onDownload: onDownload,
+                onSaveToFiles: onSaveToFiles,
                 isExtracting: isExtracting,
                 linkLoading: linkLoading,
               ),
@@ -258,12 +260,20 @@ void main() {
     });
 
     testWidgets('тултипы называют действие', (tester) async {
-      await pumpPanel(tester);
+      var saves = 0;
+      await pumpPanel(tester, onSaveToFiles: () async => saves++);
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byTooltip('Favorites'), findsOneWidget);
       expect(find.byTooltip('My Collections'), findsOneWidget);
+      // Кеш — «В офлайн», файлы — «Скачать»: разные действия,
+      // разные тултипы.
+      expect(find.byTooltip('Save offline'), findsOneWidget);
       expect(find.byTooltip('Download'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Download'));
+      await tester.pump();
+      expect(saves, 1);
     });
 
     testWidgets('загрузка: спиннер без семантики, тап — отмена', (
@@ -313,7 +323,7 @@ void main() {
 
       final icon = tester.widget<Icon>(find.byIcon(Icons.check_circle));
       expect(icon.color, Colors.white);
-      expect(find.byTooltip('Downloaded'), findsOneWidget);
+      expect(find.byTooltip('Offline'), findsOneWidget);
     });
   });
 }

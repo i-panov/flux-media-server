@@ -141,6 +141,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                     mediaType,
                     downloadedAudio[index].id,
                   ),
+                  onSaveToFiles: () => saveTrackToFiles(
+                    mediaType,
+                    downloadedAudio[index].id,
+                  ),
                   onAddToQueue: () => addTrackToQueue(downloadedAudio[index]),
                   onChangeCover: () =>
                       changeMediaCover(context, ref, downloadedAudio[index].id),
@@ -237,6 +241,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                     ref.toggleFavoriteTrack(likedToShow[index].id),
                 onDownload: () =>
                     ref.toggleDownloadTrack(mediaType, likedToShow[index].id),
+                onSaveToFiles: () => saveTrackToFiles(
+                  mediaType,
+                  likedToShow[index].id,
+                ),
                 onAddToQueue: () => addTrackToQueue(likedToShow[index]),
                 onAddToCollection: () => showAddToCollectionDialog(
                   context,
@@ -302,6 +310,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
                   mediaType,
                   downloadedAudio[index].id,
                 ),
+                onSaveToFiles: () => saveTrackToFiles(
+                  mediaType,
+                  downloadedAudio[index].id,
+                ),
                 onAddToQueue: () => addTrackToQueue(downloadedAudio[index]),
                 onAddToCollection: () => showAddToCollectionDialog(
                   context,
@@ -335,6 +347,8 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
               onFavorite: () => ref.toggleFavoriteTrack(allTracks[index].id),
               onDownload: () =>
                   ref.toggleDownloadTrack(mediaType, allTracks[index].id),
+              onSaveToFiles: () =>
+                  saveTrackToFiles(mediaType, allTracks[index].id),
               onAddToQueue: () => addTrackToQueue(allTracks[index]),
               onAddToCollection: () => showAddToCollectionDialog(
                 context,

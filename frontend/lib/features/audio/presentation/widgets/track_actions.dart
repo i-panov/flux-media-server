@@ -5,6 +5,7 @@ import 'package:flux_media_server/core/utils/extensions.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/offline/presentation/widgets/download_toggle.dart';
+import 'package:flux_media_server/features/offline/presentation/widgets/save_to_files.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -36,5 +37,14 @@ extension ConsumerTrackActions<T extends ConsumerStatefulWidget>
     // виджете. Проверяем текущее состояние, а не «пока ждали».
     if (!mounted) return;
     showTextSnackBar(context, context.l10n.addedToQueue);
+  }
+
+  /// Сохранение трека в файлы — здесь же: нужны `context` (диалог выбора
+  /// места, локализация) и `mounted`-проверка после await.
+  Future<void> saveTrackToFiles(String mediaType, int mediaId) async {
+    final media = await resolveMediaForExport(ref, mediaId, mediaType);
+    if (!mounted) return;
+    if (media == null) return;
+    await saveMediaToFiles(context, ref, media);
   }
 }

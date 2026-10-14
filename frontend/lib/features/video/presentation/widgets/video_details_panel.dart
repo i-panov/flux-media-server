@@ -28,6 +28,7 @@ class VideoDetailsPanel extends ConsumerWidget {
     this.onToggleFavorite,
     this.onAddToCollection,
     this.onDownload,
+    this.onSaveToFiles,
     this.onAddToQueue,
     this.onPlay,
     this.onExtractAudio,
@@ -45,6 +46,7 @@ class VideoDetailsPanel extends ConsumerWidget {
   final Future<void> Function()? onToggleFavorite;
   final Future<void> Function()? onAddToCollection;
   final Future<void> Function()? onDownload;
+  final Future<void> Function()? onSaveToFiles;
   final Future<void> Function()? onAddToQueue;
   final Future<void> Function()? onPlay;
 
@@ -275,7 +277,7 @@ class VideoDetailsPanel extends ConsumerWidget {
                     ? l.downloaded
                     : downloadState is DownloadError
                     ? l.errorLabel
-                    : l.download,
+                    : l.saveOffline,
                 onPressed: () => onDownload?.call(),
                 icon: isDownloading
                     ? ExcludeSemantics(
@@ -301,6 +303,15 @@ class VideoDetailsPanel extends ConsumerWidget {
                     ? const Icon(Icons.error_outline, color: Colors.white)
                     : const Icon(Icons.cloud_download, color: Colors.white),
               ),
+              // Сохранение в файлы — отдельной иконкой рядом с «В офлайн»:
+              // действия разные (кеш vs видимая область), путать их
+              // одним переключателем нельзя.
+              if (onSaveToFiles != null)
+                IconButton(
+                  tooltip: l.saveFile,
+                  onPressed: () => onSaveToFiles?.call(),
+                  icon: const Icon(Icons.file_download, color: Colors.white),
+                ),
             ],
           ),
           const SizedBox(height: 8),

@@ -8,6 +8,11 @@
          показать уведомление с медиакнопками, и системный плеер
          выглядит как «пропавший». -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Только для API < 29: сохранение в Загрузки через прямой путь
+         (метод saveViaLegacyPath). На API 29+ — MediaStore без разрешений. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <application
         android:label="Flux"
         android:name="${applicationName}"

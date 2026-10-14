@@ -143,9 +143,9 @@ class MediaCard extends ConsumerWidget {
                   right: 4,
                   child: Semantics(
                     button: true,
-                    label: isDownloaded ? l.downloaded : l.download,
+                    label: isDownloaded ? l.downloaded : l.saveOffline,
                     child: Tooltip(
-                      message: isDownloaded ? l.downloaded : l.download,
+                      message: isDownloaded ? l.downloaded : l.saveOffline,
                       child: Material(
                         color: Colors.black54,
                         borderRadius: BorderRadius.circular(12),

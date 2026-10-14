@@ -18,7 +18,26 @@
   "logout": "Выйти",
   "loggedOut": "Вы вышли из системы",
   "language": "Язык",
-  "downloads": "Загрузки",
+  "downloads": "Офлайн",
+  "@downloads": {},
+  "saveOffline": "В офлайн",
+  "@saveOffline": {},
+  "saveFile": "Скачать",
+  "@saveFile": {},
+  "preparingFile": "Готовим файл...",
+  "@preparingFile": {},
+  "fileSaved": "Файл сохранён",
+  "@fileSaved": {},
+  "saveNotSupported": "Сохранение не поддерживается на этой платформе",
+  "@saveNotSupported": {},
+  "fileSaveFailed": "Не удалось сохранить: {error}",
+  "@fileSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "clearCache": "Очистить кэш",
   "about": "О приложении",
   "clientVersion": "Версия клиента",
@@ -61,7 +80,6 @@
   "playbackCompleted": "Воспроизведение завершено",
   "replay": "Повторить",
   "edit": "Изменить",
-  "download": "Скачать",
   "addToCollection": "Добавить в коллекцию",
   "@addToCollection": {},
   "connect": "Подключиться",
@@ -220,7 +238,7 @@
   },
   "allTracks": "Все треки",
   "@allTracks": {},
-  "downloadedOfTotalTracks": "Загружено {done}/{total} треков",
+  "downloadedOfTotalTracks": "Сохранено {done}/{total} треков",
   "@downloadedOfTotalTracks": {
     "placeholders": {
       "done": {
@@ -241,13 +259,13 @@
   },
   "done": "Готово",
   "@done": {},
-  "downloading": "Загрузка...",
+  "downloading": "Сохранение...",
   "@downloading": {},
-  "downloaded": "Загружено",
+  "downloaded": "В офлайн",
   "@downloaded": {},
-  "downloadStarted": "Скачивание началось",
+  "downloadStarted": "Сохранение в офлайн началось",
   "@downloadStarted": {},
-  "downloadCancelled": "Скачивание отменено",
+  "downloadCancelled": "Сохранение отменено",
   "@downloadCancelled": {},
   "downloadFailed": "Ошибка: {error}",
   "@downloadFailed": {

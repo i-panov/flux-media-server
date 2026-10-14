@@ -11,6 +11,7 @@ import 'package:flux_media_server/features/media/presentation/providers/media_de
 import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
+import 'package:flux_media_server/features/offline/presentation/widgets/save_to_files.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
 import 'package:flux_media_server/features/video/presentation/providers/extracted_audio_provider.dart';
 import 'package:flux_media_server/features/video/presentation/utils/extract_audio_flow.dart';
@@ -105,6 +106,11 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
         showErrorSnackBar(context, newState.message);
       }
     }
+  }
+
+  Future<void> _saveToFiles(Media media) async {
+    if (!mounted) return;
+    await saveMediaToFiles(context, ref, media);
   }
 
   Future<void> _delete() async {
@@ -264,6 +270,13 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
                 onToggleFavorite: _toggleFavorite,
                 onAddToCollection: _addToCollection,
                 onDownload: _download,
+                onSaveToFiles: () async {
+                  final media = ref
+                      .read(mediaDetailProvider(widget.mediaId))
+                      .maybeWhen(loaded: (m) => m, orElse: () => null);
+                  if (media == null) return;
+                  await _saveToFiles(media);
+                },
                 onExtractAudio: _extractAudio,
                 onCancelExtract: _cancelExtract,
                 onOpenExtractedAudio: extractedTrack != null

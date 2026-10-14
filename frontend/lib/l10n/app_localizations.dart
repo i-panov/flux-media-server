@@ -209,8 +209,44 @@ abstract class AppLocalizations {
   /// No description provided for @downloads.
   ///
   /// In en, this message translates to:
-  /// **'Downloads'**
+  /// **'Offline'**
   String get downloads;
+
+  /// No description provided for @saveOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Save offline'**
+  String get saveOffline;
+
+  /// No description provided for @saveFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get saveFile;
+
+  /// No description provided for @preparingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing file...'**
+  String get preparingFile;
+
+  /// No description provided for @fileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved'**
+  String get fileSaved;
+
+  /// No description provided for @saveNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving is not supported on this platform'**
+  String get saveNotSupported;
+
+  /// No description provided for @fileSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save: {error}'**
+  String fileSaveFailed(String error);
 
   /// No description provided for @clearCache.
   ///
@@ -421,12 +457,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit'**
   String get edit;
-
-  /// No description provided for @download.
-  ///
-  /// In en, this message translates to:
-  /// **'Download'**
-  String get download;
 
   /// No description provided for @addToCollection.
   ///
@@ -707,7 +737,7 @@ abstract class AppLocalizations {
   /// No description provided for @downloadedOfTotalTracks.
   ///
   /// In en, this message translates to:
-  /// **'Downloaded {done}/{total} tracks'**
+  /// **'Saved {done}/{total} tracks'**
   String downloadedOfTotalTracks(int done, int total);
 
   /// No description provided for @noTracksFoundForArtist.
@@ -725,25 +755,25 @@ abstract class AppLocalizations {
   /// No description provided for @downloading.
   ///
   /// In en, this message translates to:
-  /// **'Downloading...'**
+  /// **'Saving...'**
   String get downloading;
 
   /// No description provided for @downloaded.
   ///
   /// In en, this message translates to:
-  /// **'Downloaded'**
+  /// **'Offline'**
   String get downloaded;
 
   /// No description provided for @downloadStarted.
   ///
   /// In en, this message translates to:
-  /// **'Download started'**
+  /// **'Offline save started'**
   String get downloadStarted;
 
   /// No description provided for @downloadCancelled.
   ///
   /// In en, this message translates to:
-  /// **'Download cancelled'**
+  /// **'Save cancelled'**
   String get downloadCancelled;
 
   /// No description provided for @downloadFailed.

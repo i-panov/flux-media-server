@@ -64,7 +64,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get language => 'Язык';
 
   @override
-  String get downloads => 'Загрузки';
+  String get downloads => 'Офлайн';
+
+  @override
+  String get saveOffline => 'В офлайн';
+
+  @override
+  String get saveFile => 'Скачать';
+
+  @override
+  String get preparingFile => 'Готовим файл...';
+
+  @override
+  String get fileSaved => 'Файл сохранён';
+
+  @override
+  String get saveNotSupported =>
+      'Сохранение не поддерживается на этой платформе';
+
+  @override
+  String fileSaveFailed(String error) {
+    return 'Не удалось сохранить: $error';
+  }
 
   @override
   String get clearCache => 'Очистить кэш';
@@ -173,9 +194,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get edit => 'Изменить';
-
-  @override
-  String get download => 'Скачать';
 
   @override
   String get addToCollection => 'Добавить в коллекцию';
@@ -338,7 +356,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String downloadedOfTotalTracks(int done, int total) {
-    return 'Загружено $done/$total треков';
+    return 'Сохранено $done/$total треков';
   }
 
   @override
@@ -350,16 +368,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get done => 'Готово';
 
   @override
-  String get downloading => 'Загрузка...';
+  String get downloading => 'Сохранение...';
 
   @override
-  String get downloaded => 'Загружено';
+  String get downloaded => 'В офлайн';
 
   @override
-  String get downloadStarted => 'Скачивание началось';
+  String get downloadStarted => 'Сохранение в офлайн началось';
 
   @override
-  String get downloadCancelled => 'Скачивание отменено';
+  String get downloadCancelled => 'Сохранение отменено';
 
   @override
   String downloadFailed(String error) {
