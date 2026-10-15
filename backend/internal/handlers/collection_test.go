@@ -58,6 +58,7 @@ func setupCollectionTestApp(t *testing.T) *fiber.App {
 	app.Put("/api/collections/:id", handler.Update)
 	app.Delete("/api/collections/:id", handler.Delete)
 	app.Post("/api/collections/:id/items", handler.AddItem)
+	app.Post("/api/collections/:id/items/move", handler.MoveItem)
 	app.Delete("/api/collections/:id/items/:mediaId", handler.RemoveItem)
 	app.Get("/api/collections/:id/items", handler.ListItems)
 

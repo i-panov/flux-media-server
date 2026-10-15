@@ -82,6 +82,10 @@ func TestSchemaMigrateAndCheckConstraints(t *testing.T) {
 	// старые БД покрыты ручными каскадами в repository.Delete.
 	assertFKCascade(t, db, "media_artists", "media_id", "media")
 	assertFKCascade(t, db, "media_artists", "artist_id", "artists")
+
+	// Именованный индекс вложенности коллекций (безымянный gorm:"index"
+	// оставил бы сироту в sqlite_master при переименовании поля).
+	assert.True(t, indexExists(t, db, "idx_collections_parent"), "collections parent index missing")
 }
 
 // assertFKCascade проверяет, что колонка table.from ссылается на

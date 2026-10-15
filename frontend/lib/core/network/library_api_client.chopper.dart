@@ -82,11 +82,33 @@ final class _$LibraryApiClient extends LibraryApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> updateCollection(
+    int id,
+    Map<String, dynamic> body,
+  ) {
+    final Uri $url = Uri.parse('/collections/${id}');
+    final $body = body;
+    final Request $request = Request('PUT', $url, client.baseUrl, body: $body);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> addCollectionItem(
     int id,
     Map<String, dynamic> body,
   ) {
     final Uri $url = Uri.parse('/collections/${id}/items');
+    final $body = body;
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> moveCollectionItem(
+    int id,
+    Map<String, dynamic> body,
+  ) {
+    final Uri $url = Uri.parse('/collections/${id}/items/move');
     final $body = body;
     final Request $request = Request('POST', $url, client.baseUrl, body: $body);
     return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);

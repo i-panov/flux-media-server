@@ -710,6 +710,12 @@ abstract class AppLocalizations {
   /// **'This collection is empty'**
   String get thisCollectionIsEmpty;
 
+  /// No description provided for @deleteCollectionCascadeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\" with subcollections ({count})?'**
+  String deleteCollectionCascadeConfirm(String name, int count);
+
   /// No description provided for @noCollectionsYetCreate.
   ///
   /// In en, this message translates to:
@@ -1105,6 +1111,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove from collection'**
   String get removeFromCollection;
+
+  /// No description provided for @moveToCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to collection'**
+  String get moveToCollection;
+
+  /// No description provided for @moveCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Move collection'**
+  String get moveCollection;
+
+  /// No description provided for @moveToRoot.
+  ///
+  /// In en, this message translates to:
+  /// **'To root'**
+  String get moveToRoot;
+
+  /// No description provided for @newSubcollection.
+  ///
+  /// In en, this message translates to:
+  /// **'New subcollection'**
+  String get newSubcollection;
+
+  /// No description provided for @subcollections.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcollections'**
+  String get subcollections;
+
+  /// No description provided for @collectionMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Collection moved'**
+  String get collectionMoved;
+
+  /// No description provided for @itemMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Item moved'**
+  String get itemMoved;
+
+  /// No description provided for @noCollections.
+  ///
+  /// In en, this message translates to:
+  /// **'No collections'**
+  String get noCollections;
+
+  /// No description provided for @goToParent.
+  ///
+  /// In en, this message translates to:
+  /// **'To parent'**
+  String get goToParent;
+
+  /// No description provided for @failedToLoadCollections.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load collections'**
+  String get failedToLoadCollections;
 
   /// No description provided for @addMedia.
   ///

@@ -339,6 +339,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get thisCollectionIsEmpty => 'Эта коллекция пуста';
 
   @override
+  String deleteCollectionCascadeConfirm(String name, int count) {
+    return 'Удалить \"$name\" вместе с подколлекциями ($count)?';
+  }
+
+  @override
   String get noCollectionsYetCreate => 'Коллекций пока нет. Создайте первую.';
 
   @override
@@ -551,6 +556,36 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get removeFromCollection => 'Удалить из коллекции';
+
+  @override
+  String get moveToCollection => 'Переместить в коллекцию';
+
+  @override
+  String get moveCollection => 'Переместить коллекцию';
+
+  @override
+  String get moveToRoot => 'В корень';
+
+  @override
+  String get newSubcollection => 'Новая подколлекция';
+
+  @override
+  String get subcollections => 'Подколлекции';
+
+  @override
+  String get collectionMoved => 'Коллекция перемещена';
+
+  @override
+  String get itemMoved => 'Элемент перемещён';
+
+  @override
+  String get noCollections => 'Нет коллекций';
+
+  @override
+  String get goToParent => 'К родительской';
+
+  @override
+  String get failedToLoadCollections => 'Не удалось загрузить коллекции';
 
   @override
   String get addMedia => 'Добавить медиа';

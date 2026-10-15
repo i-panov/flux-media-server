@@ -59,15 +59,16 @@ func TestCollectionStore_Update(t *testing.T) {
 	col := &models.Collection{UserID: 1, Name: "Old", Type: "video"}
 	require.NoError(t, store.Create(ctx, col))
 
-	col.Name = "New Name"
-	require.NoError(t, store.Update(ctx, col))
+	newName := "New Name"
+	_, err = store.Patch(ctx, col.ID, CollectionPatch{Name: &newName})
+	require.NoError(t, err)
 
 	found, err := store.FindByID(ctx, col.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, "New Name", found.Name)
 }
 
-// Regression test (MAJOR): частичный Update не должен затирать type
+// Regression test (MAJOR): частичный Patch не должен затирать type
 // (старый Save писал все колонки включая нулевые).
 func TestCollectionStore_UpdatePartialFields(t *testing.T) {
 	db, err := InitDB(":memory:")
@@ -80,7 +81,9 @@ func TestCollectionStore_UpdatePartialFields(t *testing.T) {
 	col := &models.Collection{UserID: 1, Name: "Want to Watch", Type: models.MediaTypeVideo}
 	require.NoError(t, store.Create(ctx, col))
 
-	require.NoError(t, store.Update(ctx, &models.Collection{ID: col.ID, Name: "Renamed"}))
+	renamed := "Renamed"
+	_, err = store.Patch(ctx, col.ID, CollectionPatch{Name: &renamed})
+	require.NoError(t, err)
 
 	found, err := store.FindByID(ctx, col.ID)
 	require.NoError(t, err)

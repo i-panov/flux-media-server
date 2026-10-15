@@ -218,6 +218,17 @@
   },
   "thisCollectionIsEmpty": "Эта коллекция пуста",
   "@thisCollectionIsEmpty": {},
+  "deleteCollectionCascadeConfirm": "Удалить \"{name}\" вместе с подколлекциями ({count})?",
+  "@deleteCollectionCascadeConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "noCollectionsYetCreate": "Коллекций пока нет. Создайте первую.",
   "@noCollectionsYetCreate": {},
   "addedToCollection": "Добавлено в \"{name}\"",
@@ -395,6 +406,26 @@
   "@audioPlayingInBackground": {},
   "removeFromCollection": "Удалить из коллекции",
   "@removeFromCollection": {},
+  "moveToCollection": "Переместить в коллекцию",
+  "@moveToCollection": {},
+  "moveCollection": "Переместить коллекцию",
+  "@moveCollection": {},
+  "moveToRoot": "В корень",
+  "@moveToRoot": {},
+  "newSubcollection": "Новая подколлекция",
+  "@newSubcollection": {},
+  "subcollections": "Подколлекции",
+  "@subcollections": {},
+  "collectionMoved": "Коллекция перемещена",
+  "@collectionMoved": {},
+  "itemMoved": "Элемент перемещён",
+  "@itemMoved": {},
+  "noCollections": "Нет коллекций",
+  "@noCollections": {},
+  "goToParent": "К родительской",
+  "@goToParent": {},
+  "failedToLoadCollections": "Не удалось загрузить коллекции",
+  "@failedToLoadCollections": {},
   "addMedia": "Добавить медиа",
   "@addMedia": {},
   "loadMore": "Загрузить ещё",

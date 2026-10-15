@@ -8,7 +8,14 @@ abstract class CollectionsRepository {
   Future<Either<Failure, Collection>> createCollection({
     required String name,
     required String type,
+    int? parentId,
   });
+  Future<Either<Failure, Collection>> moveCollection(int id, int? parentId);
+  Future<Either<Failure, CollectionItem>> moveCollectionItem(
+    int sourceId,
+    int targetId,
+    int mediaId,
+  );
   Future<Either<Failure, void>> deleteCollection(int id);
   Future<Either<Failure, CollectionItem>> addCollectionItem(
     int collectionId,

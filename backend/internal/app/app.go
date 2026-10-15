@@ -438,6 +438,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Put("/collections/:id", collectionHandler.Update)
 	api.Delete("/collections/:id", collectionHandler.Delete)
 	api.Post("/collections/:id/items", collectionHandler.AddItem)
+	api.Post("/collections/:id/items/move", collectionHandler.MoveItem)
 	api.Delete("/collections/:id/items/:mediaId", collectionHandler.RemoveItem)
 	api.Get("/collections/:id/items", collectionHandler.ListItems)
 

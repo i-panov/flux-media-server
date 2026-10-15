@@ -13,6 +13,7 @@ sealed class Collection with _$Collection {
     @MediaTypeConverter() required MediaType type,
     @JsonKey(name: 'created_at') required DateTime createdAt,
     @JsonKey(name: 'updated_at') required DateTime updatedAt,
+    @JsonKey(name: 'parent_id') int? parentId,
   }) = _Collection;
 
   factory fromJson(Map<String, dynamic> json) => _$CollectionFromJson(json);

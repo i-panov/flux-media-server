@@ -19,8 +19,26 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
   Future<Either<Failure, Collection>> createCollection({
     required String name,
     required String type,
+    int? parentId,
   }) => safeRepositoryCall(
-    () => remoteDataSource.createCollection(name: name, type: type),
+    () => remoteDataSource.createCollection(
+      name: name,
+      type: type,
+      parentId: parentId,
+    ),
+  );
+
+  @override
+  Future<Either<Failure, Collection>> moveCollection(int id, int? parentId) =>
+      safeRepositoryCall(() => remoteDataSource.moveCollection(id, parentId));
+
+  @override
+  Future<Either<Failure, CollectionItem>> moveCollectionItem(
+    int sourceId,
+    int targetId,
+    int mediaId,
+  ) => safeRepositoryCall(
+    () => remoteDataSource.moveCollectionItem(sourceId, targetId, mediaId),
   );
 
   @override

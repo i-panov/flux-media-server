@@ -90,8 +90,22 @@ type FavoriteRepository interface {
 type CollectionRepository interface {
 	FindByUser(ctx context.Context, userID uint) ([]models.Collection, error)
 	FindByID(ctx context.Context, id uint) (*models.Collection, error)
+	// FindChildren возвращает непосредственных детей коллекции.
+	FindChildren(ctx context.Context, id uint) ([]models.Collection, error)
 	Create(ctx context.Context, collection *models.Collection) error
-	Update(ctx context.Context, collection *models.Collection) error
+	// CreateWithParent создаёт коллекцию сразу под родителем в одной
+	// транзакции (без сироты при отказе проверок).
+	CreateWithParent(ctx context.Context, collection *models.Collection, parentID uint) error
+	// Patch применяет переименование, смену типа и перенос в одной
+	// транзакции и возвращает свежую строку для ответа. Единственная
+	// точка обновления (legacy-Update удалён, обхода запретов нет).
+	Patch(ctx context.Context, id uint, p CollectionPatch) (*models.Collection, error)
+	// SetParent переносит коллекцию под нового родителя (nil = в корень)
+	// с проверкой циклов и владения внутри одной транзакции.
+	SetParent(ctx context.Context, id uint, parentID *uint) error
+	// IsDescendant проверяет, лежит ли descendantID в поддереве ancestorID
+	// (защита от циклов при переносе).
+	IsDescendant(ctx context.Context, ancestorID, descendantID uint) (bool, error)
 	Delete(ctx context.Context, id uint) error
 }
 
@@ -105,6 +119,13 @@ type CollectionItemRepository interface {
 	// в одной транзакции. Дубликат (collection_id, media_id) возвращается
 	// как ErrDuplicateItem.
 	AddItemAtomic(ctx context.Context, collectionID, mediaID uint) (models.CollectionItem, error)
+	// MoveItemAtomic переносит элемент между коллекциями в одной
+	// транзакции: удаляет из source и добавляет в target через ту же
+	// логику позиций, что AddItemAtomic. Дубликат в target —
+	// ErrDuplicateItem, сам элемент из source при этом уже удалён? Нет:
+	// порядок обратный — сначала INSERT в target, затем DELETE из source,
+	// чтобы дубль не приводил к потере элемента.
+	MoveItemAtomic(ctx context.Context, sourceID, targetID, mediaID uint) (models.CollectionItem, error)
 	Remove(ctx context.Context, collectionID, mediaID uint) error
 	MaxPosition(ctx context.Context, collectionID uint) (int, error)
 }

@@ -27,11 +27,11 @@ class CollectionsRemoteDataSource {
   Future<Collection> createCollection({
     required String name,
     required String type,
+    int? parentId,
   }) async {
-    final response = await apiClient.createCollection({
-      'name': name,
-      'type': type,
-    });
+    final body = <String, dynamic>{'name': name, 'type': type};
+    if (parentId != null) body['parent_id'] = parentId;
+    final response = await apiClient.createCollection(body);
     checkResponse(response, 'Failed to create collection');
     return _collectionFromBody(response, 'Failed to create collection');
   }
@@ -39,6 +39,33 @@ class CollectionsRemoteDataSource {
   Future<void> deleteCollection(int id) async {
     final response = await apiClient.deleteCollection(id);
     checkResponse(response, 'Failed to delete collection');
+  }
+
+  Future<Collection> moveCollection(int id, int? parentId) async {
+    final response = await apiClient.updateCollection(id, {
+      'parent_id': parentId,
+    });
+    checkResponse(response, 'Failed to move collection');
+    return _collectionFromBody(response, 'Failed to move collection');
+  }
+
+  Future<CollectionItem> moveCollectionItem(
+    int sourceId,
+    int targetId,
+    int mediaId,
+  ) async {
+    final response = await apiClient.moveCollectionItem(sourceId, {
+      'media_id': mediaId,
+      'to_collection_id': targetId,
+    });
+    checkResponse(response, 'Failed to move item');
+    final body = response.body;
+    if (body is! Map<String, dynamic>) {
+      throw const ServerException(
+        message: 'Malformed response: Failed to move item',
+      );
+    }
+    return CollectionItem.fromJson(body);
   }
 
   Future<CollectionItem> addCollectionItem(

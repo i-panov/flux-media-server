@@ -13,6 +13,7 @@ _Collection _$CollectionFromJson(Map<String, dynamic> json) => _Collection(
   type: const MediaTypeConverter().fromJson(json['type']),
   createdAt: DateTime.parse(json['created_at'] as String),
   updatedAt: DateTime.parse(json['updated_at'] as String),
+  parentId: (json['parent_id'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$CollectionToJson(_Collection instance) =>
@@ -23,6 +24,7 @@ Map<String, dynamic> _$CollectionToJson(_Collection instance) =>
       'type': const MediaTypeConverter().toJson(instance.type),
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
+      'parent_id': instance.parentId,
     };
 
 _CollectionItem _$CollectionItemFromJson(Map<String, dynamic> json) =>

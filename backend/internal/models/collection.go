@@ -2,12 +2,18 @@ package models
 
 import "time"
 
-// Collection is a user-created playlist of media items (e.g. "Want to Watch").
+// Collection — пользовательская подборка медиа (например, «Хочу посмотреть»).
 type Collection struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	UserID    uint      `gorm:"index" json:"user_id"`
 	Name      string    `gorm:"size:255" json:"name"`
 	Type      MediaType `gorm:"index;type:text" json:"type"` // video
+	// ParentID — вложенность (NULL = корень). Индекс с явным именем:
+	// безымянный gorm:"index" при переименовании поля оставляет сироту
+	// в sqlite_master. Каскад удаления детей — в CollectionStore.Delete,
+	// FK нет: foreign keys зависят от PRAGMA и старых БД, рекурсивный
+	// CTE в транзакции надёжнее.
+	ParentID  *uint     `gorm:"index:idx_collections_parent" json:"parent_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

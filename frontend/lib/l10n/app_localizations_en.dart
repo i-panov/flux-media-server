@@ -337,6 +337,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get thisCollectionIsEmpty => 'This collection is empty';
 
   @override
+  String deleteCollectionCascadeConfirm(String name, int count) {
+    return 'Delete \"$name\" with subcollections ($count)?';
+  }
+
+  @override
   String get noCollectionsYetCreate => 'No collections yet. Create one first.';
 
   @override
@@ -549,6 +554,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeFromCollection => 'Remove from collection';
+
+  @override
+  String get moveToCollection => 'Move to collection';
+
+  @override
+  String get moveCollection => 'Move collection';
+
+  @override
+  String get moveToRoot => 'To root';
+
+  @override
+  String get newSubcollection => 'New subcollection';
+
+  @override
+  String get subcollections => 'Subcollections';
+
+  @override
+  String get collectionMoved => 'Collection moved';
+
+  @override
+  String get itemMoved => 'Item moved';
+
+  @override
+  String get noCollections => 'No collections';
+
+  @override
+  String get goToParent => 'To parent';
+
+  @override
+  String get failedToLoadCollections => 'Failed to load collections';
 
   @override
   String get addMedia => 'Add media';

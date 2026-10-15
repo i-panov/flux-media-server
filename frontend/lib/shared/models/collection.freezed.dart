@@ -16,7 +16,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Collection {
 
- int get id;@JsonKey(name: 'user_id') int get userId; String get name;@MediaTypeConverter() MediaType get type;@JsonKey(name: 'created_at') DateTime get createdAt;@JsonKey(name: 'updated_at') DateTime get updatedAt;
+ int get id;@JsonKey(name: 'user_id') int get userId; String get name;@MediaTypeConverter() MediaType get type;@JsonKey(name: 'created_at') DateTime get createdAt;@JsonKey(name: 'updated_at') DateTime get updatedAt;@JsonKey(name: 'parent_id') int? get parentId;
 /// Create a copy of Collection
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,20 +30,20 @@ $CollectionCopyWith<Collection> get copyWith => _$CollectionCopyWithImpl<Collect
 @override
 bool operator ==(Object other) {
   final _this = this as Collection;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Collection&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.userId, _this.userId) || other.userId == _this.userId)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.createdAt, _this.createdAt) || other.createdAt == _this.createdAt)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Collection&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.userId, _this.userId) || other.userId == _this.userId)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.createdAt, _this.createdAt) || other.createdAt == _this.createdAt)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt)&&(identical(other.parentId, _this.parentId) || other.parentId == _this.parentId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as Collection;
-  return Object.hash(runtimeType,_this.id,_this.userId,_this.name,_this.type,_this.createdAt,_this.updatedAt);
+  return Object.hash(runtimeType,_this.id,_this.userId,_this.name,_this.type,_this.createdAt,_this.updatedAt,_this.parentId);
 }
 
 @override
 String toString() {
   final _this = this as Collection;
-  return 'Collection(id: ${_this.id}, userId: ${_this.userId}, name: ${_this.name}, type: ${_this.type}, createdAt: ${_this.createdAt}, updatedAt: ${_this.updatedAt})';
+  return 'Collection(id: ${_this.id}, userId: ${_this.userId}, name: ${_this.name}, type: ${_this.type}, createdAt: ${_this.createdAt}, updatedAt: ${_this.updatedAt}, parentId: ${_this.parentId})';
 }
 
 
@@ -54,7 +54,7 @@ abstract mixin class $CollectionCopyWith<$Res>  {
   factory $CollectionCopyWith(Collection value, $Res Function(Collection) _then) = _$CollectionCopyWithImpl;
 @useResult
 $Res call({
- int id,@JsonKey(name: 'user_id') int userId, String name,@MediaTypeConverter() MediaType type,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt
+ int id,@JsonKey(name: 'user_id') int userId, String name,@MediaTypeConverter() MediaType type,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt,@JsonKey(name: 'parent_id') int? parentId
 });
 
 
@@ -71,7 +71,7 @@ class _$CollectionCopyWithImpl<$Res>
 
 /// Create a copy of Collection
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? userId = null,Object? name = null,Object? type = null,Object? createdAt = null,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? userId = null,Object? name = null,Object? type = null,Object? createdAt = null,Object? updatedAt = null,Object? parentId = freezed,}) {
   return _then(Collection(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
@@ -79,7 +79,8 @@ as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nu
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as MediaType,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,parentId: freezed == parentId ? _self.parentId : parentId // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 
@@ -161,10 +162,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id, @JsonKey(name: 'user_id')  int userId,  String name, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id, @JsonKey(name: 'user_id')  int userId,  String name, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'parent_id')  int? parentId)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Collection() when $default != null:
-return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_that.updatedAt,_that.parentId);case _:
   return orElse();
 
 }
@@ -182,10 +183,10 @@ return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id, @JsonKey(name: 'user_id')  int userId,  String name, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id, @JsonKey(name: 'user_id')  int userId,  String name, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'parent_id')  int? parentId)  $default,) {final _that = this;
 switch (_that) {
 case _Collection():
-return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_that.updatedAt);}
+return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_that.updatedAt,_that.parentId);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -199,10 +200,10 @@ return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id, @JsonKey(name: 'user_id')  int userId,  String name, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id, @JsonKey(name: 'user_id')  int userId,  String name, @MediaTypeConverter()  MediaType type, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'parent_id')  int? parentId)?  $default,) {final _that = this;
 switch (_that) {
 case _Collection() when $default != null:
-return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_that.updatedAt,_that.parentId);case _:
   return null;
 
 }
@@ -214,7 +215,7 @@ return $default(_that.id,_that.userId,_that.name,_that.type,_that.createdAt,_tha
 @JsonSerializable()
 
 class _Collection implements Collection {
-  const _Collection({required this.id, @JsonKey(name: 'user_id') required this.userId, required this.name, @MediaTypeConverter() required this.type, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt});
+  const _Collection({required this.id, @JsonKey(name: 'user_id') required this.userId, required this.name, @MediaTypeConverter() required this.type, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt, @JsonKey(name: 'parent_id') this.parentId});
   factory _Collection.fromJson(Map<String, dynamic> json) => _$CollectionFromJson(json);
 
 @override final  int id;
@@ -223,6 +224,7 @@ class _Collection implements Collection {
 @override@MediaTypeConverter() final  MediaType type;
 @override@JsonKey(name: 'created_at') final  DateTime createdAt;
 @override@JsonKey(name: 'updated_at') final  DateTime updatedAt;
+@override@JsonKey(name: 'parent_id') final  int? parentId;
 
 /// Create a copy of Collection
 /// with the given fields replaced by the non-null parameter values.
@@ -237,18 +239,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Collection&&(identical(other.id, id) || other.id == id)&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Collection&&(identical(other.id, id) || other.id == id)&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&(identical(other.parentId, parentId) || other.parentId == parentId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,userId,name,type,createdAt,updatedAt);
+    return Object.hash(runtimeType,id,userId,name,type,createdAt,updatedAt,parentId);
 }
 
 @override
 String toString() {
-    return 'Collection(id: $id, userId: $userId, name: $name, type: $type, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Collection(id: $id, userId: $userId, name: $name, type: $type, createdAt: $createdAt, updatedAt: $updatedAt, parentId: $parentId)';
 }
 
 
@@ -259,7 +261,7 @@ abstract mixin class _$CollectionCopyWith<$Res> implements $CollectionCopyWith<$
   factory _$CollectionCopyWith(_Collection value, $Res Function(_Collection) _then) = __$CollectionCopyWithImpl;
 @override @useResult
 $Res call({
- int id,@JsonKey(name: 'user_id') int userId, String name,@MediaTypeConverter() MediaType type,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt
+ int id,@JsonKey(name: 'user_id') int userId, String name,@MediaTypeConverter() MediaType type,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt,@JsonKey(name: 'parent_id') int? parentId
 });
 
 
@@ -276,7 +278,7 @@ class __$CollectionCopyWithImpl<$Res>
 
 /// Create a copy of Collection
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? userId = null,Object? name = null,Object? type = null,Object? createdAt = null,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? userId = null,Object? name = null,Object? type = null,Object? createdAt = null,Object? updatedAt = null,Object? parentId = freezed,}) {
   return _then(_Collection(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
@@ -284,7 +286,8 @@ as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nu
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as MediaType,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,parentId: freezed == parentId ? _self.parentId : parentId // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 

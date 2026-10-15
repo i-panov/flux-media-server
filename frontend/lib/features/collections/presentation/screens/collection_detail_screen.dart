@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
+import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/utils/collection_tree.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_media_dialog.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/collection_grid_tile.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/move_to_collection_dialog.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -30,26 +33,340 @@ class _CollectionDetailScreenState
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final itemsState = ref.watch(
-      collectionItemsFullProvider(widget.collection.id),
-    );
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.collection.name),
         actions: [
+          _ParentButton(collection: widget.collection),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: l.addMedia,
             onPressed: () => _showAddMediaDialog(context),
           ),
           IconButton(
+            icon: const Icon(Icons.create_new_folder_outlined),
+            tooltip: l.newSubcollection,
+            onPressed: () => _createSubcollection(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.drive_file_move_outlined),
+            tooltip: l.moveCollection,
+            onPressed: () => _moveCollection(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_outline),
+            tooltip: l.deleteCollection,
             onPressed: () => _confirmDelete(context),
           ),
         ],
       ),
-      body: itemsState.when(
+      body: Column(
+        children: [
+          _SubcollectionsRow(collection: widget.collection),
+          Expanded(child: _ItemsGrid(collection: widget.collection)),
+        ],
+      ),
+    );
+  }
+
+  /// Создание подколлекции: имя спрашиваем, тип наследуем, родитель — мы.
+  /// Сервер вернёт 201 с parent_id, список инвалидируем (дети читаются
+  /// из общего collectionsProvider).
+  Future<void> _createSubcollection(BuildContext context) async {
+    final l = AppLocalizations.of(context)!;
+    final name = await _askName(context, l.newSubcollection);
+    if (name == null || name.isEmpty || !mounted) return;
+    final result = await ref
+        .read(collectionsRepositoryProvider)
+        .createCollection(
+          name: name,
+          type: widget.collection.type.name,
+          parentId: widget.collection.id,
+        );
+    if (!mounted) return;
+    result.fold(
+      (failure) => showErrorSnackBar(context, failure.message),
+      (_) => ref.invalidate(collectionsProvider),
+    );
+  }
+
+  /// Перенос коллекции: цели — то же дерево минус мы и наше поддерево
+  /// (иначе цикл; сервер перепроверит и вернёт 400, но лучше не давать
+  /// выбрать). -1 из диалога — «В корень».
+  Future<void> _moveCollection(BuildContext context) async {
+    final l = AppLocalizations.of(context)!;
+    final all = ref.read(collectionsProvider).value;
+    // Диалог без данных исключил бы только свой id, а дети остались
+    // бы выбираемыми: защита от цикла пропала бы (см. _moveItem).
+    if (all == null) {
+      ref.invalidate(collectionsProvider);
+      if (!context.mounted) return;
+      showErrorSnackBar(context, l.failedToLoadCollections);
+      return;
+    }
+    final forest = buildCollectionTree(
+      all.where((c) => c.type == widget.collection.type).toList(),
+    );
+    CollectionNode? self;
+    void find(List<CollectionNode> nodes) {
+      for (final n in nodes) {
+        if (n.collection.id == widget.collection.id) {
+          self = n;
+          return;
+        }
+        find(n.children);
+        if (self != null) return;
+      }
+    }
+
+    find(forest);
+    final excluded = self == null
+        ? {widget.collection.id}
+        : subtreeIds(self!);
+    final picked = await showMoveToCollectionDialog(
+      context,
+      ref,
+      type: widget.collection.type,
+      excludeIds: excluded,
+      allowRoot: true,
+    );
+    if (picked == null || !mounted) return;
+    final result = await ref
+        .read(collectionsRepositoryProvider)
+        .moveCollection(
+          widget.collection.id,
+          picked == moveToRootId ? null : picked,
+        );
+    if (!mounted) return;
+    result.fold(
+      (failure) => showErrorSnackBar(context, failure.message),
+      (_) {
+        ref.invalidate(collectionsProvider);
+        // Экран хранит старый widget.collection (имя/parentId): вместо
+        // подписи родителя и крошек — назад к списку с тостом. Тост через
+        // глобальный ключ: контекстный снекбар умер бы вместе с экраном.
+        final message = l.collectionMoved;
+        unawaited(context.router.maybePop());
+        scaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      },
+    );
+  }
+
+  /// Спрашивает имя одной строкой (создание подколлекции).
+  Future<String?> _askName(BuildContext context, String title) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: title),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppLocalizations.of(ctx)!.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text(AppLocalizations.of(ctx)!.create),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    // Каскад: сервер сносит всё поддерево рекурсивно, молча удалять
+    // папку с сезонами одним тапом нельзя — считаем потомков из уже
+    // загруженного провайдера (без него — старый текст без счётчика).
+    final all =
+        ref.read(collectionsProvider).value ?? const <Collection>[];
+    final forest = buildCollectionTree(
+      all.where((c) => c.type == widget.collection.type).toList(),
+    );
+    CollectionNode? self;
+    void find(List<CollectionNode> nodes) {
+      for (final n in nodes) {
+        if (n.collection.id == widget.collection.id) {
+          self = n;
+          return;
+        }
+        find(n.children);
+        if (self != null) return;
+      }
+    }
+
+    find(forest);
+    final sub = self == null ? 0 : subtreeIds(self!).length - 1;
+    final message = sub > 0
+        ? l.deleteCollectionCascadeConfirm(widget.collection.name, sub)
+        : l.deleteCollectionConfirm(widget.collection.name);
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l.deleteCollection),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l.cancel),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final result = await ref
+                    .read(collectionsRepositoryProvider)
+                    .deleteCollection(widget.collection.id);
+                if (context.mounted) {
+                  result.fold(
+                    (failure) {
+                      showErrorSnackBar(
+                        context,
+                        l.failedToRemove(failure.message),
+                      );
+                    },
+                    (_) {
+                      ref.invalidate(collectionsProvider);
+                      unawaited(context.router.maybePop());
+                    },
+                  );
+                }
+              },
+              child: Text(l.delete, style: const TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Диалог выбора медиа для добавления в коллекцию (со списком
+  /// медиа типа коллекции и клиентским фильтром-поиском).
+  Future<void> _showAddMediaDialog(BuildContext context) {
+    return showAddMediaDialog(context, widget.collection);
+  }
+}
+
+/// Кнопка «к родителю» в AppBar: видна только у вложенных.
+/// Родителя берём из уже загруженного списка (без него — скрываем,
+/// а не ведём в никуда). Ведёт push-ем: стек не рвём, назад — системно.
+class _ParentButton extends ConsumerWidget {
+  const new({required this.collection});
+
+  final Collection collection;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final parentId = collection.parentId;
+    if (parentId == null) return const SizedBox.shrink();
+    final all = ref.watch(collectionsProvider).value;
+    Collection? parent;
+    if (all != null) {
+      for (final c in all) {
+        if (c.id == parentId) {
+          parent = c;
+          break;
+        }
+      }
+    }
+    if (parent == null) return const SizedBox.shrink();
+    final l = AppLocalizations.of(context)!;
+    final target = parent;
+    return IconButton(
+      icon: const Icon(Icons.upgrade_outlined),
+      tooltip: '${l.goToParent}: ${target.name}',
+      onPressed: () => unawaited(
+        context.router.push(CollectionDetailRoute(collection: target)),
+      ),
+    );
+  }
+}
+
+/// Папки-дети текущей коллекции: горизонтальный ряд над сеткой медиа.
+/// Пустой ряд не рисуем (SizedBox.shrink), чтобы не было полосы.
+class _SubcollectionsRow extends ConsumerWidget {
+  const new({required this.collection});
+
+  final Collection collection;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final all = ref.watch(collectionsProvider).value;
+    if (all == null) return const SizedBox.shrink();
+    final children = all
+        .where(
+          (c) => c.parentId == collection.id && c.type == collection.type,
+        )
+        .toList();
+    if (children.isEmpty) return const SizedBox.shrink();
+    final l = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text(
+            l.subcollections,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+        ),
+        SizedBox(
+          height: 48,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: children.length,
+            itemBuilder: (context, index) {
+              final child = children[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ActionChip(
+                  avatar: const Icon(Icons.folder_outlined, size: 18),
+                  label: Text(child.name),
+                  onPressed: () => unawaited(
+                    context.router.push(
+                      CollectionDetailRoute(collection: child),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Сетка медиа — бывшее тело экрана, выделена без изменения логики.
+class _ItemsGrid extends ConsumerStatefulWidget {
+  const new({required this.collection});
+
+  final Collection collection;
+
+  @override
+  ConsumerState<_ItemsGrid> createState() => _ItemsGridState();
+}
+
+class _ItemsGridState extends ConsumerState<_ItemsGrid> {
+  Collection get collection => widget.collection;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final itemsState = ref.watch(
+      collectionItemsFullProvider(collection.id),
+    );
+
+    return itemsState.when(
         loading: () => _buildSkeletonGrid(context),
         error: (e, _) => ErrorRetryView(
           message: e.toString(),
@@ -86,8 +403,7 @@ class _CollectionDetailScreenState
               final media = items[index];
               return CollectionGridTile(
                 media: media,
-                onTap: () {
-                  if (media.type == MediaType.audio) {
+                onTap: () {                  if (media.type == MediaType.audio) {
                     unawaited(
                       context.router.push(AudioPlayerRoute(media: media)),
                     );
@@ -100,12 +416,12 @@ class _CollectionDetailScreenState
                   }
                 },
                 onRemove: () => _confirmRemoveItem(context, media),
+                onMove: () => _moveItem(context, media),
               );
             },
           );
         },
-      ),
-    );
+      );
   }
 
   /// Подтверждение и удаление элемента из коллекции.
@@ -148,10 +464,40 @@ class _CollectionDetailScreenState
     );
   }
 
-  /// Диалог выбора медиа для добавления в коллекцию (со списком
-  /// медиа типа коллекции и клиентским фильтром-поиском).
-  Future<void> _showAddMediaDialog(BuildContext context) {
-    return showAddMediaDialog(context, widget.collection);
+  /// Диалог выбора медиа для добавления в коллекцию уже есть у экрана
+  /// (кнопка в AppBar): дубль здесь не нужен.
+  /// Подтверждение и перенос элемента в другую коллекцию того же типа.
+  Future<void> _moveItem(BuildContext context, Media media) async {
+    final l = AppLocalizations.of(context)!;
+    // Без загруженного списка клиентская защита (исключение себя)
+    // отсутствует — спасает лишь серверный 400. Диалог не открываем,
+    // список перезапрашиваем для следующей попытки.
+    if (ref.read(collectionsProvider).value == null) {
+      ref.invalidate(collectionsProvider);
+      if (!context.mounted) return;
+      showErrorSnackBar(context, l.failedToLoadCollections);
+      return;
+    }
+    final picked = await showMoveToCollectionDialog(
+      context,
+      ref,
+      type: collection.type,
+      excludeIds: {collection.id},
+    );
+    if (picked == null || picked == moveToRootId || !context.mounted) return;
+    final result = await ref
+        .read(collectionsRepositoryProvider)
+        .moveCollectionItem(collection.id, picked, media.id);
+    if (!context.mounted) return;
+    result.fold(
+      (failure) => showErrorSnackBar(context, failure.message),
+      (_) {
+        ref
+            .read(collectionItemsFullProvider(collection.id).notifier)
+            .removeLocal(media.id);
+        showTextSnackBar(context, l.itemMoved);
+      },
+    );
   }
 
   Widget _buildSkeletonGrid(BuildContext context) {
@@ -170,45 +516,6 @@ class _CollectionDetailScreenState
     );
   }
 
-  void _confirmDelete(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l.deleteCollection),
-          content: Text(l.deleteCollectionConfirm(widget.collection.name)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(l.cancel),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final result = await ref
-                    .read(collectionsRepositoryProvider)
-                    .deleteCollection(widget.collection.id);
-                if (context.mounted) {
-                  result.fold(
-                    (failure) {
-                      showErrorSnackBar(
-                        context,
-                        l.failedToRemove(failure.message),
-                      );
-                    },
-                    (_) {
-                      ref.invalidate(collectionsProvider);
-                      unawaited(context.router.maybePop());
-                    },
-                  );
-                }
-              },
-              child: Text(l.delete, style: const TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  /// Удаление коллекции — у экрана (кнопка в AppBar): дубль здесь
+  /// не нужен, оставляем только перенос/удаление элементов.
 }

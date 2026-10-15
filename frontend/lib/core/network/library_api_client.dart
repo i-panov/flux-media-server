@@ -75,8 +75,20 @@ abstract class LibraryApiClient extends ChopperService {
   @DELETE(path: '/collections/{id}')
   Future<Response<Map<String, dynamic>>> deleteCollection(@Path('id') int id);
 
+  @PUT(path: '/collections/{id}')
+  Future<Response<Map<String, dynamic>>> updateCollection(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
+
   @POST(path: '/collections/{id}/items')
   Future<Response<Map<String, dynamic>>> addCollectionItem(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @POST(path: '/collections/{id}/items/move')
+  Future<Response<Map<String, dynamic>>> moveCollectionItem(
     @Path('id') int id,
     @Body() Map<String, dynamic> body,
   );

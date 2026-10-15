@@ -77,10 +77,19 @@ class FakeCollectionsRepository implements CollectionsRepository {
   Future<Either<Failure, CollectionItem>> Function(int, int)? onAddItem;
   Future<Either<Failure, void>> Function(int, int)? onRemoveItem;
   Future<Either<Failure, List<Media>>> Function(int)? onGetItemsFull;
+  Future<Either<Failure, Collection>> Function(int, int?)? onMoveCollection;
+  Future<Either<Failure, CollectionItem>> Function(int, int, int)? onMoveItem;
+  Future<Either<Failure, Collection>> Function(String, String, int?)?
+  onCreateCollection;
+  Future<Either<Failure, void>> Function(int)? onDeleteCollection;
 
   int getItemsFullCalls = 0;
   final List<(int, int)> addItemCalls = [];
   final List<(int, int)> removeItemCalls = [];
+  final List<(int, int?)> moveCollectionCalls = [];
+  final List<(int, int, int)> moveItemCalls = [];
+  final List<(String, String, int?)> createCollectionCalls = [];
+  final List<int> deleteCollectionCalls = [];
 
   @override
   Future<Either<Failure, List<Collection>>> getCollections() =>
@@ -90,11 +99,40 @@ class FakeCollectionsRepository implements CollectionsRepository {
   Future<Either<Failure, Collection>> createCollection({
     required String name,
     required String type,
-  }) async => const Left(ServerFailure(message: 'not used'));
+    int? parentId,
+  }) {
+    createCollectionCalls.add((name, type, parentId));
+    if (onCreateCollection != null) {
+      return onCreateCollection!(name, type, parentId);
+    }
+    return Future.value(const Left(ServerFailure(message: 'not used')));
+  }
 
   @override
-  Future<Either<Failure, void>> deleteCollection(int id) async =>
-      const Left(ServerFailure(message: 'not used'));
+  Future<Either<Failure, Collection>> moveCollection(
+    int id,
+    int? parentId,
+  ) {
+    moveCollectionCalls.add((id, parentId));
+    return onMoveCollection!(id, parentId);
+  }
+
+  @override
+  Future<Either<Failure, CollectionItem>> moveCollectionItem(
+    int sourceId,
+    int targetId,
+    int mediaId,
+  ) {
+    moveItemCalls.add((sourceId, targetId, mediaId));
+    return onMoveItem!(sourceId, targetId, mediaId);
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteCollection(int id) {
+    deleteCollectionCalls.add(id);
+    if (onDeleteCollection != null) return onDeleteCollection!(id);
+    return Future.value(const Left(ServerFailure(message: 'not used')));
+  }
 
   @override
   Future<Either<Failure, CollectionItem>> addCollectionItem(

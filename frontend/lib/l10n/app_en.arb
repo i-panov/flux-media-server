@@ -261,8 +261,7 @@
   "deleteCollection": "Delete Collection",
   "@deleteCollection": {},
   "deleteCollectionConfirm": "Are you sure you want to delete \"{name}\"?",
-  "@deleteCollectionConfirm": {
-    "placeholders": {
+  "@deleteCollectionConfirm": {    "placeholders": {
       "name": {
         "type": "String"
       }
@@ -270,6 +269,17 @@
   },
   "thisCollectionIsEmpty": "This collection is empty",
   "@thisCollectionIsEmpty": {},
+  "deleteCollectionCascadeConfirm": "Delete \"{name}\" with subcollections ({count})?",
+  "@deleteCollectionCascadeConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "noCollectionsYetCreate": "No collections yet. Create one first.",
   "@noCollectionsYetCreate": {},
   "addedToCollection": "Added to \"{name}\"",
@@ -447,6 +457,26 @@
   "@audioPlayingInBackground": {},
   "removeFromCollection": "Remove from collection",
   "@removeFromCollection": {},
+  "moveToCollection": "Move to collection",
+  "@moveToCollection": {},
+  "moveCollection": "Move collection",
+  "@moveCollection": {},
+  "moveToRoot": "To root",
+  "@moveToRoot": {},
+  "newSubcollection": "New subcollection",
+  "@newSubcollection": {},
+  "subcollections": "Subcollections",
+  "@subcollections": {},
+  "collectionMoved": "Collection moved",
+  "@collectionMoved": {},
+  "itemMoved": "Item moved",
+  "@itemMoved": {},
+  "noCollections": "No collections",
+  "@noCollections": {},
+  "goToParent": "To parent",
+  "@goToParent": {},
+  "failedToLoadCollections": "Failed to load collections",
+  "@failedToLoadCollections": {},
   "addMedia": "Add media",
   "@addMedia": {},
   "loadMore": "Load more",
