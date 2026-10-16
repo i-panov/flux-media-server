@@ -473,6 +473,58 @@
   "@itemMoved": {},
   "noCollections": "No collections",
   "@noCollections": {},
+  "trash": "Trash",
+  "@trash": {},
+  "trashEmpty": "Trash is empty",
+  "@trashEmpty": {},
+  "restore": "Restore",
+  "@restore": {},
+  "restored": "Restored",
+  "@restored": {},
+  "deleteForever": "Delete forever",
+  "@deleteForever": {},
+  "purged": "Permanently deleted",
+  "@purged": {},
+  "emptyTrash": "Empty trash",
+  "@emptyTrash": {},
+  "emptyTrashConfirm": "Permanently delete everything in trash? Files will be erased from disk.",
+  "@emptyTrashConfirm": {},
+  "trashEmptied": "Trash emptied",
+  "@trashEmptied": {},
+  "purgeMediaConfirm": "Permanently delete \"{name}\"? The file will be erased from disk.",
+  "@purgeMediaConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "purgeCollectionConfirm": "Permanently delete \"{name}\" with its contents?",
+  "@purgeCollectionConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "movedToTrash": "Moved to trash",
+  "@movedToTrash": {},
+  "moveMediaToTrash": "Move file to trash? You can restore it later.",
+  "@moveMediaToTrash": {},
+  "deleteCollectionTrashConfirm": "Move \"{name}\" to trash ({sub} subcollections, {files} files)?",
+  "@deleteCollectionTrashConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "sub": {
+        "type": "int"
+      },
+      "files": {
+        "type": "int"
+      }
+    }
+  },
   "goToParent": "To parent",
   "@goToParent": {},
   "failedToLoadCollections": "Failed to load collections",

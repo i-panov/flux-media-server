@@ -582,6 +582,56 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noCollections => 'Нет коллекций';
 
   @override
+  String get trash => 'Корзина';
+
+  @override
+  String get trashEmpty => 'Корзина пуста';
+
+  @override
+  String get restore => 'Восстановить';
+
+  @override
+  String get restored => 'Восстановлено';
+
+  @override
+  String get deleteForever => 'Удалить навсегда';
+
+  @override
+  String get purged => 'Удалено навсегда';
+
+  @override
+  String get emptyTrash => 'Очистить корзину';
+
+  @override
+  String get emptyTrashConfirm =>
+      'Удалить всё из корзины навсегда? Файлы будут стёрты с диска.';
+
+  @override
+  String get trashEmptied => 'Корзина очищена';
+
+  @override
+  String purgeMediaConfirm(String name) {
+    return 'Удалить \"$name\" навсегда? Файл будет стёрт с диска.';
+  }
+
+  @override
+  String purgeCollectionConfirm(String name) {
+    return 'Удалить \"$name\" навсегда вместе с содержимым?';
+  }
+
+  @override
+  String get movedToTrash => 'Перемещено в корзину';
+
+  @override
+  String get moveMediaToTrash =>
+      'Переместить файл в корзину? Потом можно восстановить.';
+
+  @override
+  String deleteCollectionTrashConfirm(String name, int sub, int files) {
+    return 'Переместить \"$name\" в корзину (подколлекций: $sub, файлов: $files)?';
+  }
+
+  @override
   String get goToParent => 'К родительской';
 
   @override

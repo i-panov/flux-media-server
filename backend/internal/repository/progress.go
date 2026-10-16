@@ -24,6 +24,10 @@ func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, limit, offs
 		Preload("Media"). // «продолжить просмотр» — клиенту нужен объект медиа
 		Model(&models.WatchProgress{}).
 		Where("user_id = ?", userID)
+	// Корзина: прогресс по удалённым медиа скрываем (возобновлять
+	// нечего). Подзапрос — имя таблицы прогресса не хардкодим.
+	trashed := r.db.Model(&models.Media{}).Unscoped().Where("deleted_at IS NOT NULL").Select("id")
+	query = query.Where("media_id NOT IN (?)", trashed)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

@@ -580,6 +580,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noCollections => 'No collections';
 
   @override
+  String get trash => 'Trash';
+
+  @override
+  String get trashEmpty => 'Trash is empty';
+
+  @override
+  String get restore => 'Restore';
+
+  @override
+  String get restored => 'Restored';
+
+  @override
+  String get deleteForever => 'Delete forever';
+
+  @override
+  String get purged => 'Permanently deleted';
+
+  @override
+  String get emptyTrash => 'Empty trash';
+
+  @override
+  String get emptyTrashConfirm =>
+      'Permanently delete everything in trash? Files will be erased from disk.';
+
+  @override
+  String get trashEmptied => 'Trash emptied';
+
+  @override
+  String purgeMediaConfirm(String name) {
+    return 'Permanently delete \"$name\"? The file will be erased from disk.';
+  }
+
+  @override
+  String purgeCollectionConfirm(String name) {
+    return 'Permanently delete \"$name\" with its contents?';
+  }
+
+  @override
+  String get movedToTrash => 'Moved to trash';
+
+  @override
+  String get moveMediaToTrash =>
+      'Move file to trash? You can restore it later.';
+
+  @override
+  String deleteCollectionTrashConfirm(String name, int sub, int files) {
+    return 'Move \"$name\" to trash ($sub subcollections, $files files)?';
+  }
+
+  @override
   String get goToParent => 'To parent';
 
   @override

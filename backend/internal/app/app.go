@@ -215,6 +215,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
 	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
+	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
 	artistHandler := handlers.NewArtistHandler(artistRepo, cfg.Media.ThumbnailPath)
 
@@ -441,6 +442,17 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Post("/collections/:id/items/move", collectionHandler.MoveItem)
 	api.Delete("/collections/:id/items/:mediaId", collectionHandler.RemoveItem)
 	api.Get("/collections/:id/items", collectionHandler.ListItems)
+	api.Get("/collections/:id/stats", trashHandler.Stats)
+
+	// Trash — корзина: плоский список, восстановление, снос навсегда.
+	// Медиа-ветки и Empty — под requireAdmin, как media.Delete/:id:
+	// медиа глобальные, чужое сносить/возвращать нельзя.
+	api.Get("/trash", trashHandler.List)
+	api.Delete("/trash", requireAdmin, trashHandler.Empty)
+	api.Post("/trash/media/:id/restore", requireAdmin, trashHandler.RestoreMedia)
+	api.Delete("/trash/media/:id", requireAdmin, trashHandler.PurgeMedia)
+	api.Post("/trash/collections/:id/restore", trashHandler.RestoreCollection)
+	api.Delete("/trash/collections/:id", trashHandler.PurgeCollection)
 
 	// Lyrics
 	api.Get("/media/:id/lyrics", lyricsHandler.GetLyrics)

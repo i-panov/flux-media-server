@@ -101,4 +101,30 @@ abstract class LibraryApiClient extends ChopperService {
 
   @GET(path: '/collections/{id}/items')
   Future<Response<List<dynamic>>> getCollectionItems(@Path('id') int id);
+
+  @GET(path: '/collections/{id}/stats')
+  Future<Response<Map<String, dynamic>>> getCollectionStats(
+    @Path('id') int id,
+  );
+
+  // Trash — корзина: плоский список, восстановление, снос навсегда.
+  @GET(path: '/trash')
+  Future<Response<Map<String, dynamic>>> getTrash();
+
+  @DELETE(path: '/trash')
+  Future<Response<Map<String, dynamic>>> emptyTrash();
+
+  @POST(path: '/trash/media/{id}/restore')
+  Future<Response<Map<String, dynamic>>> restoreMedia(@Path('id') int id);
+
+  @DELETE(path: '/trash/media/{id}')
+  Future<Response<Map<String, dynamic>>> purgeMedia(@Path('id') int id);
+
+  @POST(path: '/trash/collections/{id}/restore')
+  Future<Response<Map<String, dynamic>>> restoreCollection(
+    @Path('id') int id,
+  );
+
+  @DELETE(path: '/trash/collections/{id}')
+  Future<Response<Map<String, dynamic>>> purgeCollection(@Path('id') int id);
 }

@@ -130,4 +130,53 @@ final class _$LibraryApiClient extends LibraryApiClient {
     final Request $request = Request('GET', $url, client.baseUrl);
     return client.send<List<dynamic>, List<dynamic>>($request);
   }
+
+  @override
+  Future<Response<Map<String, dynamic>>> getCollectionStats(int id) {
+    final Uri $url = Uri.parse('/collections/${id}/stats');
+    final Request $request = Request('GET', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> getTrash() {
+    final Uri $url = Uri.parse('/trash');
+    final Request $request = Request('GET', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> emptyTrash() {
+    final Uri $url = Uri.parse('/trash');
+    final Request $request = Request('DELETE', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> restoreMedia(int id) {
+    final Uri $url = Uri.parse('/trash/media/${id}/restore');
+    final Request $request = Request('POST', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> purgeMedia(int id) {
+    final Uri $url = Uri.parse('/trash/media/${id}');
+    final Request $request = Request('DELETE', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> restoreCollection(int id) {
+    final Uri $url = Uri.parse('/trash/collections/${id}/restore');
+    final Request $request = Request('POST', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> purgeCollection(int id) {
+    final Uri $url = Uri.parse('/trash/collections/${id}');
+    final Request $request = Request('DELETE', $url, client.baseUrl);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
 }

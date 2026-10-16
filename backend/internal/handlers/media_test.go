@@ -166,8 +166,8 @@ func TestMediaHandler_UpdateValid(t *testing.T) {
 }
 
 func TestMediaHandler_DeleteOutsideLibrary(t *testing.T) {
-	// Медиа с путём вне зарегистрированных библиотек: файл не удаляется,
-	// запись удаляется.
+	// Корзина: файл не удаляется ни внутри, ни вне библиотек —
+	// стирание только при purge. Запись помечается, из списков исчезает.
 	db, err := repository.InitDB(":memory:")
 	require.NoError(t, err)
 	require.NoError(t, repository.AutoMigrate(db))
@@ -194,9 +194,12 @@ func TestMediaHandler_DeleteOutsideLibrary(t *testing.T) {
 	_, err = os.Stat(outsidePath)
 	require.NoError(t, err, "file outside libraries must not be removed")
 
-	// Запись при этом удалена.
+	// Запись при этом в корзине: живые запросы её не видят.
 	_, err = mediaRepo.FindByID(context.Background(), 1)
 	require.Error(t, err)
+	trashed, err := mediaRepo.FindTrashedMedia(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Equal(t, "Outside", trashed.Title)
 }
 
 func TestMediaHandler_DeleteInsideLibrary(t *testing.T) {
@@ -223,9 +226,11 @@ func TestMediaHandler_DeleteInsideLibrary(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 
-	// Файл внутри библиотеки удаляется.
+	// Файл внутри библиотеки тоже цел: корзина, а не снос.
 	_, err = os.Stat(insidePath)
-	require.True(t, os.IsNotExist(err))
+	require.NoError(t, err, "trash keeps the file for restore")
+	_, err = mediaRepo.FindTrashedMedia(context.Background(), 1)
+	require.NoError(t, err)
 }
 
 func TestMediaHandler_Bulk(t *testing.T) {

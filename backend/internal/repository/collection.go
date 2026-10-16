@@ -68,6 +68,40 @@ func (r *CollectionStore) FindChildren(ctx context.Context, id uint) ([]models.C
 	return cols, err
 }
 
+// TrashedCollections — плоский список корзины пользователя (вложенности
+// внутри корзины нет, как в Windows: всё одним списком).
+func (r *CollectionStore) TrashedCollections(ctx context.Context, userID uint, limit, offset int) ([]models.Collection, error) {
+	q := r.db.WithContext(ctx).Unscoped().
+		Where("user_id = ? AND deleted_at IS NOT NULL", userID).
+		Order("deleted_at DESC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if offset > 0 {
+		q = q.Offset(offset)
+	}
+	var cols []models.Collection
+	err := q.Find(&cols).Error
+	return cols, err
+}
+
+// FindTrashedCollection грузит trashed-строку своего пользователя.
+// Живая, чужая или отсутствующая — ErrNotInTrash (везде 404).
+func (r *CollectionStore) FindTrashedCollection(ctx context.Context, userID, id uint) (*models.Collection, error) {
+	var col models.Collection
+	if err := r.db.WithContext(ctx).Unscoped().First(&col, id).Error; err != nil {
+		return nil, err
+	}
+	if col.UserID != userID || !col.DeletedAt.Valid {
+		return nil, ErrNotInTrash
+	}
+	return &col, nil
+}
+
+// ErrNotInTrash — строка не в корзине (живая или чужая): везде 404,
+// чтобы не раскрывать чужие данные.
+var ErrNotInTrash = errors.New("not found in trash")
+
 // ErrCycle — перенос коллекции под саму себя или своего потомка.
 var ErrCycle = errors.New("collection move would create a cycle")
 
@@ -80,14 +114,27 @@ var ErrCrossType = errors.New("parent collection has different type")
 // subtreeIDs возвращает id всей ветки под ancestorID (без него самого)
 // одним рекурсивным запросом — без лимита глубины. UNION (не ALL):
 // дедупликация завершает запрос даже при цикле в битых данных.
-func subtreeIDs(db *gorm.DB, ancestorID uint) ([]uint, error) {
+// includeTrashed — для операций корзины; живые операции видят только
+// неудалённые (сырой SQL GORM-фильтр soft delete не применяет).
+func subtreeIDs(db *gorm.DB, ancestorID uint, includeTrashed bool) ([]uint, error) {
 	var ids []uint
-	err := db.Raw(`
-		WITH RECURSIVE subtree(id) AS (
-			SELECT id FROM collections WHERE parent_id = ?
-			UNION
-			SELECT c.id FROM collections c JOIN subtree s ON c.parent_id = s.id
-		) SELECT id FROM subtree`, ancestorID).Scan(&ids).Error
+	var err error
+	if includeTrashed {
+		err = db.Raw(`
+			WITH RECURSIVE subtree(id) AS (
+				SELECT id FROM collections WHERE parent_id = ?
+				UNION
+				SELECT c.id FROM collections c JOIN subtree s ON c.parent_id = s.id
+			) SELECT id FROM subtree`, ancestorID).Scan(&ids).Error
+	} else {
+		err = db.Raw(`
+			WITH RECURSIVE subtree(id) AS (
+				SELECT id FROM collections WHERE parent_id = ? AND deleted_at IS NULL
+				UNION
+				SELECT c.id FROM collections c JOIN subtree s
+					ON c.parent_id = s.id WHERE c.deleted_at IS NULL
+			) SELECT id FROM subtree`, ancestorID).Scan(&ids).Error
+	}
 	return ids, err
 }
 
@@ -101,7 +148,7 @@ func (r *CollectionStore) IsDescendant(ctx context.Context, ancestorID, descenda
 // isDescendant — та же проверка на произвольном *gorm.DB (в т.ч. внутри
 // транзакции): единый код вместо дубля IsDescendant/isDescendantTx.
 func isDescendant(db *gorm.DB, ancestorID, descendantID uint) (bool, error) {
-	ids, err := subtreeIDs(db, ancestorID)
+	ids, err := subtreeIDs(db, ancestorID, false)
 	if err != nil {
 		return false, err
 	}
@@ -250,24 +297,103 @@ func applyParentTx(tx *gorm.DB, col *models.Collection, parentID uint) error {
 }
 
 func (r *CollectionStore) Delete(ctx context.Context, id uint) error {
-	// Владение проверяет вызывающий хендлер (getOwnedCollection до Delete):
-	// репозиторий user_id не скоупит осознанно — тот же подход, что у
-	// Remove/FindByCollection (решение, а не упущение).
-	// Удаление поддерева целиком одним рекурсивным запросом: id всех
-	// потомков — CTE, затем два DELETE ... IN. Без N-запросной рекурсии
-	// в открытой write-транзакции и с завершением даже при цикле
-	// в битых данных (UNION дедуплицирует).
+	// Корзина: помечаем всё поддерево, связи и элементы не трогаем —
+	// восстановление мгновенное. Владение проверяет вызывающий хендлер
+	// (getOwnedCollection до Delete): репозиторий user_id не скоупит
+	// осознанно — тот же подход, что у Remove/FindByCollection
+	// (решение, а не упущение).
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		ids, err := subtreeIDs(tx, id)
+		ids, err := subtreeIDs(tx, id, false)
 		if err != nil {
 			return err
 		}
 		ids = append(ids, id)
-		if err := tx.Where("collection_id IN ?", ids).Delete(&models.CollectionItem{}).Error; err != nil {
+		return tx.Model(&models.Collection{}).
+			Where("id IN ?", ids).
+			Update("deleted_at", time.Now().UTC()).Error
+	})
+}
+
+// RestoreCollection возвращает коллекцию из корзины вместе с
+// поддеревом, удалённым вместе с ней. Родитель недоступен (тоже
+// в корзине или снесён) — коллекция встаёт в корень, а не в никуда.
+func (r *CollectionStore) RestoreCollection(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var col models.Collection
+		if err := tx.Unscoped().First(&col, id).Error; err != nil {
 			return err
 		}
-		return tx.Where("id IN ?", ids).Delete(&models.Collection{}).Error
+		ids, err := subtreeIDs(tx.Unscoped(), id, true)
+		if err != nil {
+			return err
+		}
+		ids = append(ids, id)
+		if err := tx.Unscoped().Model(&models.Collection{}).
+			Where("id IN ? AND deleted_at IS NOT NULL", ids).
+			Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		if col.ParentID != nil {
+			var parent models.Collection
+			if err := tx.First(&parent, *col.ParentID).Error; err != nil {
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				// Родителя нет среди живых — в корень.
+				return tx.Unscoped().Model(&models.Collection{}).
+					Where("id = ?", id).
+					Update("parent_id", nil).Error
+			}
+			// Сохранившийся родитель обязан совпадать по владельцу
+			// и типу (инвариант SetParent): битые/легаси-данные иначе
+			// воскресят невозможную конфигурацию — тоже в корень.
+			if parent.UserID != col.UserID || parent.Type != col.Type {
+				return tx.Unscoped().Model(&models.Collection{}).
+					Where("id = ?", id).
+					Update("parent_id", nil).Error
+			}
+		}
+		return nil
 	})
+}
+
+// PurgeCollection сносит поддерево навсегда: элементы, затем строки.
+// Файлов у коллекций нет — стирать с диска нечего.
+func (r *CollectionStore) PurgeCollection(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		ids, err := subtreeIDs(tx.Unscoped(), id, true)
+		if err != nil {
+			return err
+		}
+		ids = append(ids, id)
+		if err := tx.Unscoped().Where("collection_id IN ?", ids).Delete(&models.CollectionItem{}).Error; err != nil {
+			return err
+		}
+		return tx.Unscoped().Where("id IN ?", ids).Delete(&models.Collection{}).Error
+	})
+}
+
+// SubtreeStats считает живые подколлекции и элементы поддерева
+// рекурсивно — для confirm-диалога («2 подколлекции и 24 файла»).
+func (r *CollectionStore) SubtreeStats(ctx context.Context, id uint) (collections int64, items int64, err error) {
+	db := r.db.WithContext(ctx)
+	ids, err := subtreeIDs(db, id, false)
+	if err != nil {
+		return 0, 0, err
+	}
+	// Рекурсивно: все уровни, а не только прямые дети. Элементы
+	// самой коллекции тоже считаются — иначе confirm занижает,
+	// а purge сносит больше показанного.
+	collections = int64(len(ids))
+	withSelf := make([]uint, 0, len(ids)+1)
+	withSelf = append(withSelf, ids...)
+	withSelf = append(withSelf, id)
+	if err := db.Model(&models.CollectionItem{}).
+		Where("collection_id IN ?", withSelf).
+		Count(&items).Error; err != nil {
+		return 0, 0, err
+	}
+	return collections, items, nil
 }
 
 type CollectionItemStore struct {

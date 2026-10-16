@@ -21,6 +21,11 @@ func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, mediaType s
 	var favs []models.Favorite
 	var total int64
 	query := r.db.WithContext(ctx).Model(&models.Favorite{}).Where("user_id = ?", userID)
+	// Корзина: избранное на удалённые медиа скрываем подзапросом, а не
+	// JOIN — у artist-избранного media_id NULL, INNER JOIN его бы уронил.
+	// Подзапрос вместо JOIN заодно не требует знать имя таблицы media.
+	trashed := r.db.Model(&models.Media{}).Unscoped().Where("deleted_at IS NOT NULL").Select("id")
+	query = query.Where("favorites.media_id IS NULL OR favorites.media_id NOT IN (?)", trashed)
 	if mediaType != "" {
 		// Filter media favorites by the media's type (video/audio).
 		query = query.Joins("JOIN media ON media.id = favorites.media_id").

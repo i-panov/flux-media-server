@@ -7,6 +7,7 @@ import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_detail_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/trash/presentation/utils/refresh.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
 /// Выбор файла и загрузка новой обложки медиа.
@@ -58,9 +59,10 @@ Future<void> changeMediaCover(
   }
 }
 
-/// Диалог подтверждения и удаление медиа.
+/// Диалог подтверждения и удаление медиа в корзину.
 ///
 /// Общая точка для выпадающего меню трека и detail-экрана.
+/// Файл остаётся на диске — восстановление из корзины мгновенное.
 /// [popOnSuccess] — закрыть текущий экран после удаления.
 Future<void> deleteMediaWithConfirm(
   BuildContext context,
@@ -73,7 +75,7 @@ Future<void> deleteMediaWithConfirm(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(l.delete),
-      content: Text(l.deleteMediaConfirmation),
+      content: Text(l.moveMediaToTrash),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
@@ -97,7 +99,10 @@ Future<void> deleteMediaWithConfirm(
       showFailureSnackBar(context, failure);
     },
     (_) {
-      refreshMediaLists(ref);
+      // Списки, избранное, офлайн и корзина — одним хелпером
+      // (refreshMediaLists внутри него).
+      refreshAfterTrashChange(ref);
+      showTextSnackBar(context, l.movedToTrash);
       if (popOnSuccess) Navigator.of(context).maybePop();
     },
   );

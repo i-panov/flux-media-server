@@ -178,7 +178,7 @@ func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen
 		deleted := false
 		for _, m := range mediaList {
 			if _, ok := seen[m.FilePath]; !ok {
-				if err := s.mediaRepo.Delete(ctx, m.ID); err != nil {
+				if err := s.mediaRepo.PurgeMedia(ctx, m.ID); err != nil {
 					log.Printf("Sweep: delete media %d (%s): %v", m.ID, m.FilePath, err)
 				} else {
 					deleted = true
@@ -320,7 +320,7 @@ func (s *ScannerService) removeMediaForPath(ctx context.Context, path string) {
 		return
 	}
 
-	if err := s.mediaRepo.Delete(ctx, existing.ID); err != nil {
+	if err := s.mediaRepo.PurgeMedia(ctx, existing.ID); err != nil {
 		log.Printf("watch scan: delete media %d (%s): %v", existing.ID, path, err)
 		return
 	}
@@ -368,6 +368,12 @@ func (s *ScannerService) scanFile(ctx context.Context, path string) {
 		return
 	}
 	if err == nil && existing != nil {
+		// Корзина: файл с trashed-строкой не импортируем дублем
+		// и не обновляем — seen уже помечен вызывающим, sweep
+		// (scoped) строку не видит и не тронет.
+		if existing.DeletedAt.Valid {
+			return
+		}
 		s.updateChangedFile(ctx, path, info, existing)
 		return
 	}

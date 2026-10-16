@@ -1160,6 +1160,90 @@ abstract class AppLocalizations {
   /// **'No collections'**
   String get noCollections;
 
+  /// No description provided for @trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash'**
+  String get trash;
+
+  /// No description provided for @trashEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash is empty'**
+  String get trashEmpty;
+
+  /// No description provided for @restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restore;
+
+  /// No description provided for @restored.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored'**
+  String get restored;
+
+  /// No description provided for @deleteForever.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete forever'**
+  String get deleteForever;
+
+  /// No description provided for @purged.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently deleted'**
+  String get purged;
+
+  /// No description provided for @emptyTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty trash'**
+  String get emptyTrash;
+
+  /// No description provided for @emptyTrashConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete everything in trash? Files will be erased from disk.'**
+  String get emptyTrashConfirm;
+
+  /// No description provided for @trashEmptied.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash emptied'**
+  String get trashEmptied;
+
+  /// No description provided for @purgeMediaConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete \"{name}\"? The file will be erased from disk.'**
+  String purgeMediaConfirm(String name);
+
+  /// No description provided for @purgeCollectionConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete \"{name}\" with its contents?'**
+  String purgeCollectionConfirm(String name);
+
+  /// No description provided for @movedToTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to trash'**
+  String get movedToTrash;
+
+  /// No description provided for @moveMediaToTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'Move file to trash? You can restore it later.'**
+  String get moveMediaToTrash;
+
+  /// No description provided for @deleteCollectionTrashConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Move \"{name}\" to trash ({sub} subcollections, {files} files)?'**
+  String deleteCollectionTrashConfirm(String name, int sub, int files);
+
   /// No description provided for @goToParent.
   ///
   /// In en, this message translates to:

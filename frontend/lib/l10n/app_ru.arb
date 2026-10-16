@@ -422,6 +422,58 @@
   "@itemMoved": {},
   "noCollections": "Нет коллекций",
   "@noCollections": {},
+  "trash": "Корзина",
+  "@trash": {},
+  "trashEmpty": "Корзина пуста",
+  "@trashEmpty": {},
+  "restore": "Восстановить",
+  "@restore": {},
+  "restored": "Восстановлено",
+  "@restored": {},
+  "deleteForever": "Удалить навсегда",
+  "@deleteForever": {},
+  "purged": "Удалено навсегда",
+  "@purged": {},
+  "emptyTrash": "Очистить корзину",
+  "@emptyTrash": {},
+  "emptyTrashConfirm": "Удалить всё из корзины навсегда? Файлы будут стёрты с диска.",
+  "@emptyTrashConfirm": {},
+  "trashEmptied": "Корзина очищена",
+  "@trashEmptied": {},
+  "purgeMediaConfirm": "Удалить \"{name}\" навсегда? Файл будет стёрт с диска.",
+  "@purgeMediaConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "purgeCollectionConfirm": "Удалить \"{name}\" навсегда вместе с содержимым?",
+  "@purgeCollectionConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "movedToTrash": "Перемещено в корзину",
+  "@movedToTrash": {},
+  "moveMediaToTrash": "Переместить файл в корзину? Потом можно восстановить.",
+  "@moveMediaToTrash": {},
+  "deleteCollectionTrashConfirm": "Переместить \"{name}\" в корзину (подколлекций: {sub}, файлов: {files})?",
+  "@deleteCollectionTrashConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "sub": {
+        "type": "int"
+      },
+      "files": {
+        "type": "int"
+      }
+    }
+  },
   "goToParent": "К родительской",
   "@goToParent": {},
   "failedToLoadCollections": "Не удалось загрузить коллекции",

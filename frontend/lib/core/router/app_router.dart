@@ -14,6 +14,7 @@ import 'package:flux_media_server/features/player/presentation/screens/audio_pla
 import 'package:flux_media_server/features/player/presentation/widgets/audio_mini_player.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/server_setup_screen.dart';
 import 'package:flux_media_server/features/settings/presentation/screens/settings_screen.dart';
+import 'package:flux_media_server/features/trash/presentation/screens/trash_screen.dart';
 import 'package:flux_media_server/features/video/presentation/screens/video_detail_screen.dart';
 import 'package:flux_media_server/features/video/presentation/screens/video_screen.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
@@ -46,6 +47,7 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: SettingsRoute.page, guards: [authGuard]),
     AutoRoute(page: ArtistRoute.page, guards: [authGuard]),
     AutoRoute(page: CollectionDetailRoute.page, guards: [authGuard]),
+    AutoRoute(page: TrashRoute.page, guards: [authGuard]),
   ];
 }
 

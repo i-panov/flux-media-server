@@ -283,6 +283,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
+          // Trash entry: заголовок секции не дублируем — один ListTile
+          // с тем же текстом ниже выглядел бы повтором.
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: Text(l.trash),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  unawaited(context.router.push(const TrashRoute())),
+            ),
+          ),
+          const SizedBox(height: 24),
+
           // Language section
           Text(l.language, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
+import 'package:flux_media_server/core/widgets/error_retry_view.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 

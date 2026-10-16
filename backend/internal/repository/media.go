@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"flux/internal/metadata"
 	"flux/internal/models"
@@ -92,7 +93,10 @@ func (r *MediaStore) FindByID(ctx context.Context, id uint) (*models.Media, erro
 
 func (r *MediaStore) FindByPath(ctx context.Context, path string) (*models.Media, error) {
 	var media models.Media
-	err := r.db.WithContext(ctx).
+	// Unscoped: дедуп видит и корзину — файл с trashed-строкой не
+	// импортируется дублем, а пропуск дубликата решает вызывающий
+	// (сканер) по DeletedAt.
+	err := r.db.WithContext(ctx).Unscoped().
 		Preload("Metadata").
 		Where("file_path = ?", path).First(&media).Error
 	if err != nil {
@@ -110,9 +114,10 @@ func (r *MediaStore) FindByPath(ctx context.Context, path string) (*models.Media
 // FindByPathBasic ищет медиа по пути ОДНИМ дешёвым SELECT без Preload
 // (Metadata/Artists). Для горячих путей, где полный объект не нужен
 // (например, сканер при полном скане: FindByPath делает 3 запроса на файл).
+// Unscoped — как FindByPath: trashed-строка тоже «существует».
 func (r *MediaStore) FindByPathBasic(ctx context.Context, path string) (*models.Media, error) {
 	var media models.Media
-	err := r.db.WithContext(ctx).Where("file_path = ?", path).First(&media).Error
+	err := r.db.WithContext(ctx).Unscoped().Where("file_path = ?", path).First(&media).Error
 	return &media, err
 }
 
@@ -138,7 +143,13 @@ func (r *MediaStore) FindByIDs(ctx context.Context, ids []uint) ([]models.Media,
 
 func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media, error) {
 	var media models.Media
-	err := r.db.WithContext(ctx).Where("file_hash = ?", hash).First(&media).Error
+	// Unscoped: дедуп загрузок видит корзину — повторная загрузка того
+	// же файла честно отвечает 409, а не плодит дубль.
+	// Детерминированный порядок: живые строки раньше trashed
+	// (в SQLite NULL меньше всего, ASC ставит их первыми) — иначе
+	// при живом дубле вернулась бы корзина и upload пошёл бы
+	// по ветке restore вместо честного 409.
+	err := r.db.WithContext(ctx).Unscoped().Where("file_hash = ?", hash).Order("deleted_at").Order("id").First(&media).Error
 	return &media, err
 }
 
@@ -361,14 +372,106 @@ func escapeLike(s string) string {
 }
 
 func (r *MediaStore) Delete(ctx context.Context, id uint) error {
-	// Delete the media record and its dependent rows (favorites, progress,
-	// lyrics, collection items, artist links) atomically to avoid orphaned data.
+	// Корзина: только флаг, без каскадов и без файлов — связи
+	// (избранное, прогресс, коллекции) и восстановление целы.
+	// Файл остаётся на диске: сканер пропускает trashed-строки
+	// и дублей не создаёт. Навсегда — PurgeMedia.
+	return r.db.WithContext(ctx).Model(&models.Media{}).
+		Where("id = ?", id).
+		Update("deleted_at", time.Now().UTC()).Error
+}
+
+// ErrPathConflict — восстановление невозможно: путь уже занят живой строкой.
+var ErrPathConflict = errors.New("live media already exists at this path")
+
+// RestoreMedia возвращает медиа из корзины. Файл всё время лежал
+// на диске — пересканировать не нужно. Живой дубль по пути — 409.
+func (r *MediaStore) RestoreMedia(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var media models.Media
+		if err := tx.Unscoped().First(&media, id).Error; err != nil {
+			return err
+		}
+		if !media.DeletedAt.Valid {
+			// Живая строка — восстанавливать нечего: 404 как у purge
+			// и коллекций, а не молчаливый 200.
+			return ErrNotInTrash
+		}
+		var live int64
+		if err := tx.Model(&models.Media{}).
+			Where("file_path = ? AND id <> ?", media.FilePath, id).
+			Count(&live).Error; err != nil {
+			return err
+		}
+		if live > 0 {
+			return ErrPathConflict
+		}
+		return tx.Unscoped().Model(&models.Media{}).
+			Where("id = ?", id).
+			Update("deleted_at", nil).Error
+	})
+}
+
+// PurgeMedia сносит медиа навсегда: связи каскадом, строка — hard,
+// файлы стирает вызывающий хендлер (как раньше делал Delete).
+// Metadata сносится тоже, но только если на неё никто больше
+// не ссылается (защита от shared-строк).
+func (r *MediaStore) PurgeMedia(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var media models.Media
+		if err := tx.Unscoped().Select("id", "metadata_id").First(&media, id).Error; err != nil {
+			return err
+		}
 		if err := cascadeDelete(tx, "media_id", id,
 			&models.Favorite{}, &models.WatchProgress{}, &models.Lyrics{},
 			&models.CollectionItem{}, &models.MediaArtist{}); err != nil {
 			return err
 		}
-		return tx.Delete(&models.Media{}, id).Error
+		if err := tx.Unscoped().Delete(&models.Media{}, id).Error; err != nil {
+			return err
+		}
+		if media.MetadataID != nil {
+			var refs int64
+			if err := tx.Model(&models.Media{}).Unscoped().
+				Where("metadata_id = ?", *media.MetadataID).
+				Count(&refs).Error; err != nil {
+				return err
+			}
+			if refs == 0 {
+				if err := tx.Unscoped().Delete(&models.Metadata{}, *media.MetadataID).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
+}
+
+// FindTrashedMedia грузит trashed-строку медиа. Живая или
+// отсутствующая — ErrNotInTrash / NotFound (purge и restore работают
+// только с корзиной).
+func (r *MediaStore) FindTrashedMedia(ctx context.Context, id uint) (*models.Media, error) {
+	var media models.Media
+	if err := r.db.WithContext(ctx).Unscoped().First(&media, id).Error; err != nil {
+		return nil, err
+	}
+	if !media.DeletedAt.Valid {
+		return nil, ErrNotInTrash
+	}
+	return &media, nil
+}
+
+// TrashedMedia — плоский список корзины (вложенности у медиа нет).
+func (r *MediaStore) TrashedMedia(ctx context.Context, limit, offset int) ([]models.Media, error) {
+	var media []models.Media
+	q := r.db.WithContext(ctx).Unscoped().
+		Where("deleted_at IS NOT NULL").
+		Order("deleted_at DESC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if offset > 0 {
+		q = q.Offset(offset)
+	}
+	return media, q.Find(&media).Error
 }

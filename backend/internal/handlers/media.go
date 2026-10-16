@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"log"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -202,49 +201,21 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 
 	ctx := c.UserContext()
 
-	// Get media record to find file path.
-	media, err := h.mediaRepo.FindByID(ctx, id)
-	if err != nil {
+	// Get media record for the response (path no longer needed here:
+	// файл при уходе в корзину остаётся на диске для восстановления).
+	if _, err := h.mediaRepo.FindByID(ctx, id); err != nil {
 		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
-	// Delete the database record FIRST. If this fails the files remain on
-	// disk (safe — they can be cleaned up later). If we deleted files first
-	// and the DB delete failed, we'd be left with a "broken" record pointing
-	// to non-existent files.
+	// Корзина: только флаг. Связи (избранное, прогресс, коллекции)
+	// и файл целы — восстановление мгновенное. Навсегда — purge
+	// в trash-хендлере (там же стирание файлов с диска).
 	if err := h.mediaRepo.Delete(ctx, id); err != nil {
 		log.Printf("Delete: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to delete media")
 	}
 
-	// Физический файл удаляем ТОЛЬКО если он лежит в зарегистрированной
-	// библиотеке — иначе Delete мог бы стереть произвольный файл системы
-	// по пути, проставленному вручную (Create/Update проходят проверку,
-	// но путь мог быть изменён в БД извне).
-	if media.FilePath != "" {
-		allowed, err := h.streamer.IsPathAllowed(ctx, media.FilePath)
-		if err != nil {
-			log.Printf("Delete: IsPathAllowed %s: %v", media.FilePath, err)
-		} else if !allowed {
-			log.Printf("Delete: skip removing %s — outside registered libraries", media.FilePath)
-		} else if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Delete: remove file %s: %v", media.FilePath, err)
-		}
-	}
-
-	// Delete thumbnail — файл ищется по ID, а не по ThumbnailURL
-	// (в БД теперь относительный URL, а не путь ФС).
-	if h.thumbSvc != nil {
-		thumbPath := h.thumbSvc.GetPath(media.ID)
-		if err := os.Remove(thumbPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Delete: remove thumbnail %s: %v", thumbPath, err)
-		}
-
-		// Delete cover (все известные форматы).
-		h.thumbSvc.RemoveCovers(media.ID)
-	}
-
-	return c.JSON(fiber.Map{"message": "Media deleted successfully"})
+	return c.JSON(fiber.Map{"message": "Media moved to trash"})
 }
 
 func (h *MediaHandler) CheckHash(c *fiber.Ctx) error {
@@ -271,6 +242,9 @@ func (h *MediaHandler) CheckHash(c *fiber.Ctx) error {
 	if existing != nil {
 		return c.JSON(fiber.Map{
 			"exists": true,
+			// Корзина видна дедупу: клиент различит «уже в библиотеке»
+			// и «лежит в корзине — предложи восстановить».
+			"trashed": existing.DeletedAt.Valid,
 			"media": fiber.Map{
 				"id":    existing.ID,
 				"title": existing.Title,

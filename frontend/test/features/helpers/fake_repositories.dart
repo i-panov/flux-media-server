@@ -3,6 +3,8 @@ import 'package:flux_media_server/features/collections/domain/repositories/colle
 import 'package:flux_media_server/features/favorites/domain/repositories/favorites_repository.dart';
 import 'package:flux_media_server/features/lyrics/domain/repositories/lyrics_cache_repository.dart';
 import 'package:flux_media_server/features/lyrics/domain/repositories/lyrics_repository.dart';
+import 'package:flux_media_server/features/trash/data/trash_remote_datasource.dart';
+import 'package:flux_media_server/features/trash/domain/trash_repository.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/favorite.dart';
 import 'package:flux_media_server/shared/models/lyrics.dart';
@@ -189,6 +191,71 @@ class FakeLyricsRepository implements LyricsRepository {
     source: source,
     translation: translation,
     syncData: syncData,
+  );
+}
+
+class FakeTrashRepository implements TrashRepository {
+  TrashContents contents = const TrashContents(collections: [], media: []);
+  Object? error;
+
+  int restoreMediaCalls = 0;
+  int purgeMediaCalls = 0;
+  int restoreCollectionCalls = 0;
+  int purgeCollectionCalls = 0;
+  int emptyCalls = 0;
+
+  Either<Failure, T> _result<T>(T value) {
+    if (error != null) {
+      return Left(ServerFailure(message: error.toString()));
+    }
+    return Right(value);
+  }
+
+  @override
+  Future<Either<Failure, TrashContents>> getTrash() async =>
+      _result(contents);
+
+  @override
+  Future<Either<Failure, void>> restoreMedia(int id) async {
+    restoreMediaCalls++;
+    return _result(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> purgeMedia(int id) async {
+    purgeMediaCalls++;
+    return _result(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> restoreCollection(int id) async {
+    restoreCollectionCalls++;
+    return _result(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> purgeCollection(int id) async {
+    purgeCollectionCalls++;
+    return _result(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> emptyTrash() async {
+    emptyCalls++;
+    return _result(null);
+  }
+
+  @override
+  Future<Either<Failure, CollectionStats>> getCollectionStats(int id) async {
+    statsCalls.add(id);
+    return _result(statsResult);
+  }
+
+  final List<int> statsCalls = [];
+
+  CollectionStats statsResult = const CollectionStats(
+    subcollections: 0,
+    items: 0,
   );
 }
 

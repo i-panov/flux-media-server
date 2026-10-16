@@ -190,7 +190,11 @@ func TestRunMigrationsDropsLegacyUniqueFilePathIndex(t *testing.T) {
 	fresh := &models.Media{Title: "New", Type: models.MediaTypeAudio, FilePath: "/a.mp3"}
 	require.NoError(t, store.Create(ctx, fresh))
 
+	// FindByPath — дедуп-видимый (Unscoped): находит строку по пути
+	// даже если она в корзине — сканер по этому пропустит дубль.
+	// Какую из двух вернёт при дубле — не детерминировано и не важно:
+	// оба исхода безопасны (живая обновится / trashed пропустится).
 	found, err := store.FindByPath(ctx, "/a.mp3")
 	require.NoError(t, err)
-	assert.Equal(t, fresh.ID, found.ID)
+	assert.Equal(t, "/a.mp3", found.FilePath)
 }

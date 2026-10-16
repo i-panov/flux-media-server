@@ -282,7 +282,9 @@ func TestMediaStore_DeleteCascadesArtistLinks(t *testing.T) {
 	require.NoError(t, store.Create(ctx, media))
 	require.NoError(t, db.Exec("INSERT INTO media_artists (media_id, artist_id) VALUES (?, ?)", media.ID, artist.ID).Error)
 
-	require.NoError(t, store.Delete(ctx, media.ID))
+	// Каскады — только при purge: корзина (Delete) связи не трогает,
+	// чтобы восстановление возвращало всё как было.
+	require.NoError(t, store.PurgeMedia(ctx, media.ID))
 
 	var links int64
 	require.NoError(t, db.Model(&models.MediaArtist{}).Where("media_id = ?", media.ID).Count(&links).Error)

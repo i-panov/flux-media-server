@@ -276,6 +276,26 @@ func (q *UploadQueue) process(job *UploadJob) {
 		return
 	}
 	if existing != nil && existing.ID != 0 {
+		// Дубль по хэшу из корзины: не 409, а восстановление —
+		// пользователь явно вернул тот же файл. Но только если файл
+		// реально на месте: иначе зальёт заново, удалит хорошую копию
+		// и воскресит указатель в никуда.
+		if existing.DeletedAt.Valid {
+			if st, statErr := os.Stat(existing.FilePath); statErr != nil || st.IsDir() {
+				os.Remove(job.filePath)
+				q.fail(job, errDuplicateUpload, "Original file is missing")
+				return
+			}
+			os.Remove(job.filePath)
+			if err := q.media.RestoreMedia(ctx, existing.ID); err != nil {
+				q.fail(job, err, "Failed to restore media")
+				return
+			}
+			// Джоба завершается успехом с восстановленной записью:
+			// клиент увидит трек без повторной загрузки.
+			q.succeedRestore(job, existing.ID)
+			return
+		}
 		// Дубль по хэшу: запись не создаём, файл удаляем. Сообщение не
 		// раскрывает путь к существующему файлу.
 		q.fail(job, errDuplicateUpload, "File already exists")
@@ -383,6 +403,19 @@ func (q *UploadQueue) process(job *UploadJob) {
 	q.mu.Unlock()
 }
 
+// succeedRestore завершает джобу успехом на восстановленной из корзины
+// записи: метаданные/обложки уже в БД и на диске, делать нечего.
+func (q *UploadQueue) succeedRestore(job *UploadJob, mediaID uint) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if job.Status == uploadJobCancelled {
+		return
+	}
+	job.Status = UploadJobDone
+	job.MediaID = mediaID
+	job.Error = ""
+}
+
 // cancelledSnapshot под одним локом проверяет отмену задания и снимает
 // снапшот его ресурсов (для последующей очистки вне q.mu).
 func (q *UploadQueue) cancelledSnapshot(job *UploadJob) (jobResources, bool) {
@@ -487,7 +520,10 @@ func (q *UploadQueue) cleanupJobResources(res jobResources) {
 		}
 	}
 	if res.mediaID != 0 {
-		if err := q.media.Delete(context.Background(), res.mediaID); err != nil {
+		// Purge, а не Delete-корзина: файл уже стёрт выше, запись
+		// недосозданная — восстанавливать нечего, а trashed-строка
+		// с висячим путём только плодила бы мусор.
+		if err := q.media.PurgeMedia(context.Background(), res.mediaID); err != nil {
 			log.Printf("upload queue: delete media %d for job %d: %v", res.mediaID, res.jobID, err)
 		}
 		q.thumbSvc.RemoveCovers(res.mediaID)

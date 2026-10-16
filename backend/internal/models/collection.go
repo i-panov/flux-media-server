@@ -2,6 +2,8 @@ package models
 
 import "time"
 
+import "gorm.io/gorm"
+
 // Collection — пользовательская подборка медиа (например, «Хочу посмотреть»).
 type Collection struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
@@ -16,6 +18,10 @@ type Collection struct {
 	ParentID  *uint     `gorm:"index:idx_collections_parent" json:"parent_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	// DeletedAt — корзина (GORM soft delete: обычные запросы trashed
+	// не видят, сырой SQL ниже фильтрует вручную). Файлов у коллекций
+	// нет — удаляются только связи, восстановление мгновенное.
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
 
 // CollectionItem links a media item to a collection.

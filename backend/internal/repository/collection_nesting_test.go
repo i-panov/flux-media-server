@@ -164,13 +164,15 @@ func TestCollectionStore_DeleteCascadesSubtree(t *testing.T) {
 	_, err = itemStore.AddItemAtomic(ctx, season, 42)
 	require.NoError(t, err)
 
+	// Корзина: поддерево скрыто из живых запросов, но строки
+	// и элементы целы (восстановление — в TrashRestorePurge).
 	require.NoError(t, store.Delete(ctx, root))
 
 	_, err = store.FindByID(ctx, season)
-	assert.Error(t, err, "дочерняя коллекция удалена вместе с корнем")
+	assert.Error(t, err, "дочерняя коллекция скрыта вместе с корнем")
 	items, err := itemStore.FindByCollection(ctx, season)
 	require.NoError(t, err)
-	assert.Empty(t, items, "элементы поддерева удалены")
+	require.Len(t, items, 1, "элементы целы для восстановления")
 }
 
 func TestCollectionItemStore_MoveItemAtomic(t *testing.T) {
@@ -458,4 +460,82 @@ func TestCollectionItemStore_MoveItemAtomic_Opposite(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, bItems, 1)
 	assert.Equal(t, uint(1), bItems[0].MediaID)
+}
+
+func TestCollectionStore_TrashRestorePurge(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewCollectionRepository(db)
+	itemStore := NewCollectionItemRepository(db)
+	ctx := context.Background()
+
+	root := mkCollection(t, store, ctx, 1, "Сериал")
+	season := mkCollection(t, store, ctx, 1, "S01")
+	require.NoError(t, store.SetParent(ctx, season, &root))
+	mkMedia(t, db, 5)
+	_, err = itemStore.AddItemAtomic(ctx, season, 5)
+	require.NoError(t, err)
+
+	// В корзину: из списков исчезли, связи целы.
+	require.NoError(t, store.Delete(ctx, root))
+	cols, err := store.FindByUser(ctx, 1)
+	require.NoError(t, err)
+	assert.Empty(t, cols)
+	trashed, err := store.TrashedCollections(ctx, 1, 0, 0)
+	require.NoError(t, err)
+	require.Len(t, trashed, 2, "корень и сезон — плоским списком")
+
+	// Статистика живого поддерева — нули (всё в корзине).
+	cc, items, err := store.SubtreeStats(ctx, root)
+	require.NoError(t, err)
+	assert.Zero(t, cc)
+	assert.Zero(t, items)
+
+	// Восстановление: дерево и элемент на месте.
+	require.NoError(t, store.RestoreCollection(ctx, root))
+	cols, err = store.FindByUser(ctx, 1)
+	require.NoError(t, err)
+	assert.Len(t, cols, 2)
+	got, err := itemStore.FindByCollection(ctx, season)
+	require.NoError(t, err)
+	require.Len(t, got, 1, "элемент пережил корзину")
+
+	// Статистика живого дерева.
+	cc, items, err = store.SubtreeStats(ctx, root)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), cc)
+	assert.Equal(t, int64(1), items)
+
+	// Purge: строк нет даже в корзине.
+	require.NoError(t, store.PurgeCollection(ctx, root))
+	trashed, err = store.TrashedCollections(ctx, 1, 0, 0)
+	require.NoError(t, err)
+	assert.Empty(t, trashed)
+	got, err = itemStore.FindByCollection(ctx, season)
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+func TestCollectionStore_RestoreToRoot(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	root := mkCollection(t, store, ctx, 1, "Сериал")
+	season := mkCollection(t, store, ctx, 1, "S01")
+	require.NoError(t, store.SetParent(ctx, season, &root))
+	// Всё в корзине; восстанавливаем только сезон при trashed-родителе —
+	// дитя встаёт в корень, а не в никуда. Родитель остаётся в корзине.
+	require.NoError(t, store.Delete(ctx, root))
+	require.NoError(t, store.RestoreCollection(ctx, season))
+	found, err := store.FindByID(ctx, season)
+	require.NoError(t, err)
+	assert.Nil(t, found.ParentID, "родитель в корзине — в корень")
+	_, err = store.FindByID(ctx, root)
+	assert.Error(t, err, "родитель остался в корзине")
 }

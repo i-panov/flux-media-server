@@ -6,13 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
+import 'package:flux_media_server/core/widgets/error_retry_view.dart';
 import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
-import 'package:flux_media_server/features/audio/presentation/widgets/error_retry_view.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/utils/collection_tree.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_media_dialog.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/collection_grid_tile.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/move_to_collection_dialog.dart';
+import 'package:flux_media_server/features/trash/presentation/providers/trash_providers.dart';
+import 'package:flux_media_server/features/trash/presentation/utils/refresh.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -181,33 +183,55 @@ class _CollectionDetailScreenState
     );
   }
 
-  void _confirmDelete(BuildContext context) {
+  Future<void> _confirmDelete(BuildContext context) async {
     final l = AppLocalizations.of(context)!;
-    // Каскад: сервер сносит всё поддерево рекурсивно, молча удалять
-    // папку с сезонами одним тапом нельзя — считаем потомков из уже
-    // загруженного провайдера (без него — старый текст без счётчика).
-    final all =
-        ref.read(collectionsProvider).value ?? const <Collection>[];
-    final forest = buildCollectionTree(
-      all.where((c) => c.type == widget.collection.type).toList(),
-    );
-    CollectionNode? self;
-    void find(List<CollectionNode> nodes) {
-      for (final n in nodes) {
-        if (n.collection.id == widget.collection.id) {
-          self = n;
-          return;
+    // Счётчики — с сервера (подколлекции + файлы рекурсивно): клиентский
+    // подсчёт файлов потребовал бы N+1 запросов. Ошибка stats —
+    // fallback на клиентское дерево (без файлов).
+    var message = l.deleteCollectionConfirm(widget.collection.name);
+    final stats = await ref
+        .read(trashRepositoryProvider)
+        .getCollectionStats(widget.collection.id);
+    stats.fold(
+      (_) {
+        final all =
+            ref.read(collectionsProvider).value ?? const <Collection>[];
+        final forest = buildCollectionTree(
+          all.where((c) => c.type == widget.collection.type).toList(),
+        );
+        CollectionNode? self;
+        void find(List<CollectionNode> nodes) {
+          for (final n in nodes) {
+            if (n.collection.id == widget.collection.id) {
+              self = n;
+              return;
+            }
+            find(n.children);
+            if (self != null) return;
+          }
         }
-        find(n.children);
-        if (self != null) return;
-      }
-    }
 
-    find(forest);
-    final sub = self == null ? 0 : subtreeIds(self!).length - 1;
-    final message = sub > 0
-        ? l.deleteCollectionCascadeConfirm(widget.collection.name, sub)
-        : l.deleteCollectionConfirm(widget.collection.name);
+        find(forest);
+        final sub = self == null ? 0 : subtreeIds(self!).length - 1;
+        if (sub > 0) {
+          message = l.deleteCollectionCascadeConfirm(
+            widget.collection.name,
+            sub,
+          );
+        }
+      },
+      (s) {
+        // Пустая коллекция — короткий текст без шумных нулей.
+        message = (s.subcollections == 0 && s.items == 0)
+            ? l.deleteCollectionConfirm(widget.collection.name)
+            : l.deleteCollectionTrashConfirm(
+                widget.collection.name,
+                s.subcollections,
+                s.items,
+              );
+      },
+    );
+    if (!context.mounted) return;
     unawaited(
       showDialog<void>(
         context: context,
@@ -235,12 +259,17 @@ class _CollectionDetailScreenState
                     },
                     (_) {
                       ref.invalidate(collectionsProvider);
+                      refreshAfterTrashChange(ref);
+                      showTextSnackBar(context, l.movedToTrash);
                       unawaited(context.router.maybePop());
                     },
                   );
                 }
               },
-              child: Text(l.delete, style: const TextStyle(color: Colors.red)),
+              child: Text(
+                l.delete,
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
           ],
         ),

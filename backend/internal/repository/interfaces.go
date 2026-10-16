@@ -51,7 +51,17 @@ type MediaRepository interface {
 	// пропускает пустые значения, чтобы сканер и очередь не затирали
 	// ручные правки. nil = ссылку не трогать.
 	UpdateWithSourceURL(ctx context.Context, media *models.Media, sourceURL *string) error
+	// Delete — корзина: только флаг, связи/файлы целы, восстановление
+	// мгновенное. Навсегда — PurgeMedia.
 	Delete(ctx context.Context, id uint) error
+	// RestoreMedia возвращает из корзины; путь занят живым — ErrPathConflict.
+	RestoreMedia(ctx context.Context, id uint) error
+	// PurgeMedia сносит навсегда: связи каскадом, строка — hard.
+	PurgeMedia(ctx context.Context, id uint) error
+	// FindTrashedMedia грузит trashed-строку (живая — ErrNotInTrash).
+	FindTrashedMedia(ctx context.Context, id uint) (*models.Media, error)
+	// TrashedMedia — плоский список корзины.
+	TrashedMedia(ctx context.Context, limit, offset int) ([]models.Media, error)
 }
 
 // ProgressRepository defines data access methods for WatchProgress entities.
@@ -100,13 +110,25 @@ type CollectionRepository interface {
 	// транзакции и возвращает свежую строку для ответа. Единственная
 	// точка обновления (legacy-Update удалён, обхода запретов нет).
 	Patch(ctx context.Context, id uint, p CollectionPatch) (*models.Collection, error)
+	// Delete — корзина: помечает поддерево, связи и элементы на месте.
+	Delete(ctx context.Context, id uint) error
+	// RestoreCollection возвращает поддерево из корзины; при недоступном
+	// родителе коллекция встаёт в корень.
+	RestoreCollection(ctx context.Context, id uint) error
+	// PurgeCollection сносит поддерево навсегда (элементы + строки).
+	PurgeCollection(ctx context.Context, id uint) error
+	// TrashedCollections — плоский список корзины пользователя.
+	TrashedCollections(ctx context.Context, userID uint, limit, offset int) ([]models.Collection, error)
+	// FindTrashedCollection — trashed-строка своего пользователя.
+	FindTrashedCollection(ctx context.Context, userID, id uint) (*models.Collection, error)
+	// SubtreeStats — живые счётчики поддерева для confirm-диалога.
+	SubtreeStats(ctx context.Context, id uint) (collections int64, items int64, err error)
 	// SetParent переносит коллекцию под нового родителя (nil = в корень)
 	// с проверкой циклов и владения внутри одной транзакции.
 	SetParent(ctx context.Context, id uint, parentID *uint) error
 	// IsDescendant проверяет, лежит ли descendantID в поддереве ancestorID
 	// (защита от циклов при переносе).
 	IsDescendant(ctx context.Context, ancestorID, descendantID uint) (bool, error)
-	Delete(ctx context.Context, id uint) error
 }
 
 // CollectionItemRepository defines data access methods for CollectionItem entities.

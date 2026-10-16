@@ -293,6 +293,22 @@ class SettingsRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [TrashScreen]
+class TrashRoute extends PageRouteInfo<void> {
+  const TrashRoute({List<PageRouteInfo>? children})
+    : super(TrashRoute.name, initialChildren: children);
+
+  static const String name = 'TrashRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const TrashScreen();
+    },
+  );
+}
+
+/// generated route for
 /// [UploadScreen]
 class UploadRoute extends PageRouteInfo<UploadRouteArgs> {
   UploadRoute({

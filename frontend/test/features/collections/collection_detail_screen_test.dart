@@ -7,6 +7,8 @@ import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/screens/collection_detail_screen.dart';
+import 'package:flux_media_server/features/trash/data/trash_remote_datasource.dart';
+import 'package:flux_media_server/features/trash/presentation/providers/trash_providers.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:fpdart/fpdart.dart';
@@ -38,7 +40,7 @@ class _TestRouter extends RootStackRouter {
   ];
 }
 
-Future<void> pumpDetail(
+Future<FakeTrashRepository> pumpDetail(
   WidgetTester tester, {
   required Collection collection,
 }) async {
@@ -47,6 +49,7 @@ Future<void> pumpDetail(
   final fake = FakeCollectionsRepository()
     ..onGetCollections = (() async => Right(_all))
     ..onGetItemsFull = ((_) async => const Right([]));
+  final trashFake = FakeTrashRepository();
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: [
@@ -54,6 +57,7 @@ Future<void> pumpDetail(
       baseUrlProvider.overrideWithValue('http://test/api'),
       collectionsRepositoryProvider.overrideWithValue(fake),
       collectionsProvider.overrideWithValue(AsyncValue.data(_all)),
+      trashRepositoryProvider.overrideWithValue(trashFake),
     ],
   );
   addTearDown(container.dispose);
@@ -71,6 +75,7 @@ Future<void> pumpDetail(
     ),
   );
   await tester.pumpAndSettle();
+  return trashFake;
 }
 
 void main() {
@@ -87,12 +92,17 @@ void main() {
       expect(find.text('Subcollections'), findsNothing);
     });
 
-    testWidgets('delete с детьми предупреждает о каскаде', (tester) async {
-      await pumpDetail(tester, collection: _all[0]);
+    testWidgets('delete показывает счётчики из stats', (tester) async {
+      final trashFake = await pumpDetail(tester, collection: _all[0]);
+      trashFake.statsResult = const CollectionStats(
+        subcollections: 2,
+        items: 24,
+      );
       await tester.tap(find.byIcon(Icons.delete_outline));
       await tester.pumpAndSettle();
+      // Фейк stats: 2 подколлекции, 24 файла.
       expect(
-        find.text('Delete "Сериал" with subcollections (2)?'),
+        find.text('Move "Сериал" to trash (2 subcollections, 24 files)?'),
         findsOneWidget,
       );
     });

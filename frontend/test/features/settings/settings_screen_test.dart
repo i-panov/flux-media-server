@@ -72,6 +72,9 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
+      // Account-секция в самом низу списка: доскролливаем,
+      // иначе ListView её не монтирует (вне cacheExtent).
+      await tester.scrollUntilVisible(find.text('u@example.com'), 100);
 
       expect(find.text('u@example.com'), findsOneWidget);
       expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
@@ -80,9 +83,20 @@ void main() {
     testWidgets('без сессии email нет, только выход', (tester) async {
       await pumpScreen(tester, makeContainer());
       await tester.pump(const Duration(milliseconds: 100));
+      await tester.scrollUntilVisible(find.text('Logout'), 100);
 
       expect(find.text('u@example.com'), findsNothing);
       expect(find.text('Logout'), findsOneWidget);
+    });
+
+    // Вход в корзину: tile существует (тап не делаем — там router.push,
+    // для навигации есть TrashScreen-тесты).
+    testWidgets('показывает вход в корзину', (tester) async {
+      await pumpScreen(tester, makeContainer());
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.scrollUntilVisible(find.byIcon(Icons.delete_outline), 100);
+
+      expect(find.text('Trash'), findsOneWidget);
     });
   });
 }
