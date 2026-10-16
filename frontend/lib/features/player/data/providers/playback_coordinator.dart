@@ -152,6 +152,34 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   /// Последний токен, под которым загружен плейлист.
   String? _playlistToken;
 
+  /// Попыток перезагрузить текущий трек после ошибок движка подряд,
+  /// прежде чем пропустить его. Ошибка загрузки следующего трека в
+  /// фоне (401 на протухший часовой токен, затык сети) иначе убивала
+  /// очередь молча: ретрая не было, мини-плеер исчезал вместе
+  /// с состоянием, а кнопка play в уведомлении молчала (в idle-плеере
+  /// играть нечего).
+  static const _maxLoadRetries = 2;
+
+  /// Трек и счётчик подряд идущих ошибок загрузки. Сбрасываются при
+  /// смене индекса и по давности (редкие разрозненные затыки —
+  /// не повод пропускать трек).
+  int _loadErrorStreak = 0;
+  int _loadErrorIndex = -1;
+  DateTime? _loadErrorAt;
+
+  /// Редкие затыки подряд не считаем: окно в 5 минут.
+  static const _loadErrorWindow = Duration(minutes: 5);
+
+  /// Последняя ошибка движка: ручной повтор идёт через ту же ветку,
+  /// что и автоматический (включая refresh при 401), а не вслепую —
+  /// иначе при протухшем токене первый тап падал бы снова.
+  String _lastLoadError = 'manual retry';
+
+  /// Флаг активной рекавери-полосы: ошибки, прилетевшие во время неё
+  /// (mpv сообщает и об убитом перезагрузкой файле), вторую не стартуют.
+  /// Сериализация самой перезагрузки — через _startQueue внутри.
+  bool _recovering = false;
+
   /// Идёт ли сейчас mpv-команда плейлиста. Повторный вход изнутри неё
   /// — признак рекурсии маршрутизации (см. [_playlistCommand]).
   bool _inPlaylistCommand = false;
@@ -436,6 +464,9 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   /// событие смены токена; надёжность очереди важнее.
   void _onTokenChanged() {
     if (!_audioPlaylistActive) return;
+    // Рекавери уже перезагружает плейлист со свежим токеном сама:
+    // вторая параллельная перезагрузка только гоняет поколение.
+    if (_recovering) return;
     if (state is! PlaybackPlaying) return;
     final current = state as PlaybackPlaying;
     if (_playlistToken == _currentToken) return;
@@ -596,6 +627,14 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   void _onMpvPlaylistIndex(int index) {
     if (!_audioPlaylistActive) return;
     if (!_playlistIndexCtl.isClosed) _playlistIndexCtl.add(index);
+    // Смена трека обнуляет счётчик ошибок загрузки (рекавери считает
+    // подряд идущие на ОДНОМ треке; событие того же индекса после
+    // перезагрузки счётчик не трогает — иначе ретраи зациклятся).
+    if (index != _loadErrorIndex) {
+      _loadErrorIndex = index;
+      _loadErrorStreak = 0;
+      _loadErrorAt = null;
+    }
     // Во время загрузки состояние выставит _startQueue; позиция и
     // длительность там ещё пустые.
     if (_loadingQueue || state is PlaybackLoading) return;
@@ -702,11 +741,140 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
   }
 
   /// Handles player errors (e.g. 401, unreachable stream).
+  ///
+  /// В режиме mpv-плейлиста ошибка загрузки — не терминал, а повод
+  /// для рекавери (см. [_recoverFromLoadError]): в заблокированном
+  /// фоне нажать retry некому, а молчаливая смерть очереди выглядит
+  /// как «доиграло». Видео и одиночные треки — как раньше, терминалом.
   void _onPlayerError(String error) {
-    AppLogger.error('Player error: $error');
-    if (state is PlaybackPlaying || state is PlaybackLoading) {
+    final queue = ref.read(playQueueProvider);
+    AppLogger.error(
+      'Player error: $error '
+      '(mpvIndex=${_audioPlayer.playlistIndex} '
+      'queueIndex=${queue.currentIndex} queueLen=${queue.items.length} '
+      'headersStale=${_playlistToken != _currentToken})',
+    );
+    if (!_audioPlaylistActive || queue.items.isEmpty) {
+      if (state is PlaybackPlaying || state is PlaybackLoading) {
+        state = PlaybackState.error(message: error);
+      }
+      return;
+    }
+    unawaited(
+      _recoverFromLoadError(error).catchError((Object e, StackTrace s) {
+        AppLogger.error('Load recovery failed', e, s);
+      }),
+    );
+  }
+
+  /// Похоже ли на отказ авторизации: только 401 доказывает, что сервер
+  /// на связи, и обновлять токен безопасно. При сетевых ошибках refresh
+  /// не дёргаем: провал рефреша по недоступности сети разлогинил бы
+  /// пользователя в фоне (см. AuthTokenRefresher._doRefresh).
+  /// Матчим словом целиком: подстрока цепляла бы и "error 4010".
+  static final _authErrorCode = RegExp(r'\b401\b');
+
+  bool _looksLikeAuthError(String error) {
+    if (_authErrorCode.hasMatch(error)) return true;
+    return error.toLowerCase().contains('unauthori');
+  }
+
+  void _terminalError(String error) {
+    if (!_disposed &&
+        (state is PlaybackPlaying || state is PlaybackLoading)) {
       state = PlaybackState.error(message: error);
     }
+  }
+
+  void _noteLoadError(int index) {
+    final now = DateTime.now();
+    final last = _loadErrorAt;
+    if (index != _loadErrorIndex ||
+        last == null ||
+        now.difference(last) > _loadErrorWindow) {
+      _loadErrorIndex = index;
+      _loadErrorStreak = 0;
+    }
+    _loadErrorAt = now;
+    _loadErrorStreak++;
+  }
+
+  /// Восстановление после ошибки загрузки трека из mpv-плейлиста:
+  /// обновить токен (только при признаках 401), перезагрузить плейлист
+  /// со свежими заголовками с того же места, исчерпав попытки —
+  /// пропустить битый трек, на последнем — завершиться честно.
+  /// Терминалом очередь больше не умирает.
+  Future<void> _recoverFromLoadError(String error) async {
+    if (_recovering || _disposed) return;
+    _recovering = true;
+    _lastLoadError = error;
+    try {
+      var queue = ref.read(playQueueProvider);
+      var index = _audioPlayer.playlistIndex;
+      if (index < 0 || index >= queue.items.length) {
+        index = queue.currentIndex;
+      }
+      if (queue.items.isEmpty ||
+          index < 0 ||
+          index >= queue.items.length) {
+        _terminalError(error);
+        return;
+      }
+      _noteLoadError(index);
+      if (_loadErrorStreak > _maxLoadRetries) {
+        _loadErrorStreak = 0;
+        if (index + 1 < queue.items.length) {
+          AppLogger.info('Track at $index unloadable, skipping');
+          await _playlistCommand(() => _audioPlayer.next());
+        } else {
+          state = const PlaybackState.completed();
+        }
+        return;
+      }
+      if (_looksLikeAuthError(error)) {
+        try {
+          await ref
+              .read(authTokenRefresherProvider)
+              .refresh(ref.read(settingsProvider).settings.refreshToken);
+        } catch (e) {
+          AppLogger.warn('Background token refresh failed: $e');
+        }
+      }
+      // Пока обновляли токен, mpv мог уйти вперёд — индекс заново.
+      queue = ref.read(playQueueProvider);
+      var retryIndex = _audioPlayer.playlistIndex;
+      if (retryIndex < 0 || retryIndex >= queue.items.length) {
+        retryIndex = queue.currentIndex;
+      }
+      if (queue.items.isEmpty ||
+          retryIndex < 0 ||
+          retryIndex >= queue.items.length) {
+        _terminalError(error);
+        return;
+      }
+      final resumeAt = state is PlaybackPlaying
+          ? (state as PlaybackPlaying).position
+          : null;
+      try {
+        await _startQueue(retryIndex, resumeAt: resumeAt);
+      } catch (e, s) {
+        AppLogger.error('Load retry failed', e, s);
+        if (state is PlaybackLoading) _terminalError(e.toString());
+      }
+    } finally {
+      _recovering = false;
+    }
+  }
+
+  /// Повтор текущего трека после ошибки (кнопка play из уведомления
+  /// в состоянии error): прямой play в idle-плеере молчит (файла нет),
+  /// идём через рекавери с обнулённым счётчиком.
+  Future<void> retryCurrent() async {
+    if (!_audioPlaylistActive) return;
+    if (ref.read(playQueueProvider).items.isEmpty) return;
+    _loadErrorStreak = 0;
+    _loadErrorAt = null;
+    await _recoverFromLoadError(_lastLoadError);
   }
 
   /// Handles buffering state changes.

@@ -88,6 +88,12 @@ void main() async {
         // Перезапускаем текущий трек: прямой player.play() оставил бы
         // UI в состоянии completed, а музыка играла бы «в фоне».
         await queue.playCurrent();
+      } else if (playback is PlaybackError) {
+        // Ошибка загрузки в фоне: прямой play в idle-плеере молчит
+        // (файла нет) — идём через ретрай текущего трека.
+        await container
+            .read(playbackCoordinatorProvider.notifier)
+            .retryCurrent();
       }
     }
     ..onPause = () async {

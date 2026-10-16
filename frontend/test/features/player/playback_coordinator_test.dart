@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/core/network/auth_token_refresher.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/session/app_settings.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
@@ -546,12 +547,17 @@ void main() {
   late PlayQueueNotifier queue;
   late SharedPreferences prefs;
 
+  /// Вызовов token-refresh: рекавери дёргает refresh только при
+  /// признаках 401, а не при каждой ошибке движка.
+  late int refreshCalls;
+
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     audio = _FakeAudioSource();
     video = _FakeVideoSource();
     repo = _FakeMediaRepository();
+    refreshCalls = 0;
     container = ProviderContainer(
       overrides: [
         audioPlayerDatasourceProvider.overrideWithValue(audio),
@@ -560,6 +566,18 @@ void main() {
         videoPlayerDatasourceProvider.overrideWithValue(video),
         mediaRepositoryProvider.overrideWithValue(repo),
         settingsRepositoryProvider.overrideWithValue(_FakeSettingsRepository()),
+        authTokenRefresherProvider.overrideWith(
+          (ref) => AuthTokenRefresher(
+            performRefresh: (refreshToken) async {
+              refreshCalls++;
+              await ref
+                  .read(settingsProvider.notifier)
+                  .setTokens('new-token', 'new-refresh');
+              return (token: 'new-token', refreshToken: 'new-refresh');
+            },
+            onRefreshFailure: () async {},
+          ),
+        ),
         offlineCacheServiceProvider.overrideWith(
           (_) => _FakeOfflineCache(prefs: prefs),
         ),
@@ -577,6 +595,10 @@ void main() {
 
   PlaybackState readState() => container.read(playbackCoordinatorProvider);
 
+  /// Подмена рефрешера: считает вызовы и кладёт свежие токены,
+  /// сеть не трогает. Дублируется в switchServer: updateOverrides
+  /// требует тот же список оверрайдов.
+
   /// Пересобирает контейнер с новым baseUrl (эмуляция смены сервера).
   /// updateOverrides заменяет весь список — дублируем setUp один в один.
   void switchServer(String baseUrl) {
@@ -587,6 +609,18 @@ void main() {
       videoPlayerDatasourceProvider.overrideWithValue(video),
       mediaRepositoryProvider.overrideWithValue(repo),
       settingsRepositoryProvider.overrideWithValue(_FakeSettingsRepository()),
+      authTokenRefresherProvider.overrideWith(
+        (ref) => AuthTokenRefresher(
+          performRefresh: (refreshToken) async {
+            refreshCalls++;
+            await ref
+                .read(settingsProvider.notifier)
+                .setTokens('new-token', 'new-refresh');
+            return (token: 'new-token', refreshToken: 'new-refresh');
+          },
+          onRefreshFailure: () async {},
+        ),
+      ),
       offlineCacheServiceProvider.overrideWith(
         (_) => _FakeOfflineCache(prefs: prefs),
       ),
@@ -658,6 +692,142 @@ void main() {
         completes,
       );
       expect(readState(), isA<PlaybackError>());
+    });
+
+    group('PlaybackCoordinator load recovery', () {
+      Future<void> startAudioPair() async {
+        await container
+            .read(settingsProvider.notifier)
+            .setTokens('old-jwt', 'refresh-1');
+        await queue.setQueue([
+          _media(1, MediaType.audio),
+          _media(2, MediaType.audio),
+        ]);
+        await _settle();
+      }
+
+      String? authOf(int index) =>
+          audio.playlist[index].httpHeaders?['Authorization'];
+
+      test('401 error reloads playlist with fresh token', () async {
+        await startAudioPair();
+        expect(authOf(0), 'Bearer old-jwt');
+
+        audio.errorCtl.add('HTTP error 401 Unauthorized');
+        await _settle();
+
+        // Refresh дёрнули ровно раз — по признаку 401, а не вслепую.
+        expect(refreshCalls, 1);
+        expect(audio.loadSourceCalls, 2);
+        expect(authOf(0), 'Bearer new-token');
+        expect(readState(), isA<PlaybackPlaying>());
+      });
+
+      test('network error reloads without token refresh', () async {
+        await startAudioPair();
+
+        audio.errorCtl.add('Connection timed out');
+        await _settle();
+
+        // Сети может не быть — refresh не трогаем (иначе разлогин в фоне).
+        expect(refreshCalls, 0);
+        expect(audio.loadSourceCalls, 2);
+        expect(readState(), isA<PlaybackPlaying>());
+      });
+
+      test('persistent errors skip to next track', () async {
+        await queue.setQueue([
+          _media(1, MediaType.audio),
+          _media(2, MediaType.audio),
+        ]);
+        await _settle();
+
+        for (var i = 0; i < 3; i++) {
+          audio.errorCtl.add('Connection timed out');
+          await _settle();
+        }
+
+        // Два ретрая перезагрузкой, затем пропуск через mpv-next.
+        expect(audio.loadSourceCalls, 3);
+        expect(audio.nextCalls, 1);
+        final playing = readState() as PlaybackPlaying;
+        expect(playing.media.id, 2);
+      });
+
+      test('persistent errors on last track complete the queue', () async {
+        await queue.setQueue([
+          _media(1, MediaType.audio),
+          _media(2, MediaType.audio),
+        ], startIndex: 1);
+        await _settle();
+
+        for (var i = 0; i < 3; i++) {
+          audio.errorCtl.add('Connection timed out');
+          await _settle();
+        }
+
+        expect(audio.nextCalls, 0);
+        expect(readState(), isA<PlaybackCompleted>());
+      });
+
+      test('streak resets on track change', () async {
+        await queue.setQueue([
+          _media(1, MediaType.audio),
+          _media(2, MediaType.audio),
+        ]);
+        await _settle();
+
+        audio.errorCtl.add('Connection timed out');
+        await _settle();
+        expect(audio.loadSourceCalls, 2);
+
+        // mpv ушёл дальше сам: счётчик обнулён, следующая ошибка —
+        // снова ретрай, а не пропуск.
+        audio.indexCtl.add(1);
+        await _settle();
+        audio.errorCtl.add('Connection timed out');
+        await _settle();
+
+        expect(audio.loadSourceCalls, 3);
+        expect(audio.nextCalls, 0);
+      });
+
+      test('retryCurrent recovers from error state', () async {
+        await queue.setQueue([
+          _media(1, MediaType.audio),
+          _media(2, MediaType.audio),
+        ]);
+        await _settle();
+
+        // Перезагрузка падает синхронно — уходим в терминал.
+        audio.loadError = Exception('boom');
+        audio.errorCtl.add('Connection timed out');
+        await _settle();
+        expect(readState(), isA<PlaybackError>());
+
+        // Ручной повтор (кнопка play из уведомления) чинит.
+        audio.loadError = null;
+        await coordinator.retryCurrent();
+        await _settle();
+        expect(readState(), isA<PlaybackPlaying>());
+      });
+
+      test('manual retry reuses remembered 401 for refresh', () async {
+        await startAudioPair();
+        audio.loadError = Exception('boom');
+        audio.errorCtl.add('HTTP error 401 Unauthorized');
+        await _settle();
+        expect(readState(), isA<PlaybackError>());
+
+        // Ручной повтор сразу идёт через refresh-ветку (один тап,
+        // а не два круга): запомненная ошибка, а не 'manual retry'.
+        // Первый refresh — из автоматической рекавери, второй — ручной.
+        audio.loadError = null;
+        await coordinator.retryCurrent();
+        await _settle();
+        expect(refreshCalls, 2);
+        expect(readState(), isA<PlaybackPlaying>());
+      });
     });
 
     test('offline cache lookup failure falls back to streaming', () async {
