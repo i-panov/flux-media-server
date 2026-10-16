@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
@@ -84,7 +85,7 @@ class MainActivity : AudioServiceActivity() {
     private var pendingSaveArgs: Map<*, *>? = null
 
     private fun saveToDownloads(
-        call: MethodChannel.MethodCall,
+        call: MethodCall,
         result: MethodChannel.Result,
     ) {
         val args = call.arguments as? Map<*, *>
