@@ -245,7 +245,7 @@ class _FakeMediaRepository implements MediaRepository {
   );
 
   @override
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>>
   checkHash(String hash) => throw UnimplementedError();
 
   @override

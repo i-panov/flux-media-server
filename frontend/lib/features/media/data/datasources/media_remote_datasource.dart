@@ -145,9 +145,10 @@ class MediaRemoteDataSource {
   }
 
   /// Checks if a file with the given [hash] already exists on the server.
-  Future<({bool exists, int? mediaId, String? title})> checkHash(
-    String hash,
-  ) async {
+  /// trashed пробрасываем как есть: без него перезалив содержимого
+  /// из корзины упирался бы в «дубликат» без пути к восстановлению.
+  Future<({bool exists, int? mediaId, String? title, bool trashed})>
+  checkHash(String hash) async {
     final response = await apiClient.checkHash({'hash': hash});
     checkResponse(response, 'Failed to check hash');
     final body = response.body!;
@@ -157,9 +158,10 @@ class MediaRemoteDataSource {
         exists: true,
         mediaId: media?['id'] as int?,
         title: media?['title'] as String?,
+        trashed: body['trashed'] == true,
       );
     }
-    return (exists: false, mediaId: null, title: null);
+    return (exists: false, mediaId: null, title: null, trashed: false);
   }
 
   /// Uploads a file to the default library for the given media type.

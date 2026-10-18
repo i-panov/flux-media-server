@@ -52,7 +52,7 @@ class MediaRepositoryImpl implements MediaRepository {
       safeRepositoryCall(remoteDataSource.getArtists);
 
   @override
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>>
   checkHash(String hash) =>
       safeRepositoryCall(() => remoteDataSource.checkHash(hash));
 

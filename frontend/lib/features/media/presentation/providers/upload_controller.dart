@@ -41,9 +41,10 @@ class UploadState {
   /// Текст ошибки для фидбека (null — успех, отмена или дубликат).
   ///
   /// Инвариант: любой возврат `false` из [UploadController.start], кроме
-  /// отмены и дубликата, выставляет errorMessage. Экран поэтому показывает
-  /// fileAlreadyExists только когда ошибки нет — реальный сбой так не
-  /// замаскируется под «дубликат».
+  /// отмены и живого дубликата, выставляет errorMessage. Дубликат из
+  /// корзины — тоже errorMessage (с намёком на восстановление), а не
+  /// молчаливый null. Экран поэтому показывает fileAlreadyExists только
+  /// когда ошибки нет — реальный сбой так не замаскируется под «дубликат».
   final String? errorMessage;
 
   double? get progress =>
@@ -170,10 +171,8 @@ class UploadController extends Notifier<UploadState> {
     required UploadSuccessCallback onSuccess,
   }) async {
     // Backstop-проверки с сырым английским текстом (как Failure.message):
-    // экран до этого показывает локализованные uploadFileEmpty/
-    // uploadFileTooLarge и сюда не доходит. errorMessage обязателен —
-    // иначе нарушился бы инвариант UploadState.errorMessage и экран
-    // показал бы «дубликат».
+    // errorMessage обязателен — иначе нарушился бы инвариант
+    // UploadState.errorMessage и экран показал бы «дубликат».
     if (fileSize == 0) {
       state = state.copyWith(errorMessage: 'Cannot upload an empty file');
       return false;
@@ -207,15 +206,25 @@ class UploadController extends Notifier<UploadState> {
       state = state.copyWith(phase: UploadPhase.checking);
 
       final checkResult = await _repository.checkHash(hash);
-      final exists = checkResult.fold((failure) {
+      final check = checkResult.fold((failure) {
         // Ошибка сети не должна молча превращаться в «дубликатов нет».
         // Failure не extends Exception — только через ignore.
         // ignore: only_throw_errors
         throw failure;
-      }, (data) => data.exists);
+      }, (data) => data);
       if (_cancelled || _disposed) return false;
 
-      if (exists) return false;
+      if (check.exists) {
+        // Содержимое из корзины — не молчаливый «дубликат», а текст
+        // с путём к восстановлению: иначе перезалив упирался бы
+        // в оранжевый тупик (бэкенд trashed-флаг отдаёт именно для этого).
+        if (check.trashed) {
+          state = state.copyWith(
+            errorMessage: 'File is in trash — restore it from trash',
+          );
+        }
+        return false;
+      }
 
       state = state.copyWith(phase: UploadPhase.uploading);
 

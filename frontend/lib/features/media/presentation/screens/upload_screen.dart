@@ -1,13 +1,10 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flux_media_server/core/utils/feedback.dart';
-import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
-import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/batch_upload_controller.dart';
 import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 
@@ -22,10 +19,6 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
-  File? _selectedFile;
-  String? _selectedFileName;
-  int? _selectedFileSize;
-
   String _formatSize(int bytes) {
     if (bytes > 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
@@ -33,209 +26,230 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     return '${(bytes / 1024).toStringAsFixed(1)} KB';
   }
 
-  Future<void> _pickFile() async {
+  /// Мультивыбор: pickFiles на Android уже отдаёт несколько файлов.
+  /// Пути может не быть (облачные провайдеры) — такие пропускаем:
+  /// грузить нечего, а молча ронять пачку нельзя.
+  Future<void> _pickFiles() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: widget.mediaType == 'audio'
           ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
           : ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v'],
     );
-
     if (result.isEmpty) return;
-    final file = result.first;
-    final path = file.path;
-    if (path == null) return;
 
-    // Размер читаем асинхронно: lengthSync() блокирует UI-изолят и на
-    // крупном файле подвисает кадр (хеширование ради этого унесли в
-    // Isolate.run — до файла добрались только здесь).
-    final size = await File(path).length();
+    final items = <BatchUploadItem>[];
+    for (final file in result) {
+      final path = file.path;
+      if (path == null) continue;
+      // Размер читаем асинхронно: lengthSync() блокирует UI-изолят.
+      final size = await File(path).length();
+      if (!mounted) return;
+      items.add(
+        BatchUploadItem(filePath: path, fileName: file.name, fileSize: size),
+      );
+    }
+    if (!mounted || items.isEmpty) return;
+    ref.read(batchUploadControllerProvider.notifier).setFiles(items);
+  }
+
+  Future<void> _startAll() async {
+    await ref
+        .read(batchUploadControllerProvider.notifier)
+        .startAll(mediaType: widget.mediaType);
     if (!mounted) return;
-    setState(() {
-      _selectedFile = File(path);
-      _selectedFileName = file.name;
-      _selectedFileSize = size;
-    });
+    _showSummary();
   }
 
-  void _cancelUpload() {
-    ref.read(uploadControllerProvider.notifier).cancel();
+  Future<void> _retryFailed() async {
+    await ref
+        .read(batchUploadControllerProvider.notifier)
+        .retryFailed(mediaType: widget.mediaType);
+    if (!mounted) return;
+    _showSummary();
   }
 
-  Future<void> _startUpload() async {
-    final file = _selectedFile;
-    if (file == null) return;
-
+  /// Итог прогона одной сводкой: зелёная только при полном успехе,
+  /// дубликаты — не ошибка, ошибки уже видны построчно.
+  void _showSummary() {
+    final summary = ref.read(batchUploadControllerProvider);
+    final total = summary.items.length;
+    if (total == 0) return;
+    // Зелёный только при полном успехе, иначе нейтральный итог:
+    // дубликаты — не ошибка, ошибки уже видны построчно.
+    final allDone = summary.failedCount == 0 && summary.duplicateCount == 0;
     final l = AppLocalizations.of(context)!;
-    final fileSize = _selectedFileSize ?? await file.length();
-    if (!mounted) return;
-
-    if (fileSize == 0) {
-      _showSnackBar(l.uploadFileEmpty, Colors.red);
-      return;
-    }
-    // Лимит — из контроллера, а не локальный хардкод: две копии дефолта
-    // разъехались бы при первой же настройке.
-    final maxSize = ref.read(uploadControllerProvider.notifier).maxUploadSizeBytes;
-    if (fileSize > maxSize) {
-      _showSnackBar(l.uploadFileTooLarge, Colors.red);
-      return;
-    }
-
-    final started = await ref.read(uploadControllerProvider.notifier).start(
-      filePath: file.path,
-      mediaType: widget.mediaType,
-      fileName: _selectedFileName,
-      fileSize: fileSize,
-      onSuccess: () => _onUploadSuccess(l),
-    );
-    if (!mounted) return;
-
-    // Фидбек с явным цветом: зелёный — успех, красный/оранжевый —
-    // ошибка и отмена. Экран мог размонтироваться во время загрузки.
-    // errorMessage гарантирован контроллером на любом реальном сбое
-    // (см. инвариант UploadState.errorMessage), поэтому ветка без
-    // сообщения — это дубликат, а не замаскированная ошибка.
-    final state = ref.read(uploadControllerProvider);
-    if (state.cancelled) {
-      _showSnackBar(l.uploadCancelled, Colors.orange);
-    } else if (!started) {
-      final message = state.errorMessage;
-      if (message != null) {
-        _showSnackBar(message, Colors.red);
-      } else {
-        _showSnackBar(l.fileAlreadyExists, Colors.orange);
-      }
-    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            l.uploadBatchSummary(
+              summary.doneCount,
+              total,
+              summary.duplicateCount,
+              summary.failedCount,
+            ),
+          ),
+          backgroundColor: allDone ? Colors.green : null,
+        ),
+      );
   }
 
-  Future<void> _onUploadSuccess(AppLocalizations l) async {
-    // Контроллер мог завершить уже после ухода с экрана (autoDispose
-    // прерывает poll, но гонка возможна): мёртвый контекст не трогаем.
-    if (!context.mounted) return;
-    refreshMediaLists(ref);
-    scaffoldMessengerKey.currentState?.showSnackBar(
-      SnackBar(
-        content: Text(l.uploadSuccess),
-        backgroundColor: Colors.green,
-      ),
-    );
-    await context.router.maybePop();
-  }
-
-  void _showSnackBar(String message, Color color) {
-    if (!mounted) return;
-    showTextSnackBar(context, message, color: color);
+  void _cancelAll() {
+    ref.read(batchUploadControllerProvider.notifier).cancelAll();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final state = ref.watch(uploadControllerProvider);
-    final progress = state.progress;
+    final batch = ref.watch(batchUploadControllerProvider);
+    final single = ref.watch(uploadControllerProvider);
+
+    final activeIndex = batch.items.indexWhere(
+      (i) => i.status == BatchItemStatus.active,
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l.uploadMedia),
         actions: [
-          if (state.isUploading)
+          if (batch.isRunning)
             IconButton(
-              onPressed: _cancelUpload,
+              onPressed: _cancelAll,
               icon: const Icon(Icons.close),
               tooltip: l.cancel,
             )
-          else if (_selectedFile != null)
-            TextButton.icon(
-              onPressed: _startUpload,
-              icon: const Icon(Icons.cloud_upload),
-              label: Text(l.upload),
-            ),
+          else ...[
+            if (batch.failedCount > 0)
+              IconButton(
+                onPressed: _retryFailed,
+                icon: const Icon(Icons.refresh),
+                tooltip: l.retry,
+              ),
+            if (batch.items.isNotEmpty)
+              TextButton.icon(
+                onPressed: _startAll,
+                icon: const Icon(Icons.cloud_upload),
+                label: Text(l.upload),
+              ),
+          ],
         ],
       ),
       body: Column(
         children: [
           const SizedBox(height: 24),
-
-          // File picker button.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: state.isUploading ? null : _pickFile,
+                onPressed: batch.isRunning ? null : _pickFiles,
                 icon: Icon(
-                  _selectedFile != null
+                  batch.items.isNotEmpty
                       ? Icons.check_circle
                       : Icons.attach_file,
                 ),
                 label: Text(
-                  _selectedFileName ?? l.selectFiles,
+                  batch.items.isEmpty
+                      ? l.selectFiles
+                      : l.selectedFiles(batch.items.length),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           ),
-
-          if (_selectedFileSize != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _formatSize(_selectedFileSize!),
-              style: TextStyle(color: Colors.grey[600], fontSize: 13),
-            ),
-          ],
-
-          if (state.isUploading) ...[
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                children: [
-                  // Честный индикатор: детерминированный при известном
-                  // размере, иначе — неопределённый спиннер.
-                  if (progress != null)
-                    LinearProgressIndicator(value: progress)
-                  else
-                    const CircularProgressIndicator(),
-                  const SizedBox(height: 8),
-                  Text(_phaseLabel(state.phase) ?? l.uploading),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: _cancelUpload,
-                    icon: const Icon(Icons.close),
-                    label: Text(l.cancel),
+          const SizedBox(height: 8),
+          Expanded(
+            child: batch.items.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_upload_outlined,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          l.noFilesSelected,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: batch.items.length,
+                    itemBuilder: (context, index) {
+                      final item = batch.items[index];
+                      final isActive = index == activeIndex;
+                      return _BatchRow(
+                        item: item,
+                        progress: isActive ? single.progress : null,
+                        phase: isActive ? single.phase : null,
+                        formatSize: _formatSize,
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-          if (_selectedFile == null)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.cloud_upload_outlined,
-                      size: 64,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l.noFilesSelected,
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+/// Строка файла пачки: имя, размер и статус (прогресс — только
+/// у активного, итоги — иконками, ошибка — текстом).
+class _BatchRow extends StatelessWidget {
+  const new({
+    required this.item,
+    required this.progress,
+    required this.phase,
+    required this.formatSize,
+  });
+
+  final BatchUploadItem item;
+  final double? progress;
+  final UploadPhase? phase;
+  final String Function(int) formatSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final (icon, color) = switch (item.status) {
+      BatchItemStatus.pending => (Icons.schedule, Colors.grey),
+      BatchItemStatus.active => (Icons.upload, null),
+      BatchItemStatus.done => (Icons.check_circle, Colors.green),
+      BatchItemStatus.duplicate => (Icons.copy_all, Colors.orange),
+      BatchItemStatus.failed => (Icons.error_outline, Colors.red),
+      BatchItemStatus.cancelled => (Icons.cancel_outlined, Colors.grey),
+    };
+    final statusText = switch (item.status) {
+      BatchItemStatus.pending => null,
+      BatchItemStatus.active => _phaseLabel(l, phase) ?? l.uploading,
+      BatchItemStatus.done => l.uploadSuccess,
+      BatchItemStatus.duplicate => l.fileAlreadyExists,
+      BatchItemStatus.failed => item.errorMessage ?? l.uploadFailed,
+      BatchItemStatus.cancelled => l.uploadCancelled,
+    };
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(item.fileName, overflow: TextOverflow.ellipsis),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(formatSize(item.fileSize)),
+          if (item.status == BatchItemStatus.active && progress != null)
+            LinearProgressIndicator(value: progress),
+          if (statusText != null) Text(statusText),
         ],
       ),
     );
   }
 
-  String? _phaseLabel(UploadPhase? phase) {
-    final l = AppLocalizations.of(context)!;
+  String? _phaseLabel(AppLocalizations l, UploadPhase? phase) {
     return switch (phase) {
       UploadPhase.hashing => l.hashingFile,
       UploadPhase.checking => l.checkingDuplicates,

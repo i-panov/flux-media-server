@@ -22,7 +22,9 @@ abstract class MediaRepository {
   /// Все исполнители (для автодополнения в диалоге метаданных).
   Future<Either<Failure, List<Artist>>> getArtists();
 
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+  /// trashed — хэш совпал со строкой в корзине: перезалив упрётся
+  /// в дубликат без пути к восстановлению, если это не обработать.
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>>
   checkHash(String hash);
 
   /// Асинхронный upload: POST возвращает id джоба, файл обрабатывается

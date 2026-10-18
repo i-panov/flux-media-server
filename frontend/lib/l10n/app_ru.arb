@@ -161,6 +161,33 @@
       }
     }
   },
+  "selectedFiles": "Выбрано файлов: {count}",
+  "@selectedFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "uploadFailed": "Ошибка загрузки",
+  "@uploadFailed": {},
+  "uploadBatchSummary": "Загружено {done} из {total} (дубли: {duplicates}, ошибки: {failed})",
+  "@uploadBatchSummary": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "checkingFile": "Проверка {name}...",
   "@checkingFile": {
     "placeholders": {

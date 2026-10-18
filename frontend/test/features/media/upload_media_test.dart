@@ -84,7 +84,7 @@ class FakeMediaRepository implements MediaRepository {
       const Left(ServerFailure(message: 'not used'));
 
   @override
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>>
   checkHash(String hash) async =>
       const Left(ServerFailure(message: 'not used'));
 

@@ -9,6 +9,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"gorm.io/gorm"
+
 	"flux/internal/config"
 	"flux/internal/models"
 	"flux/internal/repository"
@@ -116,7 +118,26 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 
 	// Check if file already exists.
 	if _, err := os.Stat(dstPath); err == nil {
-		return response.Error(c, fiber.StatusConflict, "File already exists")
+		// Файл есть: чей он? Живая строка — честный 409. Trashed-строка —
+		// 409 с намёком на корзину (файл принадлежит ей, восстанавливать
+		// оттуда). Ничья строка — сирота отменённой/упавшей загрузки:
+		// сносим stale-файл и принимаем загрузку, иначе повтор вечно
+		// упирался бы в 409, а файла не было бы видно в приложении.
+		existing, err := h.mediaRepo.FindByPathBasic(c.UserContext(), dstPath)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("upload: FindByPath %s: %v", dstPath, err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to check file")
+		}
+		if err == nil && existing != nil && existing.ID != 0 {
+			if existing.DeletedAt.Valid {
+				return response.Error(c, fiber.StatusConflict, "File exists in trash — restore it from trash")
+			}
+			return response.Error(c, fiber.StatusConflict, "File already exists")
+		}
+		if err := os.Remove(dstPath); err != nil && !os.IsNotExist(err) {
+			log.Printf("upload: remove orphaned file %s: %v", dstPath, err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to replace file")
+		}
 	}
 
 	if err := c.SaveFile(fileHeader, dstPath); err != nil {

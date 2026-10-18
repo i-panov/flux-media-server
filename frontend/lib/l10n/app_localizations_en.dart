@@ -284,6 +284,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String selectedFiles(int count) {
+    return '$count files selected';
+  }
+
+  @override
+  String get uploadFailed => 'Upload failed';
+
+  @override
+  String uploadBatchSummary(int done, int total, int duplicates, int failed) {
+    return 'Uploaded $done of $total ($duplicates duplicates, $failed failed)';
+  }
+
+  @override
   String checkingFile(String name) {
     return 'Checking $name...';
   }

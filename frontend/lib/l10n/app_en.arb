@@ -213,6 +213,33 @@
       }
     }
   },
+  "selectedFiles": "{count} files selected",
+  "@selectedFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "uploadFailed": "Upload failed",
+  "@uploadFailed": {},
+  "uploadBatchSummary": "Uploaded {done} of {total} ({duplicates} duplicates, {failed} failed)",
+  "@uploadBatchSummary": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "duplicates": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "checkingFile": "Checking {name}...",
   "@checkingFile": {
     "placeholders": {

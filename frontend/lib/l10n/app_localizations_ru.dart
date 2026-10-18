@@ -286,6 +286,19 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String selectedFiles(int count) {
+    return 'Выбрано файлов: $count';
+  }
+
+  @override
+  String get uploadFailed => 'Ошибка загрузки';
+
+  @override
+  String uploadBatchSummary(int done, int total, int duplicates, int failed) {
+    return 'Загружено $done из $total (дубли: $duplicates, ошибки: $failed)';
+  }
+
+  @override
   String checkingFile(String name) {
     return 'Проверка $name...';
   }

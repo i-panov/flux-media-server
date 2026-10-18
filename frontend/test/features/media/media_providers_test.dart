@@ -99,9 +99,9 @@ class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, void>> deleteMedia(int id) async => const Right(null);
 
   @override
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>>
   checkHash(String hash) async =>
-      const Right((exists: false, mediaId: null, title: null));
+      const Right((exists: false, mediaId: null, title: null, trashed: false));
 
   @override
   Future<Either<Failure, List<Artist>>> getArtists() async => const Right([]);

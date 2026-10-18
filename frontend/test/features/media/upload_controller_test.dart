@@ -10,6 +10,7 @@ import 'package:fpdart/fpdart.dart';
 
 class _FakeRepository implements MediaRepository {
   bool hashExists = false;
+  bool hashTrashed = false;
   int uploadJobId = 1;
   UploadStatus? statusResult;
   Failure? statusFailure;
@@ -21,9 +22,13 @@ class _FakeRepository implements MediaRepository {
   List<int> progressChunks = const [];
 
   @override
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title})>>
-  checkHash(String hash) async =>
-      Right((exists: hashExists, mediaId: null, title: null));
+  Future<Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>>
+  checkHash(String hash) async => Right((
+    exists: hashExists || hashTrashed,
+    mediaId: null,
+    title: null,
+    trashed: hashTrashed,
+  ));
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
@@ -119,6 +124,20 @@ void main() {
     expect(
       container.read(uploadControllerProvider).errorMessage,
       isNull,
+    );
+  });
+
+  test('trashed-хэш: false с errorMessage-намёком, а не дубликат', () async {
+    repo.hashTrashed = true;
+
+    final started = await start(makeController());
+
+    expect(started, isFalse);
+    expect(successCalls, isEmpty);
+    expect(repo.pollCount, 0);
+    expect(
+      container.read(uploadControllerProvider).errorMessage,
+      contains('trash'),
     );
   });
 

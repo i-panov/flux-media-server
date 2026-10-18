@@ -620,6 +620,24 @@ abstract class AppLocalizations {
   /// **'{count} skipped - already exists'**
   String skippedAlreadyExists(int count);
 
+  /// No description provided for @selectedFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files selected'**
+  String selectedFiles(int count);
+
+  /// No description provided for @uploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload failed'**
+  String get uploadFailed;
+
+  /// No description provided for @uploadBatchSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded {done} of {total} ({duplicates} duplicates, {failed} failed)'**
+  String uploadBatchSummary(int done, int total, int duplicates, int failed);
+
   /// No description provided for @checkingFile.
   ///
   /// In en, this message translates to:
