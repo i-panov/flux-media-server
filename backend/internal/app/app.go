@@ -28,6 +28,30 @@ import (
 // maxAPIBodySize caps request bodies for all non-upload endpoints (JSON API).
 const maxAPIBodySize = 4 << 20 // 4 MB
 
+// minUploadSpeedFloor — минимальная скорость заливки, из которой считаем
+// ReadTimeout для upload-роутов: MaxUploadSize должен успеть залиться
+// даже по медленной связи. Глобальные 10 секунд рвали соединение
+// посреди больших файлов (клиент видел Connection reset by peer /
+// Write failed). Slowloris через это окно не пролезет: upload-роуты
+// требуют auth (requireAdmin), плюс Concurrency и rate limiter.
+const minUploadSpeedFloor = 50 << 10 // 50 KB/s
+
+// uploadReadTimeout — сколько даём на чтение тела загрузки: время
+// прокачки MaxUploadSize на полу minUploadSpeedFloor плюс минута запаса
+// на медленный старт. Нулевой/крошечный лимит — минимум 10 минут.
+func uploadReadTimeout(maxUploadSize int64) time.Duration {
+	const minTimeout = 10 * time.Minute
+	if maxUploadSize <= 0 {
+		return minTimeout
+	}
+	seconds := maxUploadSize/minUploadSpeedFloor + 60
+	timeout := time.Duration(seconds) * time.Second
+	if timeout < minTimeout {
+		return minTimeout
+	}
+	return timeout
+}
+
 // globalBodyLimit — запасной глобальный потолок размера тела запроса для
 // fasthttp. Реальный per-route лимит задаёт HeaderReceived (см. ниже):
 // не-upload роуты ограничены maxAPIBodySize, upload/cover — MaxUploadSize.
@@ -267,14 +291,20 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// получают настоящий MaxUploadSize. Остаточный риск (атакующий шлёт
 	// большие тела на upload-роут до проверки auth) ограничен Concurrency
 	// и upload rate limiter'ом — это плата за поддержку больших загрузок.
+	//
+	// ReadTimeout тоже per-route: глобальные 10 с режут ЧТЕНИЕ ТЕЛА
+	// целиком, и заливка большого файла обрывалась на середине —
+	// клиент видел Connection reset by peer / Write failed.
 	fiberApp.Server().HeaderReceived = func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		var u fasthttp.URI
 		_ = u.Parse(nil, h.RequestURI()) // при ошибке path пуст → лимит 4 МБ (безопасный дефолт)
-		limit := maxAPIBodySize
 		if isUploadPath(string(h.Method()), string(u.Path())) {
-			limit = int(cfg.Server.MaxUploadSize)
+			return fasthttp.RequestConfig{
+				MaxRequestBodySize: int(cfg.Server.MaxUploadSize),
+				ReadTimeout:        uploadReadTimeout(cfg.Server.MaxUploadSize),
+			}
 		}
-		return fasthttp.RequestConfig{MaxRequestBodySize: limit}
+		return fasthttp.RequestConfig{MaxRequestBodySize: maxAPIBodySize}
 	}
 
 	// fasthttp буферизует тело запроса в памяти; реальные лимиты задаёт

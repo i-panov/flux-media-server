@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/media/presentation/providers/batch_upload_controller.dart';
 import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -20,6 +21,8 @@ class UploadScreen extends ConsumerStatefulWidget {
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
   String _formatSize(int bytes) {
+    // 0 — размер ещё не догрузился: не показываем ложные «0.0 KB».
+    if (bytes == 0) return '…';
     if (bytes > 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
@@ -36,10 +39,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
           ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
           : ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v'],
     );
+    // Метки этапов: если между «пикер вернулся» и списком есть дыра,
+    // видно в logcat, где именно (плагин/размеры/построение).
+    AppLogger.info('Batch picker returned: ${result.length} file(s)');
     if (result.isEmpty) return;
 
-    // Пути — сразу в работу, размеры — параллельно: последовательный
-    // length() на 20 файлах давал секунды пустого экрана.
     final names = <String, String>{};
     for (final file in result) {
       final path = file.path;
@@ -47,22 +51,29 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       names[path] = file.name;
     }
     if (names.isEmpty) return;
+    // Список показываем СРАЗУ, с нулевыми размерами: экран не должен
+    // ждать замеров. Размеры догружаются фоном и обновляют строки.
+    ref.read(batchUploadControllerProvider.notifier).setFiles(
+      [
+        for (final e in names.entries)
+          BatchUploadItem(filePath: e.key, fileName: e.value, fileSize: 0),
+      ],
+      // 0 в размере ниже — «ещё не измерено»: старт заблокирован,
+      // пока не придёт updateSizes (иначе быстрый тап = «empty file»).
+      sizesPending: true,
+    );
+    AppLogger.info('Batch list shown: ${names.length} file(s)');
+
     final sizes = await Future.wait([
       for (final path in names.keys)
         // Размер читаем асинхронно: lengthSync() блокирует UI-изолят.
         File(path).length().then((s) => MapEntry(path, s)),
     ]);
     if (!mounted) return;
-    ref
-        .read(batchUploadControllerProvider.notifier)
-        .setFiles([
-          for (final e in sizes)
-            BatchUploadItem(
-              filePath: e.key,
-              fileName: names[e.key]!,
-              fileSize: e.value,
-            ),
-        ]);
+    ref.read(batchUploadControllerProvider.notifier).updateSizes({
+      for (final e in sizes) e.key: e.value,
+    });
+    AppLogger.info('Batch sizes resolved: ${sizes.length}');
   }
 
   Future<void> _startAll() async {
@@ -141,7 +152,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
               ),
             if (batch.items.isNotEmpty)
               TextButton.icon(
-                onPressed: _startAll,
+                // Пока размеры не догрузились — старт запрещён: 0 в
+                // fileSize означает «не измерено», а контроллер трактует
+                // 0 как пустой файл и валит его backstop-ошибкой.
+                onPressed: batch.sizesPending ? null : _startAll,
                 icon: const Icon(Icons.cloud_upload),
                 label: Text(l.upload),
               ),

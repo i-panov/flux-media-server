@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -30,11 +32,12 @@ class BatchUploadItem {
     BatchItemStatus? status,
     String? errorMessage,
     String? existingTitle,
+    int? fileSize,
   }) {
     return BatchUploadItem(
       filePath: filePath,
       fileName: fileName,
-      fileSize: fileSize,
+      fileSize: fileSize ?? this.fileSize,
       status: status ?? this.status,
       errorMessage: errorMessage,
       existingTitle: existingTitle ?? this.existingTitle,
@@ -49,6 +52,7 @@ class BatchUploadState {
     this.isRunning = false,
     this.hashingTotal = 0,
     this.hashingDone = 0,
+    this.sizesPending = false,
   });
 
   final List<BatchUploadItem> items;
@@ -57,6 +61,11 @@ class BatchUploadState {
   /// Прогресс фазы хэширования (0/0 — не идёт).
   final int hashingTotal;
   final int hashingDone;
+
+  /// Размеры файлов ещё догружаются. Ноль в fileSize в этот момент —
+  /// «не измерено», а не пустой файл; старт заблокирован, иначе быстрый
+  /// тап отправил бы 0 в контроллер и получил backstop «empty file».
+  final bool sizesPending;
 
   bool get isHashing => hashingDone < hashingTotal;
 
@@ -82,12 +91,28 @@ class BatchUploadController extends Notifier<BatchUploadState> {
   bool _cancelled = false;
   bool _disposed = false;
 
-  UploadController get _single =>
-      ref.read(uploadControllerProvider.notifier);
+  UploadController get _single => ref.read(uploadControllerProvider.notifier);
 
-  void setFiles(List<BatchUploadItem> items) {
+  void setFiles(List<BatchUploadItem> items, {bool sizesPending = false}) {
     if (state.isRunning) return;
-    state = BatchUploadState(items: List.unmodifiable(items));
+    state = BatchUploadState(
+      items: List.unmodifiable(items),
+      sizesPending: sizesPending,
+    );
+  }
+
+  /// Догрузка размеров после мгновенного показа списка (0 → реальный).
+  void updateSizes(Map<String, int> sizesByPath) {
+    if (_disposed || state.isRunning) return;
+    state = BatchUploadState(
+      items: [
+        for (final item in state.items)
+          if (sizesByPath[item.filePath] case final int size)
+            item.copyWith(fileSize: size)
+          else
+            item,
+      ],
+    );
   }
 
   void clear() {
@@ -97,8 +122,10 @@ class BatchUploadController extends Notifier<BatchUploadState> {
 
   /// Грузит все pending-файлы по очереди. Возвращает сводку для снекбара.
   /// [mediaType] — общий для пачки (экран один на аудио/видео).
-  /// Хэши — первой фазой, пулом воркеров: иначе сезон из 20 серий
-  /// сначала полчаса молча хэшируется последовательно.
+  ///
+  /// Хэши считаются пулом ВПЕРЁД, а заливка стартует по готовности
+  /// хэша очередного файла — не ждёт весь пул (иначе сезон из 20 серий
+  /// сначала целиком хэшируется, и только потом начинается передача).
   Future<BatchUploadState> startAll({required String mediaType}) async {
     if (state.isRunning || state.items.isEmpty) return state;
     _cancelled = false;
@@ -111,15 +138,20 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     );
     state = BatchUploadState(items: state.items, isRunning: true);
     try {
-      final hashes = await _hashPending();
+      final hashes = _hashPending();
       for (var i = 0; i < state.items.length; i++) {
         if (_cancelled || _disposed) break;
         final item = state.items[i];
         if (item.status != BatchItemStatus.pending) continue;
+        // Хэш именно этого файла — пул уже мог посчитать его давно.
+        final hash = await hashes[i];
+        if (_cancelled || _disposed) break;
         _setStatus(i, BatchItemStatus.active);
-        await _uploadOne(i, item, mediaType, hashes[i]);
+        await _uploadOne(i, item, mediaType, hash);
         if (_cancelled || _disposed) break;
       }
+      // Дожимаем оставшиеся хэши, чтобы не текли за пределы пачки.
+      await hashes.done;
     } finally {
       keepAlive.close();
       if (!_disposed) {
@@ -141,39 +173,41 @@ class BatchUploadController extends Notifier<BatchUploadState> {
 
   /// Параллельный просчёт хэшей pending-файлов (пул 3: больше стримов
   /// с одного диска выигрыша не дают, а память и отмену усложняют).
-  /// null в карте — хэш не посчитался (отмена/ошибка чтения): _uploadOne
-  /// тогда считает сам через start (там же проверка отмены).
-  Future<Map<int, String?>> _hashPending() async {
+  /// Возвращает карту готовностей: заливка ждёт свой хэш, не дожидаясь
+  /// остальных. null — хэш не посчитался (отмена/ошибка чтения):
+  /// _uploadOne тогда считает сам через start (там же проверка отмены).
+  _HashPool _hashPending() {
     final indices = [
       for (var i = 0; i < state.items.length; i++)
         if (state.items[i].status == BatchItemStatus.pending) i,
     ];
     _setHashing(total: indices.length, done: 0);
-    final out = <int, String?>{};
+    final pool = _HashPool(indices);
     var cursor = 0;
     Future<void> worker() async {
       while (!_cancelled && !_disposed) {
         if (cursor >= indices.length) return;
         final i = cursor++;
         final item = state.items[i];
+        String? hash;
         try {
-          out[i] = await _single.hasher(
+          hash = await _single.hasher(
             item.filePath,
             () => _cancelled || _disposed,
           );
         } catch (e) {
           AppLogger.error('Batch hash failed', e);
-          out[i] = null;
         }
-        _setHashing(total: indices.length, done: out.length);
+        pool.complete(i, hash);
+        _setHashing(total: indices.length, done: pool.completedCount);
       }
     }
 
-    await Future.wait([
+    final workers = Future.wait([
       for (var w = 0; w < 3 && w < indices.length; w++) worker(),
     ]);
-    _setHashing(total: 0, done: 0);
-    return out;
+    pool.done = workers;
+    return pool;
   }
 
   void _setHashing({required int total, required int done}) {
@@ -281,3 +315,29 @@ final batchUploadControllerProvider =
     NotifierProvider.autoDispose<BatchUploadController, BatchUploadState>(
       BatchUploadController.new,
     );
+
+/// Готовности хэшей пачки: каждый индекс получает свой Future, заливка
+/// ждёт только его. Пустая карта завершений при отмене — ожидающие
+/// получают null (тогда хэшер досчитает внутри start).
+class _HashPool {
+  new(this.indices) {
+    for (final i in indices) {
+      _waiters[i] = Completer<String?>();
+    }
+  }
+
+  final List<int> indices;
+  final Map<int, Completer<String?>> _waiters = {};
+  Future<void> done = Future.value();
+  int completedCount = 0;
+
+  Future<String?> operator [](int index) =>
+      _waiters[index]?.future ?? Future.value();
+
+  void complete(int index, String? hash) {
+    final waiter = _waiters[index];
+    if (waiter == null || waiter.isCompleted) return;
+    completedCount++;
+    waiter.complete(hash);
+  }
+}

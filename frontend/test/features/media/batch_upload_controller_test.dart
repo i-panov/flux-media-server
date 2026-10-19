@@ -25,7 +25,9 @@ class _FakeRepository implements MediaRepository {
   int cancelled = 0;
 
   @override
-  Future<Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>>
+  Future<
+    Either<Failure, ({bool exists, int? mediaId, String? title, bool trashed})>
+  >
   checkHash(String hash) async => Right((
     exists: existingHashes.contains(hash) || trashedHashes.contains(hash),
     mediaId: null,
@@ -56,11 +58,8 @@ class _FakeRepository implements MediaRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-BatchUploadItem _item(String name) => BatchUploadItem(
-  filePath: '/tmp/$name',
-  fileName: name,
-  fileSize: 1024,
-);
+BatchUploadItem _item(String name) =>
+    BatchUploadItem(filePath: '/tmp/$name', fileName: name, fileSize: 1024);
 
 void main() {
   late _FakeRepository repo;
@@ -93,8 +92,10 @@ void main() {
   test('пачка: успех + дубликат + продолжение после дубликата', () async {
     // Хэшер детерминированный: хэш = путь (дубликат = тот же путь).
     batch().setFiles([_item('a.mp4'), _item('b.mp4')]);
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, _) async => 'hash-of-$path';
+    container.read(uploadControllerProvider.notifier).hasher = (
+      path,
+      _,
+    ) async => 'hash-of-$path';
     repo.existingHashes = {'hash-of-/tmp/b.mp4'};
 
     final summary = await batch().startAll(mediaType: 'video');
@@ -108,14 +109,15 @@ void main() {
 
   test('отмена останавливает пачку, остаток помечается', () async {
     batch().setFiles([_item('a.mp4'), _item('b.mp4'), _item('c.mp4')]);
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, isCancelled) async {
-          if (path.endsWith('a.mp4')) {
-            batch().cancelAll();
-            await Future<void>.delayed(Duration.zero);
-          }
-          return 'hash-$path';
-        };
+    container
+        .read(uploadControllerProvider.notifier)
+        .hasher = (path, isCancelled) async {
+      if (path.endsWith('a.mp4')) {
+        batch().cancelAll();
+        await Future<void>.delayed(Duration.zero);
+      }
+      return 'hash-$path';
+    };
 
     final summary = await batch().startAll(mediaType: 'video');
 
@@ -137,8 +139,10 @@ void main() {
 
   test('ошибка одного файла не валит пачку', () async {
     batch().setFiles([_item('a.mp4'), _item('b.mp4')]);
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, _) async => throw Exception('hash boom');
+    container.read(uploadControllerProvider.notifier).hasher = (
+      path,
+      _,
+    ) async => throw Exception('hash boom');
 
     final summary = await batch().startAll(mediaType: 'video');
 
@@ -148,8 +152,10 @@ void main() {
 
   test('хэш из корзины — failed с намёком, а не дубликат', () async {
     batch().setFiles([_item('a.mp4')]);
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, _) async => 'hash-$path';
+    container.read(uploadControllerProvider.notifier).hasher = (
+      path,
+      _,
+    ) async => 'hash-$path';
     repo.trashedHashes = {'hash-/tmp/a.mp4'};
 
     final summary = await batch().startAll(mediaType: 'video');
@@ -157,10 +163,7 @@ void main() {
     expect(summary.doneCount, 0);
     expect(summary.duplicateCount, 0);
     expect(summary.failedCount, 1);
-    expect(
-      summary.items.single.errorMessage,
-      contains('trash'),
-    );
+    expect(summary.items.single.errorMessage, contains('trash'));
   });
 
   test('retryFailed перепроганяет только упавшие', () async {
@@ -191,12 +194,11 @@ void main() {
 
   test('setFiles во время running игнорируется', () async {
     batch().setFiles([_item('a.mp4')]);
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, _) async {
-          // Пока первый файл в работе — подмена списка запрещена.
-          batch().setFiles([_item('x.mp4')]);
-          return 'hash-$path';
-        };
+    container.read(uploadControllerProvider.notifier).hasher = (path, _) async {
+      // Пока первый файл в работе — подмена списка запрещена.
+      batch().setFiles([_item('x.mp4')]);
+      return 'hash-$path';
+    };
 
     final summary = await batch().startAll(mediaType: 'video');
 
@@ -213,26 +215,23 @@ void main() {
   test('хэшер вызван один раз на файл (knownHash без перехэша)', () async {
     batch().setFiles([_item('a.mp4'), _item('b.mp4'), _item('c.mp4')]);
     final calls = <String, int>{};
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, _) async {
-          calls[path] = (calls[path] ?? 0) + 1;
-          return 'hash-$path';
-        };
+    container.read(uploadControllerProvider.notifier).hasher = (path, _) async {
+      calls[path] = (calls[path] ?? 0) + 1;
+      return 'hash-$path';
+    };
 
     await batch().startAll(mediaType: 'video');
 
     // Пул посчитал + заливка переиспользовала: ровно по разу.
-    expect(calls, {
-      '/tmp/a.mp4': 1,
-      '/tmp/b.mp4': 1,
-      '/tmp/c.mp4': 1,
-    });
+    expect(calls, {'/tmp/a.mp4': 1, '/tmp/b.mp4': 1, '/tmp/c.mp4': 1});
   });
 
   test('дубликат несёт название совпавшего', () async {
     batch().setFiles([_item('a.mp4')]);
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, _) async => 'hash-$path';
+    container.read(uploadControllerProvider.notifier).hasher = (
+      path,
+      _,
+    ) async => 'hash-$path';
     repo
       ..existingHashes = {'hash-/tmp/a.mp4'}
       ..titles = {'hash-/tmp/a.mp4': 'S01E02 Название'};
@@ -244,23 +243,22 @@ void main() {
   });
 
   test('хэширование идёт пулом с честным прогрессом', () async {
-    batch().setFiles([
-      for (var i = 0; i < 6; i++) _item('f$i.mp4'),
-    ]);
+    batch().setFiles([for (var i = 0; i < 6; i++) _item('f$i.mp4')]);
     final gate = Completer<void>();
     var active = 0;
     var maxActive = 0;
-    container.read(uploadControllerProvider.notifier).hasher =
-        (path, isCancelled) async {
-          active++;
-          if (active > maxActive) maxActive = active;
-          try {
-            await gate.future;
-            return 'hash-$path';
-          } finally {
-            active--;
-          }
-        };
+    container
+        .read(uploadControllerProvider.notifier)
+        .hasher = (path, isCancelled) async {
+      active++;
+      if (active > maxActive) maxActive = active;
+      try {
+        await gate.future;
+        return 'hash-$path';
+      } finally {
+        active--;
+      }
+    };
 
     final running = batch().startAll(mediaType: 'video');
     // Ждём входа в фазу хэширования (пул упёрся в гейт).
@@ -279,5 +277,82 @@ void main() {
     expect(maxActive, greaterThan(1));
     expect(maxActive, lessThanOrEqualTo(3));
     expect(summary.doneCount, 6);
+  });
+
+  test('sizesPending: старт запрещён, updateSizes снимает флаг', () {
+    batch().setFiles([
+      const BatchUploadItem(
+        filePath: '/tmp/a.mp4',
+        fileName: 'a.mp4',
+        fileSize: 0,
+      ),
+    ], sizesPending: true);
+
+    var state = container.read(batchUploadControllerProvider);
+    expect(state.sizesPending, isTrue, reason: '0 = не измерено');
+    expect(state.items.single.fileSize, 0);
+
+    batch().updateSizes({'/tmp/a.mp4': 2048});
+
+    state = container.read(batchUploadControllerProvider);
+    expect(state.sizesPending, isFalse, reason: 'размеры пришли');
+    expect(state.items.single.fileSize, 2048);
+  });
+
+  test('updateSizes не трогает файлы вне карты', () {
+    batch().setFiles([
+      const BatchUploadItem(
+        filePath: '/tmp/a.mp4',
+        fileName: 'a.mp4',
+        fileSize: 0,
+      ),
+      const BatchUploadItem(
+        filePath: '/tmp/b.mp4',
+        fileName: 'b.mp4',
+        fileSize: 0,
+      ),
+    ], sizesPending: true);
+
+    batch().updateSizes({'/tmp/a.mp4': 100});
+
+    final items = container.read(batchUploadControllerProvider).items;
+    expect(items[0].fileSize, 100);
+    expect(items[1].fileSize, 0);
+  });
+
+  test('пустой файл (0 после замеров) честно падает backstopом', () async {
+    // После updateSizes 0 означает реальный пустой файл: старт разрешён,
+    // контроллер валит его своим backstop-сообщением, а не молча.
+    batch().setFiles([
+      const BatchUploadItem(
+        filePath: '/tmp/empty.mp4',
+        fileName: 'empty.mp4',
+        fileSize: 0,
+      ),
+    ], sizesPending: true);
+    batch().updateSizes({'/tmp/empty.mp4': 0});
+
+    final summary = await batch().startAll(mediaType: 'video');
+
+    expect(summary.failedCount, 1);
+    expect(summary.items.single.errorMessage, contains('empty'));
+  });
+
+  test('retryFailed работает вместе с пулом хэшей', () async {
+    batch().setFiles([_item('a.mp4'), _item('b.mp4')]);
+    var failFirst = true;
+    container.read(uploadControllerProvider.notifier).hasher = (path, _) async {
+      if (failFirst && path.endsWith('a.mp4')) throw Exception('hash boom');
+      return 'hash-$path';
+    };
+
+    final first = await batch().startAll(mediaType: 'video');
+    expect(first.failedCount, 1);
+    expect(first.doneCount, 1);
+
+    failFirst = false;
+    final second = await batch().retryFailed(mediaType: 'video');
+    expect(second.failedCount, 0);
+    expect(second.doneCount, 2);
   });
 }
