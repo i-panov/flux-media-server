@@ -38,19 +38,31 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     );
     if (result.isEmpty) return;
 
-    final items = <BatchUploadItem>[];
+    // Пути — сразу в работу, размеры — параллельно: последовательный
+    // length() на 20 файлах давал секунды пустого экрана.
+    final names = <String, String>{};
     for (final file in result) {
       final path = file.path;
       if (path == null) continue;
-      // Размер читаем асинхронно: lengthSync() блокирует UI-изолят.
-      final size = await File(path).length();
-      if (!mounted) return;
-      items.add(
-        BatchUploadItem(filePath: path, fileName: file.name, fileSize: size),
-      );
+      names[path] = file.name;
     }
-    if (!mounted || items.isEmpty) return;
-    ref.read(batchUploadControllerProvider.notifier).setFiles(items);
+    if (names.isEmpty) return;
+    final sizes = await Future.wait([
+      for (final path in names.keys)
+        // Размер читаем асинхронно: lengthSync() блокирует UI-изолят.
+        File(path).length().then((s) => MapEntry(path, s)),
+    ]);
+    if (!mounted) return;
+    ref
+        .read(batchUploadControllerProvider.notifier)
+        .setFiles([
+          for (final e in sizes)
+            BatchUploadItem(
+              filePath: e.key,
+              fileName: names[e.key]!,
+              fileSize: e.value,
+            ),
+        ]);
   }
 
   Future<void> _startAll() async {
@@ -160,6 +172,27 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          // Фаза хэширования видна честным прогрессом: иначе пачка
+          // на 20 серий молчит, пока пул считает хэши.
+          if (batch.isHashing) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: batch.hashingTotal > 0
+                        ? batch.hashingDone / batch.hashingTotal
+                        : null,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${l.hashingFile} ${batch.hashingDone}/${batch.hashingTotal}',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Expanded(
             child: batch.items.isEmpty
                 ? Center(
@@ -226,10 +259,13 @@ class _BatchRow extends StatelessWidget {
       BatchItemStatus.cancelled => (Icons.cancel_outlined, Colors.grey),
     };
     final statusText = switch (item.status) {
-      BatchItemStatus.pending => null,
+      BatchItemStatus.pending => l.queued,
       BatchItemStatus.active => _phaseLabel(l, phase) ?? l.uploading,
       BatchItemStatus.done => l.uploadSuccess,
-      BatchItemStatus.duplicate => l.fileAlreadyExists,
+      BatchItemStatus.duplicate =>
+        item.existingTitle == null
+            ? l.fileAlreadyExists
+            : '${l.fileAlreadyExists}: ${item.existingTitle}',
       BatchItemStatus.failed => item.errorMessage ?? l.uploadFailed,
       BatchItemStatus.cancelled => l.uploadCancelled,
     };
@@ -243,7 +279,7 @@ class _BatchRow extends StatelessWidget {
           Text(formatSize(item.fileSize)),
           if (item.status == BatchItemStatus.active && progress != null)
             LinearProgressIndicator(value: progress),
-          if (statusText != null) Text(statusText),
+          Text(statusText),
         ],
       ),
     );

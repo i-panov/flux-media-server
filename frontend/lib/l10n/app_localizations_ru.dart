@@ -294,6 +294,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get uploadFailed => 'Ошибка загрузки';
 
   @override
+  String get queued => 'В очереди';
+
+  @override
   String uploadBatchSummary(int done, int total, int duplicates, int failed) {
     return 'Загружено $done из $total (дубли: $duplicates, ошибки: $failed)';
   }

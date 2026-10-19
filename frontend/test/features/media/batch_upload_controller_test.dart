@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
@@ -16,6 +18,9 @@ class _FakeRepository implements MediaRepository {
   /// Хэши, лежащие в корзине: перезалив упирается в намёк,
   /// а не в молчаливый дубликат.
   Set<String> trashedHashes = {};
+
+  /// Названия дубликатов по хэшу (сервер отдаёт title совпавшего).
+  Map<String, String> titles = {};
   UploadStatus? statusResult;
   int cancelled = 0;
 
@@ -24,7 +29,7 @@ class _FakeRepository implements MediaRepository {
   checkHash(String hash) async => Right((
     exists: existingHashes.contains(hash) || trashedHashes.contains(hash),
     mediaId: null,
-    title: null,
+    title: titles[hash],
     trashed: trashedHashes.contains(hash),
   ));
 
@@ -203,5 +208,76 @@ void main() {
 
     expect(summary.isRunning, false);
     expect(summary.items, isEmpty);
+  });
+
+  test('хэшер вызван один раз на файл (knownHash без перехэша)', () async {
+    batch().setFiles([_item('a.mp4'), _item('b.mp4'), _item('c.mp4')]);
+    final calls = <String, int>{};
+    container.read(uploadControllerProvider.notifier).hasher =
+        (path, _) async {
+          calls[path] = (calls[path] ?? 0) + 1;
+          return 'hash-$path';
+        };
+
+    await batch().startAll(mediaType: 'video');
+
+    // Пул посчитал + заливка переиспользовала: ровно по разу.
+    expect(calls, {
+      '/tmp/a.mp4': 1,
+      '/tmp/b.mp4': 1,
+      '/tmp/c.mp4': 1,
+    });
+  });
+
+  test('дубликат несёт название совпавшего', () async {
+    batch().setFiles([_item('a.mp4')]);
+    container.read(uploadControllerProvider.notifier).hasher =
+        (path, _) async => 'hash-$path';
+    repo
+      ..existingHashes = {'hash-/tmp/a.mp4'}
+      ..titles = {'hash-/tmp/a.mp4': 'S01E02 Название'};
+
+    final summary = await batch().startAll(mediaType: 'video');
+
+    expect(summary.duplicateCount, 1);
+    expect(summary.items.single.existingTitle, 'S01E02 Название');
+  });
+
+  test('хэширование идёт пулом с честным прогрессом', () async {
+    batch().setFiles([
+      for (var i = 0; i < 6; i++) _item('f$i.mp4'),
+    ]);
+    final gate = Completer<void>();
+    var active = 0;
+    var maxActive = 0;
+    container.read(uploadControllerProvider.notifier).hasher =
+        (path, isCancelled) async {
+          active++;
+          if (active > maxActive) maxActive = active;
+          try {
+            await gate.future;
+            return 'hash-$path';
+          } finally {
+            active--;
+          }
+        };
+
+    final running = batch().startAll(mediaType: 'video');
+    // Ждём входа в фазу хэширования (пул упёрся в гейт).
+    for (var i = 0; i < 100; i++) {
+      final s = container.read(batchUploadControllerProvider);
+      if (s.hashingTotal == 6) break;
+      await Future<void>.delayed(Duration.zero);
+    }
+    final hashing = container.read(batchUploadControllerProvider);
+    expect(hashing.hashingTotal, 6);
+    expect(hashing.hashingDone, lessThan(6));
+    gate.complete();
+    final summary = await running;
+
+    // Параллельно, но не wider пула.
+    expect(maxActive, greaterThan(1));
+    expect(maxActive, lessThanOrEqualTo(3));
+    expect(summary.doneCount, 6);
   });
 }

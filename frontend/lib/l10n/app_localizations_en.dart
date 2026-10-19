@@ -292,6 +292,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get uploadFailed => 'Upload failed';
 
   @override
+  String get queued => 'Queued';
+
+  @override
   String uploadBatchSummary(int done, int total, int duplicates, int failed) {
     return 'Uploaded $done of $total ($duplicates duplicates, $failed failed)';
   }

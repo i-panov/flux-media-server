@@ -232,27 +232,27 @@ func (h *MediaHandler) CheckHash(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 	existing, err := h.mediaRepo.FindByHash(ctx, req.Hash)
 	if err != nil {
+		// FindByHash возвращает не-nil пустую структуру вместе с
+		// ErrRecordNotFound — проверять только existing != nil нельзя:
+		// так любой новый файл отвечал «уже есть» (регрессия 759cf42).
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.JSON(fiber.Map{"exists": false})
+		}
 		// Ошибка БД — это не "hash не найден": логируем и возвращаем 500,
 		// чтобы клиент не принял сбой за отсутствие дубликата.
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("CheckHash: FindByHash: %v", err)
-			return response.Error(c, fiber.StatusInternalServerError, "Failed to check hash")
-		}
+		log.Printf("CheckHash: FindByHash: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to check hash")
 	}
-	if existing != nil {
-		return c.JSON(fiber.Map{
-			"exists": true,
-			// Корзина видна дедупу: клиент различит «уже в библиотеке»
-			// и «лежит в корзине — предложи восстановить».
-			"trashed": existing.DeletedAt.Valid,
-			"media": fiber.Map{
-				"id":    existing.ID,
-				"title": existing.Title,
-			},
-		})
-	}
-
-	return c.JSON(fiber.Map{"exists": false})
+	return c.JSON(fiber.Map{
+		"exists": true,
+		// Корзина видна дедупу: клиент различит «уже в библиотеке»
+		// и «лежит в корзине — предложи восстановить».
+		"trashed": existing.DeletedAt.Valid,
+		"media": fiber.Map{
+			"id":    existing.ID,
+			"title": existing.Title,
+		},
+	})
 }
 
 func (h *MediaHandler) Stream(c *fiber.Ctx) error {

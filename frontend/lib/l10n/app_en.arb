@@ -223,6 +223,8 @@
   },
   "uploadFailed": "Upload failed",
   "@uploadFailed": {},
+  "queued": "Queued",
+  "@queued": {},
   "uploadBatchSummary": "Uploaded {done} of {total} ({duplicates} duplicates, {failed} failed)",
   "@uploadBatchSummary": {
     "placeholders": {

@@ -632,6 +632,12 @@ abstract class AppLocalizations {
   /// **'Upload failed'**
   String get uploadFailed;
 
+  /// No description provided for @queued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get queued;
+
   /// No description provided for @uploadBatchSummary.
   ///
   /// In en, this message translates to:

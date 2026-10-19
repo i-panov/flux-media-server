@@ -171,6 +171,8 @@
   },
   "uploadFailed": "Ошибка загрузки",
   "@uploadFailed": {},
+  "queued": "В очереди",
+  "@queued": {},
   "uploadBatchSummary": "Загружено {done} из {total} (дубли: {duplicates}, ошибки: {failed})",
   "@uploadBatchSummary": {
     "placeholders": {

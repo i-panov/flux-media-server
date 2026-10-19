@@ -14,6 +14,7 @@ class BatchUploadItem {
     required this.fileSize,
     this.status = BatchItemStatus.pending,
     this.errorMessage,
+    this.existingTitle,
   });
 
   final String filePath;
@@ -22,23 +23,42 @@ class BatchUploadItem {
   final BatchItemStatus status;
   final String? errorMessage;
 
-  BatchUploadItem copyWith({BatchItemStatus? status, String? errorMessage}) {
+  /// Название совпавшего дубликата с сервера (checkHash его отдаёт).
+  final String? existingTitle;
+
+  BatchUploadItem copyWith({
+    BatchItemStatus? status,
+    String? errorMessage,
+    String? existingTitle,
+  }) {
     return BatchUploadItem(
       filePath: filePath,
       fileName: fileName,
       fileSize: fileSize,
       status: status ?? this.status,
       errorMessage: errorMessage,
+      existingTitle: existingTitle ?? this.existingTitle,
     );
   }
 }
 
 /// Состояние пакетной загрузки: список файлов и флаг работы.
 class BatchUploadState {
-  const new({this.items = const [], this.isRunning = false});
+  const new({
+    this.items = const [],
+    this.isRunning = false,
+    this.hashingTotal = 0,
+    this.hashingDone = 0,
+  });
 
   final List<BatchUploadItem> items;
   final bool isRunning;
+
+  /// Прогресс фазы хэширования (0/0 — не идёт).
+  final int hashingTotal;
+  final int hashingDone;
+
+  bool get isHashing => hashingDone < hashingTotal;
 
   int get doneCount =>
       items.where((i) => i.status == BatchItemStatus.done).length;
@@ -77,6 +97,8 @@ class BatchUploadController extends Notifier<BatchUploadState> {
 
   /// Грузит все pending-файлы по очереди. Возвращает сводку для снекбара.
   /// [mediaType] — общий для пачки (экран один на аудио/видео).
+  /// Хэши — первой фазой, пулом воркеров: иначе сезон из 20 серий
+  /// сначала полчаса молча хэшируется последовательно.
   Future<BatchUploadState> startAll({required String mediaType}) async {
     if (state.isRunning || state.items.isEmpty) return state;
     _cancelled = false;
@@ -89,12 +111,13 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     );
     state = BatchUploadState(items: state.items, isRunning: true);
     try {
+      final hashes = await _hashPending();
       for (var i = 0; i < state.items.length; i++) {
         if (_cancelled || _disposed) break;
         final item = state.items[i];
         if (item.status != BatchItemStatus.pending) continue;
         _setStatus(i, BatchItemStatus.active);
-        await _uploadOne(i, item, mediaType);
+        await _uploadOne(i, item, mediaType, hashes[i]);
         if (_cancelled || _disposed) break;
       }
     } finally {
@@ -114,6 +137,53 @@ class BatchUploadController extends Notifier<BatchUploadState> {
       }
     }
     return state;
+  }
+
+  /// Параллельный просчёт хэшей pending-файлов (пул 3: больше стримов
+  /// с одного диска выигрыша не дают, а память и отмену усложняют).
+  /// null в карте — хэш не посчитался (отмена/ошибка чтения): _uploadOne
+  /// тогда считает сам через start (там же проверка отмены).
+  Future<Map<int, String?>> _hashPending() async {
+    final indices = [
+      for (var i = 0; i < state.items.length; i++)
+        if (state.items[i].status == BatchItemStatus.pending) i,
+    ];
+    _setHashing(total: indices.length, done: 0);
+    final out = <int, String?>{};
+    var cursor = 0;
+    Future<void> worker() async {
+      while (!_cancelled && !_disposed) {
+        if (cursor >= indices.length) return;
+        final i = cursor++;
+        final item = state.items[i];
+        try {
+          out[i] = await _single.hasher(
+            item.filePath,
+            () => _cancelled || _disposed,
+          );
+        } catch (e) {
+          AppLogger.error('Batch hash failed', e);
+          out[i] = null;
+        }
+        _setHashing(total: indices.length, done: out.length);
+      }
+    }
+
+    await Future.wait([
+      for (var w = 0; w < 3 && w < indices.length; w++) worker(),
+    ]);
+    _setHashing(total: 0, done: 0);
+    return out;
+  }
+
+  void _setHashing({required int total, required int done}) {
+    if (_disposed) return;
+    state = BatchUploadState(
+      items: state.items,
+      isRunning: true,
+      hashingTotal: total,
+      hashingDone: done,
+    );
   }
 
   /// Отмена: текущий файл — через одиночный контроллер (там же
@@ -139,14 +209,22 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     return await startAll(mediaType: mediaType);
   }
 
-  Future<void> _uploadOne(int index, BatchUploadItem item, String mediaType) async {
+  Future<void> _uploadOne(
+    int index,
+    BatchUploadItem item,
+    String mediaType,
+    String? knownHash,
+  ) async {
     var ok = false;
+    String? duplicateTitle;
     try {
       ok = await _single.start(
         filePath: item.filePath,
         mediaType: mediaType,
         fileName: item.fileName,
         fileSize: item.fileSize,
+        knownHash: knownHash,
+        onDuplicateTitle: (title) => duplicateTitle = title,
         // Без pop экрана: пачка продолжается. Списки обновляем теми же
         // провайдерами, что refreshMediaLists, но напрямую: ref нотифаера —
         // Ref, а не WidgetRef, в сигнатуру он не входит.
@@ -175,14 +253,23 @@ class BatchUploadController extends Notifier<BatchUploadState> {
       _setStatus(index, BatchItemStatus.failed, single.errorMessage);
     } else {
       // false без ошибки — дубликат (инвариант UploadState.errorMessage).
-      _setStatus(index, BatchItemStatus.duplicate);
+      _setStatus(index, BatchItemStatus.duplicate, null, duplicateTitle);
     }
   }
 
-  void _setStatus(int index, BatchItemStatus status, [String? error]) {
+  void _setStatus(
+    int index,
+    BatchItemStatus status, [
+    String? error,
+    String? existingTitle,
+  ]) {
     if (_disposed) return;
     final items = List<BatchUploadItem>.from(state.items);
-    items[index] = items[index].copyWith(status: status, errorMessage: error);
+    items[index] = items[index].copyWith(
+      status: status,
+      errorMessage: error,
+      existingTitle: existingTitle,
+    );
     state = BatchUploadState(items: items, isRunning: true);
   }
 }

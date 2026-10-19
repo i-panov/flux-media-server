@@ -163,12 +163,17 @@ class UploadController extends Notifier<UploadState> {
 
   /// Запускает загрузку [filePath]. Возвращает true только при полном
   /// успехе (включая onSuccess). См. инвариант [UploadState.errorMessage].
+  /// [knownHash] — заранее посчитанный хэш (пачка считает их конвейером
+  /// во время заливки соседних файлов): пропускаем повторный прогон.
+  /// [onDuplicateTitle] — existing title дубликата для подписи в пачке.
   Future<bool> start({
     required String filePath,
     required String mediaType,
     required String? fileName,
     required int fileSize,
     required UploadSuccessCallback onSuccess,
+    String? knownHash,
+    void Function(String? existingTitle)? onDuplicateTitle,
   }) async {
     // Backstop-проверки с сырым английским текстом (как Failure.message):
     // errorMessage обязателен — иначе нарушился бы инвариант
@@ -194,7 +199,8 @@ class UploadController extends Notifier<UploadState> {
     );
 
     try {
-      final hash = await _hasher(filePath, () => _cancelled);
+      // knownHash из пачки считается тем же хэшером: null только при отмене.
+      final hash = knownHash ?? await _hasher(filePath, () => _cancelled);
       // null от хэшера — тоже отмена: единственный легитимный
       // производитель null — сработавшая проверка isCancelled внутри.
       if (hash == null) {
@@ -222,6 +228,8 @@ class UploadController extends Notifier<UploadState> {
           state = state.copyWith(
             errorMessage: 'File is in trash — restore it from trash',
           );
+        } else {
+          onDuplicateTitle?.call(check.title);
         }
         return false;
       }
