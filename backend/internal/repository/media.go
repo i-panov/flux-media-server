@@ -121,6 +121,48 @@ func (r *MediaStore) FindByPathBasic(ctx context.Context, path string) (*models.
 	return &media, err
 }
 
+// FindVideosMissingDimensions отдаёт живые видео без размеров кадра.
+//
+// Фильтр по ОБОИМ размерам (width = 0 OR height = 0): клиенту нужна
+// пара, а не одно число — при width > 0 и height = 0 запись не
+// заполнилась бы никогда (фильтр по width её не видел), и пропорции
+// остались бы неопределёнными.
+//
+// Мягкий фильтр: битый файл, который ffprobe не осилил, не должен
+// заставлять заливку переспрашивать его при каждом старте — достаточно,
+// чтобы он не уехал в конец очереди навсегда. Порядок по ID: заливка
+// идёт до конца, а не крутится по кругу.
+func (r *MediaStore) FindVideosMissingDimensions(ctx context.Context, limit int) ([]models.Media, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var media []models.Media
+	err := r.db.WithContext(ctx).
+		Where("type = ? AND (width = 0 OR height = 0)", models.MediaTypeVideo).
+		Order("id ASC").
+		Limit(limit).
+		Find(&media).Error
+	return media, err
+}
+
+// UpdateDimensions записывает только размеры кадра.
+//
+// Отдельный метод вместо Update: Update трогает ассоциации (Artists),
+// и вызов на записи без предзагруженных артистов стирал связи видео с
+// артистами. Здесь пишутся два технических числа — ничего больше.
+func (r *MediaStore) UpdateDimensions(ctx context.Context, id uint, width, height int) error {
+	if id == 0 {
+		return errors.New("repository: media ID required for UpdateDimensions")
+	}
+	return r.db.WithContext(ctx).
+		Model(&models.Media{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"width":  width,
+			"height": height,
+		}).Error
+}
+
 // FindByIDs возвращает медиа по списку ID (порядок не гарантируется —
 // сортировка по media.id ASC). Артисты грузятся пакетно, как в FindAll.
 func (r *MediaStore) FindByIDs(ctx context.Context, ids []uint) ([]models.Media, error) {
@@ -244,11 +286,24 @@ func updateMediaTx(tx *gorm.DB, media *models.Media, sourceURL *string) error {
 		*sourceURL = normalized
 	}
 
-	artists, err := resolveArtists(tx, media.Artists)
-	if err != nil {
-		return err
+	// Артисты: nil означает «не загружено» (запись прочитана без
+	// Preload), а НЕ «связей нет». resolveArtists на nil вернул бы
+	// не-nil пустой срез, и проверка ниже сочла бы, что связи надо
+	// заменить — Replace с пустым списком удаляет все строки
+	// media_artists у записи. Так терялись артисты у видео, к которым
+	// применили Update без предзагруженных артистов (например, при
+	// бэкфилле размеров кадра).
+	//
+	// Поэтому пустой срез (осознанное «связей нет») и nil (не знаем)
+	// различаются, и ассоциация трогается только в первом случае.
+	artistsLoaded := media.Artists != nil
+	if artistsLoaded {
+		resolved, err := resolveArtists(tx, media.Artists)
+		if err != nil {
+			return err
+		}
+		media.Artists = resolved
 	}
-	media.Artists = artists
 
 	updates := make(map[string]interface{})
 	if media.Title != "" {
@@ -274,6 +329,12 @@ func updateMediaTx(tx *gorm.DB, media *models.Media, sourceURL *string) error {
 	}
 	if media.Duration != 0 {
 		updates["duration"] = media.Duration
+	}
+	if media.Width != 0 {
+		updates["width"] = media.Width
+	}
+	if media.Height != 0 {
+		updates["height"] = media.Height
 	}
 	if media.FilePath != "" {
 		updates["file_path"] = media.FilePath
@@ -319,7 +380,9 @@ func updateMediaTx(tx *gorm.DB, media *models.Media, sourceURL *string) error {
 		}
 	}
 
-	if media.Artists != nil {
+	// Связи артистов трогаем только если они были загружены (см. выше
+	// про nil vs пустой срез).
+	if artistsLoaded {
 		return tx.Model(media).Association("Artists").Replace(&media.Artists)
 	}
 	return nil

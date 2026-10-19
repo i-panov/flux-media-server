@@ -412,11 +412,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addToQueue => 'В очередь';
 
   @override
-  String continueFrom(String formatted) {
-    return 'Продолжить с $formatted';
-  }
-
-  @override
   String get editMetadata => 'Редактировать метаданные';
 
   @override
@@ -474,7 +469,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get speed => 'Скорость';
 
   @override
+  String get volume => 'Громкость';
+
+  @override
   String get pause => 'Пауза';
+
+  @override
+  String get fullscreen => 'Полный экран';
+
+  @override
+  String get seekBack10 => 'Назад на 10 секунд';
+
+  @override
+  String get seekForward10 => 'Вперёд на 10 секунд';
 
   @override
   String get close => 'Закрыть';
@@ -499,6 +506,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get extractCancelled => 'Извлечение аудио отменено';
+
+  @override
+  String get cancelExtraction => 'Отменить извлечение';
 
   @override
   String get openAudioTrack => 'Открыть трек';

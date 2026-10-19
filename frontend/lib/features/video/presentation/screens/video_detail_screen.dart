@@ -13,6 +13,7 @@ import 'package:flux_media_server/features/media/presentation/widgets/edit_metad
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/offline/presentation/widgets/save_to_files.dart';
 import 'package:flux_media_server/features/player/data/providers/play_queue_provider.dart';
+import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/video/presentation/providers/extracted_audio_provider.dart';
 import 'package:flux_media_server/features/video/presentation/utils/extract_audio_flow.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_details_panel.dart';
@@ -34,6 +35,40 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
   bool _isFullscreen = false;
   bool _isUploadingCover = false;
   bool _coverUploadCancelled = false;
+
+  /// Последнее известное состояние плеера: решение о паузе принимается
+  /// по нему, а не чтением провайдера в dispose.
+  PlaybackState _lastPlayback = const PlaybackState.initial();
+
+  @override
+  void initState() {
+    super.initState();
+    // ref.read в dispose бросает (виджет демонтируется), поэтому
+    // состояние плеера запоминается подпиской, а читается из кэша.
+    ref.listenManual(playbackCoordinatorProvider, (_, next) {
+      _lastPlayback = next;
+    }, fireImmediately: true);
+  }
+
+  @override
+  void dispose() {
+    // Пауза при УХОДЕ с экрана. Раньше это делала панель в своём dispose,
+    // но её dispose срабатывает и при смене режима (встроенная ⇄ полный
+    // экран): экран собирает другую ветвь дерева, и панель
+    // пересоздаётся. Из-за этого вход в полный экран ставил видео на
+    // паузу — пользователь видел застывший кадр.
+    //
+    // Здесь различие видно явно: dispose экрана — это именно уход
+    // (системный «назад» сносит роут мимо экранной кнопки), а смена
+    // режима экран не трогает.
+    //
+    // Паузим только своё неподоставленное видео — фоновое аудио и чужой
+    // трек не трогаем. Заодно сохраняется прогресс для resume.
+    if (shouldPauseOnScreenDispose(_lastPlayback, widget.mediaId)) {
+      unawaited(ref.read(playbackCoordinatorProvider.notifier).pause());
+    }
+    super.dispose();
+  }
 
   void _setFullscreen(bool value) {
     setState(() => _isFullscreen = value);
@@ -225,40 +260,15 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.maybePop(),
         ),
-        actions: [
-          IconButton(
-            color: Colors.white,
-            icon: _isUploadingCover
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.image),
-            tooltip: _isUploadingCover ? l.uploadingCover : l.changeCover,
-            onPressed: _changeCover,
-          ),
-          IconButton(
-            color: Colors.white,
-            icon: const Icon(Icons.edit),
-            onPressed: () => showEditMetadataDialog(context, ref, media),
-            tooltip: l.edit,
-          ),
-          IconButton(
-            color: Colors.red,
-            icon: const Icon(Icons.delete_outline),
-            onPressed: _delete,
-            tooltip: l.delete,
-          ),
-        ],
+        // Действий в AppBar больше нет: смена обложки, правка и удаление
+        // живут в общем вертикальном списке панели — там у всех одна
+        // форма (иконка + подпись), а не «три иконки без подписей».
       ),
       body: Column(
         children: [
           VideoPlayerPanel(
             media: media,
+            onPlay: _play,
             onToggleFullscreen: () => _setFullscreen(true),
           ),
           Expanded(
@@ -266,7 +276,6 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
               padding: const EdgeInsets.only(bottom: 24),
               child: VideoDetailsPanel(
                 media: media,
-                onPlay: _play,
                 onToggleFavorite: _toggleFavorite,
                 onAddToCollection: _addToCollection,
                 onDownload: _download,
@@ -283,6 +292,7 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
                     ? () => _openExtractedAudio(extractedTrack)
                     : null,
                 isExtracting: isExtracting,
+                isUploadingCover: _isUploadingCover,
                 linkLoading: extractedAsync.isLoading,
                 onChangeCover: _changeCover,
                 onEditMetadata: () =>

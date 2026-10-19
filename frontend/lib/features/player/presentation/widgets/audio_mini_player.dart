@@ -44,6 +44,10 @@ class _AudioMiniPlayerState extends ConsumerState<AudioMiniPlayer> {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       final audioDs = ref.read(audioPlayerDatasourceProvider);
       // Показываем текущий уровень плеера, а не 100 до первого события.
+      //
+      // Источник — аудиоплеер, но громкость общая на аудио и видео
+      // (см. PlaybackCoordinator.setVolume): значение в обоих mpv-инстансах
+      // одно, поэтому тут оно актуально и для видео.
       _volume = audioDs.volume;
       _volumeSub = audioDs.volumeStream.listen((v) {
         if (mounted) setState(() => _volume = v);

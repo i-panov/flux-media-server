@@ -13,7 +13,6 @@ class PlayerView {
     required this.media,
     required this.type,
     required this.isPaused,
-    required this.savedPosition,
     required this.errorMessage,
   });
 
@@ -21,12 +20,11 @@ class PlayerView {
   final Media? media;
   final MediaType? type;
   final bool isPaused;
-  final Duration? savedPosition;
   final String? errorMessage;
 
   // `==`/`hashCode` обязательны: `ref.watch(select(...))` сравнивает
-  // результат через `!=` и без них каждый новый PlayerView (создаваемый на
-  // каждый тик позиции, даже если поля не изменились) считался бы
+  // результат через `!=` и без них каждый новый PlayerView (создаваемый
+  // на каждый тик позиции, даже если поля не изменились) считался бы
   // изменённым → панель управления пересоздавалась бы на каждый тик.
   @override
   bool operator ==(Object other) {
@@ -35,19 +33,17 @@ class PlayerView {
         other.media == media &&
         other.type == type &&
         other.isPaused == isPaused &&
-        other.savedPosition == savedPosition &&
         other.errorMessage == errorMessage;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(kind, media, type, isPaused, savedPosition, errorMessage);
+  int get hashCode => Object.hash(kind, media, type, isPaused, errorMessage);
 }
 
 /// Сопоставляет [PlaybackState] с минимальным снимком для панели управления.
 ///
-/// Позиция намеренно не включается: она меняется на каждый тик таймера
-/// (media_kit рисует прогресс сам), и слежка за ней пересоздавала бы панель.
+/// Позиция намеренно не включается: она меняется на каждый тик таймера,
+/// и слежка за ней пересоздавала бы панель.
 PlayerView playerViewFromPlaybackState(PlaybackState state) {
   return switch (state) {
     PlaybackInitial() => const PlayerView(
@@ -55,7 +51,6 @@ PlayerView playerViewFromPlaybackState(PlaybackState state) {
       media: null,
       type: null,
       isPaused: false,
-      savedPosition: null,
       errorMessage: null,
     ),
     PlaybackLoading() => const PlayerView(
@@ -63,7 +58,6 @@ PlayerView playerViewFromPlaybackState(PlaybackState state) {
       media: null,
       type: null,
       isPaused: false,
-      savedPosition: null,
       errorMessage: null,
     ),
     PlaybackError(:final message) => PlayerView(
@@ -71,7 +65,6 @@ PlayerView playerViewFromPlaybackState(PlaybackState state) {
       media: null,
       type: null,
       isPaused: false,
-      savedPosition: null,
       errorMessage: message,
     ),
     PlaybackCompleted() => const PlayerView(
@@ -79,22 +72,14 @@ PlayerView playerViewFromPlaybackState(PlaybackState state) {
       media: null,
       type: null,
       isPaused: false,
-      savedPosition: null,
       errorMessage: null,
     ),
-    PlaybackPlaying(
-      :final media,
-      :final type,
-      :final isPaused,
-      :final savedPosition,
-    ) =>
-      PlayerView(
-        kind: PlayerViewKind.playing,
-        media: media,
-        type: type,
-        isPaused: isPaused,
-        savedPosition: savedPosition,
-        errorMessage: null,
-      ),
+    PlaybackPlaying(:final media, :final type, :final isPaused) => PlayerView(
+      kind: PlayerViewKind.playing,
+      media: media,
+      type: type,
+      isPaused: isPaused,
+      errorMessage: null,
+    ),
   };
 }

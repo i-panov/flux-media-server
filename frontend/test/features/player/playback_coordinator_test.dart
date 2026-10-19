@@ -263,6 +263,7 @@ class _FakeVideoSource implements VideoPlaybackSource {
   final errorCtl = StreamController<String>.broadcast();
   final bufferingCtl = StreamController<bool>.broadcast();
   final rateCtl = StreamController<double>.broadcast();
+  final volumeCtl = StreamController<double>.broadcast();
 
   int openCalls = 0;
   int playCalls = 0;
@@ -314,6 +315,20 @@ class _FakeVideoSource implements VideoPlaybackSource {
   }
 
   @override
+  Future<void> setVolume(double volume) async {
+    volumeCalls.add(volume);
+    volumeCtl.add(volume);
+  }
+
+  final List<double> volumeCalls = [];
+
+  @override
+  double get volume => 100;
+
+  @override
+  Stream<double> get volumeStream => volumeCtl.stream;
+
+  @override
   Stream<Duration> get positionStream => positionCtl.stream;
 
   @override
@@ -346,6 +361,7 @@ class _FakeVideoSource implements VideoPlaybackSource {
       errorCtl,
       bufferingCtl,
       rateCtl,
+      volumeCtl,
     ]) {
       unawaited(c.close());
     }
@@ -1515,7 +1531,7 @@ void main() {
   });
 
   group('PlaybackCoordinator resume logic', () {
-    test('resumes immediately when saved position <= 5s', () async {
+    test('маленькая сохранённая позиция — без перемотки', () async {
       repo.progressById[9] = const WatchProgress(
         userId: 1,
         mediaId: 9,
@@ -1524,38 +1540,67 @@ void main() {
 
       await queue.setQueue([_media(9, MediaType.video)]);
 
-      final playback = readState() as PlaybackPlaying;
-      expect(playback.savedPosition, isNull);
-      expect(video.seekCalls, [const Duration(seconds: 4)]);
-    });
-
-    test('shows resume overlay when saved position > 5s', () async {
-      repo.progressById[9] = const WatchProgress(
-        userId: 1,
-        mediaId: 9,
-        position: 30,
-      );
-
-      await queue.setQueue([_media(9, MediaType.video)]);
-
-      final playback = readState() as PlaybackPlaying;
-      expect(playback.savedPosition, const Duration(seconds: 30));
       expect(video.seekCalls, isEmpty);
     });
 
-    test('seekToSavedPosition seeks and clears the overlay', () async {
+    test('resume применяется сразу, без кнопки в контролах', () async {
+      // Регрессия: при позиции больше порога координатор НЕ делал seek,
+      // а показывал кнопку «Продолжить с …» внутри контролов, которые
+      // сами скрываются по таймеру. Пользователь видел «жму play — с
+      // начала», а кнопка то появлялась, то нет.
       repo.progressById[9] = const WatchProgress(
         userId: 1,
         mediaId: 9,
         position: 30,
       );
-      await queue.setQueue([_media(9, MediaType.video)]);
-      video.seekCalls.clear();
 
-      await coordinator.seekToSavedPosition();
+      await queue.setQueue([_media(9, MediaType.video)]);
 
       expect(video.seekCalls, [const Duration(seconds: 30)]);
-      expect((readState() as PlaybackPlaying).savedPosition, isNull);
+      expect((readState() as PlaybackPlaying).position, Duration.zero);
+    });
+
+    test('досмотренное видео начинается с начала', () async {
+      repo.progressById[9] = const WatchProgress(
+        userId: 1,
+        mediaId: 9,
+        position: 3600,
+        duration: 3600,
+        completed: true,
+      );
+
+      await queue.setQueue([_media(9, MediaType.video)]);
+
+      expect(video.seekCalls, isEmpty);
+    });
+  });
+
+  group('PlaybackCoordinator volume', () {
+    // Громкость в приложении ОДНА на аудио и видео: mpv-инстансов два,
+    // и каждый хранит громкость свою. Без общего значения на десктопе
+    // получалось два независимых регулятора — убавил звук под видео,
+    // а аудио заиграло на 100%.
+    test('setVolume меняет громкость обоих плееров', () async {
+      // Видеоплеер создан (его читает панель видео) — тогда громкость
+      // применяется к обоим сразу.
+      container.read(videoPlayerDatasourceProvider);
+
+      await coordinator.setVolume(30);
+
+      expect(audio.setVolumeCalls, 1);
+      expect(video.volumeCalls, [30]);
+    });
+
+    test('громкость применяется к видео и при его открытии', () async {
+      // Видеоплеер мог быть создан позже, чем громкость меняли (например,
+      // убавили в мини-плеере аудио, а видео открыли после) — при старте
+      // видео должно получить текущее значение.
+      await coordinator.setVolume(30);
+      video.volumeCalls.clear();
+
+      await queue.setQueue([_media(9, MediaType.video)]);
+
+      expect(video.volumeCalls, [30]);
     });
   });
 

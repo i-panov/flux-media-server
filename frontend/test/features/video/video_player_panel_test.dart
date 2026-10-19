@@ -19,6 +19,59 @@ Media _track(int id) => Media(
 );
 
 void main() {
+  group('shouldPauseOnScreenDispose', () {
+    // Регрессия (P0): вход в полный экран ставил видео на паузу.
+    //
+    // Экран собирает две разные ветви дерева (встроенная и полноэкранная),
+    // поэтому панель при смене режима пересоздаётся, и её dispose
+    // срабатывал. Пауза в dispose панели останавливала видео ровно в
+    // момент входа в полный экран — пользователь видел застывший кадр.
+    //
+    // Теперь пауза живёт на экране: его dispose — это настоящий уход,
+    // а смена режима экран не трогает.
+    test('своё играющее видео — пауза при уходе с экрана', () {
+      expect(
+        shouldPauseOnScreenDispose(
+          PlaybackState.playing(media: _video(7), type: MediaType.video),
+          7,
+        ),
+        isTrue,
+      );
+    });
+
+    test('на паузе, чужое видео, аудио — не трогаем', () {
+      expect(
+        shouldPauseOnScreenDispose(
+          PlaybackState.playing(
+            media: _video(7),
+            type: MediaType.video,
+            isPaused: true,
+          ),
+          7,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldPauseOnScreenDispose(
+          PlaybackState.playing(media: _video(9), type: MediaType.video),
+          7,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldPauseOnScreenDispose(
+          PlaybackState.playing(media: _track(7), type: MediaType.audio),
+          7,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldPauseOnScreenDispose(const PlaybackState.initial(), 7),
+        isFalse,
+      );
+    });
+  });
+
   group('shouldPauseOnPanelDispose', () {
     test('своё играющее видео — пауза', () {
       expect(
@@ -30,27 +83,7 @@ void main() {
       );
     });
 
-    test('чужое видео — не трогаем (его панель сама разберётся)', () {
-      expect(
-        shouldPauseOnPanelDispose(
-          PlaybackState.playing(media: _video(9), type: MediaType.video),
-          7,
-        ),
-        isFalse,
-      );
-    });
-
-    test('фоновое аудио — не трогаем', () {
-      expect(
-        shouldPauseOnPanelDispose(
-          PlaybackState.playing(media: _track(3), type: MediaType.audio),
-          3,
-        ),
-        isFalse,
-      );
-    });
-
-    test('уже на паузе / не играет — не трогаем', () {
+    test('на паузе, чужое видео, аудио — не трогаем', () {
       expect(
         shouldPauseOnPanelDispose(
           PlaybackState.playing(
@@ -63,22 +96,21 @@ void main() {
         isFalse,
       );
       expect(
-        shouldPauseOnPanelDispose(const PlaybackState.initial(), 7),
-        isFalse,
-      );
-      expect(
-        shouldPauseOnPanelDispose(const PlaybackState.completed(), 7),
-        isFalse,
-      );
-      expect(
-        shouldPauseOnPanelDispose(const PlaybackState.loading(), 7),
+        shouldPauseOnPanelDispose(
+          PlaybackState.playing(media: _video(9), type: MediaType.video),
+          7,
+        ),
         isFalse,
       );
       expect(
         shouldPauseOnPanelDispose(
-          const PlaybackState.error(message: 'boom'),
+          PlaybackState.playing(media: _track(7), type: MediaType.audio),
           7,
         ),
+        isFalse,
+      );
+      expect(
+        shouldPauseOnPanelDispose(const PlaybackState.initial(), 7),
         isFalse,
       );
     });
@@ -90,7 +122,6 @@ void main() {
       media: _video(id),
       type: MediaType.video,
       isPaused: false,
-      savedPosition: null,
       errorMessage: null,
     );
 
@@ -98,8 +129,9 @@ void main() {
       expect(isOwnPlayingVideo(playing(7), 7), isTrue);
     });
 
-    test('чужое видео, пауза, не-playing — постер', () {
-      expect(isOwnPlayingVideo(playing(9), 7), isFalse);
+    test('пауза своего видео — тоже живой кадр', () {
+      // Кнопка play поверх превью на паузе показывается, но сам кадр
+      // остаётся: это и есть точка, с которой видео продолжится.
       expect(
         isOwnPlayingVideo(
           PlayerView(
@@ -107,13 +139,16 @@ void main() {
             media: _video(7),
             type: MediaType.video,
             isPaused: true,
-            savedPosition: null,
             errorMessage: null,
           ),
           7,
         ),
         isTrue,
       );
+    });
+
+    test('чужое видео и не-playing — постер', () {
+      expect(isOwnPlayingVideo(playing(9), 7), isFalse);
       expect(
         isOwnPlayingVideo(
           const PlayerView(
@@ -121,46 +156,22 @@ void main() {
             media: null,
             type: null,
             isPaused: false,
-            savedPosition: null,
             errorMessage: null,
           ),
           7,
         ),
         isFalse,
       );
-    });
-  });
-
-  group('showResumeControl', () {
-    test('только играющее видео с позицией', () {
       expect(
-        showResumeControl(
-          PlayerViewKind.playing,
-          MediaType.video,
-          const Duration(seconds: 30),
-        ),
-        isTrue,
-      );
-    });
-
-    test('без позиции, не видео, не playing — скрыта', () {
-      expect(
-        showResumeControl(PlayerViewKind.playing, MediaType.video, null),
-        isFalse,
-      );
-      expect(
-        showResumeControl(
-          PlayerViewKind.playing,
-          MediaType.audio,
-          const Duration(seconds: 30),
-        ),
-        isFalse,
-      );
-      expect(
-        showResumeControl(
-          PlayerViewKind.initial,
-          MediaType.video,
-          const Duration(seconds: 30),
+        isOwnPlayingVideo(
+          const PlayerView(
+            kind: PlayerViewKind.completed,
+            media: null,
+            type: null,
+            isPaused: false,
+            errorMessage: null,
+          ),
+          7,
         ),
         isFalse,
       );

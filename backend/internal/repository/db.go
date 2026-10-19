@@ -76,6 +76,19 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// In-memory SQLite не разделяется между соединениями: каждое новое
+	// соединение пула получает СВОЮ пустую базу (ни файла, ни общего
+	// кеша). С пулом в одно соединение все обращения видят одну базу.
+	// Без этого любая фоновая задача (бэкфилл размеров кадра при старте
+	// сервера) на тестовой БД получала «no such table: …» и ломала
+	// соседние тесты.
+	if isMemoryPath(path) {
+		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetMaxIdleConns(1)
+		return db, nil
+	}
+
 	maxConns := runtime.NumCPU()
 	if maxConns < 4 {
 		maxConns = 4
@@ -83,6 +96,13 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(maxConns)
 
 	return db, nil
+}
+
+// isMemoryPath — признак БД в памяти, у которой каждое соединение пула
+// получает отдельную копию данных.
+func isMemoryPath(path string) bool {
+	return strings.Contains(path, ":memory:") ||
+		strings.Contains(path, "mode=memory")
 }
 
 func AutoMigrate(db *gorm.DB) error {

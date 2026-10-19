@@ -824,12 +824,6 @@ abstract class AppLocalizations {
   /// **'Add to Queue'**
   String get addToQueue;
 
-  /// No description provided for @continueFrom.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue from {formatted}'**
-  String continueFrom(String formatted);
-
   /// No description provided for @editMetadata.
   ///
   /// In en, this message translates to:
@@ -944,11 +938,35 @@ abstract class AppLocalizations {
   /// **'Speed'**
   String get speed;
 
+  /// No description provided for @volume.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get volume;
+
   /// No description provided for @pause.
   ///
   /// In en, this message translates to:
   /// **'Pause'**
   String get pause;
+
+  /// No description provided for @fullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen'**
+  String get fullscreen;
+
+  /// No description provided for @seekBack10.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewind 10 seconds'**
+  String get seekBack10;
+
+  /// No description provided for @seekForward10.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward 10 seconds'**
+  String get seekForward10;
 
   /// No description provided for @close.
   ///
@@ -997,6 +1015,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Audio extraction cancelled'**
   String get extractCancelled;
+
+  /// No description provided for @cancelExtraction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel extraction'**
+  String get cancelExtraction;
 
   /// No description provided for @openAudioTrack.
   ///

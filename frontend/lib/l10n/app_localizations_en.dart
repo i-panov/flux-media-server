@@ -410,11 +410,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToQueue => 'Add to Queue';
 
   @override
-  String continueFrom(String formatted) {
-    return 'Continue from $formatted';
-  }
-
-  @override
   String get editMetadata => 'Edit Metadata';
 
   @override
@@ -472,7 +467,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get speed => 'Speed';
 
   @override
+  String get volume => 'Volume';
+
+  @override
   String get pause => 'Pause';
+
+  @override
+  String get fullscreen => 'Fullscreen';
+
+  @override
+  String get seekBack10 => 'Rewind 10 seconds';
+
+  @override
+  String get seekForward10 => 'Forward 10 seconds';
 
   @override
   String get close => 'Close';
@@ -497,6 +504,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get extractCancelled => 'Audio extraction cancelled';
+
+  @override
+  String get cancelExtraction => 'Cancel extraction';
 
   @override
   String get openAudioTrack => 'Open audio track';

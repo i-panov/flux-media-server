@@ -41,6 +41,19 @@ type MediaRepository interface {
 	// (как у FindByHash), а не nil-пара: вызывающий различает через errors.Is.
 	FindBySourceMediaID(ctx context.Context, mediaID uint) (*models.Media, error)
 	FindByPathPrefix(ctx context.Context, prefix string, limit, offset int) ([]models.Media, int64, error)
+	// FindVideosMissingDimensions — живые видео без записанных размеров
+	// кадра. Разовая заливка размеров при старте сервера: у записей,
+	// созданных до появления колонок width/height, файлы не менялись,
+	// поэтому обычный скан их больше не трогает.
+	FindVideosMissingDimensions(ctx context.Context, limit int) ([]models.Media, error)
+	// UpdateDimensions записывает ТОЛЬКО размеры кадра, ничего не
+	// трогая в остальных полях и связях.
+	//
+	// Отдельный метод, а не Update: Update работает с ассоциациями
+	// (Artists), и вызов на записи, прочитанной без Preload, стирал
+	// связи видео с артистами. Для технических полей, которые ставит
+	// фоновая задача, рисковать ассоциациями незачем.
+	UpdateDimensions(ctx context.Context, id uint, width, height int) error
 	Create(ctx context.Context, media *models.Media) error
 	// Update обновляет только непустые поля; ассоциации Artists заменяются
 	// целиком, Metadata сохраняется upsert'ом при наличии.

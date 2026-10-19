@@ -86,6 +86,13 @@ abstract class VideoPlaybackSource {
   Future<void> stop();
   Future<void> seek(Duration position);
   Future<void> setRate(double rate);
+
+  /// Громкость (0..100). Нужна для регулятора в десктопном интерфейсе:
+  /// на смартфоне громкость и так живёт на физических кнопках, а на
+  /// десктопе её нечем менять.
+  Future<void> setVolume(double volume);
+  double get volume;
+  Stream<double> get volumeStream;
   Stream<Duration> get positionStream;
   Stream<Duration> get durationStream;
   Stream<bool> get playingStream;

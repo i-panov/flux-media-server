@@ -129,11 +129,11 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function( Media media,  MediaType type,  bool isPaused,  Duration position,  Duration? duration,  double speed,  Duration? savedPosition)?  playing,TResult Function()?  completed,TResult Function()?  loading,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function( Media media,  MediaType type,  bool isPaused,  Duration position,  Duration? duration,  double speed)?  playing,TResult Function()?  completed,TResult Function()?  loading,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case PlaybackInitial() when initial != null:
 return initial();case PlaybackPlaying() when playing != null:
-return playing(_that.media,_that.type,_that.isPaused,_that.position,_that.duration,_that.speed,_that.savedPosition);case PlaybackCompleted() when completed != null:
+return playing(_that.media,_that.type,_that.isPaused,_that.position,_that.duration,_that.speed);case PlaybackCompleted() when completed != null:
 return completed();case PlaybackLoading() when loading != null:
 return loading();case PlaybackError() when error != null:
 return error(_that.message);case _:
@@ -154,11 +154,11 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function( Media media,  MediaType type,  bool isPaused,  Duration position,  Duration? duration,  double speed,  Duration? savedPosition)  playing,required TResult Function()  completed,required TResult Function()  loading,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function( Media media,  MediaType type,  bool isPaused,  Duration position,  Duration? duration,  double speed)  playing,required TResult Function()  completed,required TResult Function()  loading,required TResult Function( String message)  error,}) {final _that = this;
 switch (_that) {
 case PlaybackInitial():
 return initial();case PlaybackPlaying():
-return playing(_that.media,_that.type,_that.isPaused,_that.position,_that.duration,_that.speed,_that.savedPosition);case PlaybackCompleted():
+return playing(_that.media,_that.type,_that.isPaused,_that.position,_that.duration,_that.speed);case PlaybackCompleted():
 return completed();case PlaybackLoading():
 return loading();case PlaybackError():
 return error(_that.message);}
@@ -175,11 +175,11 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function( Media media,  MediaType type,  bool isPaused,  Duration position,  Duration? duration,  double speed,  Duration? savedPosition)?  playing,TResult? Function()?  completed,TResult? Function()?  loading,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function( Media media,  MediaType type,  bool isPaused,  Duration position,  Duration? duration,  double speed)?  playing,TResult? Function()?  completed,TResult? Function()?  loading,TResult? Function( String message)?  error,}) {final _that = this;
 switch (_that) {
 case PlaybackInitial() when initial != null:
 return initial();case PlaybackPlaying() when playing != null:
-return playing(_that.media,_that.type,_that.isPaused,_that.position,_that.duration,_that.speed,_that.savedPosition);case PlaybackCompleted() when completed != null:
+return playing(_that.media,_that.type,_that.isPaused,_that.position,_that.duration,_that.speed);case PlaybackCompleted() when completed != null:
 return completed();case PlaybackLoading() when loading != null:
 return loading();case PlaybackError() when error != null:
 return error(_that.message);case _:
@@ -226,7 +226,7 @@ String toString() {
 
 
 class PlaybackPlaying implements PlaybackState {
-  const PlaybackPlaying({required this.media, required this.type, this.isPaused = false, this.position = Duration.zero, this.duration, this.speed = 1.0, this.savedPosition});
+  const PlaybackPlaying({required this.media, required this.type, this.isPaused = false, this.position = Duration.zero, this.duration, this.speed = 1.0});
   
 
  final  Media media;
@@ -235,7 +235,6 @@ class PlaybackPlaying implements PlaybackState {
 @JsonKey() final  Duration position;
  final  Duration? duration;
 @JsonKey() final  double speed;
- final  Duration? savedPosition;
 
 /// Create a copy of PlaybackState
 /// with the given fields replaced by the non-null parameter values.
@@ -247,18 +246,18 @@ $PlaybackPlayingCopyWith<PlaybackPlaying> get copyWith => _$PlaybackPlayingCopyW
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is PlaybackPlaying&&(identical(other.media, media) || other.media == media)&&(identical(other.type, type) || other.type == type)&&(identical(other.isPaused, isPaused) || other.isPaused == isPaused)&&(identical(other.position, position) || other.position == position)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.speed, speed) || other.speed == speed)&&(identical(other.savedPosition, savedPosition) || other.savedPosition == savedPosition));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is PlaybackPlaying&&(identical(other.media, media) || other.media == media)&&(identical(other.type, type) || other.type == type)&&(identical(other.isPaused, isPaused) || other.isPaused == isPaused)&&(identical(other.position, position) || other.position == position)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.speed, speed) || other.speed == speed));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,media,type,isPaused,position,duration,speed,savedPosition);
+    return Object.hash(runtimeType,media,type,isPaused,position,duration,speed);
 }
 
 @override
 String toString() {
-    return 'PlaybackState.playing(media: $media, type: $type, isPaused: $isPaused, position: $position, duration: $duration, speed: $speed, savedPosition: $savedPosition)';
+    return 'PlaybackState.playing(media: $media, type: $type, isPaused: $isPaused, position: $position, duration: $duration, speed: $speed)';
 }
 
 
@@ -269,7 +268,7 @@ abstract mixin class $PlaybackPlayingCopyWith<$Res> implements $PlaybackStateCop
   factory $PlaybackPlayingCopyWith(PlaybackPlaying value, $Res Function(PlaybackPlaying) _then) = _$PlaybackPlayingCopyWithImpl;
 @useResult
 $Res call({
- Media media, MediaType type, bool isPaused, Duration position, Duration? duration, double speed, Duration? savedPosition
+ Media media, MediaType type, bool isPaused, Duration position, Duration? duration, double speed
 });
 
 
@@ -286,7 +285,7 @@ class _$PlaybackPlayingCopyWithImpl<$Res>
 
 /// Create a copy of PlaybackState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? media = null,Object? type = null,Object? isPaused = null,Object? position = null,Object? duration = freezed,Object? speed = null,Object? savedPosition = freezed,}) {
+@pragma('vm:prefer-inline') $Res call({Object? media = null,Object? type = null,Object? isPaused = null,Object? position = null,Object? duration = freezed,Object? speed = null,}) {
   return _then(PlaybackPlaying(
 media: null == media ? _self.media : media // ignore: cast_nullable_to_non_nullable
 as Media,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
@@ -294,8 +293,7 @@ as MediaType,isPaused: null == isPaused ? _self.isPaused : isPaused // ignore: c
 as bool,position: null == position ? _self.position : position // ignore: cast_nullable_to_non_nullable
 as Duration,duration: freezed == duration ? _self.duration : duration // ignore: cast_nullable_to_non_nullable
 as Duration?,speed: null == speed ? _self.speed : speed // ignore: cast_nullable_to_non_nullable
-as double,savedPosition: freezed == savedPosition ? _self.savedPosition : savedPosition // ignore: cast_nullable_to_non_nullable
-as Duration?,
+as double,
   ));
 }
 

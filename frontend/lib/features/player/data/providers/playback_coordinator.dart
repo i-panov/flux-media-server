@@ -409,29 +409,36 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     }
 
     await _audioPlayer.stop();
+
+    // Сохранённую позицию читаем ПАРАЛЛЕЛЬНО с открытием файла: это
+    // сетевой запрос, а open() — тоже. Затем seek до play: иначе видео
+    // успевает отыграть первые секунды с начала, прежде чем прыгнуть на
+    // прошлую позицию (было видно «старт с нуля», а потом прыжок).
+    final resumeFuture = _resumePolicy.loadSavedPosition(media.id);
+
     await _videoPlayer
         .open(entry.url, httpHeaders: entry.httpHeaders)
         .timeout(_loadTimeout);
     if (generation != _playGeneration) return;
-    await _videoPlayer.play().timeout(_loadTimeout);
-    if (generation != _playGeneration) return;
+
+    // Громкость общая на аудио и видео: видеоплеер мог быть создан
+    // позже, чем её меняли (например, громкость убавили в мини-плеере
+    // аудио, а видео открыли после) — применяем текущее значение.
+    await _videoPlayer.setVolume(_volume);
 
     _subscribeVideoStreams();
 
-    // Загружаем сохранённую позицию для диалога resume (только видео).
-    final resumePosition = await _resumePolicy.loadSavedPosition(media.id);
+    final resumeTarget = ResumePolicy.target(await resumeFuture);
     if (generation != _playGeneration) return;
-    final resume = ResumePolicy.split(resumePosition);
-
-    state = PlaybackState.playing(
-      media: media,
-      type: MediaType.video,
-      savedPosition: resume.overlay,
-    );
-
-    if (resume.autoSeek != null) {
-      await _videoPlayer.seek(resume.autoSeek!);
+    if (resumeTarget != null) {
+      await _videoPlayer.seek(resumeTarget);
+      if (generation != _playGeneration) return;
     }
+
+    await _videoPlayer.play().timeout(_loadTimeout);
+    if (generation != _playGeneration) return;
+
+    state = PlaybackState.playing(media: media, type: MediaType.video);
   }
 
   /// Снимок для автосейва прогресса: только играющее непоставленное
@@ -937,20 +944,23 @@ class PlaybackCoordinator extends Notifier<PlaybackState>
     }
   }
 
-  /// Seeks to the saved position (from the resume dialog).
-  Future<void> seekToSavedPosition() async {
-    if (state is PlaybackPlaying) {
-      final current = state as PlaybackPlaying;
-      final saved = current.savedPosition;
-      if (saved != null) {
-        await _videoPlayer.seek(saved);
-        state = current.copyWith(savedPosition: null);
-      }
-    }
-  }
+  /// Громкость приложения: одна на аудио и видео.
+  ///
+  /// Плееров в приложении два (аудио-очередь в mpv и видеоплеер), и
+  /// каждый mpv-инстанс хранит громкость СВОЮ. Без общего значения
+  /// на десктопе получалось расхождение: убавил громкость видео до 30% —
+  /// и тут же аудио заиграло на 100%.
+  double _volume = 100;
 
   Future<void> setVolume(double volume) async {
+    _volume = volume;
     await _audioPlayer.setVolume(volume);
+    // Видеоплеер поднимается лениво: незачем создавать mpv-инстанс ради
+    // громкости. Уже созданный — обновляем сразу, а созданный позже
+    /// получит значение при открытии (см. _playSingle).
+    if (ref.exists(videoPlayerDatasourceProvider)) {
+      await _videoPlayer.setVolume(volume);
+    }
   }
 
   @override

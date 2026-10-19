@@ -352,6 +352,12 @@ func (q *UploadQueue) process(job *UploadJob) {
 		if fileMeta.Genre != "" {
 			media.Genre = fileMeta.Genre
 		}
+		if fileMeta.Width > 0 {
+			media.Width = fileMeta.Width
+		}
+		if fileMeta.Height > 0 {
+			media.Height = fileMeta.Height
+		}
 		if fileMeta.Title != "" {
 			media.Title = fileMeta.Title
 		}

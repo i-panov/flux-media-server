@@ -139,6 +139,18 @@ void main() {
     );
   }
 
+  /// Активна ли строка действия: у `_ActionRow` InkWell, а не кнопка с
+  /// onPressed, поэтому активность проверяется по InkWell.
+  bool rowEnabled(WidgetTester tester, String label) {
+    final ink = tester.widget<InkWell>(
+      find.ancestor(
+        of: find.text(label),
+        matching: find.byType(InkWell),
+      ),
+    );
+    return ink.onTap != null;
+  }
+
   group('VideoDetailsPanel audio extraction', () {
     testWidgets('кнопка извлечения зовёт колбэк', (tester) async {
       var calls = 0;
@@ -185,8 +197,16 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Extracting audio…'), findsOneWidget);
-      await tester.tap(find.text('Extracting audio…'));
+      // Строка извлечения на время джоба заблокирована...
+      expect(rowEnabled(tester, 'Extracting audio…'), isFalse);
+      // ...и её иконка — «в работе», а НЕ крестик: крестик читался бы
+      // как отмена, а отмена живёт отдельной строкой ниже.
+      expect(find.byIcon(Icons.hourglass_empty), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsNothing);
+      // Отмена — отдельной строкой.
+      expect(find.text('Cancel extraction'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel extraction'));
       await tester.pump();
       expect(calls, 1);
     });
@@ -202,10 +222,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Extract audio'), findsOneWidget);
-      final button = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Extract audio'),
-      );
-      expect(button.onPressed, isNull);
+      expect(rowEnabled(tester, 'Extract audio'), isFalse);
     });
 
     testWidgets('без колбэков кнопок извлечения нет', (tester) async {
@@ -216,21 +233,40 @@ void main() {
       expect(find.text('Open audio track'), findsNothing);
     });
 
-    testWidgets('ряд действий — иконки без текстов', (tester) async {
+    testWidgets('действия — вертикальным списком с иконкой и текстом', (
+      tester,
+    ) async {
       await pumpPanel(tester);
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Тексты не влезали в ширину смартфона — только иконки с тултипами.
+      // Раньше часть действий была текстовыми кнопками, часть — голыми
+      // иконками без подписей. Теперь у каждого есть и то, и другое.
       expect(find.byIcon(Icons.favorite_border), findsOneWidget);
-      expect(find.byIcon(Icons.add_to_queue), findsOneWidget);
+      expect(find.byIcon(Icons.playlist_add), findsOneWidget);
       expect(find.byIcon(Icons.cloud_download), findsOneWidget);
-      expect(find.text('Favorites'), findsNothing);
-      expect(find.text('My Collections'), findsNothing);
+      expect(find.text('Favorites'), findsOneWidget);
+      expect(find.text('My Collections'), findsOneWidget);
     });
 
-    testWidgets('без избранного кнопка задизейблена серым', (tester) async {
+    testWidgets('список идёт сверху вниз в порядке действий', (
+      tester,
+    ) async {
+      await pumpPanel(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final favoritesY = tester.getCenter(find.text('Favorites')).dy;
+      final collectionsY = tester.getCenter(find.text('My Collections')).dy;
+      final offlineY = tester.getCenter(find.text('Save offline')).dy;
+
+      expect(favoritesY, lessThan(collectionsY));
+      expect(collectionsY, lessThan(offlineY));
+    });
+
+    testWidgets('без избранного действие задизейблено и приглушено', (
+      tester,
+    ) async {
       // favoriteToggle в loading (ids ещё летят): isFavorite == null —
-      // кнопка disabled, иконка приглушена, а не «не избранное».
+      // действие заблокировано, иконка приглушена, а не «не избранное».
       final gate = Completer<void>();
       favoritesRepo.onGetFavorites = () async {
         await gate.future;
@@ -239,10 +275,7 @@ void main() {
       await pumpPanel(tester);
       await tester.pump(const Duration(milliseconds: 100));
 
-      final button = tester.widget<IconButton>(
-        find.widgetWithIcon(IconButton, Icons.favorite_border),
-      );
-      expect(button.onPressed, isNull);
+      expect(rowEnabled(tester, 'Favorites'), isFalse);
       final icon = tester.widget<Icon>(find.byIcon(Icons.favorite_border));
       expect(icon.color, Colors.white38);
 
@@ -259,24 +292,26 @@ void main() {
       expect(find.textContaining('video'), findsNothing);
     });
 
-    testWidgets('тултипы называют действие', (tester) async {
+    testWidgets('подписи действий различимы и не роняются в тултипы', (
+      tester,
+    ) async {
       var saves = 0;
       await pumpPanel(tester, onSaveToFiles: () async => saves++);
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byTooltip('Favorites'), findsOneWidget);
-      expect(find.byTooltip('My Collections'), findsOneWidget);
+      expect(find.text('Favorites'), findsOneWidget);
+      expect(find.text('My Collections'), findsOneWidget);
       // Кеш — «В офлайн», файлы — «Скачать»: разные действия,
-      // разные тултипы.
-      expect(find.byTooltip('Save offline'), findsOneWidget);
-      expect(find.byTooltip('Download'), findsOneWidget);
+      // разные подписи. Раньше различались только тултипы.
+      expect(find.text('Save offline'), findsOneWidget);
+      expect(find.text('Download'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Download'));
+      await tester.tap(find.text('Download'));
       await tester.pump();
       expect(saves, 1);
     });
 
-    testWidgets('загрузка: спиннер без семантики, тап — отмена', (
+    testWidgets('загрузка: спиннер у действия, тап — отмена', (
       tester,
     ) async {
       var calls = 0;
@@ -288,22 +323,19 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      // Спиннер исключён из семантики — скринридер его не анонсирует.
-      expect(
-        find.ancestor(
-          of: find.byType(CircularProgressIndicator),
-          matching: find.byType(ExcludeSemantics),
-        ),
-        findsOneWidget,
-      );
-      expect(find.byTooltip('Cancel'), findsOneWidget);
+      // Во время загрузки действие называет отмену, а не «в офлайн».
+      expect(find.text('Cancel'), findsOneWidget);
+      // И иконка соответствует действию: тап отменяет загрузку —
+      // значит, и значок должен быть отменой, а не «облаком».
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.byIcon(Icons.cloud_download), findsNothing);
 
-      await tester.tap(find.byTooltip('Cancel'));
+      await tester.tap(find.text('Cancel'));
       await tester.pump();
       expect(calls, 1);
     });
 
-    testWidgets('ошибка загрузки видна иконкой и тултипом', (tester) async {
+    testWidgets('ошибка загрузки видна иконкой и подписью', (tester) async {
       await pumpPanel(
         tester,
         downloadState: const DownloadError('boom'),
@@ -311,19 +343,58 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
-      expect(find.byTooltip('Error'), findsOneWidget);
+      expect(find.text('Error'), findsOneWidget);
     });
 
     testWidgets('скачанное — белый чек, не primary', (tester) async {
       await pumpPanel(
         tester,
+        onDownload: () async {},
         downloadState: const DownloadDownloaded(),
       );
       await tester.pump(const Duration(milliseconds: 100));
 
       final icon = tester.widget<Icon>(find.byIcon(Icons.check_circle));
       expect(icon.color, Colors.white);
-      expect(find.byTooltip('Offline'), findsOneWidget);
+      expect(find.text('Offline'), findsOneWidget);
+    });
+
+    testWidgets('строки действий объявлены кнопками для скринридера', (
+      tester,
+    ) async {
+      // Без Semantics(button: true) строка читается как обычный текст,
+      // и действие «В офлайн» звучит строкой, а не кнопкой.
+      //
+      // Проверяем на активной строке: у «Favorites» состояние избранного
+      // ещё грузится (isFavorite == null), и действие заблокировано —
+      // у заблокированной строки нет флага isEnabled.
+      await pumpPanel(
+        tester,
+        onDownload: () async {},
+        downloadState: const DownloadDownloaded(),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        tester.getSemantics(find.text('Offline')),
+        matchesSemantics(
+          label: 'Offline',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+        ),
+      );
+    });
+
+    testWidgets('кнопки play в панели нет: она живёт поверх превью', (
+      tester,
+    ) async {
+      await pumpPanel(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Запуск — круглая кнопка на самом превью в VideoPlayerPanel.
+      // В панели действий отдельной строки «Play» быть не должно.
+      expect(find.text('Play'), findsNothing);
     });
   });
 }

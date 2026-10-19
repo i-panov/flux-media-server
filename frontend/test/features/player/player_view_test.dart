@@ -159,6 +159,15 @@ class _FakeVideoSource implements VideoPlaybackSource {
   Future<void> setRate(double rate) async {}
 
   @override
+  Future<void> setVolume(double volume) async {}
+
+  @override
+  double get volume => 100;
+
+  @override
+  Stream<double> get volumeStream => const Stream<double>.empty();
+
+  @override
   Stream<Duration> get positionStream => positionCtl.stream;
 
   @override

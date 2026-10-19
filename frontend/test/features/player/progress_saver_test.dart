@@ -214,29 +214,27 @@ void main() {
     });
   });
 
-  group('ResumePolicy.split', () {
+  group('ResumePolicy.target', () {
     test('null — начинать с нуля', () {
-      expect(
-        ResumePolicy.split(null),
-        (overlay: null, autoSeek: null),
-      );
+      expect(ResumePolicy.target(null), isNull);
     });
 
-    test('позиция в пределах порога — применить молча', () {
-      expect(
-        ResumePolicy.split(const Duration(seconds: 5)),
-        (overlay: null, autoSeek: const Duration(seconds: 5)),
-      );
-      expect(
-        ResumePolicy.split(const Duration(seconds: 3)),
-        (overlay: null, autoSeek: const Duration(seconds: 3)),
-      );
+    test('позиция не выше порога — перемотка бессмысленна', () {
+      expect(ResumePolicy.target(const Duration(seconds: 5)), isNull);
+      expect(ResumePolicy.target(const Duration(seconds: 3)), isNull);
+      expect(ResumePolicy.target(Duration.zero), isNull);
     });
 
-    test('позиция больше порога — показать диалог', () {
+    test('позиция выше порога — продолжаем с неё, без кнопок', () {
+      // Раньше здесь появлялась кнопка «Продолжить с …» в автоскрывающихся
+      // контролах: её то видели, то нет, а видео стартовало с нуля.
       expect(
-        ResumePolicy.split(const Duration(seconds: 6)),
-        (overlay: const Duration(seconds: 6), autoSeek: null),
+        ResumePolicy.target(const Duration(seconds: 6)),
+        const Duration(seconds: 6),
+      );
+      expect(
+        ResumePolicy.target(const Duration(seconds: 7200)),
+        const Duration(seconds: 7200),
       );
     });
   });
@@ -269,6 +267,22 @@ void main() {
 
       expect(await policy.loadSavedPosition(9), isNull);
       expect(await policy.loadSavedPosition(404), isNull);
+    });
+
+    test('досмотренное видео — null, а не прыжок в последнюю секунду', () async {
+      // Регрессия: флаг completed не проверялся, хотя был задокументирован
+      // в докстринге метода.
+      final repo = _FakeRepository()
+        ..storedById[9] = const WatchProgress(
+          userId: 1,
+          mediaId: 9,
+          position: 3599,
+          duration: 3600,
+          completed: true,
+        );
+      final policy = ResumePolicy(repository: repo);
+
+      expect(await policy.loadSavedPosition(9), isNull);
     });
 
     test('ошибка сети превращается в null, а не в исключение', () async {

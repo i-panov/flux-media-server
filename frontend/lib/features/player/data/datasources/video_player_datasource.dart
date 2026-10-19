@@ -38,6 +38,10 @@ class VideoPlayerDatasource implements VideoPlaybackSource {
   @override
   Future<void> setRate(double rate) => player.setRate(rate);
 
+  /// Sets playback volume (0..100).
+  @override
+  Future<void> setVolume(double volume) => player.setVolume(volume);
+
   /// Current playback position.
   @override
   Duration get position => player.state.position;
@@ -53,6 +57,14 @@ class VideoPlayerDatasource implements VideoPlaybackSource {
   /// Stream of playback rate changes.
   @override
   Stream<double> get rateStream => player.stream.rate;
+
+  /// Current playback volume (0..100).
+  @override
+  double get volume => player.state.volume;
+
+  /// Stream of playback volume changes.
+  @override
+  Stream<double> get volumeStream => player.stream.volume;
 
   /// Stream of current playback position.
   @override

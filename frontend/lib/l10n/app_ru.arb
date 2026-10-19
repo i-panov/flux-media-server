@@ -319,14 +319,6 @@
   "@errorLabel": {},
   "addToQueue": "В очередь",
   "@addToQueue": {},
-  "continueFrom": "Продолжить с {formatted}",
-  "@continueFrom": {
-    "placeholders": {
-      "formatted": {
-        "type": "String"
-      }
-    }
-  },
 "editMetadata": "Редактировать метаданные",
 "@editMetadata": {},
   "artist": "Исполнитель",
@@ -364,9 +356,16 @@
   "cannotOpenLink": "Не удалось открыть ссылку",
   "@cannotOpenLink": {},
   "speed": "Скорость",
+  "volume": "Громкость",
   "@speed": {},
   "pause": "Пауза",
   "@pause": {},
+  "fullscreen": "Полный экран",
+  "@fullscreen": {},
+  "seekBack10": "Назад на 10 секунд",
+  "@seekBack10": {},
+  "seekForward10": "Вперёд на 10 секунд",
+  "@seekForward10": {},
   "close": "Закрыть",
   "@close": {},
   "checkingAuthentication": "Проверка авторизации...",
@@ -383,6 +382,8 @@
   "@extractingAudio": {},
   "extractCancelled": "Извлечение аудио отменено",
   "@extractCancelled": {},
+  "cancelExtraction": "Отменить извлечение",
+  "@cancelExtraction": {},
   "openAudioTrack": "Открыть трек",
   "@openAudioTrack": {},
   "audioExtracted": "Аудиотрек сохранён в библиотеку",

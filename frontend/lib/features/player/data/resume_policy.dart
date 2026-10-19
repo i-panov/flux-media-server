@@ -1,20 +1,25 @@
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 
-/// Политика resume для видео: порог, загрузка сохранённой позиции
-/// и решение «показать диалог vs применить молча».
+/// Политика resume для видео: порог и загрузка сохранённой позиции.
 ///
 /// Выделено из `PlaybackCoordinator`: порог и разбор сохранённой позиции
 /// — чистое правило без зависимости от плееров и состояния. Граница:
 ///
 /// - вход — сохранённая позиция (или её отсутствие);
-/// - выход — что показать в оверлее и куда мотать сразу.
+/// - выход — с какой секунды продолжать (или null = с начала).
+///
+/// Раньше здесь был выбор «показать кнопку resume или применить молча».
+/// Он и породил жалобу «жму play, а начинается сначала»: кнопка жила
+/// в контролах, которые сами скрываются по таймеру, поэтому её то видели,
+/// то нет. Теперь позиция применяется сразу и всегда.
 class ResumePolicy {
   new({required this.repository});
 
   final MediaRepository repository;
 
-  /// Порог для resume-оверлея: позиции не больше этого значения
-  /// применяются сразу (видео продолжается без диалога).
+  /// Порог осмысленности: с позиции не больше этого значения
+  /// перемотка бессмысленна — mpv стартует там же практически.
+  /// Всё, что выше, применяется автоматически.
   static const threshold = Duration(seconds: 5);
 
   /// Returns the saved watch position for [mediaId], or null if there is
@@ -26,22 +31,27 @@ class ResumePolicy {
     return repository.getProgressById(mediaId).then(
       (result) => result.fold((_) => null, (progress) {
         if (progress == null || progress.position <= 0) return null;
+        // Досмотренное видео открываем с начала: иначе «продолжение»
+        // прыгало бы в последнюю секунду и сразу останавливалось.
+        // Проверка была задокументирована, но не сделана — из-за этого
+        // авторезюм (теперь он всегда применяется) подводил бы к концу.
+        if (progress.completed) return null;
         return Duration(seconds: progress.position);
       }),
     );
   }
 
-  /// Раскладывает сохранённую позицию на два действия.
+  /// Позиция, с которой продолжать видео, либо null — начинать с нуля.
   ///
-  /// - `overlay`: показать в resume-диалоге (позиция больше порога);
-  /// - `autoSeek`: применить молча (позиция в пределах порога).
-  /// При `null` на входе оба выхода `null` — начинать с нуля.
+  /// Сохранённая позиция применяется всегда, без диалогов и кнопок:
+  /// пользователь сам промотает на начало, если нужно. Значения не выше
+  /// [threshold] отбрасываются — перемотка на пару секунд не стоит
+  /// лишнего seek.
   ///
   /// Статика осознанно: чистая функция без состояния и зависимостей,
   /// граничные условия порога тестируются без репозитория.
-  static ({Duration? overlay, Duration? autoSeek}) split(Duration? saved) {
-    if (saved == null) return (overlay: null, autoSeek: null);
-    if (saved > threshold) return (overlay: saved, autoSeek: null);
-    return (overlay: null, autoSeek: saved);
+  static Duration? target(Duration? saved) {
+    if (saved == null || saved <= threshold) return null;
+    return saved;
   }
 }

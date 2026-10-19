@@ -122,6 +122,38 @@ func TestMediaStore_UpdateArtistRealDBErrorNotMasked(t *testing.T) {
 	assert.NotContains(t, err.Error(), "record not found")
 }
 
+// Update с ПУСТЫМ (но не nil) списком артистов означает «связи снять»
+// — это осознанное действие (PUT /api/metadata с пустым artists).
+//
+// Отличать от nil («не загружено») обязательно: иначе фоновые задачи,
+// читающие записи без Preload, стирали бы артистов. Регрессия (P0).
+func TestMediaStore_UpdateWithEmptyArtistsClearsThem(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	media := &models.Media{
+		Title: "Track", Type: models.MediaTypeAudio, FilePath: "/a.mp3",
+		Artists: []models.Artist{{Name: "Real Artist"}},
+	}
+	require.NoError(t, store.Create(ctx, media))
+
+	got, err := store.FindByID(ctx, media.ID)
+	require.NoError(t, err)
+	require.Len(t, got.Artists, 1)
+
+	// Осознанная очистка: пустой не-nil список.
+	got.Artists = []models.Artist{}
+	require.NoError(t, store.Update(ctx, got))
+
+	after, err := store.FindByID(ctx, media.ID)
+	require.NoError(t, err)
+	assert.Empty(t, after.Artists, "пустой список должен снимать связи")
+}
+
 // FindByPathBasic должен быть одним дешёвым SELECT без Preload.
 func TestMediaStore_FindByPathBasic(t *testing.T) {
 	db, err := InitDB(":memory:")

@@ -370,14 +370,6 @@
   "@errorLabel": {},
   "addToQueue": "Add to Queue",
   "@addToQueue": {},
-  "continueFrom": "Continue from {formatted}",
-  "@continueFrom": {
-    "placeholders": {
-      "formatted": {
-        "type": "String"
-      }
-    }
-  },
 "editMetadata": "Edit Metadata",
 "@editMetadata": {},
   "artist": "Artist",
@@ -415,9 +407,16 @@
   "cannotOpenLink": "Couldn't open the link",
   "@cannotOpenLink": {},
   "speed": "Speed",
+  "volume": "Volume",
   "@speed": {},
   "pause": "Pause",
   "@pause": {},
+  "fullscreen": "Fullscreen",
+  "@fullscreen": {},
+  "seekBack10": "Rewind 10 seconds",
+  "@seekBack10": {},
+  "seekForward10": "Forward 10 seconds",
+  "@seekForward10": {},
   "close": "Close",
   "@close": {},
   "checkingAuthentication": "Checking authentication...",
@@ -434,6 +433,8 @@
   "@extractingAudio": {},
   "extractCancelled": "Audio extraction cancelled",
   "@extractCancelled": {},
+  "cancelExtraction": "Cancel extraction",
+  "@cancelExtraction": {},
   "openAudioTrack": "Open audio track",
   "@openAudioTrack": {},
   "audioExtracted": "Audio track saved to library",

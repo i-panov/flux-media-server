@@ -1,36 +1,20 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/providers/api_provider.dart';
-import 'package:flux_media_server/core/utils/extensions.dart';
-import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/player/presentation/screens/player_view.dart';
-import 'package:flux_media_server/features/player/presentation/utils/playback_toggle.dart';
-import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/features/video/presentation/utils/controls_api.dart';
+import 'package:flux_media_server/features/video/presentation/utils/video_geometry.dart';
+import 'package:flux_media_server/features/video/presentation/widgets/player_controls_layer.dart';
+import 'package:flux_media_server/features/video/presentation/widgets/video_overlay.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-
-/// Seek bar styling shared with the (deleted) fullscreen player.
-const _seekBarBaseTheme = MaterialVideoControlsThemeData(
-  seekBarHeight: 5,
-  seekBarThumbSize: 20,
-  seekBarMargin: EdgeInsets.only(left: 12, right: 12),
-  seekBarPositionColor: Colors.deepPurple,
-  seekBarThumbColor: Colors.deepPurple,
-  seekBarBufferColor: Color(0x66FFFFFF),
-  seekBarColor: Color(0x33FFFFFF),
-);
-
-const _minSpeed = .5;
-const _maxSpeed = 2.0;
-const _speedStep = 0.5;
-const _seekStep = Duration(seconds: 10);
 
 /// Видеоконтроллер живёт столько же, сколько видео-плеер (синглтон).
 /// Без onDispose: у VideoController нет dispose, а плеер чистит
@@ -40,42 +24,15 @@ final videoControllerProvider = Provider<VideoController>((ref) {
   return VideoController(
     datasource.player,
     configuration: VideoControllerConfiguration(
-      enableHardwareAcceleration: !Platform.isLinux,
+      // Аппаратное ускорение на Linux не работает (об этом известно в
+      // media_kit), поэтому там его выключаем.
+      // Через defaultTargetPlatform, а не dart:io: проект умеет
+      // собираться под веб, где dart:io недоступен.
+      enableHardwareAcceleration:
+          defaultTargetPlatform != TargetPlatform.linux,
     ),
   );
 });
-
-MaterialVideoControlsThemeData _buildMobileControlsTheme(
-  MediaQueryData mq, {
-  required List<Widget> topButtonBar,
-  required List<Widget> bottomButtonBar,
-}) {
-  // Явно, а не через copyWith: у copyWith нет padding/bottomButtonBarMargin,
-  // а молчаливое выпадение отступов хуже дублирования семи полей сикбара.
-  const base = _seekBarBaseTheme;
-  return MaterialVideoControlsThemeData(
-    seekBarHeight: base.seekBarHeight,
-    seekBarThumbSize: base.seekBarThumbSize,
-    seekBarMargin: base.seekBarMargin,
-    seekBarPositionColor: base.seekBarPositionColor,
-    seekBarThumbColor: base.seekBarThumbColor,
-    seekBarBufferColor: base.seekBarBufferColor,
-    seekBarColor: base.seekBarColor,
-    topButtonBar: topButtonBar,
-    bottomButtonBar: bottomButtonBar,
-    padding: EdgeInsets.only(
-      left: 12,
-      right: 12,
-      top: mq.padding.top > 0 ? mq.padding.top + 8 : 12,
-      bottom: 24 + mq.padding.bottom,
-    ),
-    bottomButtonBarMargin: EdgeInsets.only(
-      left: 16,
-      right: 8,
-      bottom: mq.padding.bottom,
-    ),
-  );
-}
 
 /// Паузить ли видео при сносе панели (системный «назад»):
 /// только своё играющее непоставленное видео. Чистая функция ради
@@ -87,12 +44,23 @@ bool shouldPauseOnPanelDispose(PlaybackState playback, int mediaId) {
       !playback.isPaused;
 }
 
+/// Паузить ли видео при УХОДЕ с экрана видео.
+///
+/// Отличие от [shouldPauseOnPanelDispose] — в смысле вызова: панель
+/// пересоздаётся ещё и при смене режима (встроенная ⇄ полный экран),
+/// и пауза на этом переходе выглядела бы как «видео встало при входе в
+/// полный экран». Экран же пересоздаётся только при настоящем уходе.
+bool shouldPauseOnScreenDispose(PlaybackState playback, int mediaId) {
+  return shouldPauseOnPanelDispose(playback, mediaId);
+}
+
 class VideoPlayerPanel extends ConsumerStatefulWidget {
   const new({
     required this.media,
     this.isFullscreen = false,
     this.onToggleFullscreen,
     this.onClose,
+    this.onPlay,
     super.key,
   });
 
@@ -101,31 +69,18 @@ class VideoPlayerPanel extends ConsumerStatefulWidget {
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onClose;
 
+  /// Запуск воспроизведения с кнопки поверх превью. Без него кнопки нет:
+  /// на экране без трека запускать нечем.
+  final VoidCallback? onPlay;
+
   @override
   ConsumerState<VideoPlayerPanel> createState() => _VideoPlayerPanelState();
 }
 
 class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
-  /// Координатор захвачен в initState: в dispose() обращаться к `ref`
-  /// нельзя — виджет уже демонтируется, и чтение может бросить,
-  /// похоронив паузу вместе с исключением.
-  late final PlaybackCoordinator _coordinator;
-
-  /// Последнее известное состояние (через listen ниже): решение о паузе
-  /// в dispose принимается по нему, а не чтением провайдера.
-  PlaybackState _lastPlayback = const PlaybackState.initial();
-
-  ProviderSubscription<PlaybackState>? _playbackSub;
-
   @override
   void initState() {
     super.initState();
-    _coordinator = ref.read(playbackCoordinatorProvider.notifier);
-    _playbackSub = ref.listenManual(
-      playbackCoordinatorProvider,
-      (_, next) => _lastPlayback = next,
-      fireImmediately: true,
-    );
     if (widget.isFullscreen) {
       _setFullscreenChrome(true);
     }
@@ -134,14 +89,33 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
     ref.read(videoControllerProvider);
   }
 
+  /// Системный UI и ориентация экрана для полноэкранного режима.
+  ///
+  /// Ориентацию выбираем по размерам кадра из метаданных: альбомная для
+  /// горизонтального видео (подавляющее большинство), книжная для
+  /// вертикальных роликов. При выходе возвращаем все ориентации — раньше
+  /// приложение не лочило ничего, и возвращать надо именно это состояние,
+  /// иначе телефон остался бы в альбомной после просмотра.
   void _setFullscreenChrome(bool fullscreen) {
-    // Только системный UI (immersive vs edge-to-edge): ориентации не
-    // трогаем вовсе — приложение нигде не лочит portrait (ни манифест,
-    // ни main), и выставление «всех ориентаций» было бы no-op'ом,
-    // маскирующимся под восстановление состояния.
+    final orientation = videoOrientationFor(
+      width: widget.media.width,
+      height: widget.media.height,
+    );
     unawaited(
       SystemChrome.setEnabledSystemUIMode(
         fullscreen ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+      ),
+    );
+    unawaited(
+      SystemChrome.setPreferredOrientations(
+        fullscreen
+            ? orientationsFor(orientation)
+            : const [
+                DeviceOrientation.portraitUp,
+                DeviceOrientation.portraitDown,
+                DeviceOrientation.landscapeLeft,
+                DeviceOrientation.landscapeRight,
+              ],
       ),
     );
   }
@@ -161,21 +135,16 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
   // дёргают напрямую audio-движок) — известное ограничение.
   @override
   void dispose() {
-    _playbackSub?.close();
-    _playbackSub = null;
     if (widget.isFullscreen) {
       _setFullscreenChrome(false);
     }
-    // Системный «назад» сносит роут мимо экранной кнопки (та ставит
-    // на паузу сама): без этого видео играло бы в никуда, а новая
-    // карточка подхватывала бы старый трек из синглтон-плеера.
-    // Паузим только своё неподоставленное видео — фоновое аудио и чужой
-    // трек не трогаем. Заодно сохраняется прогресс для resume.
-    // Ни одного ref.read здесь: виджет демонтируется, чтение может
-    // бросить и похоронить паузу — всё захвачено в initState.
-    if (shouldPauseOnPanelDispose(_lastPlayback, widget.media.id)) {
-      unawaited(_coordinator.pause());
-    }
+    // Паузы здесь НЕТ: dispose панели бывает и при смене режима
+    // (встроенная ⇄ полный экран) — экран собирает другую ветвь дерева,
+    // и панель пересоздаётся. Пауза на этом переходе выглядела бы как
+    // «видео встало при входе в полный экран».
+    //
+    // Пауза при УХОДЕ с экрана — на стороне экрана (VideoDetailScreen),
+    // где видно разницу между «сменили режим» и «покинули экран».
     super.dispose();
   }
 
@@ -185,92 +154,88 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
       playbackCoordinatorProvider.select(playerViewFromPlaybackState),
     );
 
-    // Resume overlay.
-    final savedPosition = view.savedPosition;
+    final showLiveFrame = isOwnPlayingVideo(view, widget.media.id);
+    final isPaused = view.kind == PlayerViewKind.playing && view.isPaused;
 
-    final isMobile = Platform.isAndroid || Platform.isIOS;
-    final mobileTheme = _buildMobileControlsTheme(
-      MediaQuery.of(context),
-      // Встроенный режим: назад есть в апп-баре экрана, дублировать
-      // в плеере незачем. В fullscreen кнопка остаётся — это выход
-      // из fullscreen, а не с экрана.
-      topButtonBar: [
-        if (widget.isFullscreen) _BackButton(onClose: widget.onClose),
-        if (showResumeControl(view.kind, view.type, savedPosition))
-          _ResumeButton(savedPosition: savedPosition!),
-      ],
-      bottomButtonBar: [
-        const Spacer(),
-        const _SeekButton(direction: -1),
-        const _SeekButton(direction: 1),
-        const _SpeedButton(),
-        const SizedBox(width: 16),
-        const Spacer(),
-        const MaterialPositionIndicator(),
-        if (!widget.isFullscreen)
-          _FullscreenButton(onTap: widget.onToggleFullscreen),
-      ],
+    // Кадр. Пропорции контейнера задаёт videoAspectRatioFor (для
+    // встроенного режима), а как кадр вписывается в него — fit и
+    // alignment ниже, заданы ЯВНО.
+    //
+    // Явно, а не «как у media_kit по умолчанию»: contain и по центру —
+    // сейчас дефолты библиотеки, но полагаться на них молча нельзя.
+    // Смена дефолта в апдейте media_kit тихо обрезала бы вертикальные
+    // ролики по бокам, и это выглядело бы как баг в нашем коде.
+    final video = Video(
+      controller: ref.watch(videoControllerProvider),
+      // Значения совпадают с дефолтами media_kit — в этом и смысл: они
+      // зафиксированы здесь, чтобы смена дефолта в апдейте библиотеки не
+      // обрезала вертикальные ролики по бокам. Линтер считает такое
+      // «лишним», поэтому правило подавлено точечно.
+      // ignore: avoid_redundant_argument_values
+      fit: BoxFit.contain,
+      // Тот же довод: alignment тоже фиксируем явно.
+      // ignore: avoid_redundant_argument_values
+      alignment: Alignment.center,
+      // Стандартные контролы media_kit выключены: свой слой поверх.
+      controls: _emptyControls,
     );
 
-    final desktopTheme = const MaterialDesktopVideoControlsThemeData().copyWith(
-      topButtonBar: [
-        if (widget.isFullscreen) _BackButton(onClose: widget.onClose),
-        if (showResumeControl(view.kind, view.type, savedPosition))
-          _ResumeButton(savedPosition: savedPosition!),
-      ],
-      bottomButtonBar: [
-        const MaterialDesktopSkipPreviousButton(),
-        const MaterialDesktopPlayOrPauseButton(),
-        const MaterialDesktopSkipNextButton(),
-        const MaterialDesktopVolumeButton(),
-        const _SeekButton(direction: -1),
-        const _SeekButton(direction: 1),
-        const _SpeedButton(),
-        const SizedBox(width: 16),
-        const MaterialDesktopPositionIndicator(),
-        const Spacer(),
-        if (!widget.isFullscreen)
-          _FullscreenButton(onTap: widget.onToggleFullscreen),
-      ],
-    );
-
-    final body = MaterialVideoControlsTheme(
-      normal: mobileTheme,
-      fullscreen: mobileTheme,
-      child: MaterialDesktopVideoControlsTheme(
-        normal: desktopTheme,
-        fullscreen: desktopTheme,
-        child: Video(
-          controller: ref.watch(videoControllerProvider),
-          controls: isMobile
-              ? MaterialVideoControls
-              : MaterialDesktopVideoControls,
+    // Порядок слоёв (кто сверху) задаёт VideoOverlay: интерактивные
+    // элементы обязаны идти после слоя жестов, иначе тот забирает их
+    // тапы — кнопка выглядит живой, но не нажимается.
+    final overlay = VideoOverlay(
+      // Постер — только если играет не это видео: иначе новая карточка
+      // показывала бы чужой трек из синглтон-плеера. Если видео на паузе
+      // своё, оставляем живой кадр: он и есть точка продолжения.
+      poster: showLiveFrame ? null : _Poster(media: widget.media),
+      controls: PlayerControlsLayer(
+        api: MediaKitControlsApi(
+          ref.watch(videoPlayerDatasourceProvider),
+          // Громкость — через координатор: она общая на аудио и видео,
+          // иначе на десктопе были бы два независимых регулятора.
+          volumeWriter: (volume) => ref
+              .read(playbackCoordinatorProvider.notifier)
+              .setVolume(volume),
         ),
+        isPaused: isPaused,
+        showFullscreenButton: !widget.isFullscreen,
+        onToggleFullscreen: widget.onToggleFullscreen,
+        // Активна карточка только когда в плеере ИМЕННО это видео: иначе
+        // транспортные кнопки правили бы чужой трек (см. isActive).
+        isActive: showLiveFrame,
+        onStart: widget.onPlay,
       ),
+      // Кнопка play поверх превью — как в большинстве плееров. Раньше
+      // такая же кнопка висела сильно ниже картинки, отдельным блоком,
+      // и выглядело это так, будто она не относится к видео.
+      playButton: !showLiveFrame && widget.onPlay != null
+          ? Center(child: PlayOverlayButton(onPressed: widget.onPlay!))
+          : null,
+      // Кнопка «назад» в полноэкранном режиме.
+      topBar: widget.isFullscreen && widget.onClose != null
+          ? FullscreenBackButton(onClose: widget.onClose!)
+          : null,
     );
 
-    final posterOrBody = Stack(
-      fit: StackFit.expand,
-      children: [
-        body,
-        // Живой кадр — только если играет именно это видео: иначе новая
-        // карточка показывала бы чужой трек из синглтон-плеера (постер +
-        // play вместо этого).
-        if (!isOwnPlayingVideo(view, widget.media.id))
-          _Poster(media: widget.media),
-      ],
-    );
+    final body = Stack(fit: StackFit.expand, children: [video, overlay]);
 
     if (widget.isFullscreen) {
-      return ColoredBox(color: Colors.black, child: posterOrBody);
+      return body;
     }
-    // Embedded: 16:9 until video dimensions are known.
     return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: ColoredBox(color: Colors.black, child: posterOrBody),
+      aspectRatio: videoAspectRatioFor(
+        width: widget.media.width,
+        height: widget.media.height,
+      ),
+      child: body,
     );
   }
 }
+
+/// Пустой билдер контролов media_kit: свои контролы рисуются отдельным
+/// слоем поверх, стандартные мешали бы (их таймер автоскрытия терялся
+/// при пересборке `Video`).
+Widget _emptyControls(VideoState state) => const SizedBox.shrink();
 
 /// Показывать ли живой кадр плеера: играет именно это медиа.
 /// Иначе — постер (чужой трек из общего плеера не подменяет карточку).
@@ -278,70 +243,6 @@ bool isOwnPlayingVideo(PlayerView view, int mediaId) {
   return view.kind == PlayerViewKind.playing &&
       view.type == MediaType.video &&
       view.media?.id == mediaId;
-}
-
-/// Показывать ли кнопку resume в панели контролов: только для играющего
-/// видео с сохранённой позицией. Живёт вместе с контролами (прячется
-/// с ними) — вместо бывшего висящего оверлея с собственным таймером.
-///
-/// isPaused осознанно НЕ в сигнатуре: кнопка теперь делает seek+play,
-/// поэтому на паузе работает корректно, а не «выглядит сломанной».
-bool showResumeControl(
-  PlayerViewKind kind,
-  MediaType? type,
-  Duration? savedPosition,
-) {
-  return kind == PlayerViewKind.playing &&
-      type == MediaType.video &&
-      savedPosition != null;
-}
-
-/// Кнопка «продолжить с …» в топ-баре контролов.
-///
-/// Flexible + ellipsis вместо фиксированной maxWidth (была 180 и давила
-/// соседей в нижнем баре): текст занимает свободное место и только
-/// в крайнем случае режется. Не возвращать фикс — будет тот же инцидент.
-class _ResumeButton extends ConsumerWidget {
-  const new({required this.savedPosition});
-
-  final Duration savedPosition;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context)!;
-    // Flexible вместо фиксированной ширины: в топ-баре места много,
-    // текст занимает свободное и только в крайнем случае режется.
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Flexible(
-        child: TextButton.icon(
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          // «Продолжить» обязано играть: один seek без play на паузе
-          // выглядел бы как «кнопка не сработала». Ошибки глушим в лог:
-          // необработанный async-гэп из кнопки роняет зону.
-          onPressed: () async {
-            final coordinator = ref.read(
-              playbackCoordinatorProvider.notifier,
-            );
-            try {
-              await coordinator.seekToSavedPosition();
-              await coordinator.resume();
-            } catch (e) {
-              AppLogger.error('Resume from saved position failed', e);
-            }
-          },
-          icon: const Icon(Icons.history, size: 20),
-          label: Text(
-            l.continueFrom(savedPosition.formatted),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _Poster extends ConsumerWidget {
@@ -364,111 +265,6 @@ class _Poster extends ConsumerWidget {
         placeholder: (_, _) => const SizedBox.shrink(),
         errorWidget: (_, _, _) => const SizedBox.shrink(),
       ),
-    );
-  }
-}
-
-class _BackButton extends ConsumerWidget {
-  const new({this.onClose});
-  final VoidCallback? onClose;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return IconButton(
-      color: Colors.white,
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () async {
-        await ref.read(playbackCoordinatorProvider.notifier).pause();
-        final cb = onClose;
-        if (cb != null) {
-          cb();
-        } else {
-          if (context.mounted) await Navigator.of(context).maybePop();
-        }
-      },
-    );
-  }
-}
-
-class _FullscreenButton extends StatelessWidget {
-  const new({this.onTap});
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      color: Colors.white,
-      icon: const Icon(Icons.fullscreen),
-      onPressed: onTap,
-    );
-  }
-}
-
-class _SeekButton extends ConsumerWidget {
-  const new({required this.direction});
-  final int direction;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final coordinator = ref.read(playbackCoordinatorProvider.notifier);
-    return IconButton(
-      color: Colors.white,
-      icon: Icon(direction < 0 ? Icons.replay_10 : Icons.forward_10),
-      iconSize: 24,
-      onPressed: () {
-        final video = ref.read(videoPlayerDatasourceProvider);
-        final target = clampSeekPosition(
-          position: video.position,
-          step: _seekStep * direction,
-          duration: video.duration,
-        );
-        unawaited(coordinator.seek(target));
-      },
-    );
-  }
-}
-
-class _SpeedButton extends ConsumerStatefulWidget {
-  const new();
-
-  @override
-  ConsumerState<_SpeedButton> createState() => _SpeedButtonState();
-}
-
-class _SpeedButtonState extends ConsumerState<_SpeedButton> {
-  StreamSubscription<double>? _rateSub;
-  double _rate = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    final video = ref.read(videoPlayerDatasourceProvider);
-    _rate = video.rate;
-    _rateSub = video.rateStream.listen((rate) {
-      if (mounted) setState(() => _rate = rate);
-    });
-  }
-
-  @override
-  void dispose() {
-    unawaited(_rateSub?.cancel());
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      color: Colors.white,
-      icon: Text(
-        '${_rate}x',
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-      ),
-      onPressed: () {
-        final next = _rate >= _maxSpeed ? _minSpeed : _rate + _speedStep;
-        unawaited(
-          ref.read(playbackCoordinatorProvider.notifier).setSpeed(next),
-        );
-      },
     );
   }
 }

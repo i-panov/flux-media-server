@@ -19,6 +19,12 @@ sealed class Media with _$Media {
     int? year,
     String? description,
     int? duration,
+    /// Размеры кадра в пикселях (видео). Сервер проставляет их при скане
+    /// и загрузке; 0/0 у аудио и у файлов без видеопотока. Нужны, чтобы
+    /// до старта воспроизведения выбрать пропорции превью и ориентацию
+    /// fullscreen — без них остаётся запасной 16:9.
+    @Default(0) int width,
+    @Default(0) int height,
     @JsonKey(name: 'thumbnail_url') String? thumbnailUrl,
     @JsonKey(name: 'cover_url') String? coverUrl,
     @JsonKey(name: 'source_url') String? sourceUrl,

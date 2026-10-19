@@ -204,6 +204,40 @@ func TestScannerUpdateKeepsManualEdits(t *testing.T) {
 	assert.NotEqual(t, oldQuickHash, after.QuickHash, "quick hash изменившегося файла должен обновиться")
 }
 
+// Размеры кадра при изменении файла перезаписываются: тот же путь мог
+// содержать другое видео — с другим разрешением. Старые пропорции вели
+// бы к неверной ориентации в плеере.
+func TestApplyVideoDimensionsOverwrites(t *testing.T) {
+	media := &models.Media{Width: 1920, Height: 1080}
+
+	services.ApplyVideoDimensions(media, &services.FileMetadata{
+		Width: 720, Height: 1280,
+	})
+
+	assert.Equal(t, 720, media.Width)
+	assert.Equal(t, 1280, media.Height)
+}
+
+// Пустые размеры (ffprobe не отдал) не затирают уже известные.
+func TestApplyVideoDimensionsKeepsKnownOnEmpty(t *testing.T) {
+	media := &models.Media{Width: 1920, Height: 1080}
+
+	services.ApplyVideoDimensions(media, &services.FileMetadata{})
+
+	assert.Equal(t, 1920, media.Width)
+	assert.Equal(t, 1080, media.Height)
+}
+
+// nil-метаданные — ничего не меняют.
+func TestApplyVideoDimensionsNilMeta(t *testing.T) {
+	media := &models.Media{Width: 1920, Height: 1080}
+
+	services.ApplyVideoDimensions(media, nil)
+
+	assert.Equal(t, 1920, media.Width)
+	assert.Equal(t, 1080, media.Height)
+}
+
 // errorHashRepo — обёртка над MediaStore, которая проваливает FindByHash
 // любой ошибкой, не являющейся gorm.ErrRecordNotFound.
 type errorHashRepo struct {

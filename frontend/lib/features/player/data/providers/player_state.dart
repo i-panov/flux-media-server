@@ -22,7 +22,6 @@ sealed class PlaybackState with _$PlaybackState {
     @Default(Duration.zero) Duration position,
     Duration? duration,
     @Default(1.0) double speed,
-    Duration? savedPosition,
   }) = PlaybackPlaying;
   const factory completed() = PlaybackCompleted;
   const factory loading() = PlaybackLoading;

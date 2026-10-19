@@ -21,6 +21,12 @@ type Media struct {
 	Album    string   `json:"album"`
 	Genre    string   `json:"genre"`
 	Duration int      `json:"duration"` // seconds
+	// Width/Height — размеры видео в пикселях (0 у аудио и у файлов,
+	// у которых ffprobe не отдал поток). Нужны клиенту до старта
+	// воспроизведения: по соотношению сторон выбирается ориентация
+	// fullscreen и пропорции встроенного превью (жёсткие 16:9 врют).
+	Width  int `json:"width"`
+	Height int `json:"height"`
 	// FilePath is indexed (not unique): a unique index conflicts with soft
 	// delete — a file re-appearing after its record was soft-deleted would
 	// fail with a UNIQUE error and the media would be lost. Duplicate

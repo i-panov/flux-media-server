@@ -546,6 +546,22 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		}
 	})
 
+	// Разовая заливка размеров кадра для видео, записанных до появления
+	// колонок width/height. Фоном: ffprobe по каждому файлу — процесс
+	// должен принимать запросы, пока идёт проход. Отменяется вместе с
+	// cleanupStop, чтобы не мешать завершению.
+	dimensionsCtx, cancelDimensions := context.WithCancel(context.Background())
+	goSafe(func() {
+		go func() {
+			<-cleanupStop
+			cancelDimensions()
+		}()
+		updated := services.BackfillVideoDimensions(dimensionsCtx, mediaRepo)
+		if updated > 0 {
+			log.Printf("dimensions: залито размеров кадра для %d видео", updated)
+		}
+	})
+
 	ok = true
 	return &App{
 		Fiber:        fiberApp,

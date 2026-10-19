@@ -42,6 +42,27 @@ var (
 	}
 )
 
+// ApplyVideoDimensions переносит размеры кадра из метаданных файла в
+// запись.
+//
+// В отличие от пользовательских полей (title/artist/album/genre),
+// размеры перезаписываются ВСЕГДА: файл по тому же пути мог быть
+// заменён на другой (с другим разрешением), и оставленные старые
+// пропорции вели бы к неверной ориентации в плеере. Нулевые значения
+// (ffprobe не отдал) игнорируются — иначе запись потеряла бы уже
+// известные размеры.
+func ApplyVideoDimensions(media *models.Media, meta *FileMetadata) {
+	if meta == nil {
+		return
+	}
+	if meta.Width > 0 {
+		media.Width = meta.Width
+	}
+	if meta.Height > 0 {
+		media.Height = meta.Height
+	}
+}
+
 func IsAllowedExtension(ext string) bool {
 	return videoExtensions[ext] || audioExtensions[ext]
 }
@@ -441,6 +462,13 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 		if existing.Genre == "" && fileMeta.Genre != "" {
 			existing.Genre = fileMeta.Genre
 		}
+		// Размеры кадра — ТЕХНИЧЕСКИЕ поля: они перезаписываются
+		// всегда, в отличие от пользовательских (title/artist/album/
+		// genre), которые заполняются только при пустых значениях.
+		// Файл по тому же пути мог быть заменён на другой — с другим
+		// разрешением, и старые пропорции вели бы к неверной ориентации
+		// в плеере.
+		ApplyVideoDimensions(existing, fileMeta)
 	}
 
 	// Regenerate thumbnail for changed file. В БД сохраняем
@@ -539,6 +567,12 @@ func (s *ScannerService) createNewMedia(ctx context.Context, path string, info o
 		}
 		if media.Genre == "" && fileMeta.Genre != "" {
 			media.Genre = fileMeta.Genre
+		}
+		if media.Width == 0 && fileMeta.Width > 0 {
+			media.Width = fileMeta.Width
+		}
+		if media.Height == 0 && fileMeta.Height > 0 {
+			media.Height = fileMeta.Height
 		}
 		if fileMeta.Title != "" {
 			media.Title = fileMeta.Title

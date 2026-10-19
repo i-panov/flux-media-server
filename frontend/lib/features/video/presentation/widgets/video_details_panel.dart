@@ -18,7 +18,8 @@ import 'package:flux_media_server/shared/models/media.dart';
 /// `Colors.black87` в обеих темах), поэтому текст — захардкоженные белые
 /// оттенки, а не `colorScheme`: в светлой теме `onSurface` был бы тёмным
 /// и стал невидимым. Контраст пар: белый/70%/60% на near-black — от ~5:1
-/// и выше при требовании 4.5:1; акцент ссылки — lightBlueAccent.
+/// и выше при требовании 4.5:1; приглушённый 38% — только для
+/// заблокированных действий.
 class VideoDetailsPanel extends ConsumerWidget {
   const new({
     required this.media,
@@ -30,11 +31,11 @@ class VideoDetailsPanel extends ConsumerWidget {
     this.onDownload,
     this.onSaveToFiles,
     this.onAddToQueue,
-    this.onPlay,
     this.onExtractAudio,
     this.onCancelExtract,
     this.onOpenExtractedAudio,
     this.isExtracting = false,
+    this.isUploadingCover = false,
     this.linkLoading = false,
     super.key,
   });
@@ -48,12 +49,11 @@ class VideoDetailsPanel extends ConsumerWidget {
   final Future<void> Function()? onDownload;
   final Future<void> Function()? onSaveToFiles;
   final Future<void> Function()? onAddToQueue;
-  final Future<void> Function()? onPlay;
 
   /// Запустить извлечение аудио (связки ещё нет).
   final Future<void> Function()? onExtractAudio;
 
-  /// Отменить летящий джоб извлечения. Показывается вместо запуска,
+  /// Отменить летящий джоб извлечения. Показывается рядом с извлечением,
   /// пока [isExtracting] — долгую операцию должно быть чем прервать.
   final Future<void> Function()? onCancelExtract;
 
@@ -61,11 +61,14 @@ class VideoDetailsPanel extends ConsumerWidget {
   /// задаёт родитель: либо извлекаем, либо открываем готовое.
   final Future<void> Function()? onOpenExtractedAudio;
 
-  /// Джоб извлечения в полёте: кнопка превращается в отмену.
+  /// Джоб извлечения в полёте: действие превращается в отмену.
   final bool isExtracting;
 
+  /// Загрузка новой обложки: действие заблокировано, пока летит файл.
+  final bool isUploadingCover;
+
   /// Связка ещё грузится: извлечение недоступно (нельзя решать вслепую),
-  /// кнопка заблокирована. Ошибка чтения связки — НЕ блокер: сервер
+  /// действие заблокировано. Ошибка чтения связки — НЕ блокер: сервер
   /// перепроверит её в POST, поэтому onExtractAudio остаётся.
   final bool linkLoading;
 
@@ -89,6 +92,15 @@ class VideoDetailsPanel extends ConsumerWidget {
       kind: hasCover ? MediaImageKind.cover : MediaImageKind.thumb,
       cacheBust: media.updatedAt?.millisecondsSinceEpoch,
     );
+
+    // Первичная загрузка состояния избранного: приглушённый красный
+    // вместо мигания «не избранное» (как в мини-плеере, но под тёмную
+    // подложку панели).
+    final favoriteColor = switch (isFavorite) {
+      null => Colors.white38,
+      true => Colors.red,
+      false => Colors.white,
+    };
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -127,8 +139,9 @@ class VideoDetailsPanel extends ConsumerWidget {
             header: true,
             child: Text(
               media.title,
-              style: Theme.of(context).textTheme.headlineMedium
-                  ?.copyWith(color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(color: Colors.white),
             ),
           ),
           const SizedBox(height: 8),
@@ -138,23 +151,26 @@ class VideoDetailsPanel extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(
               '${media.year}',
-              style: Theme.of(context).textTheme.bodyLarge
-                  ?.copyWith(color: Colors.white70),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
             ),
           ],
           if (media.artists.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               media.artists.map((a) => a.name).join(', '),
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.white),
             ),
           ],
           if (media.album != null && media.album!.isNotEmpty) ...[
             Text(
               media.album!,
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: Colors.white60),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.white60),
             ),
           ],
           if (media.genre != null && media.genre!.isNotEmpty) ...[
@@ -183,8 +199,9 @@ class VideoDetailsPanel extends ConsumerWidget {
             Text(
               '${l.duration}: '
               '${Duration(seconds: media.duration!).formatted}',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: Colors.white60),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.white60),
             ),
           ],
           if (media.sourceUrl != null && media.sourceUrl!.isNotEmpty) ...[
@@ -192,142 +209,215 @@ class VideoDetailsPanel extends ConsumerWidget {
             SourceLinkRow(url: media.sourceUrl!),
           ],
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: Tooltip(
-              message: l.play,
-              child: FilledButton.icon(
-                onPressed: onPlay == null ? null : () => onPlay!.call(),
-                icon: const Icon(Icons.play_arrow),
-                label: Text(l.play),
-              ),
-            ),
+          // Единый вертикальный список действий. Раньше действия были
+          // смесью текстовых кнопок во всю ширину и голых иконок в ряд
+          // без подписей: часть читалась по надписи, часть — только по
+          // иконке, и единого вида не было. Список с иконкой И текстом
+          // убирает вопрос «что это за кнопка».
+          //
+          // Кнопки play здесь больше нет: она живёт полупрозрачным
+          // треугольником поверх превью — так она видна всегда и
+          // относится к тому, что запускает.
+          _ActionRow(
+            icon: (isFavorite ?? false)
+                ? Icons.favorite
+                : Icons.favorite_border,
+            iconColor: favoriteColor,
+            label: l.favorites,
+            onPressed: isFavorite == null || onToggleFavorite == null
+                ? null
+                : () => onToggleFavorite?.call(),
           ),
-          if (onOpenExtractedAudio != null || onExtractAudio != null) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: onOpenExtractedAudio != null
-                  ? Tooltip(
-                      message: l.openAudioTrack,
-                      child: OutlinedButton.icon(
-                        onPressed: () => onOpenExtractedAudio!.call(),
-                        icon: const Icon(Icons.audio_file_outlined),
-                        label: Text(l.openAudioTrack),
-                      ),
-                    )
-                  : isExtracting
-                  ? Tooltip(
-                      message: l.extractCancelled,
-                      child: OutlinedButton.icon(
-                        onPressed: () => onCancelExtract?.call(),
-                        icon: const Icon(Icons.close),
-                        label: Text(l.extractingAudio),
-                      ),
-                    )
-                  : Tooltip(
-                      message: l.extractAudio,
-                      child: OutlinedButton.icon(
-                        onPressed: linkLoading
-                            ? null
-                            : () => onExtractAudio?.call(),
-                        icon: const Icon(Icons.music_note_outlined),
-                        label: Text(l.extractAudio),
-                      ),
+          _ActionRow(
+            icon: Icons.playlist_add,
+            label: l.myCollections,
+            onPressed: onAddToCollection == null
+                ? null
+                : () => onAddToCollection!.call(),
+          ),
+          if (onAddToQueue != null)
+            _ActionRow(
+              icon: Icons.queue_music,
+              label: l.addToQueue,
+              onPressed: () => onAddToQueue!.call(),
+            ),
+          if (onOpenExtractedAudio != null)
+            _ActionRow(
+              icon: Icons.audio_file_outlined,
+              label: l.openAudioTrack,
+              onPressed: () => onOpenExtractedAudio!.call(),
+            )
+          else if (onExtractAudio != null)
+            _ActionRow(
+              // Пока джоб летит — иконка «в работе», а НЕ крестик: крестик
+              // читается как отмена, а отмена живёт отдельной строкой
+              // ниже, и два «отменяющих» значка в одном списке путают.
+              icon: isExtracting
+                  ? Icons.hourglass_empty
+                  : Icons.music_note_outlined,
+              label: isExtracting ? l.extractingAudio : l.extractAudio,
+              // Пока летит джоб — заблокировано: второй POST на
+              // извлечение сервер всё равно отобьёт. Связка ещё грузится —
+              // решать вслепую нельзя, но ошибка чтения связи не
+              // блокирует: сервер перепроверит её в POST.
+              onPressed: linkLoading || isExtracting
+                  ? null
+                  : () => onExtractAudio?.call(),
+            ),
+          // Отмена — только пока джоб летит: до старта и после него
+          // отменять нечего, а строка «Отменить» рядом с готовым действием
+          // только путает.
+          if (onCancelExtract != null && isExtracting)
+            _ActionRow(
+              icon: Icons.cancel_outlined,
+              label: l.cancelExtraction,
+              onPressed: () => onCancelExtract!.call(),
+            ),
+          _ActionRow(
+            icon: downloadIcon(downloadState),
+            label: downloadLabel(l, downloadState),
+            onPressed: onDownload == null ? null : () => onDownload!.call(),
+            trailing: isDownloading
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      value: downloadProgress > 0 ? downloadProgress : null,
                     ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          // Три быстрых действия — только иконки: текстовые кнопки
-          // не влезали в ширину смартфона, надписи переносились.
-          // Discoverability — через tooltip (он же семантический лейбл
-          // для скринридера, как в media_card/audio_track_row): тултип
-          // называет ДЕЙСТВИЕ тапа, а не состояние.
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                tooltip: l.favorites,
-                onPressed: isFavorite == null
-                    ? null
-                    : onToggleFavorite == null
-                    ? null
-                    : () => onToggleFavorite?.call(),
-                icon: Icon(
-                  (isFavorite ?? false)
-                      ? Icons.favorite
-                      : Icons.favorite_border,
-                  color: isFavorite == null
-                      // Первичная загрузка состояния: приглушённый
-                      // серый вместо мигания «не избранное» (как в
-                      // мини-плеере, но под тёмную подложку панели).
-                      ? Colors.white38
-                      : (isFavorite ? Colors.red : Colors.white),
-                ),
-              ),
-              IconButton(
-                tooltip: l.myCollections,
-                onPressed: () => onAddToCollection?.call(),
-                icon: const Icon(Icons.add_to_queue, color: Colors.white),
-              ),
-              IconButton(
-                tooltip: isDownloading
-                    ? l.cancel
-                    : downloadState is DownloadDownloaded
-                    ? l.downloaded
-                    : downloadState is DownloadError
-                    ? l.errorLabel
-                    : l.saveOffline,
-                onPressed: () => onDownload?.call(),
-                icon: isDownloading
-                    ? ExcludeSemantics(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            value: downloadProgress > 0
-                                ? downloadProgress
-                                : null,
-                          ),
-                        ),
-                      )
-                    : downloadState is DownloadDownloaded
-                    ? const Icon(
-                        Icons.check_circle,
-                        // Белый вместо primary: primary на near-black
-                        // подложке не дотягивает до контраста 4.5:1.
-                        color: Colors.white,
-                      )
-                    : downloadState is DownloadError
-                    ? const Icon(Icons.error_outline, color: Colors.white)
-                    : const Icon(Icons.cloud_download, color: Colors.white),
-              ),
-              // Сохранение в файлы — отдельной иконкой рядом с «В офлайн»:
-              // действия разные (кеш vs видимая область), путать их
-              // одним переключателем нельзя.
-              if (onSaveToFiles != null)
-                IconButton(
-                  tooltip: l.saveFile,
-                  onPressed: () => onSaveToFiles?.call(),
-                  icon: const Icon(Icons.file_download, color: Colors.white),
-                ),
-            ],
+                  )
+                : null,
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: Tooltip(
-              message: l.addToQueue,
-              child: OutlinedButton.icon(
-                onPressed: () => onAddToQueue?.call(),
-                icon: const Icon(Icons.queue_music_outlined),
-                label: Text(l.addToQueue),
-              ),
+          if (onSaveToFiles != null)
+            _ActionRow(
+              icon: Icons.file_download,
+              label: l.saveFile,
+              onPressed: () => onSaveToFiles!.call(),
             ),
-          ),
+          if (onChangeCover != null)
+            _ActionRow(
+              icon: Icons.image,
+              label: isUploadingCover ? l.uploadingCover : l.changeCover,
+              onPressed: isUploadingCover
+                  ? null
+                  : () => onChangeCover!.call(),
+            ),
+          if (onEditMetadata != null)
+            _ActionRow(
+              icon: Icons.edit,
+              label: l.edit,
+              onPressed: () => onEditMetadata!.call(),
+            ),
+          if (onDelete != null)
+            _ActionRow(
+              icon: Icons.delete_outline,
+              label: l.delete,
+              color: Colors.red,
+              onPressed: () => onDelete!.call(),
+            ),
         ],
       ),
     );
   }
+}
+
+/// Строка действия в общем списке: иконка + подпись + справа индикатор
+/// прогресса (у загрузки) и шеврон.
+class _ActionRow extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.iconColor,
+    this.color,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final Color? iconColor;
+  final Color? color;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = onPressed == null ? Colors.white38 : color ?? Colors.white;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Semantics(
+        // Скринридер должен объявлять строку как КНОПКУ: без этого
+        // InkWell читается как обычный текст, и «В офлайн» звучит
+        // строкой, а не действием.
+        button: true,
+        enabled: onPressed != null,
+        label: label,
+        child: ExcludeSemantics(
+          // Текст и иконка объявлены самой Semantics-меткой выше —
+          // иначе скринридер прочитал бы подпись дважды.
+          child: Material(
+            color: Colors.white10,
+            borderRadius: BorderRadius.circular(8),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onPressed,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, color: iconColor ?? foreground),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(color: foreground, fontSize: 15),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (trailing != null) ...[
+                      const SizedBox(width: 12),
+                      trailing!,
+                    ],
+                    const Icon(
+                      Icons.chevron_right,
+                      color: Colors.white38,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Иконка действия «в офлайн» по состоянию загрузки.
+///
+/// Иконка отражает ДЕЙСТВИЕ тапа: пока идёт загрузка, тап отменяет её —
+/// значит, и значок должен быть отменой, а не «облако» (оно читалось
+/// бы как «скачать», хотя тап уже отменяет). Прогресс показывает спиннер
+/// справа.
+IconData downloadIcon(DownloadState downloadState) {
+  return switch (downloadState) {
+    DownloadDownloading() => Icons.close,
+    DownloadDownloaded() => Icons.check_circle,
+    DownloadError() => Icons.error_outline,
+    _ => Icons.cloud_download,
+  };
+}
+
+/// Подпись действия «в офлайн» по состоянию загрузки.
+String downloadLabel(AppLocalizations l, DownloadState downloadState) {
+  return switch (downloadState) {
+    DownloadDownloading() => l.cancel,
+    DownloadDownloaded() => l.downloaded,
+    DownloadError() => l.errorLabel,
+    _ => l.saveOffline,
+  };
 }
