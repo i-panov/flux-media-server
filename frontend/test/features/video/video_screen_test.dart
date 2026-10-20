@@ -11,6 +11,7 @@ import 'package:flux_media_server/features/media/presentation/providers/media_li
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/video/presentation/screens/video_screen.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
@@ -81,6 +82,22 @@ class _FakeAuthNotifier extends AuthNotifier {
   AuthState build() => const AuthState.initial();
 }
 
+/// Коллекция для проверки секции «Мои коллекции» на главном экране.
+Collection _collection(
+  int id,
+  String name, {
+  int? parentId,
+  MediaType type = MediaType.video,
+}) => Collection(
+  id: id,
+  userId: 1,
+  name: name,
+  type: type,
+  createdAt: DateTime(2024),
+  updatedAt: DateTime(2024),
+  parentId: parentId,
+);
+
 void main() {
   late SharedPreferences prefs;
   late _FakeMediaRepository mediaRepo;
@@ -140,6 +157,50 @@ void main() {
       expect(find.text('Video 1'), findsOneWidget);
       expect(find.text('Video 2'), findsOneWidget);
       expect(find.text('Recently Added'), findsOneWidget);
+    });
+
+    testWidgets('показывает только корневые коллекции', (tester) async {
+      // Подколлекции — на экране родителя, в ряд на главном им не место:
+      // иначе одна и та же коллекция светится в двух местах.
+      collectionsRepo.onGetCollections = () async => Right([
+        _collection(1, 'Root'),
+        _collection(2, 'Child', parentId: 1),
+        _collection(3, 'GrandChild', parentId: 2),
+      ]);
+
+      await pumpScreen(tester, makeContainer());
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Root'), findsOneWidget);
+      expect(find.text('Child'), findsNothing);
+      expect(find.text('GrandChild'), findsNothing);
+    });
+
+    testWidgets('сирота с потерянным родителем остаётся видна', (tester) async {
+      // Родитель удалён или в корзине: простой фильтр `parentId == null`
+      // спрятал бы такую коллекцию навсегда — до неё не дошёл бы
+      // никто. Корнем считается и сирота.
+      collectionsRepo.onGetCollections = () async => Right([
+        _collection(7, 'Orphan', parentId: 99),
+      ]);
+
+      await pumpScreen(tester, makeContainer());
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Orphan'), findsOneWidget);
+    });
+
+    testWidgets('коллекции другого типа не показываются', (tester) async {
+      collectionsRepo.onGetCollections = () async => Right([
+        _collection(1, 'VideoCol'),
+        _collection(2, 'AudioCol', type: MediaType.audio),
+      ]);
+
+      await pumpScreen(tester, makeContainer());
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('VideoCol'), findsOneWidget);
+      expect(find.text('AudioCol'), findsNothing);
     });
 
     testWidgets('пустая библиотека показывает заглушку', (tester) async {

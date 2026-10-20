@@ -11,6 +11,7 @@ import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/utils/collection_tree.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_media_dialog.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/collection_breadcrumbs.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/collection_grid_tile.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/move_to_collection_dialog.dart';
 import 'package:flux_media_server/features/trash/presentation/providers/trash_providers.dart';
@@ -38,9 +39,10 @@ class _CollectionDetailScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.collection.name),
+        // Заголовка нет: имя коллекции стоит последним звеном крошек
+        // на странице. Одно и то же имя в двух соседних местах
+        // («Season 01» в баре и строкой ниже) читалось бы как дубль.
         actions: [
-          _ParentButton(collection: widget.collection),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: l.addMedia,
@@ -65,6 +67,7 @@ class _CollectionDetailScreenState
       ),
       body: Column(
         children: [
+          _Breadcrumbs(collection: widget.collection),
           _SubcollectionsRow(collection: widget.collection),
           Expanded(child: _ItemsGrid(collection: widget.collection)),
         ],
@@ -284,38 +287,61 @@ class _CollectionDetailScreenState
   }
 }
 
-/// Кнопка «к родителю» в AppBar: видна только у вложенных.
-/// Родителя берём из уже загруженного списка (без него — скрываем,
-/// а не ведём в никуда). Ведёт push-ем: стек не рвём, назад — системно.
-class _ParentButton extends ConsumerWidget {
+/// Хлебные крошки коллекции: вертикальная цепочка на странице.
+///
+/// Раньше кнопка «к родителю» стояла в AppBar, но там для цепочки места
+/// не хватало — помещался обрывок первого слова. Теперь цепочка
+/// на странице, над рядом подколлекций.
+class _Breadcrumbs extends ConsumerWidget {
   const new({required this.collection});
 
   final Collection collection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final parentId = collection.parentId;
-    if (parentId == null) return const SizedBox.shrink();
-    final all = ref.watch(collectionsProvider).value;
-    Collection? parent;
-    if (all != null) {
-      for (final c in all) {
-        if (c.id == parentId) {
-          parent = c;
-          break;
-        }
-      }
-    }
-    if (parent == null) return const SizedBox.shrink();
-    final l = AppLocalizations.of(context)!;
-    final target = parent;
-    return IconButton(
-      icon: const Icon(Icons.upgrade_outlined),
-      tooltip: '${l.goToParent}: ${target.name}',
-      onPressed: () => unawaited(
-        context.router.push(CollectionDetailRoute(collection: target)),
-      ),
+    // Список нужен только для предков. Пока он грузится, цепочка
+    // состоит из одной текущей коллекции — имя видно сразу, а не после
+    // сетевого ответа. Заголовка в AppBar нет (иначе имя дублировалось
+    // бы двумя соседними строками), поэтому прятать его некуда.
+    final all = ref.watch(collectionsProvider).value ?? const <Collection>[];
+
+    final crumbs = buildBreadcrumbs(all, collection);
+    if (crumbs.isEmpty) return const SizedBox.shrink();
+
+    return CollectionBreadcrumbs(
+      crumbs: crumbs,
+      onCrumbTapped: (target) {
+        if (target.id == collection.id) return;
+        unawaited(_openAncestor(context, target));
+      },
     );
+  }
+
+  /// Переход к предку по крошке.
+  ///
+  /// Push давал зигзаг: из [глубокая, корень] крошка «корень» клала
+  /// третий экран, и системный «назад» возвращал вниз, в глубокую
+  /// коллекцию. Поэтому:
+  ///
+  /// - если предок уже есть в стеке (мы пришли оттуда) — возвращаемся
+  ///   к нему через popUntil, стек укорачивается;
+  /// - если его в стеке нет (зашли по прямой ссылке) — заменяем текущий
+  ///   экран, чтобы стек не рос и «назад» не вёл в потомка.
+  Future<void> _openAncestor(BuildContext context, Collection target) async {
+    final router = context.router;
+    if (collectionIdsInStack(router.stack).contains(target.id)) {
+      router.popUntil(
+        (route) {
+          final settings = route.settings;
+          if (settings is! AutoRoutePage) return false;
+          final args = settings.routeData.args;
+          return args is CollectionDetailRouteArgs &&
+              args.collection.id == target.id;
+        },
+      );
+      return;
+    }
+    await router.replace(CollectionDetailRoute(collection: target));
   }
 }
 

@@ -656,9 +656,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get goToParent => 'To parent';
-
-  @override
   String get failedToLoadCollections => 'Failed to load collections';
 
   @override

@@ -11,6 +11,7 @@ import 'package:flux_media_server/features/audio/presentation/widgets/section_he
 import 'package:flux_media_server/features/audio/presentation/widgets/track_actions.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/utils/collection_tree.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -396,16 +397,25 @@ class _EmptyLibrary extends StatelessWidget {
   }
 }
 
-/// Видеоколлекции (только свой тип медиа).
+/// Видеоколлекции (только свой тип медиа, только корневые).
 class _CollectionsSection extends ConsumerWidget {
   const new();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final collections =
-        (ref.watch(collectionsProvider).value ?? const <Collection>[])
-            .where((c) => c.type == MediaType.video)
-            .toList();
+    // Корневые — через buildCollectionTree, а не фильтром
+    // `parentId == null`: сирота (родитель удалён или в корзине) тоже
+    // корень, и простой фильтр спрятал бы такую коллекцию навсегда —
+    // до неё не дошёл бы никто. Лес строится тем же хелпером, что и на
+    // экране коллекции и в диалоге перемещения, поэтому «что считается
+    // корнем» везде одинаково.
+    final forest = buildCollectionTree(
+      ref.watch(collectionsProvider).value ?? const <Collection>[],
+    );
+    final collections = [
+      for (final node in forest)
+        if (node.collection.type == MediaType.video) node.collection,
+    ];
     if (collections.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }

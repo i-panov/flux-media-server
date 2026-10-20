@@ -658,9 +658,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get goToParent => 'К родительской';
-
-  @override
   String get failedToLoadCollections => 'Не удалось загрузить коллекции';
 
   @override

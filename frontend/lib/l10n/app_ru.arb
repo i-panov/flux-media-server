@@ -504,8 +504,6 @@
       }
     }
   },
-  "goToParent": "К родительской",
-  "@goToParent": {},
   "failedToLoadCollections": "Не удалось загрузить коллекции",
   "@failedToLoadCollections": {},
   "addMedia": "Добавить медиа",

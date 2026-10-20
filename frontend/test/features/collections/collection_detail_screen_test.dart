@@ -43,6 +43,16 @@ class _TestRouter extends RootStackRouter {
 Future<FakeTrashRepository> pumpDetail(
   WidgetTester tester, {
   required Collection collection,
+  /// Список коллекций для провайдера. `null` — список ещё грузится
+  /// (данных нет): так проверяется, что имя коллекции видно до ответа
+  /// сети.
+  List<Collection>? collectionsOverride,
+  /// Не переопределять провайдер списка вовсе: он сам ходит в репозиторий
+  /// и первым кадром находится в состоянии загрузки.
+  bool useRealCollectionsProvider = false,
+  /// Ждать ли загрузки данных. `false` — остановиться на первом кадре:
+  /// так проверяется состояние «список ещё едет».
+  bool settle = true,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -56,7 +66,10 @@ Future<FakeTrashRepository> pumpDetail(
       sharedPreferencesProvider.overrideWithValue(prefs),
       baseUrlProvider.overrideWithValue('http://test/api'),
       collectionsRepositoryProvider.overrideWithValue(fake),
-      collectionsProvider.overrideWithValue(AsyncValue.data(_all)),
+      if (!useRealCollectionsProvider)
+        collectionsProvider.overrideWithValue(
+          AsyncValue.data(collectionsOverride ?? _all),
+        ),
       trashRepositoryProvider.overrideWithValue(trashFake),
     ],
   );
@@ -74,7 +87,11 @@ Future<FakeTrashRepository> pumpDetail(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
   return trashFake;
 }
 
@@ -90,6 +107,45 @@ void main() {
     testWidgets('у корня без детей ряда нет', (tester) async {
       await pumpDetail(tester, collection: _all[3]);
       expect(find.text('Subcollections'), findsNothing);
+    });
+
+    testWidgets('у вложенной — цепочка крошек на странице', (tester) async {
+      // Кнопка «к родителю» стояла в AppBar, но для цепочки там места не
+      // хватало — помещался обрывок первого слова. Теперь крошки на
+      // странице: корень и текущая коллекция.
+      await pumpDetail(tester, collection: _all[1]);
+
+      expect(find.text('Сериал'), findsOneWidget);
+      expect(find.text('Season 01'), findsOneWidget);
+      // Кнопки в AppBar больше нет.
+      expect(find.byIcon(Icons.upgrade_outlined), findsNothing);
+    });
+
+    testWidgets('у корня имя видно как заголовок цепочки', (tester) async {
+      // Заголовка в AppBar нет (иначе имя дублировалось бы двумя
+      // соседними строками) — значит, имя корня обязано быть в крошках,
+      // иначе его не было бы видно вообще.
+      await pumpDetail(tester, collection: _all[0]);
+
+      expect(find.text('Сериал'), findsOneWidget);
+      expect(find.byIcon(Icons.upgrade_outlined), findsNothing);
+    });
+
+    testWidgets('имя видно, пока список коллекций грузится', (tester) async {
+      // Список нужен только для предков; пока он едет, имя текущей
+      // коллекции должно быть видно сразу — заголовка в AppBar нет.
+      //
+      // settle: false — останавливаемся на первом кадре, пока провайдер
+      // ещё в состоянии загрузки. С pumpAndSettle проверка прошла бы
+      // вхолостую: данные уже приехали бы.
+      await pumpDetail(
+        tester,
+        collection: _all[0],
+        useRealCollectionsProvider: true,
+        settle: false,
+      );
+
+      expect(find.text('Сериал'), findsOneWidget);
     });
 
     testWidgets('delete показывает счётчики из stats', (tester) async {

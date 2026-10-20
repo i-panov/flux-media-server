@@ -555,8 +555,6 @@
       }
     }
   },
-  "goToParent": "To parent",
-  "@goToParent": {},
   "failedToLoadCollections": "Failed to load collections",
   "@failedToLoadCollections": {},
   "addMedia": "Add media",

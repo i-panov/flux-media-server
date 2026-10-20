@@ -1292,12 +1292,6 @@ abstract class AppLocalizations {
   /// **'Move \"{name}\" to trash ({sub} subcollections, {files} files)?'**
   String deleteCollectionTrashConfirm(String name, int sub, int files);
 
-  /// No description provided for @goToParent.
-  ///
-  /// In en, this message translates to:
-  /// **'To parent'**
-  String get goToParent;
-
   /// No description provided for @failedToLoadCollections.
   ///
   /// In en, this message translates to:
