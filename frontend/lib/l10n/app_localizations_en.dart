@@ -476,6 +476,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fullscreen => 'Fullscreen';
 
   @override
+  String get exitFullscreen => 'Exit fullscreen';
+
+  @override
   String get seekBack10 => 'Rewind 10 seconds';
 
   @override

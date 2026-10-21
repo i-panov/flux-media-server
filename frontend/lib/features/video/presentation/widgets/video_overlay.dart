@@ -10,9 +10,7 @@ import 'package:flux_media_server/l10n/app_localizations.dart';
 /// - [controls] — слой с GestureDetector на всю площадь кадра; он
 ///   перехватывает тапы, поэтому под ним ничего не нажимается;
 /// - [playButton] — круглая кнопка запуска поверх превью; идёт после
-///   [controls], иначе тап по ней прятал бы контролы вместо запуска;
-/// - [topBar] — кнопки верхнего бара (выход из полного экрана), тоже
-///   после [controls] по той же причине.
+///   [controls], иначе тап по ней прятал бы контролы вместо запуска.
 ///
 /// Вынесено отдельным виджетом не ради красоты: порядок слоёв —
 /// ровно тот случай, когда опечатка в списке даёт «кнопка выглядит
@@ -23,10 +21,8 @@ class VideoOverlay extends StatelessWidget {
     required this.poster,
     required this.controls,
     this.playButton,
-    this.topBar,
     super.key,
   });
-
 
   /// Постер (или `null`, если показывается живой кадр).
   final Widget? poster;
@@ -37,9 +33,6 @@ class VideoOverlay extends StatelessWidget {
   /// Круглая кнопка запуска поверх превью.
   final Widget? playButton;
 
-  /// Кнопки верхнего бара.
-  final Widget? topBar;
-
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -48,7 +41,6 @@ class VideoOverlay extends StatelessWidget {
         ?poster,
         ?controls,
         ?playButton,
-        ?topBar,
       ],
     );
   }

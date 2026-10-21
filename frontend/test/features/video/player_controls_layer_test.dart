@@ -104,6 +104,8 @@ Future<void> _pump(
   _FakeApi api, {
   bool isPaused = false,
   bool isActive = true,
+  bool isFullscreen = false,
+  bool showVolumeControl = false,
   VoidCallback? onStart,
   double width = 300,
   Locale locale = const Locale('en'),
@@ -122,6 +124,8 @@ Future<void> _pump(
               api: api,
               isPaused: isPaused,
               isActive: isActive,
+              isFullscreen: isFullscreen,
+              showVolumeControl: showVolumeControl,
               onStart: onStart,
               onToggleFullscreen: () {},
             ),
@@ -268,23 +272,44 @@ void main() {
   });
 
   group('controlsLayoutFor', () {
-    test('узкий кадр — только play/pause и полный экран', () {
+    test('узкий кадр — только полный экран', () {
       // Ряды кнопок в узком кадре не влезают: встроенный плеер на
-      // ноутбуке — 300–500 px. Полный ряд (6 кнопок по 48) плюс
-      // ползунок громкости (110) туда не влезает.
+      // ноутбуке — 300–500 px. Полный ряд (скорость + полный экран =
+      // 96) туда ещё помещается, но на совсем узком — нет.
       expect(controlsLayoutFor(0), ControlsLayout.minimal);
-      expect(controlsLayoutFor(200), ControlsLayout.minimal);
-      expect(controlsLayoutFor(287), ControlsLayout.minimal);
+      expect(controlsLayoutFor(95), ControlsLayout.minimal);
     });
 
-    test('средний кадр — полный ряд без ползунка громкости', () {
-      expect(controlsLayoutFor(288), ControlsLayout.full);
-      expect(controlsLayoutFor(397), ControlsLayout.full);
+    test('средний кадр — скорость и полный экран', () {
+      expect(controlsLayoutFor(96), ControlsLayout.full);
+      expect(controlsLayoutFor(500), ControlsLayout.full);
     });
 
-    test('широкий кадр — с ползунком громкости', () {
-      expect(controlsLayoutFor(398), ControlsLayout.withVolumeSlider);
-      expect(controlsLayoutFor(1200), ControlsLayout.withVolumeSlider);
+    test('на десктопе ряд шире: добавляется кнопка звука', () {
+      // С кнопкой звука ряд занимает 144: до этого места влезает
+      // только скорость с полным экраном.
+      expect(controlsLayoutFor(143, withVolume: true), ControlsLayout.minimal);
+      expect(controlsLayoutFor(144, withVolume: true), ControlsLayout.full);
+    });
+
+    test('широкий кадр на десктопе — с ползунком громкости', () {
+      expect(
+        controlsLayoutFor(254, withVolume: true),
+        ControlsLayout.withVolumeSlider,
+      );
+      expect(
+        controlsLayoutFor(1200, withVolume: true),
+        ControlsLayout.withVolumeSlider,
+      );
+    });
+
+    test('на смартфоне ползунка громкости нет вовсе', () {
+      // Громкость на смартфоне живёт на физических кнопках.
+      expect(
+        controlsLayoutFor(1200),
+        ControlsLayout.full,
+        reason: 'без регулятора звука ползунок не появляется',
+      );
     });
   });
 
@@ -313,15 +338,67 @@ void main() {
       await tester.pumpAndSettle();
       expect(_controlsVisible(tester), isFalse);
 
+      // Тапаем в угол: в центре кадра стоит кнопка play/pause, и тап
+      // достался бы ей, а не слою жестов.
+      final layer = tester.getRect(find.byType(PlayerControlsLayer));
+      final corner = Offset(layer.left + 20, layer.top + 20);
+
       // Одиночный тап подтверждается только после истечения таймаута
       // двойного — иначе его не отличить от первого тапа пары.
-      await _singleTapAt(tester, tester.getCenter(find.byType(PlayerControlsLayer)));
+      await _singleTapAt(tester, corner);
       expect(_controlsVisible(tester), isTrue);
 
       // Повторный тап снова прячет — иначе показать/спрятать было бы
       // нечем, кроме как угадать момент автоскрытия.
-      await _singleTapAt(tester, tester.getCenter(find.byType(PlayerControlsLayer)));
+      await _singleTapAt(tester, corner);
       expect(_controlsVisible(tester), isFalse);
+    });
+
+    testWidgets('кнопка play/pause по центру кадра', (tester) async {
+      // Как в обычных плеерах: крупная кнопка в центре, при нажатии
+      // видео играет. В нижнем ряду её больше нет — там тесно.
+      await _pump(tester, api, isPaused: true);
+
+      expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.pumpAndSettle();
+
+      expect(api.playCalls, 1);
+    });
+
+    testWidgets('на паузе кнопка в центре не прячется по таймеру', (
+      tester,
+    ) async {
+      // На паузе прятать нечего: вернуться к управлению можно только
+      // тапом, о котором легко забыть.
+      await _pump(tester, api, isPaused: true);
+
+      await tester.pump(kControlsAutoHideDelay * 2);
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+    });
+
+    testWidgets('при воспроизведении кнопка в центре скрыта с контролами', (
+      tester,
+    ) async {
+      await _pump(tester, api);
+
+      await tester.pump(kControlsAutoHideDelay);
+      await tester.pumpAndSettle();
+
+      // Группа спряталась: элементы остаются в дереве с нулевой
+      // прозрачностью, но нажать их уже нельзя.
+      expect(_controlsVisible(tester), isFalse);
+      // Кнопка в центре — часть этой группы, а не отдельный слой.
+      expect(
+        find.ancestor(
+          of: find.byIcon(Icons.pause),
+          matching: find.byKey(playerControlsVisibilityKey),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('двойной тап слева отматывает, справа — перематывает', (
@@ -390,16 +467,16 @@ void main() {
       expect(find.byIcon(Icons.play_arrow), findsWidgets);
     });
 
-    testWidgets('кнопки ±10 секунд перематывают', (tester) async {
+    testWidgets('кнопок ±10 секунд в ряду нет — перемотка двойным тапом', (
+      tester,
+    ) async {
+      // Кнопки дублировали двойной тап по краям кадра и занимали место в
+      // и без того тесном ряду. Остались только скорость, громкость и
+      // полный экран.
       await _pump(tester, api, width: 700);
 
-      await tester.tap(find.byIcon(Icons.replay_10));
-      await tester.pumpAndSettle();
-      expect(api.seeks.last, const Duration(seconds: 20));
-
-      await tester.tap(find.byIcon(Icons.forward_10));
-      await tester.pumpAndSettle();
-      expect(api.seeks.last, const Duration(seconds: 40));
+      expect(find.byIcon(Icons.replay_10), findsNothing);
+      expect(find.byIcon(Icons.forward_10), findsNothing);
     });
 
     testWidgets('кнопка скорости идёт по кругу', (tester) async {
@@ -435,14 +512,25 @@ void main() {
         width: 700,
         locale: const Locale('ru'),
       );
-      expect(find.byTooltip('Воспроизвести'), findsOneWidget);
-      expect(find.byTooltip('Назад на 10 секунд'), findsOneWidget);
-      expect(find.byTooltip('Вперёд на 10 секунд'), findsOneWidget);
       expect(find.byTooltip('Скорость'), findsOneWidget);
       expect(find.byTooltip('Полный экран'), findsOneWidget);
       expect(find.byTooltip('Play'), findsNothing);
       expect(find.byTooltip('Speed'), findsNothing);
       expect(find.byTooltip('Fullscreen'), findsNothing);
+    });
+
+    testWidgets('кнопка полного экрана в полном экране сворачивает', (
+      tester,
+    ) async {
+      // Одна кнопка на оба состояния, в правом нижнем углу: развернуть
+      // и свернуть обратно в карточку.
+      await _pump(tester, api, width: 700, isFullscreen: true);
+      expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
+      expect(find.byIcon(Icons.fullscreen), findsNothing);
+
+      await _pump(tester, api, width: 700);
+      expect(find.byIcon(Icons.fullscreen), findsOneWidget);
+      expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
     });
 
     testWidgets('слой перехватывает тапы по всей площади кадра', (
@@ -455,9 +543,9 @@ void main() {
       await _pump(tester, api);
       final layer = tester.getRect(find.byType(PlayerControlsLayer));
 
-      // Одиночный тап в ЦЕНТРЕ — зона, где двойной тап ничего не делает
-      // и куда кнопка play встаёт как раз при старте.
-      await _singleTapAt(tester, Offset(layer.center.dx, layer.center.dy));
+      // Тапаем в угол: в центре кадра стоит кнопка play/pause, и тап
+      // достался бы ей, а не слою жестов.
+      await _singleTapAt(tester, Offset(layer.left + 20, layer.top + 20));
 
       // Слой среагировал (переключил видимость), а не пропустил тап мимо.
       expect(api.seeks, isEmpty);
@@ -476,7 +564,7 @@ void main() {
       expect(_controlsVisible(tester), isTrue);
 
       final layer = tester.getRect(find.byType(PlayerControlsLayer));
-      await _singleTapAt(tester, Offset(layer.center.dx, layer.center.dy));
+      await _singleTapAt(tester, Offset(layer.left + 20, layer.top + 20));
 
       expect(_controlsVisible(tester), isFalse);
     });
@@ -525,14 +613,12 @@ void main() {
     testWidgets('регулятор громкости — только на десктопе', (tester) async {
       // На смартфоне громкость живёт на физических кнопках, и в панели
       // она только мешает; на десктопе её нечем менять.
-      await _pump(tester, api, width: 700);
+      await _pump(tester, api, width: 700, showVolumeControl: true);
+      expect(find.byIcon(Icons.volume_up), findsOneWidget);
+      expect(find.byTooltip('Volume'), findsOneWidget);
 
-      if (shouldShowVolumeControl()) {
-        expect(find.byIcon(Icons.volume_up), findsOneWidget);
-        expect(find.byTooltip('Volume'), findsOneWidget);
-      } else {
-        expect(find.byIcon(Icons.volume_up), findsNothing);
-      }
+      await _pump(tester, api, width: 700);
+      expect(find.byIcon(Icons.volume_up), findsNothing);
     });
 
     testWidgets('в узком кадре ряд урезан и не переполняется', (
@@ -540,13 +626,12 @@ void main() {
     ) async {
       // Ряд кнопок в узком кадре не влезает: переполнение (жёлтые
       // полосы) выглядело бы хуже, чем лишние кнопки.
-      await _pump(tester, api, width: 280);
+      //
+      // 80 px — уже не помещаются даже скорость с полным экраном
+      // (2 кнопки по 48 = 96).
+      await _pump(tester, api, width: 80);
 
-      // Только play/pause и полный экран.
-      expect(find.byIcon(Icons.pause), findsOneWidget);
       expect(find.byIcon(Icons.fullscreen), findsOneWidget);
-      expect(find.byIcon(Icons.replay_10), findsNothing);
-      expect(find.byIcon(Icons.forward_10), findsNothing);
       expect(find.text('1x'), findsNothing);
     });
 
@@ -556,9 +641,10 @@ void main() {
       // В кадре средней ширины ползунок громкости уходит, но кнопка
       // отключения остаётся — иначе громкость на десктопе нечем было бы
       // менять вовсе.
-      if (!shouldShowVolumeControl()) return;
-
-      await _pump(tester, api, width: 400);
+      //
+      // 200 px: ряд из трёх кнопок (скорость, звук, полный экран = 144)
+      // помещается, а ползунок громкости (110) — уже нет.
+      await _pump(tester, api, width: 200, showVolumeControl: true);
 
       expect(find.byIcon(Icons.volume_up), findsOneWidget);
       // Ползунков в ряду один: сикбар позиции. Громкостного нет —
@@ -569,9 +655,7 @@ void main() {
     testWidgets('кнопка отключения глушит и восстанавливает громкость', (
       tester,
     ) async {
-      if (!shouldShowVolumeControl()) return;
-
-      await _pump(tester, api, width: 700);
+      await _pump(tester, api, width: 700, showVolumeControl: true);
       expect(find.byIcon(Icons.volume_up), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.volume_up));
@@ -588,9 +672,7 @@ void main() {
     testWidgets('внешняя смена громкости видна в регуляторе', (tester) async {
       // Громкость меняют и системными кнопками на наушниках — регулятор
       // обязан показывать фактическое значение.
-      if (!shouldShowVolumeControl()) return;
-
-      await _pump(tester, api, width: 700);
+      await _pump(tester, api, width: 700, showVolumeControl: true);
       api.emitVolume(20);
       await tester.pumpAndSettle();
 

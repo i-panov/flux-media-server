@@ -478,6 +478,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get fullscreen => 'Полный экран';
 
   @override
+  String get exitFullscreen => 'Свернуть';
+
+  @override
   String get seekBack10 => 'Назад на 10 секунд';
 
   @override

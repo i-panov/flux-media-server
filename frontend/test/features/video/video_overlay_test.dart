@@ -13,11 +13,10 @@ Widget _app(Widget child) {
   );
 }
 
-/// Кадр 300x300 с постером, слоем жестов и опциональными кнопками.
+/// Кадр 300x300 с постером, слоем жестов и опциональной кнопкой play.
 Widget _frame({
   required VoidCallback onGesture,
   VoidCallback? onPlay,
-  VoidCallback? onBack,
 }) {
   return _app(
     Center(
@@ -34,15 +33,6 @@ Widget _frame({
           playButton: onPlay == null
               ? null
               : Center(child: PlayOverlayButton(onPressed: onPlay)),
-          topBar: onBack == null
-              ? null
-              : Align(
-                  alignment: Alignment.topLeft,
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: onBack,
-                  ),
-                ),
         ),
       ),
     ),
@@ -73,19 +63,15 @@ void main() {
       expect(toggled, 0);
     });
 
-    testWidgets('верхний бар тоже поверх слоя жестов', (tester) async {
-      var closed = 0;
-      var toggled = 0;
+    testWidgets('верхнего бара больше нет: выход из полного экрана — кнопкой в углу', (
+      tester,
+    ) async {
+      // Стрелка «назад» в полноэкранном режиме висела поверх скрытых
+      // контролов и занимала место, которое отведено кнопке полного
+      // экрана в углу.
+      await tester.pumpWidget(_frame(onGesture: () {}));
 
-      await tester.pumpWidget(
-        _frame(onGesture: () => toggled++, onBack: () => closed++),
-      );
-
-      await tester.tap(find.byIcon(Icons.arrow_back));
-      await tester.pump();
-
-      expect(closed, 1);
-      expect(toggled, 0);
+      expect(find.byIcon(Icons.arrow_back), findsNothing);
     });
 
     testWidgets('тап по кадру мимо кнопки уходит в слой жестов', (

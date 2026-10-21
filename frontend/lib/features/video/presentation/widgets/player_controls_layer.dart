@@ -63,28 +63,39 @@ const _controlButtonWidth = 48.0;
 /// Что показывать в нижнем ряду при данной ширине кадра.
 ///
 /// Ряды кнопок в узком кадре не влезают: встроенный плеер на ноутбуке
-/// — это 300–500 px, и полный ряд (6 кнопок по 48 = 288) плюс
-/// ползунок громкости (110) в него не влезает. Раньше это приводило к
-/// жёлто-полосатому переполнению — хуже, чем лишние кнопки убрать.
+/// — это 300–500 px. Переполнение выглядит как жёлто-полосатая полоса
+/// поверх видео — хуже, чем лишние кнопки убрать.
 enum ControlsLayout {
-  /// Только play/pause и полный экран — самое важное, помещается всегда.
+  /// Только полный экран — помещается в любой кадр.
   minimal,
 
-  /// Плюс перемотка ±10 с, скорость и отключение звука.
+  /// Плюс скорость (и кнопка звука на десктопе).
   full,
 
-  /// Плюс ползунок громкости.
+  /// Плюс ползунок громкости (только на десктопе).
   withVolumeSlider,
 }
 
 /// Выбирает состав нижнего ряда по ширине кадра.
 ///
 /// [availableWidth] — ширина, доступная ряду (уже без отступов панели).
-ControlsLayout controlsLayoutFor(double availableWidth) {
-  const fullWidth = 6 * _controlButtonWidth;
-  const sliderWidth = fullWidth + 110;
-  if (availableWidth >= sliderWidth) return ControlsLayout.withVolumeSlider;
-  if (availableWidth >= fullWidth) return ControlsLayout.full;
+/// [withVolume] — есть ли в ряду кнопка звука и ползунок громкости
+/// (десктоп; на смартфоне громкость живёт на физических кнопках).
+ControlsLayout controlsLayoutFor(
+  double availableWidth, {
+  bool withVolume = false,
+}) {
+  // Состав ряда: скорость (48) + полный экран (48), на десктопе ещё
+  // кнопка звука (48); ползунок громкости добавляет 110.
+  const fullWidth = 2 * _controlButtonWidth;
+  const desktopFullWidth = 3 * _controlButtonWidth;
+  const sliderWidth = desktopFullWidth + 110;
+
+  if (withVolume && availableWidth >= sliderWidth) {
+    return ControlsLayout.withVolumeSlider;
+  }
+  final needed = withVolume ? desktopFullWidth : fullWidth;
+  if (availableWidth >= needed) return ControlsLayout.full;
   return ControlsLayout.minimal;
 }
 
@@ -206,8 +217,9 @@ class PlayerControlsLayer extends StatefulWidget {
     required this.api,
     required this.isPaused,
     required this.onToggleFullscreen,
-    this.showFullscreenButton = true,
+    this.isFullscreen = false,
     this.isActive = true,
+    this.showVolumeControl = false,
     this.onStart,
     super.key,
   });
@@ -219,11 +231,12 @@ class PlayerControlsLayer extends StatefulWidget {
   /// тапом, о котором легко забыть.
   final bool isPaused;
 
+  /// Переключение полного экрана. В полноэкранном режиме кнопка сворачивает
+  /// видео обратно в карточку — отдельной стрелки «назад» больше нет.
   final VoidCallback? onToggleFullscreen;
 
-  /// В полноэкранном режиме кнопка выхода из него не рисуется: там есть
-  /// отдельная кнопка «назад» в верхнем баре.
-  final bool showFullscreenButton;
+  /// Полноэкранный ли режим: меняет иконку кнопки (развернуть/свернуть).
+  final bool isFullscreen;
 
   /// Загружено ли это медиа в плеер.
   ///
@@ -234,6 +247,15 @@ class PlayerControlsLayer extends StatefulWidget {
   /// чужую длительность, а перемотка мотала чужое. Поэтому у неактивной
   /// карточки остаётся только запуск (тап по кадру) и полный экран.
   final bool isActive;
+
+  /// Показывать ли регулятор громкости.
+  ///
+  /// На смартфоне громкость живёт на физических кнопках, и в панели она
+  /// только мешает; на десктопе её нечем менять. Решение принимает
+  /// вызывающая сторона (см. shouldShowVolumeControl), а слой получает
+  /// готовый ответ: проверка платформы внутри виджета ломала бы его
+  /// тестируемость.
+  final bool showVolumeControl;
 
   /// Запуск этого медиа. Вызывается тапом по кадру, когда медиа ещё не
   /// загружено в плеер.
@@ -382,14 +404,32 @@ class _PlayerControlsLayerState extends State<PlayerControlsLayer> {
                 child: AnimatedOpacity(
                   opacity: _visible ? 1 : 0,
                   duration: const Duration(milliseconds: 200),
-                  child: _ControlsBar(
-                    api: widget.api,
-                    isPaused: widget.isPaused,
-                    onTogglePlayback: _togglePlayback,
-                    onSeekRelative: _seekRelative,
-                    onToggleFullscreen: widget.onToggleFullscreen,
-                    showFullscreenButton: widget.showFullscreenButton,
-                    isActive: widget.isActive,
+                  child: Stack(
+                    children: [
+                      // Кнопка play/pause по центру кадра. Она часть
+                      // общей группы контролов: на паузе таймер автоскрытия
+                      // не тикает, и кнопка остаётся видимой — вернуться
+                      // к управлению можно только тапом, о котором легко
+                      // забыть. При воспроизведении прячется вместе с
+                      // остальными и появляется по тапу.
+                      if (widget.isActive)
+                        Center(
+                          child: _CenterPlayButton(
+                            isPaused: widget.isPaused,
+                            onPressed: _togglePlayback,
+                          ),
+                        ),
+                      _ControlsBar(
+                        api: widget.api,
+                        isPaused: widget.isPaused,
+                        onTogglePlayback: _togglePlayback,
+                        onSeekRelative: _seekRelative,
+                        onToggleFullscreen: widget.onToggleFullscreen,
+                        isFullscreen: widget.isFullscreen,
+                        isActive: widget.isActive,
+                        showVolumeControl: widget.showVolumeControl,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -454,8 +494,9 @@ class _ControlsBar extends StatelessWidget {
     required this.onTogglePlayback,
     required this.onSeekRelative,
     required this.onToggleFullscreen,
-    required this.showFullscreenButton,
+    required this.isFullscreen,
     required this.isActive,
+    required this.showVolumeControl,
   });
 
   final PlayerControlsApi api;
@@ -463,10 +504,15 @@ class _ControlsBar extends StatelessWidget {
   final Future<void> Function() onTogglePlayback;
   final Future<void> Function(int sign) onSeekRelative;
   final VoidCallback? onToggleFullscreen;
-  final bool showFullscreenButton;
+
+  /// Полноэкранный ли режим: меняет иконку кнопки полного экрана.
+  final bool isFullscreen;
 
   /// Медиа загружено в плеер: только тогда транспорт имеет смысл.
   final bool isActive;
+
+  /// Показывать ли регулятор громкости (десктоп).
+  final bool showVolumeControl;
 
   @override
   Widget build(BuildContext context) {
@@ -500,33 +546,13 @@ class _ControlsBar extends StatelessWidget {
                       // плеер на ноутбуке — это 300–500 px. Состав ряда
                       // подбирается по ширине (controlsLayoutFor),
                       // чтобы не было переполнения.
-                      final layout = controlsLayoutFor(constraints.maxWidth);
+                      final layout = controlsLayoutFor(
+                        constraints.maxWidth,
+                        withVolume: showVolumeControl,
+                      );
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          if (isActive) ...[
-                            _ControlButton(
-                              tooltip: isPaused ? l.play : l.pause,
-                              icon: Icon(
-                                isPaused ? Icons.play_arrow : Icons.pause,
-                              ),
-                              onPressed: () => unawaited(onTogglePlayback()),
-                            ),
-                            if (layout != ControlsLayout.minimal) ...[
-                              _ControlButton(
-                                tooltip: l.seekBack10,
-                                icon: const Icon(Icons.replay_10),
-                                onPressed: () =>
-                                    unawaited(onSeekRelative(-1)),
-                              ),
-                              _ControlButton(
-                                tooltip: l.seekForward10,
-                                icon: const Icon(Icons.forward_10),
-                                onPressed: () =>
-                                    unawaited(onSeekRelative(1)),
-                              ),
-                            ],
-                          ],
                           // Скорость — свойство ЗАГРУЖЕННОГО трека: на
                           // неактивной карточке менять нечего.
                           if (isActive &&
@@ -536,18 +562,30 @@ class _ControlsBar extends StatelessWidget {
                           // её меняют физическими кнопками, и в панели
                           // она бы только мешала.
                           if (isActive &&
-                              shouldShowVolumeControl() &&
+                              showVolumeControl &&
                               layout != ControlsLayout.minimal)
                             _VolumeControl(
                               api: api,
                               showSlider:
                                   layout == ControlsLayout.withVolumeSlider,
                             ),
-                          if (showFullscreenButton)
+                          // Кнопка полного экрана — переключатель: в правом
+                          // нижнем углу она разворачивает видео, а в
+                          // полноэкранном режиме сворачивает обратно в
+                          // карточку. Отдельной стрелки «назад» больше
+                          // нет: в полном экране она всё равно висела
+                          // поверх скрытых контролов.
+                          if (onToggleFullscreen != null)
                             _ControlButton(
-                              tooltip: l.fullscreen,
-                              icon: const Icon(Icons.fullscreen),
-                              onPressed: onToggleFullscreen,
+                              tooltip: isFullscreen
+                                  ? l.exitFullscreen
+                                  : l.fullscreen,
+                              icon: Icon(
+                                isFullscreen
+                                    ? Icons.fullscreen_exit
+                                    : Icons.fullscreen,
+                              ),
+                              onPressed: () => onToggleFullscreen!(),
                             ),
                         ],
                       );
@@ -602,42 +640,56 @@ class _SeekBarState extends State<_SeekBar> {
                         0)
                     .clamp(0.0, max);
 
-            return Row(
-              children: [
-                Text(
-                  Duration(milliseconds: position.round()).formatted,
-                  style: _timeStyle,
-                ),
-                Expanded(
-                  child: SliderTheme(
-                    data: const SliderThemeData(
-                      trackHeight: 3,
-                      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 7),
-                      overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
-                      activeTrackColor: Colors.white,
-                      inactiveTrackColor: Colors.white24,
-                      thumbColor: Colors.white,
-                      overlayColor: Colors.white24,
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                // Подписи времени занимают около 100 px: в узком кадре
+                // они вытесняли бы полосу прогресса, а та переполнялась бы
+                // (жёлтые полосы). Тогда оставляем только саму полосу.
+                final showTimes = constraints.maxWidth >= 200;
+                return Row(
+                  children: [
+                    if (showTimes)
+                      Text(
+                        Duration(milliseconds: position.round()).formatted,
+                        style: _timeStyle,
+                      ),
+                    Expanded(
+                      child: SliderTheme(
+                        data: const SliderThemeData(
+                          trackHeight: 3,
+                          thumbShape: RoundSliderThumbShape(
+                            enabledThumbRadius: 7,
+                          ),
+                          overlayShape: RoundSliderOverlayShape(
+                            overlayRadius: 14,
+                          ),
+                          activeTrackColor: Colors.white,
+                          inactiveTrackColor: Colors.white24,
+                          thumbColor: Colors.white,
+                          overlayColor: Colors.white24,
+                        ),
+                        child: Slider(
+                          value: position,
+                          max: max,
+                          onChanged: (value) =>
+                              setState(() => _dragValue = value),
+                          // По отпусканию, а не на каждый пиксель: seek на
+                          // каждый кадр перетаскивания дёргает mpv сильнее,
+                          // чем нужно.
+                          onChangeEnd: (value) {
+                            unawaited(widget.api.seek(Duration(
+                              milliseconds: value.round(),
+                            )));
+                            setState(() => _dragValue = null);
+                          },
+                        ),
+                      ),
                     ),
-                    child: Slider(
-                      value: position,
-                      max: max,
-                      onChanged: (value) =>
-                          setState(() => _dragValue = value),
-                      // По отпусканию, а не на каждый пиксель: seek на
-                      // каждый кадр перетаскивания дёргает mpv сильнее,
-                      // чем нужно.
-                      onChangeEnd: (value) {
-                        unawaited(widget.api.seek(Duration(
-                          milliseconds: value.round(),
-                        )));
-                        setState(() => _dragValue = null);
-                      },
-                    ),
-                  ),
-                ),
-                Text(duration.formatted, style: _timeStyle),
-              ],
+                    if (showTimes)
+                      Text(duration.formatted, style: _timeStyle),
+                  ],
+                );
+              },
             );
           },
         );
@@ -824,20 +876,78 @@ class _VolumeControlState extends State<_VolumeControl> {
 /// определить — проверяем состояние `IgnorePointer.ignoring` по этому ключу.
 const playerControlsVisibilityKey = Key('player-controls-visibility');
 
-/// Кнопка «назад» в верхнем баре полноэкранного плеера.
-class FullscreenBackButton extends StatelessWidget {
-  const new({required this.onClose, super.key});
+/// Кнопка play/pause по центру кадра.
+///
+/// Как в обычных плеерах: на паузе она крупная и всегда на виду, при
+/// воспроизведении прячется вместе с остальными контролами и
+/// появляется по тапу. Без неё на паузе управление приходилось искать в
+/// нижнем ряду, а он на узком кадре обрезается.
+class _CenterPlayButton extends StatefulWidget {
+  const new({required this.isPaused, required this.onPressed});
 
-  final VoidCallback onClose;
+  final bool isPaused;
+  final Future<void> Function() onPressed;
+
+  @override
+  State<_CenterPlayButton> createState() => _CenterPlayButtonState();
+}
+
+class _CenterPlayButtonState extends State<_CenterPlayButton> {
+  /// Время последнего нажатия и состояние, при котором оно было.
+  (DateTime, bool)? _lastTap;
+
+  /// Окно, в котором второй тап считается «парой».
+  static const _doubleTapGuard = Duration(milliseconds: 300);
+
+  void _handleTap() {
+    final now = DateTime.now();
+    final last = _lastTap;
+    // Двойной тап по кнопке не должен переключать её дважды
+    // (включил-выключил — как будто ничего не нажали).
+    //
+    // Защита по времени, а не через onDoubleTap: тот заставил бы
+    // GestureDetector ждать таймаут двойного тапа, и одиночное нажатие
+    // срабатывало бы на 300 мс позже — кнопка в центре кадра отвечала
+    // бы с заметной паузой.
+    //
+    // Глушится только второй тап ТОГО ЖЕ действия: после «play» кнопка
+    // становится «pause», и нажатие на неё — другое действие, его
+    // выполнять надо (пользователь передумал).
+    if (last != null &&
+        last.$2 == widget.isPaused &&
+        now.difference(last.$1) < _doubleTapGuard) {
+      return;
+    }
+    _lastTap = (now, widget.isPaused);
+    unawaited(widget.onPressed());
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: IconButton(
-        color: Colors.white,
-        icon: const Icon(Icons.arrow_back),
-        onPressed: onClose,
+    final l = AppLocalizations.of(context)!;
+    final label = widget.isPaused ? l.play : l.pause;
+    return Semantics(
+      button: true,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: Colors.black54,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: _handleTap,
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: Icon(
+                widget.isPaused ? Icons.play_arrow : Icons.pause,
+                size: 44,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

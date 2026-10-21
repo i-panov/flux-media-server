@@ -40,11 +40,18 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
   /// по нему, а не чтением провайдера в dispose.
   PlaybackState _lastPlayback = const PlaybackState.initial();
 
+  /// Координатор захвачен заранее: в dispose обращаться к `ref` нельзя —
+  /// виджет демонтируется, и чтение бросает «Using ref when a widget is
+  /// about to or has been unmounted is unsafe». Из-за этого пауза при
+  /// уходе с экрана не срабатывала, и видео играло в фоне.
+  late final PlaybackCoordinator _coordinator;
+
   @override
   void initState() {
     super.initState();
-    // ref.read в dispose бросает (виджет демонтируется), поэтому
-    // состояние плеера запоминается подпиской, а читается из кэша.
+    _coordinator = ref.read(playbackCoordinatorProvider.notifier);
+    // Состояние плеера запоминается подпиской, а читается из кэша —
+    // по той же причине, что и координатор.
     ref.listenManual(playbackCoordinatorProvider, (_, next) {
       _lastPlayback = next;
     }, fireImmediately: true);
@@ -65,7 +72,7 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
     // Паузим только своё неподоставленное видео — фоновое аудио и чужой
     // трек не трогаем. Заодно сохраняется прогресс для resume.
     if (shouldPauseOnScreenDispose(_lastPlayback, widget.mediaId)) {
-      unawaited(ref.read(playbackCoordinatorProvider.notifier).pause());
+      unawaited(_coordinator.pause());
     }
     super.dispose();
   }
@@ -231,18 +238,32 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
       extractControllerProvider.select((s) => s.isExtracting),
     );
     if (_isFullscreen) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: VideoPlayerPanel(
-                media: media,
-                isFullscreen: true,
-                onClose: () => _setFullscreen(false),
+      return PopScope(
+        // Системная «назад» в полном экране сворачивает видео в карточку,
+        // а не уходит с экрана: иначе выход из полного экрана был бы
+        // неочевиден (кнопка в углу автоскрывается вместе с остальными
+        // контролами), а «назад» сразу закрывал бы экран вместе с
+        // видео.
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _setFullscreen(false);
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: VideoPlayerPanel(
+                  media: media,
+                  isFullscreen: true,
+                  // Кнопка полного экрана в углу сворачивает видео обратно
+                  // в карточку: отдельной стрелки «назад» нет.
+                  onToggleFullscreen: () => _setFullscreen(false),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -254,9 +275,10 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
         elevation: 0,
         leading: IconButton(
           color: Colors.white,
-          // Только pop, без паузы: она происходит в dispose панели
-          // (shouldPauseOnPanelDispose) — см. комментарий там. Если гвард
-          // тронут, встроенный «назад» снова начнёт играть в никуда.
+          // Только pop, без паузы: она происходит в dispose ЭКРАНА
+          // (shouldPauseOnScreenDispose) — там видно различие между
+          // «уход с экрана» и «смена режима». Если гвард тронут здесь,
+          // встроенный «назад» снова начнёт играть в никуда.
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.maybePop(),
         ),

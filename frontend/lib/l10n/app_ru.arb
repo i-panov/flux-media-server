@@ -361,6 +361,7 @@
   "pause": "Пауза",
   "@pause": {},
   "fullscreen": "Полный экран",
+  "exitFullscreen": "Свернуть",
   "@fullscreen": {},
   "seekBack10": "Назад на 10 секунд",
   "@seekBack10": {},

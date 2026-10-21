@@ -412,6 +412,7 @@
   "pause": "Pause",
   "@pause": {},
   "fullscreen": "Fullscreen",
+  "exitFullscreen": "Exit fullscreen",
   "@fullscreen": {},
   "seekBack10": "Rewind 10 seconds",
   "@seekBack10": {},

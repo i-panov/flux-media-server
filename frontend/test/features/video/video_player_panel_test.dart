@@ -72,50 +72,6 @@ void main() {
     });
   });
 
-  group('shouldPauseOnPanelDispose', () {
-    test('своё играющее видео — пауза', () {
-      expect(
-        shouldPauseOnPanelDispose(
-          PlaybackState.playing(media: _video(7), type: MediaType.video),
-          7,
-        ),
-        isTrue,
-      );
-    });
-
-    test('на паузе, чужое видео, аудио — не трогаем', () {
-      expect(
-        shouldPauseOnPanelDispose(
-          PlaybackState.playing(
-            media: _video(7),
-            type: MediaType.video,
-            isPaused: true,
-          ),
-          7,
-        ),
-        isFalse,
-      );
-      expect(
-        shouldPauseOnPanelDispose(
-          PlaybackState.playing(media: _video(9), type: MediaType.video),
-          7,
-        ),
-        isFalse,
-      );
-      expect(
-        shouldPauseOnPanelDispose(
-          PlaybackState.playing(media: _track(7), type: MediaType.audio),
-          7,
-        ),
-        isFalse,
-      );
-      expect(
-        shouldPauseOnPanelDispose(const PlaybackState.initial(), 7),
-        isFalse,
-      );
-    });
-  });
-
   group('isOwnPlayingVideo', () {
     PlayerView playing(int id) => PlayerView(
       kind: PlayerViewKind.playing,

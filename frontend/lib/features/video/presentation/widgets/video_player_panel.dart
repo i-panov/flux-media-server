@@ -34,24 +34,21 @@ final videoControllerProvider = Provider<VideoController>((ref) {
   );
 });
 
-/// Паузить ли видео при сносе панели (системный «назад»):
-/// только своё играющее непоставленное видео. Чистая функция ради
-/// тестируемости — сама панель требует нативный libmpv.
-bool shouldPauseOnPanelDispose(PlaybackState playback, int mediaId) {
+/// Паузить ли видео при УХОДЕ с экрана видео.
+///
+/// Только своё играющее непоставленное видео: фоновое аудио и чужой
+/// трек не трогаем. Чистая функция ради тестируемости — сам экран
+/// требует нативный libmpv.
+///
+/// Вызывается на dispose ЭКРАНА, а не панели: панель пересоздаётся ещё
+/// и при смене режима (встроенная ⇄ полный экран), и пауза на этом
+/// переходе выглядела бы как «видео встало при входе в полный экран».
+/// Экран же пересоздаётся только при настоящем уходе.
+bool shouldPauseOnScreenDispose(PlaybackState playback, int mediaId) {
   return playback is PlaybackPlaying &&
       playback.type == MediaType.video &&
       playback.media.id == mediaId &&
       !playback.isPaused;
-}
-
-/// Паузить ли видео при УХОДЕ с экрана видео.
-///
-/// Отличие от [shouldPauseOnPanelDispose] — в смысле вызова: панель
-/// пересоздаётся ещё и при смене режима (встроенная ⇄ полный экран),
-/// и пауза на этом переходе выглядела бы как «видео встало при входе в
-/// полный экран». Экран же пересоздаётся только при настоящем уходе.
-bool shouldPauseOnScreenDispose(PlaybackState playback, int mediaId) {
-  return shouldPauseOnPanelDispose(playback, mediaId);
 }
 
 class VideoPlayerPanel extends ConsumerStatefulWidget {
@@ -59,15 +56,16 @@ class VideoPlayerPanel extends ConsumerStatefulWidget {
     required this.media,
     this.isFullscreen = false,
     this.onToggleFullscreen,
-    this.onClose,
     this.onPlay,
     super.key,
   });
 
   final Media media;
   final bool isFullscreen;
+
+  /// Переключение полного экрана. В полноэкранном режиме кнопка сворачивает
+  /// видео обратно в карточку — отдельной стрелки «назад» нет.
   final VoidCallback? onToggleFullscreen;
-  final VoidCallback? onClose;
 
   /// Запуск воспроизведения с кнопки поверх превью. Без него кнопки нет:
   /// на экране без трека запускать нечем.
@@ -178,6 +176,14 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
       alignment: Alignment.center,
       // Стандартные контролы media_kit выключены: свой слой поверх.
       controls: _emptyControls,
+      // Сворачивание приложения НЕ ставит видео на паузу — видео должно
+      // продолжаться в фоне, как аудио из мини-плеера. Останавливает его
+      // уход с экрана (пауза в dispose экрана).
+      //
+      // Дефолт библиотеки — наоборот (true), и он молча ломал это
+      // поведение: media_kit звал player.pause() напрямую, минуя
+      // координатор, и состояние плеера расходилось с картинкой.
+      pauseUponEnteringBackgroundMode: false,
     );
 
     // Порядок слоёв (кто сверху) задаёт VideoOverlay: интерактивные
@@ -198,7 +204,10 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
               .setVolume(volume),
         ),
         isPaused: isPaused,
-        showFullscreenButton: !widget.isFullscreen,
+        isFullscreen: widget.isFullscreen,
+        // Регулятор громкости — только на десктопе: на смартфоне
+        // громкость живёт на физических кнопках.
+        showVolumeControl: shouldShowVolumeControl(),
         onToggleFullscreen: widget.onToggleFullscreen,
         // Активна карточка только когда в плеере ИМЕННО это видео: иначе
         // транспортные кнопки правили бы чужой трек (см. isActive).
@@ -210,10 +219,6 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
       // и выглядело это так, будто она не относится к видео.
       playButton: !showLiveFrame && widget.onPlay != null
           ? Center(child: PlayOverlayButton(onPressed: widget.onPlay!))
-          : null,
-      // Кнопка «назад» в полноэкранном режиме.
-      topBar: widget.isFullscreen && widget.onClose != null
-          ? FullscreenBackButton(onClose: widget.onClose!)
           : null,
     );
 
