@@ -133,4 +133,51 @@ void main() {
       );
     });
   });
+
+  group('isVideoPlayingOnScreen', () {
+    // Экран держит флаг «не гасить экран», пока играет именно это видео.
+    // Чужое аудио из мини-плеера и чужой видеотрек экран не касаются:
+    // держать экран ради них незачем.
+    test('своё играющее видео — держим', () {
+      expect(
+        isVideoPlayingOnScreen(
+          PlaybackState.playing(media: _video(7), type: MediaType.video),
+          7,
+        ),
+        isTrue,
+      );
+    });
+
+    test('пауза, чужое видео, аудио, пустое состояние — не держим', () {
+      expect(
+        isVideoPlayingOnScreen(
+          PlaybackState.playing(
+            media: _video(7),
+            type: MediaType.video,
+            isPaused: true,
+          ),
+          7,
+        ),
+        isFalse,
+      );
+      expect(
+        isVideoPlayingOnScreen(
+          PlaybackState.playing(media: _video(9), type: MediaType.video),
+          7,
+        ),
+        isFalse,
+      );
+      expect(
+        isVideoPlayingOnScreen(
+          PlaybackState.playing(media: _track(7), type: MediaType.audio),
+          7,
+        ),
+        isFalse,
+      );
+      expect(
+        isVideoPlayingOnScreen(const PlaybackState.initial(), 7),
+        isFalse,
+      );
+    });
+  });
 }

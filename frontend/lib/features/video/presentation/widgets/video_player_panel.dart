@@ -51,6 +51,18 @@ bool shouldPauseOnScreenDispose(PlaybackState playback, int mediaId) {
       !playback.isPaused;
 }
 
+/// Играет ли на экране именно это видео: не пауза, тип — видео, и медиа
+/// то самое, чья карточка открыта.
+///
+/// Отвечает на вопрос «держать ли экран включённым»: фоновое аудио из
+/// мини-плеера и чужой трек экран не касаются.
+bool isVideoPlayingOnScreen(PlaybackState playback, int mediaId) {
+  return playback is PlaybackPlaying &&
+      playback.type == MediaType.video &&
+      playback.media.id == mediaId &&
+      !playback.isPaused;
+}
+
 class VideoPlayerPanel extends ConsumerStatefulWidget {
   const new({
     required this.media,
@@ -184,6 +196,15 @@ class _VideoPlayerPanelState extends ConsumerState<VideoPlayerPanel> {
       // поведение: media_kit звал player.pause() напрямую, минуя
       // координатор, и состояние плеера расходилось с картинкой.
       pauseUponEnteringBackgroundMode: false,
+      // Wakelock media_kit держит по потоку playing и о lifecycle
+      // приложения не знает: в свёрнутом состоянии флаг «не гасить
+      // экран» оставался включённым (на iOS отключённый idle timer не
+      // давал устройству уснуть) — фоновое воспроизведение съедало
+      // батарею.
+      //
+      // Управляем сами (VideoWakelock): экран держит флаг только пока
+      // видео играет И приложение на переднем плане.
+      wakelock: false,
     );
 
     // Порядок слоёв (кто сверху) задаёт VideoOverlay: интерактивные

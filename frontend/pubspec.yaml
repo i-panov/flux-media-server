@@ -1,7 +1,7 @@
 name: flux_media_server
 description: Flux Media Player Client
 publish_to: "none"
-version: 1.0.13+14
+version: 1.0.14+15
 applicationId: app.lib.flux
 
 environment:
@@ -37,6 +37,10 @@ dependencies:
   riverpod_annotation: ^4.0.7
   shared_preferences: ^2.5.6
   url_launcher: ^6.3.1
+  # Экран не гасить при просмотре видео. Управляется вручную (VideoWakelock),
+  # потому что media_kit_video держит флаг по потоку playing и о lifecycle
+  # приложения не знает.
+  wakelock_plus: ^1.8.1
 
 dev_dependencies:
   auto_route_generator: ^10.6.0

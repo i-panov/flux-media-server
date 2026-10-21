@@ -16,6 +16,7 @@ import 'package:flux_media_server/features/player/data/providers/play_queue_prov
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/video/presentation/providers/extracted_audio_provider.dart';
 import 'package:flux_media_server/features/video/presentation/utils/extract_audio_flow.dart';
+import 'package:flux_media_server/features/video/presentation/utils/video_wakelock.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_details_panel.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/video_player_panel.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -46,14 +47,40 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
   /// уходе с экрана не срабатывала, и видео играло в фоне.
   late final PlaybackCoordinator _coordinator;
 
+  /// Экран не должен гаснуть, пока видео играет на переднем плане.
+  ///
+  /// Управление вынесено из media_kit_video: там wakelock привязан к
+  /// потоку `playing` и о lifecycle приложения не знает — в свёрнутом
+  /// состоянии флаг оставался включённым и не давал устройству уснуть.
+  /// Здесь видно оба условия: играет ли видео и на переднем ли плане
+  /// приложение.
+  late final VideoWakelock _wakelock;
+
+  /// Lifecycle приложения: по нему снимается wakelock при уходе в фон.
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
     _coordinator = ref.read(playbackCoordinatorProvider.notifier);
+    _wakelock = VideoWakelock();
+    // Скрытие и пауза означают «приложение в фоне» (на десктопе —
+    // свёрнутое окно), возврат и показ — «снова на экране». Промежуточное
+    // состояние inactive (шторка уведомлений, входящий звонок) игнорируем:
+    // приложение ещё видно, и экран должен гореть.
+    _lifecycle = AppLifecycleListener(
+      onHide: () => _wakelock.updateForeground(foreground: false),
+      onPause: () => _wakelock.updateForeground(foreground: false),
+      onShow: () => _wakelock.updateForeground(foreground: true),
+      onResume: () => _wakelock.updateForeground(foreground: true),
+    );
     // Состояние плеера запоминается подпиской, а читается из кэша —
     // по той же причине, что и координатор.
     ref.listenManual(playbackCoordinatorProvider, (_, next) {
       _lastPlayback = next;
+      _wakelock.updatePlaying(
+        playing: isVideoPlayingOnScreen(next, widget.mediaId),
+      );
     }, fireImmediately: true);
   }
 
@@ -74,6 +101,9 @@ class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
     if (shouldPauseOnScreenDispose(_lastPlayback, widget.mediaId)) {
       unawaited(_coordinator.pause());
     }
+    // Экран уходит — флаг «не гасить экран» больше не нужен.
+    _lifecycle.dispose();
+    _wakelock.dispose();
     super.dispose();
   }
 
