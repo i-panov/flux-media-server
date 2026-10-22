@@ -239,6 +239,21 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
       ..invalidate(collectionsProvider);
   }
 
+  /// Групповое добавление выделенных файлов в коллекцию.
+  ///
+  /// Выделение снимаем только после успеха: при отмене или ошибке
+  /// пользователь должен был бы выбирать заново.
+  Future<void> _addSelectionToCollection() async {
+    final added = await addSelectionToCollection(
+      context,
+      ref,
+      mediaIds: ref.read(mediaSelectionProvider(mediaType)).toList(),
+      type: MediaType.video,
+    );
+    if (!added || !mounted) return;
+    ref.read(mediaSelectionProvider(mediaType).notifier).clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -262,12 +277,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
       appBar: MediaListAppBar(
         title: l.videoTab,
         mediaType: mediaType,
-        onSelectionAdd: () => addSelectionToCollection(
-          context,
-          ref,
-          mediaIds: ref.read(mediaSelectionProvider(mediaType)).toList(),
-          type: MediaType.video,
-        ),
+        onSelectionAdd: _addSelectionToCollection,
       ),
       body: _buildBody(
         l: l,

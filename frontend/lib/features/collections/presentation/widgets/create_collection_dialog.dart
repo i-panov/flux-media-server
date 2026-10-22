@@ -72,7 +72,15 @@ class _CreateCollectionDialogState extends ConsumerState<_CreateCollectionDialog
         final l = AppLocalizations.of(context)!;
         showErrorSnackBar(context, l.failedToCreate(failure.message));
       },
-      (collection) => Navigator.pop(context, collection),
+      (collection) {
+        // Список коллекций инвалидируем здесь, а не у вызывающих: коллекция
+        // создаётся из трёх мест (секция «Мои коллекции», диалог «добавить
+        // в коллекцию», выбор коллекции при загрузке), и забыть об
+        // инвалидации в одном из них означало бы, что коллекция появится
+        // только после pull-to-refresh.
+        ref.invalidate(collectionsProvider);
+        Navigator.pop(context, collection);
+      },
     );
   }
 

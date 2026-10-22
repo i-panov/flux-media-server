@@ -10,72 +10,94 @@ import 'package:flux_media_server/shared/models/media.dart';
 ///
 /// Групповая операция: загруженный сезон раскладывается по коллекции
 /// одним действием, а не по одному файлу.
-Future<void> addSelectionToCollection(
+///
+/// Возвращает true, если операция выполнена. Отмена и ошибка оставляют
+/// выделение как было — иначе пользовательу пришлось бы выбирать
+/// заново.
+Future<bool> addSelectionToCollection(
   BuildContext context,
   WidgetRef ref, {
   required List<int> mediaIds,
   required MediaType type,
 }) async {
-  if (mediaIds.isEmpty) return;
+  if (mediaIds.isEmpty) return false;
   final collection = await showSelectCollectionDialog(
     context,
     ref,
     type: type,
   );
-  if (collection == null || !context.mounted) return;
+  if (collection == null || !context.mounted) return false;
 
   final result = await ref
       .read(collectionsRepositoryProvider)
       .addCollectionItemsBulk(collection.id, mediaIds);
-  if (!context.mounted) return;
+  if (!context.mounted) return false;
   final l = AppLocalizations.of(context)!;
-  result.fold(
-    (failure) => showErrorSnackBar(context, failure.message),
-    (bulk) => showSuccessSnackBar(
-      context,
-      l.bulkAddedToCollection(
-        collection.name,
-        bulk.changedCount,
-        bulk.skipped.length,
-      ),
-    ),
+  final ok = result.fold(
+    (failure) {
+      showErrorSnackBar(context, failure.message);
+      return false;
+    },
+    (bulk) {
+      showSuccessSnackBar(
+        context,
+        l.bulkAddedToCollection(
+          collection.name,
+          bulk.changedCount,
+          bulk.skipped.length,
+        ),
+      );
+      return true;
+    },
   );
+  return ok;
 }
 
 /// Переносит выделенные медиа из одной коллекции в другую.
 ///
 /// Отдельная операция, а не «добавить»: элемент из исходной коллекции
 /// должен из неё уйти, иначе он останется в обеих.
-Future<void> moveSelectionToCollection(
+///
+/// Возвращает true, если перенос выполнен (см. [addSelectionToCollection]).
+Future<bool> moveSelectionToCollection(
   BuildContext context,
   WidgetRef ref, {
   required int sourceCollectionId,
   required List<int> mediaIds,
   required MediaType type,
 }) async {
-  if (mediaIds.isEmpty) return;
+  if (mediaIds.isEmpty) return false;
   final collection = await showSelectCollectionDialog(
     context,
     ref,
     type: type,
   );
-  if (collection == null || !context.mounted) return;
-  if (collection.id == sourceCollectionId) return;
+  if (collection == null || !context.mounted) return false;
+  // Выбрали ту же коллекцию: переносить некуда, но выделение снимать
+  // нельзя — операция не состоялась, а не «прошла».
+  if (collection.id == sourceCollectionId) return false;
 
   final result = await ref
       .read(collectionsRepositoryProvider)
       .moveCollectionItemsBulk(sourceCollectionId, collection.id, mediaIds);
-  if (!context.mounted) return;
+  if (!context.mounted) return false;
   final l = AppLocalizations.of(context)!;
-  result.fold(
-    (failure) => showErrorSnackBar(context, failure.message),
-    (bulk) => showSuccessSnackBar(
-      context,
-      l.bulkMovedToCollection(
-        collection.name,
-        bulk.changedCount,
-        bulk.skipped.length,
-      ),
-    ),
+  final ok = result.fold(
+    (failure) {
+      showErrorSnackBar(context, failure.message);
+      return false;
+    },
+    (bulk) {
+      showSuccessSnackBar(
+        context,
+        l.bulkMovedToCollection(
+          collection.name,
+          bulk.changedCount,
+          bulk.skipped.length,
+        ),
+      );
+      return true;
+    },
   );
+  return ok;
 }

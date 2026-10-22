@@ -168,7 +168,7 @@ class _AddToCollectionDialogState
       );
       if (!mounted) return;
       if (created != null) {
-        ref.invalidate(collectionsProvider);
+        // Список коллекций инвалидирует сам диалог создания.
         showSuccessSnackBar(context, l.createdCollection(created.name));
       }
     } finally {

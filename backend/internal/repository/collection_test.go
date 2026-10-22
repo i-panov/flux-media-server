@@ -152,7 +152,14 @@ func TestCollectionItemStore_Remove(t *testing.T) {
 		MediaID:      10,
 	}))
 
-	require.NoError(t, itemStore.Remove(ctx, 1, 10))
+	affected, err := itemStore.Remove(ctx, 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), affected)
+
+	// Повторное удаление — элемента уже нет: затронуто 0 строк.
+	affected, err = itemStore.Remove(ctx, 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), affected)
 
 	items, err := itemStore.FindByCollection(ctx, 1)
 	assert.NoError(t, err)

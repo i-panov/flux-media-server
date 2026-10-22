@@ -109,15 +109,16 @@ class _CollectionDetailScreenState
   /// Групповой перенос выделенных элементов в другую коллекцию.
   Future<void> _moveSelection(BuildContext context) async {
     final ids = ref.read(mediaSelectionProvider(_selectionScope)).toList();
-    await moveSelectionToCollection(
+    final moved = await moveSelectionToCollection(
       context,
       ref,
       sourceCollectionId: widget.collection.id,
       mediaIds: ids,
       type: widget.collection.type,
     );
-    if (!mounted) return;
+    if (!moved || !mounted) return;
     // Элементы ушли из коллекции — список перечитываем, выделение снимаем.
+    // При отмене или ошибке выделение остаётся: выбирать заново не нужно.
     ref.invalidate(collectionItemsFullProvider(widget.collection.id));
     ref.read(mediaSelectionProvider(_selectionScope).notifier).clear();
   }

@@ -85,7 +85,6 @@ class _CollectionsRow extends ConsumerWidget {
       type: mediaType,
     );
     if (created == null || !context.mounted) return;
-    ref.invalidate(collectionsProvider);
     showSuccessSnackBar(
       context,
       context.l10n.createdCollection(created.name),

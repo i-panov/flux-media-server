@@ -112,6 +112,65 @@ void main() {
     });
   });
 
+  group('moveSelectionToCollection', () {
+    late FakeCollectionsRepository repo;
+
+    setUp(() {
+      Future<Either<Failure, List<Collection>>> getCollections() async =>
+          Right([testCollection(2, 'Другая', type: MediaType.audio)]);
+      repo = FakeCollectionsRepository()..onGetCollections = getCollections;
+    });
+
+    testWidgets('отмена не двигает элементы и снимает выделение', (
+      tester,
+    ) async {
+      // Отмена диалога — это не «перенос выполнен»: выделение должно
+      // остаться, иначе пользователь выбирал бы заново.
+      final container = ProviderContainer(
+        retry: (_, _) => null,
+        overrides: [collectionsRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(container.dispose);
+
+      bool? result;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Consumer(
+                builder: (context, ref, _) => ElevatedButton(
+                  onPressed: () async {
+                    result = await moveSelectionToCollection(
+                      context,
+                      ref,
+                      sourceCollectionId: 1,
+                      mediaIds: const [7, 8],
+                      type: MediaType.audio,
+                    );
+                  },
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(result, isFalse);
+      expect(repo.moveItemsBulkCalls, isEmpty);
+    });
+  });
+
   group('BulkItemsResult.parse', () {    test('разбирает списки ответа', () {
       final result = BulkItemsResult.parse({
         'added': [1, 2],

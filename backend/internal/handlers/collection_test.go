@@ -15,9 +15,18 @@ import (
 
 	"flux/internal/models"
 	"flux/internal/repository"
+	"flux/internal/response"
 )
 
 func setupCollectionTestApp(t *testing.T) *fiber.App {
+	userID := uint(1)
+	return setupCollectionTestAppAs(t, &userID)
+}
+
+// setupCollectionTestAppAs — то же приложение, но user_id берётся из
+// указателя: проверки владения коллекцией нуждаются во втором
+// пользователе (иначе 403 не проверить).
+func setupCollectionTestAppAs(t *testing.T, userID *uint) *fiber.App {
 	// Файловая БД, а не :memory:: параллельные запросы получают разные
 	// коннекты пула, а каждая in-memory БД была бы пустой и без таблиц.
 	db, err := repository.InitDB(filepath.Join(t.TempDir(), "test.db"))
@@ -49,7 +58,7 @@ func setupCollectionTestApp(t *testing.T) *fiber.App {
 	app := fiber.New()
 
 	app.Use(func(c *fiber.Ctx) error {
-		c.Locals("user_id", uint(1))
+		c.Locals("user_id", *userID)
 		return c.Next()
 	})
 
@@ -465,7 +474,124 @@ func TestCollectionHandler_RemoveItemsBulk(t *testing.T) {
 // возвращал nil-ошибку (response.Error отдаёт nil при успешной записи
 // ответа), поэтому проверка `err != nil` не срабатывала и обработчик
 // продолжал работать с чужой коллекцией: клиент получал 403, а данные
+// менялись.
+func TestCollectionHandler_ForeignCollectionNotModified(t *testing.T) {
+	userID := uint(1)
+	app := setupCollectionTestAppAs(t, &userID)
+	colID := createCollectionForBulk(t, app, "Чужая")
+
+	// Запрос от другого пользователя.
+	userID = 2
+	body, _ := json.Marshal(map[string][]uint{"media_ids": {1, 2}})
+	req := httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(colID))+"/items/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+
+	// Возвращаемся владельцем и смотрим содержимое: оно должно быть пустым.
+	userID = 1
+	req = httptest.NewRequest("GET", "/api/collections/"+strconv.Itoa(int(colID))+"/items", nil)
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	buf := bytes.Buffer{}
+	_, _ = buf.ReadFrom(resp.Body)
+	var items []models.Media
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &items))
+	assert.Empty(t, items, "в чужую коллекцию не должно попасть ни одного элемента")
+}
 
 // Тот же сценарий для одиночного добавления: уязвимость была не только
+// в новых bulk-хендлерах.
+func TestCollectionHandler_ForeignCollectionSingleAddNotModified(t *testing.T) {
+	userID := uint(1)
+	app := setupCollectionTestAppAs(t, &userID)
+	colID := createCollectionForBulk(t, app, "Чужая")
+
+	userID = 2
+	body, _ := json.Marshal(map[string]uint{"media_id": 1})
+	req := httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(colID))+"/items", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+
+	userID = 1
+	req = httptest.NewRequest("GET", "/api/collections/"+strconv.Itoa(int(colID))+"/items", nil)
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	buf := bytes.Buffer{}
+	_, _ = buf.ReadFrom(resp.Body)
+	var items []models.Media
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &items))
+	assert.Empty(t, items)
+}
 
 // Несуществующая коллекция: 404 и никакой паники. Раньше source/target
+// были nil, и обращение к source.Type давало 500.
+func TestCollectionHandler_MissingCollection(t *testing.T) {
+	app := setupCollectionTestApp(t)
+	colID := createCollectionForBulk(t, app, "Season 1")
+
+	body, _ := json.Marshal(map[string][]uint{"media_ids": {1}})
+	req := httptest.NewRequest("POST", "/api/collections/999/items/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+
+	// Групповой перенос с несуществующей целью — тоже 404, не 500.
+	body, _ = json.Marshal(map[string]any{"media_ids": []uint{1}, "to_collection_id": 999})
+	req = httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(colID))+"/items/move/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+}
+
+// Тело ошибки 400 не должно затираться результатом операции.
+func TestCollectionHandler_AddItemsBulkKeepsErrorBody(t *testing.T) {
+	app := setupCollectionTestApp(t)
+	colID := createCollectionForBulk(t, app, "Season 1")
+
+	body, _ := json.Marshal(map[string][]uint{"media_ids": {}})
+	req := httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(colID))+"/items/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+	buf := bytes.Buffer{}
+	_, _ = buf.ReadFrom(resp.Body)
+	var errResp response.ErrorResponse
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &errResp))
+	assert.Equal(t, "media_ids is required", errResp.Error)
+}
+
+// Элемента в коллекции нет — «пропущено», а не «удалено».
+func TestCollectionHandler_RemoveItemsBulkSkipsMissing(t *testing.T) {
+	app := setupCollectionTestApp(t)
+	colID := createCollectionForBulk(t, app, "Season 1")
+
+	body, _ := json.Marshal(map[string][]uint{"media_ids": {1}})
+	req := httptest.NewRequest("POST", "/api/collections/"+strconv.Itoa(int(colID))+"/items/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	// Удаляем первый (он есть) и второй (которого в коллекции нет).
+	body, _ = json.Marshal(map[string][]uint{"media_ids": {1, 2}})
+	req = httptest.NewRequest("DELETE", "/api/collections/"+strconv.Itoa(int(colID))+"/items", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var result BulkItemsResult
+	buf := bytes.Buffer{}
+	_, _ = buf.ReadFrom(resp.Body)
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &result))
+	assert.Equal(t, []uint{1}, result.Removed)
+	assert.Equal(t, []uint{2}, result.Skipped)
+}

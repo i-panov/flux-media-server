@@ -498,10 +498,16 @@ func (r *CollectionItemStore) AddItemAtomic(ctx context.Context, collectionID, m
 	}
 }
 
-func (r *CollectionItemStore) Remove(ctx context.Context, collectionID, mediaID uint) error {
-	return r.db.WithContext(ctx).
+// Remove удаляет элемент из коллекции и возвращает число затронутых
+// строк: 0 — элемента в коллекции не было.
+//
+// Число нужно групповой операции: «удалено» и «пропущено» — разные
+// вещи, а DELETE без проверки считает оба случая успехом.
+func (r *CollectionItemStore) Remove(ctx context.Context, collectionID, mediaID uint) (int64, error) {
+	result := r.db.WithContext(ctx).
 		Where("collection_id = ? AND media_id = ?", collectionID, mediaID).
-		Delete(&models.CollectionItem{}).Error
+		Delete(&models.CollectionItem{})
+	return result.RowsAffected, result.Error
 }
 
 // MoveItemAtomic переносит элемент между коллекциями в одной транзакции.

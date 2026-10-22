@@ -190,18 +190,25 @@ class MediaCard extends ConsumerWidget {
               // Без неё выделенная карточка неотличима от обычной —
               // а выделение нужно видно, чтобы понимать, что в пачку
               // попало.
+              //
+              // IgnorePointer обязателен: заливка во весь размер карточки
+              // перехватывала бы тапы по кнопкам избранного и скачивания
+              // (они нарисованы ниже по стеку) — тап открывал бы медиа
+              // вместо переключения избранного.
               if (isSelected)
                 Positioned.fill(
-                  child: ColoredBox(
-                    color: colorScheme.primary.withValues(alpha: 0.35),
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(
-                          Icons.check_circle,
-                          size: 20,
-                          color: colorScheme.primary,
+                  child: IgnorePointer(
+                    child: ColoredBox(
+                      color: colorScheme.primary.withValues(alpha: 0.35),
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.check_circle,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
                         ),
                       ),
                     ),

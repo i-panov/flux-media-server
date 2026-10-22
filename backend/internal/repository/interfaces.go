@@ -161,7 +161,9 @@ type CollectionItemRepository interface {
 	// порядок обратный — сначала INSERT в target, затем DELETE из source,
 	// чтобы дубль не приводил к потере элемента.
 	MoveItemAtomic(ctx context.Context, sourceID, targetID, mediaID uint) (models.CollectionItem, error)
-	Remove(ctx context.Context, collectionID, mediaID uint) error
+	// Remove удаляет элемент из коллекции и возвращает число затронутых
+	// строк: 0 — элемента в коллекции не было.
+	Remove(ctx context.Context, collectionID, mediaID uint) (int64, error)
 	MaxPosition(ctx context.Context, collectionID uint) (int, error)
 }
 

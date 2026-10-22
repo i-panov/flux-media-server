@@ -238,8 +238,8 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Only the owner may modify a collection.
-	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
-		return err
+	if _, ok := h.getOwnedCollection(c, collectionID); !ok {
+		return nil
 	}
 
 	// Verify media exists
@@ -283,13 +283,13 @@ func (h *CollectionHandler) MoveItem(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "media_id and to_collection_id are required")
 	}
 
-	source, err := h.getOwnedCollection(c, sourceID)
-	if err != nil {
-		return err
+	source, ok := h.getOwnedCollection(c, sourceID)
+	if !ok {
+		return nil
 	}
-	target, err := h.getOwnedCollection(c, req.ToCollectionID)
-	if err != nil {
-		return err
+	target, ok := h.getOwnedCollection(c, req.ToCollectionID)
+	if !ok {
+		return nil
 	}
 	if source.Type != target.Type {
 		return response.Error(c, fiber.StatusBadRequest, "Collections have different types")
@@ -330,13 +330,13 @@ func (h *CollectionHandler) RemoveItem(c *fiber.Ctx) error {
 	}
 
 	// Only the owner may modify a collection.
-	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
-		return err
+	if _, ok := h.getOwnedCollection(c, collectionID); !ok {
+		return nil
 	}
 
 	ctx := c.UserContext()
 
-	if err := h.itemRepo.Remove(ctx, collectionID, mediaID); err != nil {
+	if _, err := h.itemRepo.Remove(ctx, collectionID, mediaID); err != nil {
 		log.Printf("Remove collection item: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to remove item")
 	}
@@ -351,8 +351,8 @@ func (h *CollectionHandler) ListItems(c *fiber.Ctx) error {
 	}
 
 	// Only the owner may view a collection's contents.
-	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
-		return err
+	if _, ok := h.getOwnedCollection(c, collectionID); !ok {
+		return nil
 	}
 
 	ctx := c.UserContext()
@@ -399,18 +399,27 @@ type BulkItemsResult struct {
 
 // parseBulkItems разбирает тело групповой операции: список непустой и
 // не длиннее maxBulkItems.
-func parseBulkItems(c *fiber.Ctx) ([]uint, error) {
+//
+// Второе значение — «можно продолжать»: false означает, что ответ уже
+// записан (400) и обработчик обязан остановиться. Раньше здесь
+// возвращалась ошибка, а response.Error отдаёт nil после записи
+// ответа — обработчик продолжал работу и затирал тело 400 результатом
+// операции.
+func parseBulkItems(c *fiber.Ctx) ([]uint, bool) {
 	var req BulkItemsRequest
 	if err := c.BodyParser(&req); err != nil {
-		return nil, response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+		response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+		return nil, false
 	}
 	if len(req.MediaIDs) == 0 {
-		return nil, response.Error(c, fiber.StatusBadRequest, "media_ids is required")
+		response.Error(c, fiber.StatusBadRequest, "media_ids is required")
+		return nil, false
 	}
 	if len(req.MediaIDs) > maxBulkItems {
-		return nil, response.Error(c, fiber.StatusBadRequest, "too many media_ids")
+		response.Error(c, fiber.StatusBadRequest, "too many media_ids")
+		return nil, false
 	}
-	return req.MediaIDs, nil
+	return req.MediaIDs, true
 }
 
 // AddItemsBulk добавляет несколько медиа в коллекцию за один запрос.
@@ -422,12 +431,12 @@ func (h *CollectionHandler) AddItemsBulk(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
-	mediaIDs, err := parseBulkItems(c)
-	if err != nil {
-		return err
+	mediaIDs, ok := parseBulkItems(c)
+	if !ok {
+		return nil
 	}
-	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
-		return err
+	if _, ok := h.getOwnedCollection(c, collectionID); !ok {
+		return nil
 	}
 
 	ctx := c.UserContext()
@@ -479,13 +488,13 @@ func (h *CollectionHandler) MoveItemsBulk(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "to_collection_id is required")
 	}
 
-	source, err := h.getOwnedCollection(c, sourceID)
-	if err != nil {
-		return err
+	source, ok := h.getOwnedCollection(c, sourceID)
+	if !ok {
+		return nil
 	}
-	target, err := h.getOwnedCollection(c, req.ToCollectionID)
-	if err != nil {
-		return err
+	target, ok := h.getOwnedCollection(c, req.ToCollectionID)
+	if !ok {
+		return nil
 	}
 	if source.Type != target.Type {
 		return response.Error(c, fiber.StatusBadRequest, "Collections have different types")
@@ -519,12 +528,12 @@ func (h *CollectionHandler) RemoveItemsBulk(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
 	}
-	mediaIDs, err := parseBulkItems(c)
-	if err != nil {
-		return err
+	mediaIDs, ok := parseBulkItems(c)
+	if !ok {
+		return nil
 	}
-	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
-		return err
+	if _, ok := h.getOwnedCollection(c, collectionID); !ok {
+		return nil
 	}
 
 	ctx := c.UserContext()
@@ -533,8 +542,14 @@ func (h *CollectionHandler) RemoveItemsBulk(c *fiber.Ctx) error {
 		if mediaID == 0 {
 			continue
 		}
-		if err := h.itemRepo.Remove(ctx, collectionID, mediaID); err != nil {
+		affected, err := h.itemRepo.Remove(ctx, collectionID, mediaID)
+		if err != nil {
 			log.Printf("Remove collection item (bulk): %v", err)
+			result.Skipped = append(result.Skipped, mediaID)
+			continue
+		}
+		// Элемента в коллекции не было — это «пропущено», а не «удалено».
+		if affected == 0 {
 			result.Skipped = append(result.Skipped, mediaID)
 			continue
 		}
@@ -545,21 +560,33 @@ func (h *CollectionHandler) RemoveItemsBulk(c *fiber.Ctx) error {
 }
 
 // getOwnedCollection loads the collection and verifies it belongs to the
-// current user. On failure it writes the appropriate error response.
-func (h *CollectionHandler) getOwnedCollection(c *fiber.Ctx, collectionID uint) (*models.Collection, error) {
+// current user.
+//
+// The second return value says whether the caller may continue. false
+// means the response has already been written (401/403/404) and the
+// handler must stop.
+//
+// It used to be an error, and that was a hole: response.Error returns nil
+// after a successful write, so the `err != nil` check never fired and the
+// handler went on to modify a collection it had just refused — the client
+// got 403 while the data changed underneath it.
+func (h *CollectionHandler) getOwnedCollection(c *fiber.Ctx, collectionID uint) (*models.Collection, bool) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		return nil, response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+		response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+		return nil, false
 	}
 
 	col, err := h.colRepo.FindByID(c.UserContext(), collectionID)
 	if err != nil {
-		return nil, repoError(c, err, "Collection not found", "Failed to fetch collection")
+		repoError(c, err, "Collection not found", "Failed to fetch collection")
+		return nil, false
 	}
 
 	if col.UserID != userID {
-		return nil, response.Error(c, fiber.StatusForbidden, "Not your collection")
+		response.Error(c, fiber.StatusForbidden, "Not your collection")
+		return nil, false
 	}
 
-	return col, nil
+	return col, true
 }

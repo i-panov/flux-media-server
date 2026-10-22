@@ -91,5 +91,50 @@ void main() {
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
     });
 
+    testWidgets('оверлей выделения не перехватывает кнопки карточки', (
+      tester,
+    ) async {
+      // Заливка выделения во весь размер карточки перекрывала кнопки
+      // избранного и скачивания: тап по сердечку открывал медиа.
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final container = ProviderContainer(
+        overrides: [
+          baseUrlProvider.overrideWithValue('http://test/api'),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      var favoriteTaps = 0;
+      var cardTaps = 0;
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: MediaCard(
+                media: _video(7),
+                onTap: () => cardTaps++,
+                onFavorite: () => favoriteTaps++,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.longPress(find.byType(MediaCard));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.favorite_border));
+      await tester.pump();
+
+      expect(favoriteTaps, 1, reason: 'тап по избранному должен доходить до кнопки');
+      expect(cardTaps, 0);
+    });
   });
 }

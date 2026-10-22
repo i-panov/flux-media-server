@@ -4,6 +4,7 @@ import 'package:flux_media_server/core/providers/api_provider.dart';
 import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_selection_provider.dart';
 import 'package:flux_media_server/features/offline/presentation/providers/download_state_provider.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/features/player/presentation/utils/playback_toggle.dart';
@@ -89,17 +90,37 @@ class AudioTrackRow extends ConsumerWidget {
     final isCurrentlyPlaying = playback?.mediaId == media.id;
     final isCurrentlyPaused =
         (playback?.isPaused ?? false) && isCurrentlyPlaying;
-
+    // Выделение: долгое нажатие по треку включает его — иначе в
+    // аудио-разделе групповое действие было бы недостижимо (карточки
+    // видео выделяются так же).
+    final scope = media.type.value;
+    final selected = ref.watch(
+      mediaSelectionProvider(scope).select((s) => s.contains(media.id)),
+    );
     return InkWell(
       onTap: () => _handleTap(ref, playback),
+      onLongPress: () =>
+          ref.read(mediaSelectionProvider(scope).notifier).toggle(media.id),
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        color: isCurrentlyPlaying
+        color: selected
+            ? colorScheme.primary.withValues(alpha: 0.15)
+            : isCurrentlyPlaying
             ? colorScheme.primaryContainer.withValues(alpha: 0.3)
             : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Row(
           children: [
+            // Отметка выделения: без неё не видно, что попало в пачку.
+            if (selected)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Icon(
+                  Icons.check_circle,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+              ),
             // Cover — tap toggles play/pause
             GestureDetector(
               onTap: () => _handleTap(ref, playback),

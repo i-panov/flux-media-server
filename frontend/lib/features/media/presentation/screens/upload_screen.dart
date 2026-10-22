@@ -103,6 +103,9 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   Future<void> _retryFailed() async {
+    // Счётчик сбрасываем и тут: повторный прогон — это новый заход, и
+    // ошибки прошлого не должны висеть в его сводке.
+    _collectionFailures = 0;
     await ref
         .read(batchUploadControllerProvider.notifier)
         .retryFailed(

@@ -219,5 +219,18 @@ void main() {
       expect(find.text('Плейлист'), findsOneWidget);
     });
 
+    testWidgets('долгое нажатие по треку включает выделение', (tester) async {
+      // Без выделения в аудио-разделе групповое действие было бы
+      // недостижимо: треки рисуются не карточками, а строками.
+      await pumpScreen(tester, makeContainer());
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.longPress(find.text('Track 1'));
+      await tester.pump();
+
+      expect(find.text('Selected: 1'), findsOneWidget);
+      // И действие над пачкой доступно.
+      expect(find.byIcon(Icons.folder_outlined), findsOneWidget);
+    });
   });
 }
