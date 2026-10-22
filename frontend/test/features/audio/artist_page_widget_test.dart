@@ -8,6 +8,7 @@ import 'package:flux_media_server/features/auth/presentation/providers/auth_prov
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_selection_provider.dart';
 import 'package:flux_media_server/features/offline/data/offline_cache_service.dart';
 import 'package:flux_media_server/features/player/data/providers/playback_coordinator.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -143,6 +144,23 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Load more'), findsOneWidget);
+    });
+
+    testWidgets('долгое нажатие по треку не включает выделение', (
+      tester,
+    ) async {
+      // На странице артиста нет UI для выделения (счётчика, сброса и
+      // действия над пачкой): включённое выделение было бы тупиком —
+      // галочка есть, а применить её нечем.
+      final container = makeContainer();
+      await pumpPage(tester, container);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.longPress(find.text('First'));
+      await tester.pump();
+
+      expect(container.read(mediaSelectionProvider('audio')), isEmpty);
+      expect(find.byIcon(Icons.check_circle), findsNothing);
     });
   });
 }

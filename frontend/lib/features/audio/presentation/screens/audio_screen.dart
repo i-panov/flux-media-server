@@ -83,12 +83,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
       appBar: MediaListAppBar(
         title: l.audioTab,
         mediaType: mediaType,
-        onSelectionAdd: () => addSelectionToCollection(
-          context,
-          ref,
-          mediaIds: ref.read(mediaSelectionProvider(mediaType)).toList(),
-          type: MediaType.audio,
-        ),
+        onSelectionAdd: _addSelectionToCollection,
       ),
       body: _buildBody(
         context: context,
@@ -99,6 +94,21 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
         favoriteIds: favoriteIds,
       ),
     );
+  }
+
+  /// Групповое добавление выделенных треков в коллекцию.
+  ///
+  /// Выделение снимаем только после успеха: при отмене или ошибке
+  /// пользователь должен был бы выбирать заново.
+  Future<void> _addSelectionToCollection() async {
+    final added = await addSelectionToCollection(
+      context,
+      ref,
+      mediaIds: ref.read(mediaSelectionProvider(mediaType)).toList(),
+      type: MediaType.audio,
+    );
+    if (!added || !mounted) return;
+    ref.read(mediaSelectionProvider(mediaType).notifier).clear();
   }
 
   Widget _buildBody({
@@ -147,6 +157,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
               delegate: SliverChildBuilderDelegate(
                 (context, index) => AudioTrackRow(
                   media: downloadedAudio[index],
+                  selectable: true,
                   onPlay: () =>
                       _playTrack(downloadedAudio[index], downloadedAudio),
                   onDownload: () => ref.toggleDownloadTrack(
@@ -247,6 +258,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
             delegate: SliverChildBuilderDelegate(
               (context, index) => AudioTrackRow(
                 media: likedToShow[index],
+                selectable: true,
                 isFavorite: true,
                 onPlay: () => _playTrack(likedToShow[index], allTracks),
                 onFavorite: () =>
@@ -318,6 +330,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
             delegate: SliverChildBuilderDelegate(
               (context, index) => AudioTrackRow(
                 media: downloadedAudio[index],
+                selectable: true,
                 isFavorite: favoriteIds.contains(downloadedAudio[index].id),
                 onPlay: () => _playTrack(downloadedAudio[index], allTracks),
                 onFavorite: () =>
@@ -358,6 +371,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
           delegate: SliverChildBuilderDelegate(
             (context, index) => AudioTrackRow(
               media: allTracks[index],
+              selectable: true,
               isFavorite: favoriteIds.contains(allTracks[index].id),
               onPlay: () => _playTrack(allTracks[index], allTracks),
               onFavorite: () => ref.toggleFavoriteTrack(allTracks[index].id),

@@ -18,6 +18,7 @@ class AudioTrackRow extends ConsumerWidget {
     required this.media,
     super.key,
     this.isFavorite = false,
+    this.selectable = false,
     this.onPlay,
     this.onFavorite,
     this.onDownload,
@@ -31,6 +32,14 @@ class AudioTrackRow extends ConsumerWidget {
 
   final Media media;
   final bool isFavorite;
+
+  /// Разрешено ли выделение долгим нажатием.
+  ///
+  /// По умолчанию выключено: выделение без UI (счётчика, сброса и
+  /// действия над пачкой) — тупик, из которого нельзя выйти, кроме
+  /// повторного долгого нажатия. Включать его должен экран, который
+  /// умеет с выделением работать.
+  final bool selectable;
   final VoidCallback? onPlay;
   final VoidCallback? onFavorite;
   final VoidCallback? onDownload;
@@ -94,16 +103,24 @@ class AudioTrackRow extends ConsumerWidget {
     // аудио-разделе групповое действие было бы недостижимо (карточки
     // видео выделяются так же).
     final scope = media.type.value;
+    // watch вызывается всегда: число слушателей провайдера не должно
+    // зависеть от selectable (иначе Riverpod ругается на смену числа
+    // подписок при пересборке).
     final selected = ref.watch(
       mediaSelectionProvider(scope).select((s) => s.contains(media.id)),
     );
+    final isSelected = selectable && selected;
+
     return InkWell(
       onTap: () => _handleTap(ref, playback),
-      onLongPress: () =>
-          ref.read(mediaSelectionProvider(scope).notifier).toggle(media.id),
+      onLongPress: selectable
+          ? () => ref
+                .read(mediaSelectionProvider(scope).notifier)
+                .toggle(media.id)
+          : null,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        color: selected
+        color: isSelected
             ? colorScheme.primary.withValues(alpha: 0.15)
             : isCurrentlyPlaying
             ? colorScheme.primaryContainer.withValues(alpha: 0.3)
@@ -112,7 +129,7 @@ class AudioTrackRow extends ConsumerWidget {
         child: Row(
           children: [
             // Отметка выделения: без неё не видно, что попало в пачку.
-            if (selected)
+            if (isSelected)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Icon(
