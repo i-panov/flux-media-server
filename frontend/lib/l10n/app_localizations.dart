@@ -464,6 +464,66 @@ abstract class AppLocalizations {
   /// **'Add to Collection'**
   String get addToCollection;
 
+  /// No description provided for @selectCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Collection'**
+  String get selectCollection;
+
+  /// No description provided for @newCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'New Collection'**
+  String get newCollection;
+
+  /// No description provided for @collection.
+  ///
+  /// In en, this message translates to:
+  /// **'Collection'**
+  String get collection;
+
+  /// No description provided for @selectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {count}'**
+  String selectedCount(int count);
+
+  /// No description provided for @bulkAddedToCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {count} to \"{name}\", skipped {skipped}'**
+  String bulkAddedToCollection(String name, int count, int skipped);
+
+  /// No description provided for @bulkMovedToCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved {count} to \"{name}\", skipped {skipped}'**
+  String bulkMovedToCollection(String name, int count, int skipped);
+
+  /// No description provided for @noCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'No Collection'**
+  String get noCollection;
+
+  /// No description provided for @failedToAddToCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add to collection: {count}'**
+  String failedToAddToCollection(int count);
+
+  /// No description provided for @createdCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Created collection \"{name}\"'**
+  String createdCollection(String name);
+
+  /// No description provided for @failedToCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create: {error}'**
+  String failedToCreate(String error);
+
   /// No description provided for @connect.
   ///
   /// In en, this message translates to:
@@ -751,6 +811,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Added to \"{name}\"'**
   String addedToCollection(String name);
+
+  /// No description provided for @removedFromCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed from \"{name}\"'**
+  String removedFromCollection(String name);
 
   /// No description provided for @failedToAdd.
   ///

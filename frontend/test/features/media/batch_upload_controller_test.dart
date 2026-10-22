@@ -9,6 +9,7 @@ import 'package:flux_media_server/features/media/domain/repositories/media_repos
 import 'package:flux_media_server/features/media/presentation/providers/batch_upload_controller.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 import 'package:fpdart/fpdart.dart';
 
 class _FakeRepository implements MediaRepository {
@@ -88,6 +89,33 @@ void main() {
 
   BatchUploadController batch() =>
       container.read(batchUploadControllerProvider.notifier);
+
+  test('onUploaded получает id каждого загруженного файла', () async {
+    // Экран загрузки кладёт файл в выбранную коллекцию — ему нужен id
+    // созданного медиа, а не только факт успеха.
+    repo.statusResult = const UploadStatus(
+      id: 1,
+      status: 'done',
+      media: Media(
+        id: 42,
+        title: 'File',
+        type: MediaType.video,
+        fileSize: 1024,
+      ),
+    );
+    final uploaded = <int>[];
+
+    container
+        .read(uploadControllerProvider.notifier)
+        .hasher = (path, _) async => 'hash-of-$path';
+    batch().setFiles([_item('a.mp4')]);
+    await batch().startAll(
+      mediaType: 'video',
+      onUploaded: (id) async => uploaded.add(id),
+    );
+
+    expect(uploaded, [42]);
+  });
 
   test('пачка: успех + дубликат + продолжение после дубликата', () async {
     // Хэшер детерминированный: хэш = путь (дубликат = тот же путь).

@@ -82,7 +82,11 @@ typedef FileHasher = Future<String?> Function(
 /// Колбэк успешной загрузки: инвалидация списков, снэкбар, закрытие экрана.
 /// Передаётся в [UploadController.start] — экрану нужны свежие ref/context,
 /// хранить замыкание в поле контроллера нельзя (stale-контекст).
-typedef UploadSuccessCallback = Future<void> Function();
+///
+/// [mediaId] — id созданного медиа: экран загрузки кладёт файл в
+/// выбранную коллекцию, и для этого нужен id, а не только факт успеха.
+/// null — сервер не отдал медиа в статусе джоба (защитный случай).
+typedef UploadSuccessCallback = Future<void> Function(int? mediaId);
 
 /// Хэшер по умолчанию: читает файл чанками в текущем изоляте.
 /// Чанками, а не Isolate.run целиком: между чанками проверяем отмену
@@ -269,7 +273,7 @@ class UploadController extends Notifier<UploadState> {
         return false;
       }
 
-      await onSuccess();
+      await onSuccess(poll.mediaId);
       return true;
     } on Failure catch (e) {
       AppLogger.error('Upload failed', e);
@@ -321,9 +325,12 @@ class UploadController extends Notifier<UploadState> {
   /// Ошибка возвращается текстом (а не только флагом): иначе экран не
   /// отличил бы сбой обработки от дубликата и показал бы
   /// «файл уже существует».
-  Future<({bool done, String? error})> _pollUploadStatus(int jobId) async {
+  Future<({bool done, String? error, int? mediaId})> _pollUploadStatus(
+    int jobId,
+  ) async {
     var consecutiveFailures = 0;
     String? lastError;
+    int? mediaId;
 
     while (!_cancelled && !_disposed) {
       await Future<void>.delayed(statusPollInterval);
@@ -345,15 +352,22 @@ class UploadController extends Notifier<UploadState> {
             lastError = status.error;
             return true;
           }
+          // Готовый джоб отдаёт созданное медиа — его id нужен
+          // вызывающему (положить файл в коллекцию).
+          mediaId = status.media?.id;
           return status.isDone;
         },
       );
       if (shouldStop) {
         final done = result.fold((_) => false, (s) => s.isDone);
-        if (done) return (done: true, error: null);
+        if (done) return (done: true, error: null, mediaId: mediaId);
         // status.error может быть null — тогда fallback вместо молчания:
         // иначе экран покажет «дубликат».
-        return (done: false, error: lastError ?? 'Upload processing failed');
+        return (
+          done: false,
+          error: lastError ?? 'Upload processing failed',
+          mediaId: null,
+        );
       }
     }
 
@@ -362,7 +376,7 @@ class UploadController extends Notifier<UploadState> {
     if (_cancelled && !_disposed) {
       await _cancelJob(jobId);
     }
-    return (done: false, error: null);
+    return (done: false, error: null, mediaId: null);
   }
 
   Future<void> _cancelJob(int jobId) async {

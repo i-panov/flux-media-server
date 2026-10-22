@@ -9,6 +9,7 @@ import 'package:flux_media_server/core/widgets/search_sliver.dart';
 
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_selection_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_list_state_gate.dart';
 
 // Развилка состояния — часть «набора экрана списка», экспортируем,
@@ -145,21 +146,54 @@ mixin MediaListSearchMixin<T extends ConsumerStatefulWidget>
 /// AppBar экрана списка медиа: заголовок вкладки, загрузка, настройки.
 ///
 /// Кнопка настроек прячется на широких экранах — там есть NavigationRail.
-class MediaListAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const new({required this.title, required this.mediaType, super.key});
+class MediaListAppBar extends ConsumerWidget implements PreferredSizeWidget {
+  const new({
+    required this.title,
+    required this.mediaType,
+    super.key,
+    this.onSelectionAdd,
+  });
 
   final String title;
 
-  /// Тип медиа для маршрута загрузки ('video' / 'audio').
+  /// Тип медиа для маршрута загрузки ('video' / 'audio') и область
+  /// выделения.
   final String mediaType;
+
+  /// Действие над выделенными файлами («в коллекцию»). null — действий
+  /// над выделением нет: AppBar показывает только счётчик и сброс.
+  final VoidCallback? onSelectionAdd;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final isNarrow = MediaQuery.of(context).size.width < 900;
+    final selected = ref.watch(mediaSelectionProvider(mediaType)).length;
+    // Режим выделения: вместо обычных кнопок — счётчик и действия над
+    // пачкой. Обычный AppBar в выделенном состоянии вводил бы в
+    // заблуждение: кнопки загрузки и настроек тут ни при чём.
+    if (selected > 0) {
+      return AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: l.cancel,
+          onPressed: () =>
+              ref.read(mediaSelectionProvider(mediaType).notifier).clear(),
+        ),
+        title: Text(l.selectedCount(selected)),
+        actions: [
+          if (onSelectionAdd != null)
+            IconButton(
+              icon: const Icon(Icons.folder_outlined),
+              tooltip: l.addToCollection,
+              onPressed: onSelectionAdd,
+            ),
+        ],
+      );
+    }
     return AppBar(
       // Вкладки уже обозначены подписью и иконкой в навигации.
       leading: const SizedBox.shrink(),

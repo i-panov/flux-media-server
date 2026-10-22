@@ -11,10 +11,12 @@ import 'package:flux_media_server/features/audio/presentation/widgets/section_he
 import 'package:flux_media_server/features/audio/presentation/widgets/track_actions.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
-import 'package:flux_media_server/features/collections/presentation/utils/collection_tree.dart';
+import 'package:flux_media_server/features/collections/presentation/utils/bulk_collection_action.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/collections_section.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_selection_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/watch_progress_provider.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_card.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_list_scaffold.dart';
@@ -22,7 +24,6 @@ import 'package:flux_media_server/features/offline/presentation/providers/downlo
 import 'package:flux_media_server/features/video/presentation/utils/continue_watching.dart';
 import 'package:flux_media_server/features/video/presentation/widgets/horizontal_video_row.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
-import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
 
@@ -258,7 +259,16 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
     final hasDownloadedVideo = library.downloadedIds.isNotEmpty;
 
     return Scaffold(
-      appBar: MediaListAppBar(title: l.videoTab, mediaType: mediaType),
+      appBar: MediaListAppBar(
+        title: l.videoTab,
+        mediaType: mediaType,
+        onSelectionAdd: () => addSelectionToCollection(
+          context,
+          ref,
+          mediaIds: ref.read(mediaSelectionProvider(mediaType)).toList(),
+          type: MediaType.video,
+        ),
+      ),
       body: _buildBody(
         l: l,
         mediaListState: mediaListState,
@@ -342,7 +352,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen>
             onFavoriteToggled: (id) => ref.toggleFavoriteTrack(id),
             onDownloadToggled: (id) => ref.toggleDownloadTrack(mediaType, id),
           ),
-          const _CollectionsSection(),
+          const CollectionsSection(mediaType: MediaType.video),
           const _DownloadsSection(),
           _AllVideosGrid(
             items: library.gridItems(),
@@ -392,48 +402,6 @@ class _EmptyLibrary extends StatelessWidget {
                 ?.copyWith(color: Colors.grey),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Видеоколлекции (только свой тип медиа, только корневые).
-class _CollectionsSection extends ConsumerWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Корневые — через buildCollectionTree, а не фильтром
-    // `parentId == null`: сирота (родитель удалён или в корзине) тоже
-    // корень, и простой фильтр спрятал бы такую коллекцию навсегда —
-    // до неё не дошёл бы никто. Лес строится тем же хелпером, что и на
-    // экране коллекции и в диалоге перемещения, поэтому «что считается
-    // корнем» везде одинаково.
-    final forest = buildCollectionTree(
-      ref.watch(collectionsProvider).value ?? const <Collection>[],
-    );
-    final collections = [
-      for (final node in forest)
-        if (node.collection.type == MediaType.video) node.collection,
-    ];
-    if (collections.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
-
-    return SliverToBoxAdapter(
-      child: _CollectionsRow(
-        collections: collections,
-        onItemTapped: (id) {
-          // firstWhere мог бросить StateError — идём циклом.
-          for (final c in collections) {
-            if (c.id == id) {
-              unawaited(
-                context.router.push(CollectionDetailRoute(collection: c)),
-              );
-              return;
-            }
-          }
-        },
       ),
     );
   }
@@ -529,65 +497,6 @@ class _AllVideosGrid extends ConsumerWidget {
           );
         }, childCount: items.length),
       ),
-    );
-  }
-}
-
-/// A row showing collection covers.
-class _CollectionsRow extends StatelessWidget {
-  const new({required this.collections, required this.onItemTapped});
-
-  final List<Collection> collections;
-  final ValueChanged<int> onItemTapped;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = context.l10n;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionHeader(icon: Icons.folder, title: l.myCollections),
-        SizedBox(
-          height: 120,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: collections.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final collection = collections[index];
-              return GestureDetector(
-                onTap: () => onItemTapped(collection.id),
-                child: Container(
-                  width: 100,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.video_library,
-                        size: 32,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        collection.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }

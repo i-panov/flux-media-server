@@ -12,10 +12,13 @@ import 'package:flux_media_server/features/audio/presentation/widgets/audio_trac
 import 'package:flux_media_server/features/audio/presentation/widgets/section_header.dart';
 import 'package:flux_media_server/features/audio/presentation/widgets/track_actions.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/is_offline_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/utils/bulk_collection_action.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_to_collection_dialog.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/collections_section.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/artists_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_selection_provider.dart';
 import 'package:flux_media_server/features/media/presentation/utils/media_actions.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/edit_metadata_dialog.dart';
 import 'package:flux_media_server/features/media/presentation/widgets/media_list_scaffold.dart';
@@ -77,7 +80,16 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
         ref.watch(favoriteMediaIdsProvider).value ?? const <int>{};
 
     return Scaffold(
-      appBar: MediaListAppBar(title: l.audioTab, mediaType: mediaType),
+      appBar: MediaListAppBar(
+        title: l.audioTab,
+        mediaType: mediaType,
+        onSelectionAdd: () => addSelectionToCollection(
+          context,
+          ref,
+          mediaIds: ref.read(mediaSelectionProvider(mediaType)).toList(),
+          type: MediaType.audio,
+        ),
+      ),
       body: _buildBody(
         context: context,
         l: l,
@@ -262,6 +274,10 @@ class _AudioScreenState extends ConsumerState<AudioScreen>
             ),
           ),
         ],
+        // Коллекции — сразу после любимых треков: как и в видео-разделе,
+        // это пользовательские подборки, и им место вверху, а не в хвосте
+        // списка, где их не видно без прокрутки.
+        const CollectionsSection(mediaType: MediaType.audio),
         if (artists.isNotEmpty) ...[
           SliverSectionHeader(icon: Icons.people, title: l.artists),
           SliverToBoxAdapter(

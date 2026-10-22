@@ -81,6 +81,74 @@
   "replay": "Повторить",
   "edit": "Изменить",
   "addToCollection": "Добавить в коллекцию",
+  "selectCollection": "Выбрать коллекцию",
+  "@selectCollection": {},
+  "newCollection": "Новая коллекция",
+  "@newCollection": {},
+  "collection": "Коллекция",
+  "@collection": {},
+  "selectedCount": "Выбрано: {count}",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bulkAddedToCollection": "В «{name}» добавлено {count}, пропущено {skipped}",
+  "@bulkAddedToCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "bulkMovedToCollection": "В «{name}» перенесено {count}, пропущено {skipped}",
+  "@bulkMovedToCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "noCollection": "Без коллекции",
+  "@noCollection": {},
+  "failedToAddToCollection": "Не удалось добавить в коллекцию: {count}",
+  "@failedToAddToCollection": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createdCollection": "Создана коллекция \"{name}\"",
+  "@createdCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToCreate": "Не удалось создать: {error}",
+  "@failedToCreate": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "@addToCollection": {},
   "connect": "Подключиться",
   "@connect": {},
@@ -262,6 +330,14 @@
   "@noCollectionsYetCreate": {},
   "addedToCollection": "Добавлено в \"{name}\"",
   "@addedToCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removedFromCollection": "Удалено из \"{name}\"",
+  "@removedFromCollection": {
     "placeholders": {
       "name": {
         "type": "String"

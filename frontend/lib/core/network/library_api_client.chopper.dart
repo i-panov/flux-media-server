@@ -115,6 +115,44 @@ final class _$LibraryApiClient extends LibraryApiClient {
   }
 
   @override
+  Future<Response<Map<String, dynamic>>> addCollectionItemsBulk(
+    int id,
+    Map<String, dynamic> body,
+  ) {
+    final Uri $url = Uri.parse('/collections/${id}/items/bulk');
+    final $body = body;
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> moveCollectionItemsBulk(
+    int id,
+    Map<String, dynamic> body,
+  ) {
+    final Uri $url = Uri.parse('/collections/${id}/items/move/bulk');
+    final $body = body;
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
+  Future<Response<Map<String, dynamic>>> removeCollectionItemsBulk(
+    int id,
+    Map<String, dynamic> body,
+  ) {
+    final Uri $url = Uri.parse('/collections/${id}/items');
+    final $body = body;
+    final Request $request = Request(
+      'DELETE',
+      $url,
+      client.baseUrl,
+      body: $body,
+    );
+    return client.send<Map<String, dynamic>, Map<String, dynamic>>($request);
+  }
+
+  @override
   Future<Response<Map<String, dynamic>>> removeCollectionItem(
     int id,
     int mediaId,

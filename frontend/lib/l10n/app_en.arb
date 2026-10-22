@@ -134,6 +134,74 @@
   "@edit": {},
   "addToCollection": "Add to Collection",
   "@addToCollection": {},
+  "selectCollection": "Select Collection",
+  "@selectCollection": {},
+  "newCollection": "New Collection",
+  "@newCollection": {},
+  "collection": "Collection",
+  "@collection": {},
+  "selectedCount": "Selected: {count}",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bulkAddedToCollection": "Added {count} to \"{name}\", skipped {skipped}",
+  "@bulkAddedToCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "bulkMovedToCollection": "Moved {count} to \"{name}\", skipped {skipped}",
+  "@bulkMovedToCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "noCollection": "No Collection",
+  "@noCollection": {},
+  "failedToAddToCollection": "Failed to add to collection: {count}",
+  "@failedToAddToCollection": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createdCollection": "Created collection \"{name}\"",
+  "@createdCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToCreate": "Failed to create: {error}",
+  "@failedToCreate": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "connect": "Connect",
   "@connect": {},
   "enterServerAddress": "Enter the server address to connect",
@@ -313,6 +381,14 @@
   "@noCollectionsYetCreate": {},
   "addedToCollection": "Added to \"{name}\"",
   "@addedToCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removedFromCollection": "Removed from \"{name}\"",
+  "@removedFromCollection": {
     "placeholders": {
       "name": {
         "type": "String"

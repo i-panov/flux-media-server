@@ -13,6 +13,7 @@ class CollectionGridTile extends StatelessWidget {
     required this.onTap,
     required this.onRemove,
     this.onMove,
+    this.selectionScope,
     super.key,
   });
 
@@ -21,12 +22,15 @@ class CollectionGridTile extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback? onMove;
 
+  /// Область выделения (внутри коллекции — своя).
+  final String? selectionScope;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     return Stack(
       children: [
-        MediaCard(media: media, onTap: onTap),
+        MediaCard(media: media, onTap: onTap, selectionScope: selectionScope),
         // Кнопка удаления элемента из коллекции (зона тапа 48dp).
         // Tooltip — он же семантический лейбл для скринридера.
         Positioned(

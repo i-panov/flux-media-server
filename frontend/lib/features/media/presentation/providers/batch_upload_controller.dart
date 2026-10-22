@@ -123,10 +123,17 @@ class BatchUploadController extends Notifier<BatchUploadState> {
   /// Грузит все pending-файлы по очереди. Возвращает сводку для снекбара.
   /// [mediaType] — общий для пачки (экран один на аудио/видео).
   ///
+  /// [onUploaded] — вызывается с id каждого загруженного файла: экран
+  /// кладёт файл в выбранную коллекцию. Само знание о коллекциях в
+  /// контроллере не нужно — это забота вызывающего.
+  ///
   /// Хэши считаются пулом ВПЕРЁД, а заливка стартует по готовности
   /// хэша очередного файла — не ждёт весь пул (иначе сезон из 20 серий
   /// сначала целиком хэшируется, и только потом начинается передача).
-  Future<BatchUploadState> startAll({required String mediaType}) async {
+  Future<BatchUploadState> startAll({
+    required String mediaType,
+    Future<void> Function(int mediaId)? onUploaded,
+  }) async {
     if (state.isRunning || state.items.isEmpty) return state;
     _cancelled = false;
     // Держим одиночный контроллер живым всю пачку: без подписки
@@ -147,7 +154,7 @@ class BatchUploadController extends Notifier<BatchUploadState> {
         final hash = await hashes[i];
         if (_cancelled || _disposed) break;
         _setStatus(i, BatchItemStatus.active);
-        await _uploadOne(i, item, mediaType, hash);
+        await _uploadOne(i, item, mediaType, hash, onUploaded);
         if (_cancelled || _disposed) break;
       }
       // Дожимаем оставшиеся хэши, чтобы не текли за пределы пачки.
@@ -229,7 +236,10 @@ class BatchUploadController extends Notifier<BatchUploadState> {
 
   /// Повтор упавших без перепick'а файлов: failed → pending и прогон.
   /// Дубликаты и done не трогаем — их повторять незачем.
-  Future<BatchUploadState> retryFailed({required String mediaType}) async {
+  Future<BatchUploadState> retryFailed({
+    required String mediaType,
+    Future<void> Function(int mediaId)? onUploaded,
+  }) async {
     if (state.isRunning) return state;
     state = BatchUploadState(
       items: [
@@ -240,7 +250,7 @@ class BatchUploadController extends Notifier<BatchUploadState> {
             item,
       ],
     );
-    return await startAll(mediaType: mediaType);
+    return await startAll(mediaType: mediaType, onUploaded: onUploaded);
   }
 
   Future<void> _uploadOne(
@@ -248,6 +258,7 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     BatchUploadItem item,
     String mediaType,
     String? knownHash,
+    Future<void> Function(int mediaId)? onUploaded,
   ) async {
     var ok = false;
     String? duplicateTitle;
@@ -262,10 +273,11 @@ class BatchUploadController extends Notifier<BatchUploadState> {
         // Без pop экрана: пачка продолжается. Списки обновляем теми же
         // провайдерами, что refreshMediaLists, но напрямую: ref нотифаера —
         // Ref, а не WidgetRef, в сигнатуру он не входит.
-        onSuccess: () async {
+        onSuccess: (mediaId) async {
           ref
             ..invalidate(mediaListProvider('video'))
             ..invalidate(mediaListProvider('audio'));
+          if (mediaId != null) await onUploaded?.call(mediaId);
         },
       );
     } catch (e, st) {

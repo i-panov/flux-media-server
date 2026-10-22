@@ -13,6 +13,7 @@ import (
 
 	"gorm.io/gorm"
 )
+
 type CollectionHandler struct {
 	colRepo   repository.CollectionRepository
 	itemRepo  repository.CollectionItemRepository
@@ -366,6 +367,181 @@ func (h *CollectionHandler) ListItems(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(media)
+}
+
+// maxBulkItems — потолок числа элементов в групповой операции.
+// Сезон из 20-40 серий укладывается; тысячи id в одном запросе — это
+// уже не «выделил и нажал», а злоупотребление.
+const maxBulkItems = 500
+
+// BulkItemsRequest — набор медиа для групповой операции.
+type BulkItemsRequest struct {
+	MediaIDs []uint `json:"media_ids"`
+}
+
+// BulkMoveItemsRequest — групповой перенос между коллекциями.
+type BulkMoveItemsRequest struct {
+	MediaIDs       []uint `json:"media_ids"`
+	ToCollectionID uint   `json:"to_collection_id"`
+}
+
+// BulkItemsResult — итог групповой операции.
+//
+// Частичный успех — норма, а не ошибка: часть элементов может уже
+// лежать в целевой коллекции (или её не быть), и из-за одного такого
+// элемента весь запрос падать не должен.
+type BulkItemsResult struct {
+	Added   []uint `json:"added"`
+	Moved   []uint `json:"moved"`
+	Removed []uint `json:"removed"`
+	Skipped []uint `json:"skipped"`
+}
+
+// parseBulkItems разбирает тело групповой операции: список непустой и
+// не длиннее maxBulkItems.
+func parseBulkItems(c *fiber.Ctx) ([]uint, error) {
+	var req BulkItemsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return nil, response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if len(req.MediaIDs) == 0 {
+		return nil, response.Error(c, fiber.StatusBadRequest, "media_ids is required")
+	}
+	if len(req.MediaIDs) > maxBulkItems {
+		return nil, response.Error(c, fiber.StatusBadRequest, "too many media_ids")
+	}
+	return req.MediaIDs, nil
+}
+
+// AddItemsBulk добавляет несколько медиа в коллекцию за один запрос.
+//
+// Групповая операция нужна для сезонов: раскладывать их по коллекции
+// по одному файлу — рутина на десятки запросов.
+func (h *CollectionHandler) AddItemsBulk(c *fiber.Ctx) error {
+	collectionID, err := parseIDParam(c, "id")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
+	}
+	mediaIDs, err := parseBulkItems(c)
+	if err != nil {
+		return err
+	}
+	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
+		return err
+	}
+
+	ctx := c.UserContext()
+	result := BulkItemsResult{Added: []uint{}, Skipped: []uint{}}
+	for _, mediaID := range mediaIDs {
+		if mediaID == 0 {
+			continue
+		}
+		if _, err := h.mediaRepo.FindByID(ctx, mediaID); err != nil {
+			result.Skipped = append(result.Skipped, mediaID)
+			continue
+		}
+		if _, err := h.itemRepo.AddItemAtomic(ctx, collectionID, mediaID); err != nil {
+			// Дубликат в коллекции — не ошибка запроса, а пропуск.
+			if !errors.Is(err, repository.ErrDuplicateItem) {
+				log.Printf("AddItemAtomic (bulk): %v", err)
+			}
+			result.Skipped = append(result.Skipped, mediaID)
+			continue
+		}
+		result.Added = append(result.Added, mediaID)
+	}
+
+	return c.JSON(result)
+}
+
+// MoveItemsBulk переносит несколько элементов из своей коллекции в другую.
+//
+// Порядок внутри репозитория (вставка в цель, потом удаление из
+// источника) гарантирует, что дубликат в цели не приводит к потере
+// элемента из источника.
+func (h *CollectionHandler) MoveItemsBulk(c *fiber.Ctx) error {
+	sourceID, err := parseIDParam(c, "id")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
+	}
+
+	var req BulkMoveItemsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if len(req.MediaIDs) == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "media_ids is required")
+	}
+	if len(req.MediaIDs) > maxBulkItems {
+		return response.Error(c, fiber.StatusBadRequest, "too many media_ids")
+	}
+	if req.ToCollectionID == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "to_collection_id is required")
+	}
+
+	source, err := h.getOwnedCollection(c, sourceID)
+	if err != nil {
+		return err
+	}
+	target, err := h.getOwnedCollection(c, req.ToCollectionID)
+	if err != nil {
+		return err
+	}
+	if source.Type != target.Type {
+		return response.Error(c, fiber.StatusBadRequest, "Collections have different types")
+	}
+
+	ctx := c.UserContext()
+	result := BulkItemsResult{Moved: []uint{}, Skipped: []uint{}}
+	for _, mediaID := range req.MediaIDs {
+		if mediaID == 0 {
+			continue
+		}
+		item, err := h.itemRepo.MoveItemAtomic(ctx, sourceID, req.ToCollectionID, mediaID)
+		if err != nil {
+			// Не член источника — тоже пропуск, а не падение всего запроса.
+			if !errors.Is(err, repository.ErrNotMember) &&
+				!errors.Is(err, repository.ErrDuplicateItem) {
+				log.Printf("MoveItemAtomic (bulk): %v", err)
+			}
+			result.Skipped = append(result.Skipped, mediaID)
+			continue
+		}
+		result.Moved = append(result.Moved, item.MediaID)
+	}
+
+	return c.JSON(result)
+}
+
+// RemoveItemsBulk убирает несколько элементов из коллекции.
+func (h *CollectionHandler) RemoveItemsBulk(c *fiber.Ctx) error {
+	collectionID, err := parseIDParam(c, "id")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid collection ID")
+	}
+	mediaIDs, err := parseBulkItems(c)
+	if err != nil {
+		return err
+	}
+	if _, err := h.getOwnedCollection(c, collectionID); err != nil {
+		return err
+	}
+
+	ctx := c.UserContext()
+	result := BulkItemsResult{Removed: []uint{}, Skipped: []uint{}}
+	for _, mediaID := range mediaIDs {
+		if mediaID == 0 {
+			continue
+		}
+		if err := h.itemRepo.Remove(ctx, collectionID, mediaID); err != nil {
+			log.Printf("Remove collection item (bulk): %v", err)
+			result.Skipped = append(result.Skipped, mediaID)
+			continue
+		}
+		result.Removed = append(result.Removed, mediaID)
+	}
+
+	return c.JSON(result)
 }
 
 // getOwnedCollection loads the collection and verifies it belongs to the

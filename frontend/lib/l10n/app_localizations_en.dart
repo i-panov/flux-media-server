@@ -198,6 +198,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToCollection => 'Add to Collection';
 
   @override
+  String get selectCollection => 'Select Collection';
+
+  @override
+  String get newCollection => 'New Collection';
+
+  @override
+  String get collection => 'Collection';
+
+  @override
+  String selectedCount(int count) {
+    return 'Selected: $count';
+  }
+
+  @override
+  String bulkAddedToCollection(String name, int count, int skipped) {
+    return 'Added $count to \"$name\", skipped $skipped';
+  }
+
+  @override
+  String bulkMovedToCollection(String name, int count, int skipped) {
+    return 'Moved $count to \"$name\", skipped $skipped';
+  }
+
+  @override
+  String get noCollection => 'No Collection';
+
+  @override
+  String failedToAddToCollection(int count) {
+    return 'Failed to add to collection: $count';
+  }
+
+  @override
+  String createdCollection(String name) {
+    return 'Created collection \"$name\"';
+  }
+
+  @override
+  String failedToCreate(String error) {
+    return 'Failed to create: $error';
+  }
+
+  @override
   String get connect => 'Connect';
 
   @override
@@ -363,6 +405,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String addedToCollection(String name) {
     return 'Added to \"$name\"';
+  }
+
+  @override
+  String removedFromCollection(String name) {
+    return 'Removed from \"$name\"';
   }
 
   @override

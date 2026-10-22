@@ -5,9 +5,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/select_collection_dialog.dart';
 import 'package:flux_media_server/features/media/presentation/providers/batch_upload_controller.dart';
 import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 @RoutePage()
 class UploadScreen extends ConsumerStatefulWidget {
@@ -20,6 +23,20 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
+  /// Коллекция, в которую попадут все файлы пачки (null — без неё).
+  ///
+  /// Выбор живёт в состоянии экрана, а не в контроллере загрузки:
+  /// контроллеру о коллекциях знать нечего, а в его состоянии выбор
+  /// пришлось бы дублировать в шести местах сборки нового состояния.
+  int? _collectionId;
+  String? _collectionName;
+
+  /// Файлы, которые загрузились, но не попали в коллекцию.
+  int _collectionFailures = 0;
+
+  MediaType get _mediaType =>
+      widget.mediaType == 'audio' ? MediaType.audio : MediaType.video;
+
   String _formatSize(int bytes) {
     // 0 — размер ещё не догрузился: не показываем ложные «0.0 KB».
     if (bytes == 0) return '…';
@@ -77,9 +94,10 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   Future<void> _startAll() async {
+    _collectionFailures = 0;
     await ref
         .read(batchUploadControllerProvider.notifier)
-        .startAll(mediaType: widget.mediaType);
+        .startAll(mediaType: widget.mediaType, onUploaded: _addToCollection);
     if (!mounted) return;
     _showSummary();
   }
@@ -87,9 +105,45 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   Future<void> _retryFailed() async {
     await ref
         .read(batchUploadControllerProvider.notifier)
-        .retryFailed(mediaType: widget.mediaType);
+        .retryFailed(
+          mediaType: widget.mediaType,
+          onUploaded: _addToCollection,
+        );
     if (!mounted) return;
     _showSummary();
+  }
+
+  /// Выбор коллекции для всей пачки: и загрузка, и создание новой —
+  /// прямо отсюда (иначе выбирать было бы нечего).
+  Future<void> _pickCollection() async {
+    final collection = await showSelectCollectionDialog(
+      context,
+      ref,
+      type: _mediaType,
+    );
+    if (collection == null || !mounted) return;
+    setState(() {
+      _collectionId = collection.id;
+      _collectionName = collection.name;
+    });
+  }
+
+  /// Кладёт загруженный файл в выбранную коллекцию.
+  Future<void> _addToCollection(int mediaId) async {
+    final collectionId = _collectionId;
+    if (collectionId == null) return;
+    final result = await ref
+        .read(collectionsRepositoryProvider)
+        .addCollectionItem(collectionId, mediaId);
+    if (result.isLeft()) {
+      // Счётчик, а не снекбар на каждый файл: при пачке в 20 серий
+      // двадцать одинаковых сообщений — шум.
+      _collectionFailures++;
+      AppLogger.error(
+        'Failed to add media $mediaId to collection $collectionId',
+        result.fold((failure) => failure, (_) => null),
+      );
+    }
   }
 
   /// Итог прогона одной сводкой: зелёная только при полном успехе,
@@ -100,19 +154,30 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     if (total == 0) return;
     // Зелёный только при полном успехе, иначе нейтральный итог:
     // дубликаты — не ошибка, ошибки уже видны построчно.
-    final allDone = summary.failedCount == 0 && summary.duplicateCount == 0;
+    final allDone =
+        summary.failedCount == 0 &&
+        summary.duplicateCount == 0 &&
+        _collectionFailures == 0;
     final l = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(
-            l.uploadBatchSummary(
-              summary.doneCount,
-              total,
-              summary.duplicateCount,
-              summary.failedCount,
-            ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l.uploadBatchSummary(
+                  summary.doneCount,
+                  total,
+                  summary.duplicateCount,
+                  summary.failedCount,
+                ),
+              ),
+              if (_collectionFailures > 0)
+                Text(l.failedToAddToCollection(_collectionFailures)),
+            ],
           ),
           backgroundColor: allDone ? Colors.green : null,
         ),
@@ -186,6 +251,24 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          // Куда сложить загруженное: одна коллекция на всю пачку.
+          // Без этого сезон из 20 серий после загрузки лежал в общем
+          // списке, и раскладывать его по коллекциям приходилось вручную,
+          // по одному файлу.
+          if (batch.items.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _CollectionPicker(
+                name: _collectionName,
+                enabled: !batch.isRunning,
+                onTap: _pickCollection,
+                onClear: () => setState(() {
+                  _collectionId = null;
+                  _collectionName = null;
+                }),
+              ),
+            ),
+          const SizedBox(height: 8),
           // Фаза хэширования видна честным прогрессом: иначе пачка
           // на 20 серий молчит, пока пул считает хэши.
           if (batch.isHashing) ...[
@@ -241,6 +324,58 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Выбор коллекции для пачки: одна коллекция на все файлы.
+///
+/// Создание новой — прямо отсюда (диалог выбора умеет и создавать):
+/// иначе «выбрать коллекцию» при пустом списке коллекций бесполезно.
+class _CollectionPicker extends StatelessWidget {
+  const new({
+    required this.name,
+    required this.enabled,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final String? name;
+  final bool enabled;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: enabled ? onTap : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.folder_outlined, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  name == null ? l.noCollection : '${l.collection}: $name',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (name != null)
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: l.noCollection,
+                  onPressed: enabled ? onClear : null,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -199,6 +199,48 @@ class AppLocalizationsRu extends AppLocalizations {
   String get addToCollection => 'Добавить в коллекцию';
 
   @override
+  String get selectCollection => 'Выбрать коллекцию';
+
+  @override
+  String get newCollection => 'Новая коллекция';
+
+  @override
+  String get collection => 'Коллекция';
+
+  @override
+  String selectedCount(int count) {
+    return 'Выбрано: $count';
+  }
+
+  @override
+  String bulkAddedToCollection(String name, int count, int skipped) {
+    return 'В «$name» добавлено $count, пропущено $skipped';
+  }
+
+  @override
+  String bulkMovedToCollection(String name, int count, int skipped) {
+    return 'В «$name» перенесено $count, пропущено $skipped';
+  }
+
+  @override
+  String get noCollection => 'Без коллекции';
+
+  @override
+  String failedToAddToCollection(int count) {
+    return 'Не удалось добавить в коллекцию: $count';
+  }
+
+  @override
+  String createdCollection(String name) {
+    return 'Создана коллекция \"$name\"';
+  }
+
+  @override
+  String failedToCreate(String error) {
+    return 'Не удалось создать: $error';
+  }
+
+  @override
   String get connect => 'Подключиться';
 
   @override
@@ -365,6 +407,11 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String addedToCollection(String name) {
     return 'Добавлено в \"$name\"';
+  }
+
+  @override
+  String removedFromCollection(String name) {
+    return 'Удалено из \"$name\"';
   }
 
   @override

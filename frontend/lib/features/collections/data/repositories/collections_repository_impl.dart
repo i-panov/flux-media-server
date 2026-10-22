@@ -1,6 +1,7 @@
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/features/collections/data/datasources/collections_remote_datasource.dart';
+import 'package:flux_media_server/features/collections/domain/models/bulk_items_result.dart';
 import 'package:flux_media_server/features/collections/domain/repositories/collections_repository.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
@@ -66,5 +67,34 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
     int collectionId,
   ) => safeRepositoryCall(
     () => remoteDataSource.getCollectionItemsFull(collectionId),
+  );
+
+  @override
+  Future<Either<Failure, BulkItemsResult>> addCollectionItemsBulk(
+    int collectionId,
+    List<int> mediaIds,
+  ) => safeRepositoryCall(
+    () => remoteDataSource.addCollectionItemsBulk(collectionId, mediaIds),
+  );
+
+  @override
+  Future<Either<Failure, BulkItemsResult>> moveCollectionItemsBulk(
+    int sourceId,
+    int targetId,
+    List<int> mediaIds,
+  ) => safeRepositoryCall(
+    () => remoteDataSource.moveCollectionItemsBulk(
+      sourceId,
+      targetId,
+      mediaIds,
+    ),
+  );
+
+  @override
+  Future<Either<Failure, BulkItemsResult>> removeCollectionItemsBulk(
+    int collectionId,
+    List<int> mediaIds,
+  ) => safeRepositoryCall(
+    () => remoteDataSource.removeCollectionItemsBulk(collectionId, mediaIds),
   );
 }

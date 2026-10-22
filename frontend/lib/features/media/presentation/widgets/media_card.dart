@@ -5,6 +5,7 @@ import 'package:flux_media_server/core/utils/media_image_url.dart';
 import 'package:flux_media_server/core/widgets/audio_placeholder.dart';
 import 'package:flux_media_server/core/widgets/auth_network_image.dart';
 import 'package:flux_media_server/core/widgets/skeleton_widget.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_selection_provider.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -17,6 +18,7 @@ class MediaCard extends ConsumerWidget {
     this.onFavorite,
     this.isDownloaded = false,
     this.onDownload,
+    this.selectionScope,
   });
 
   final Media media;
@@ -26,12 +28,21 @@ class MediaCard extends ConsumerWidget {
   final bool isDownloaded;
   final VoidCallback? onDownload;
 
+  /// Область выделения. По умолчанию — тип медиа (список библиотеки);
+  /// внутри коллекции область своя, иначе выделение из библиотеки
+  /// перемешивалось бы с выделением в коллекции.
+  final String? selectionScope;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context)!;
     final baseUrl = ref.watch(baseUrlProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final hasCover = media.coverUrl != null && media.coverUrl!.isNotEmpty;
+    final scope = selectionScope ?? media.type.value;
+    final isSelected = ref.watch(
+      mediaSelectionProvider(scope).select((s) => s.contains(media.id)),
+    );
     // Cache-buster: CachedNetworkImage caches by URL, so append updatedAt
     // to force a reload when the cover changes on the server.
     final imageUrl = buildMediaImageUrl(
@@ -61,6 +72,11 @@ class MediaCard extends ConsumerWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          // Долгое нажатие включает выделение: пачка файлов раскладывается
+          // по коллекции одним действием, а не по одному файлу.
+          onLongPress: () => ref
+              .read(mediaSelectionProvider(scope).notifier)
+              .toggle(media.id),
           child: Stack(
             children: [
               Column(
@@ -165,6 +181,27 @@ class MediaCard extends ConsumerWidget {
                                   : Colors.white,
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              // Отметка выделения: полупрозрачная заливка и галочка.
+              // Без неё выделенная карточка неотличима от обычной —
+              // а выделение нужно видно, чтобы понимать, что в пачку
+              // попало.
+              if (isSelected)
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: colorScheme.primary.withValues(alpha: 0.35),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.check_circle,
+                          size: 20,
+                          color: colorScheme.primary,
                         ),
                       ),
                     ),

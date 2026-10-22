@@ -93,6 +93,26 @@ abstract class LibraryApiClient extends ChopperService {
     @Body() Map<String, dynamic> body,
   );
 
+  /// Групповые операции: сезон раскладывается по коллекции одним
+  /// запросом, а не по файлу.
+  @POST(path: '/collections/{id}/items/bulk')
+  Future<Response<Map<String, dynamic>>> addCollectionItemsBulk(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @POST(path: '/collections/{id}/items/move/bulk')
+  Future<Response<Map<String, dynamic>>> moveCollectionItemsBulk(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @DELETE(path: '/collections/{id}/items')
+  Future<Response<Map<String, dynamic>>> removeCollectionItemsBulk(
+    @Path('id') int id,
+    @Body() Map<String, dynamic> body,
+  );
+
   @DELETE(path: '/collections/{id}/items/{mediaId}')
   Future<Response<Map<String, dynamic>>> removeCollectionItem(
     @Path('id') int id,

@@ -201,5 +201,23 @@ void main() {
       // Дважды: в карточке артиста и в строке трека.
       expect(find.text('Artist One'), findsNWidgets(2));
     });
+
+    testWidgets('коллекции аудио показываются своей секцией', (tester) async {
+      // Регрессия: секция коллекций жила приватным виджетом в
+      // video_screen, поэтому коллекцию для аудио можно было создать, но
+      // нельзя было увидеть и открыть — тупик.
+      collectionsRepo.onGetCollections = () async =>
+          Right([collection(1, 'Плейлист')]);
+      await pumpScreen(tester, makeContainer());
+      // Два кадра: первый строит секцию (провайдер коллекций стартует
+      // только здесь — в аудио-разделе его больше никто не слушает),
+      // второй — перерисовывает её уже с данными.
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('My Collections'), findsOneWidget);
+      expect(find.text('Плейлист'), findsOneWidget);
+    });
+
   });
 }

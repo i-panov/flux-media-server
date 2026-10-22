@@ -470,6 +470,11 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Delete("/collections/:id", collectionHandler.Delete)
 	api.Post("/collections/:id/items", collectionHandler.AddItem)
 	api.Post("/collections/:id/items/move", collectionHandler.MoveItem)
+	// Групповые операции: сезон раскладывается по коллекции одним
+	// запросом, а не по файлу.
+	api.Post("/collections/:id/items/bulk", collectionHandler.AddItemsBulk)
+	api.Post("/collections/:id/items/move/bulk", collectionHandler.MoveItemsBulk)
+	api.Delete("/collections/:id/items", collectionHandler.RemoveItemsBulk)
 	api.Delete("/collections/:id/items/:mediaId", collectionHandler.RemoveItem)
 	api.Get("/collections/:id/items", collectionHandler.ListItems)
 	api.Get("/collections/:id/stats", trashHandler.Stats)

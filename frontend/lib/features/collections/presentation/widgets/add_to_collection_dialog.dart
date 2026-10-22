@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/feedback.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/widgets/create_collection_dialog.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
+import 'package:flux_media_server/shared/models/media.dart';
 
 /// Shows a dialog to add a media item to a collection.
 /// Returns true if the item was added.
@@ -74,6 +76,7 @@ class _AddToCollectionDialogState
                         mediaId: widget.mediaId,
                         enabled: !_loading,
                         onTap: () => _addToCollection(collection),
+                        onRemove: () => _removeFromCollection(collection),
                       );
                     },
                   );
@@ -120,30 +123,53 @@ class _AddToCollectionDialogState
     }
   }
 
-  Future<void> _showCreateDialog(AppLocalizations l) async {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (_) => const _CreateCollectionDialog(),
-    );
-    if (name == null || name.isEmpty || !mounted) return;
-
+  /// Убрать элемент из коллекции.
+  ///
+  /// Раньше элемент можно было только добавить: плитка уже добавленной
+  /// коллекции блокировала тап, и из коллекции было не выйти — ни из
+  /// этого диалога, ни откуда-то ещё (в аудио-разделе коллекции вообще
+  /// не показывались, то есть и не существовало места, где их видно).
+  Future<void> _removeFromCollection(Collection collection) async {
+    final l = AppLocalizations.of(context)!;
     setState(() => _loading = true);
     try {
-      final collection = await ref
+      final result = await ref
           .read(collectionsRepositoryProvider)
-          .createCollection(name: name, type: widget.mediaType);
+          .removeCollectionItem(collection.id, widget.mediaId);
       if (!mounted) return;
-      collection.fold(
+      result.fold(
         (failure) {
-          showErrorSnackBar(context, l.failedToAdd(failure.message));
+          showErrorSnackBar(context, l.failedToRemove(failure.message));
         },
         (_) {
-          ref.invalidate(collectionsProvider);
+          // Перечитываем элементы коллекции, чтобы убрать удалённый.
+          ref.invalidate(collectionItemsFullProvider(collection.id));
+          showSuccessSnackBar(
+            context,
+            l.removedFromCollection(collection.name),
+          );
         },
       );
     } catch (e) {
       if (mounted) {
-        showErrorSnackBar(context, l.failedToAdd(e.toString()));
+        showErrorSnackBar(context, l.failedToRemove(e.toString()));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _showCreateDialog(AppLocalizations l) async {
+    setState(() => _loading = true);
+    try {
+      final created = await showCreateCollectionDialog(
+        context,
+        type: widget.mediaType == 'audio' ? MediaType.audio : MediaType.video,
+      );
+      if (!mounted) return;
+      if (created != null) {
+        ref.invalidate(collectionsProvider);
+        showSuccessSnackBar(context, l.createdCollection(created.name));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -163,12 +189,14 @@ class _CollectionTile extends ConsumerWidget {
     required this.mediaId,
     required this.enabled,
     required this.onTap,
+    required this.onRemove,
   });
 
   final Collection collection;
   final int mediaId;
   final bool enabled;
   final VoidCallback onTap;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -176,78 +204,19 @@ class _CollectionTile extends ConsumerWidget {
     final itemsState = ref.watch(collectionItemsFullProvider(collection.id));
     final alreadyAdded = itemsState.value?.any((m) => m.id == mediaId) ?? false;
     return ListTile(
-      enabled: enabled && !alreadyAdded,
       leading: Icon(alreadyAdded ? Icons.check_circle : Icons.folder),
       title: Text(collection.name),
       subtitle: Text(collection.type.value),
-      trailing: alreadyAdded ? Text(l.alreadyAdded) : null,
+      // Уже добавленный элемент нельзя добавить повторно, но можно убрать —
+      // поэтому вместо блокирующей надписи кнопка удаления.
+      trailing: alreadyAdded
+          ? IconButton(
+              icon: const Icon(Icons.remove_circle_outline),
+              tooltip: l.removeFromCollection,
+              onPressed: enabled ? onRemove : null,
+            )
+          : null,
       onTap: enabled && !alreadyAdded ? onTap : null,
-    );
-  }
-}
-
-/// Диалог создания коллекции: trim имени, Create активна при непустом
-/// поле, контроллер диспозится.
-class _CreateCollectionDialog extends StatefulWidget {
-  const new();
-
-  @override
-  State<_CreateCollectionDialog> createState() =>
-      _CreateCollectionDialogState();
-}
-
-class _CreateCollectionDialogState extends State<_CreateCollectionDialog> {
-  final TextEditingController _nameController = TextEditingController();
-  bool _canSubmit = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController.addListener(_onNameChanged);
-  }
-
-  @override
-  void dispose() {
-    _nameController
-      ..removeListener(_onNameChanged)
-      ..dispose();
-    super.dispose();
-  }
-
-  void _onNameChanged() {
-    final canSubmit = _nameController.text.trim().isNotEmpty;
-    if (canSubmit != _canSubmit) {
-      setState(() => _canSubmit = canSubmit);
-    }
-  }
-
-  void _submit() {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) return;
-    Navigator.pop(context, name);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    return AlertDialog(
-      title: Text(l.create),
-      content: TextField(
-        controller: _nameController,
-        decoration: InputDecoration(hintText: l.name),
-        autofocus: true,
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l.cancel),
-        ),
-        TextButton(
-          onPressed: _canSubmit ? _submit : null,
-          child: Text(l.create),
-        ),
-      ],
     );
   }
 }

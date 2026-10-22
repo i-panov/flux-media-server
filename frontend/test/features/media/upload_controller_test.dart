@@ -98,7 +98,7 @@ void main() {
       mediaType: 'audio',
       fileName: 'file.mp3',
       fileSize: 100,
-      onSuccess: () async => successCalls.add('ok'),
+      onSuccess: (_) async => successCalls.add('ok'),
     );
   }
 
@@ -147,7 +147,7 @@ void main() {
       mediaType: 'audio',
       fileName: 'empty.mp3',
       fileSize: 0,
-      onSuccess: () async => successCalls.add('ok'),
+      onSuccess: (_) async => successCalls.add('ok'),
     );
     expect(started, isFalse);
     expect(successCalls, isEmpty);
@@ -163,7 +163,7 @@ void main() {
       mediaType: 'video',
       fileName: 'big.mp3',
       fileSize: 3 * 1024 * 1024 * 1024,
-      onSuccess: () async => successCalls.add('ok'),
+      onSuccess: (_) async => successCalls.add('ok'),
     );
     expect(started, isFalse);
     expect(successCalls, isEmpty);
@@ -179,7 +179,7 @@ void main() {
       mediaType: 'audio',
       fileName: null,
       fileSize: 100,
-      onSuccess: () async => successCalls.add('ok'),
+      onSuccess: (_) async => successCalls.add('ok'),
     );
     expect(started, isFalse);
     expect(successCalls, isEmpty);
@@ -254,7 +254,7 @@ void main() {
       mediaType: 'audio',
       fileName: 'file.mp3',
       fileSize: 100,
-      onSuccess: () async => successCalls.add('ok'),
+      onSuccess: (_) async => successCalls.add('ok'),
     );
 
     expect(started, isFalse);

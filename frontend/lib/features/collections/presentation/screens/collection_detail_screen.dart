@@ -9,11 +9,13 @@ import 'package:flux_media_server/core/utils/scaffold_messenger.dart';
 import 'package:flux_media_server/core/widgets/error_retry_view.dart';
 import 'package:flux_media_server/core/widgets/skeleton_media_grid.dart';
 import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
+import 'package:flux_media_server/features/collections/presentation/utils/bulk_collection_action.dart';
 import 'package:flux_media_server/features/collections/presentation/utils/collection_tree.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/add_media_dialog.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/collection_breadcrumbs.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/collection_grid_tile.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/move_to_collection_dialog.dart';
+import 'package:flux_media_server/features/media/presentation/providers/media_selection_provider.dart';
 import 'package:flux_media_server/features/trash/presentation/providers/trash_providers.dart';
 import 'package:flux_media_server/features/trash/presentation/utils/refresh.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -33,12 +35,36 @@ class CollectionDetailScreen extends ConsumerStatefulWidget {
 
 class _CollectionDetailScreenState
     extends ConsumerState<CollectionDetailScreen> {
+  /// Область выделения: выделение внутри коллекции не путается с
+  /// выделением в библиотеке (иначе «переместить» относилось бы не к
+  /// тому списку).
+  String get _selectionScope => 'collection:${widget.collection.id}';
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final selected = ref.watch(mediaSelectionProvider(_selectionScope)).length;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: selected > 0
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: l.cancel,
+                onPressed: () =>
+                    ref.read(mediaSelectionProvider(_selectionScope).notifier)
+                        .clear(),
+              ),
+              title: Text(l.selectedCount(selected)),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.drive_file_move_outlined),
+                  tooltip: l.moveToCollection,
+                  onPressed: () => _moveSelection(context),
+                ),
+              ],
+            )
+          : AppBar(
         // Заголовка нет: имя коллекции стоит последним звеном крошек
         // на странице. Одно и то же имя в двух соседних местах
         // («Season 01» в баре и строкой ниже) читалось бы как дубль.
@@ -69,10 +95,31 @@ class _CollectionDetailScreenState
         children: [
           _Breadcrumbs(collection: widget.collection),
           _SubcollectionsRow(collection: widget.collection),
-          Expanded(child: _ItemsGrid(collection: widget.collection)),
+          Expanded(
+            child: _ItemsGrid(
+              collection: widget.collection,
+              selectionScope: _selectionScope,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// Групповой перенос выделенных элементов в другую коллекцию.
+  Future<void> _moveSelection(BuildContext context) async {
+    final ids = ref.read(mediaSelectionProvider(_selectionScope)).toList();
+    await moveSelectionToCollection(
+      context,
+      ref,
+      sourceCollectionId: widget.collection.id,
+      mediaIds: ids,
+      type: widget.collection.type,
+    );
+    if (!mounted) return;
+    // Элементы ушли из коллекции — список перечитываем, выделение снимаем.
+    ref.invalidate(collectionItemsFullProvider(widget.collection.id));
+    ref.read(mediaSelectionProvider(_selectionScope).notifier).clear();
   }
 
   /// Создание подколлекции: имя спрашиваем, тип наследуем, родитель — мы.
@@ -403,9 +450,13 @@ class _SubcollectionsRow extends ConsumerWidget {
 
 /// Сетка медиа — бывшее тело экрана, выделена без изменения логики.
 class _ItemsGrid extends ConsumerStatefulWidget {
-  const new({required this.collection});
+  const new({required this.collection, required this.selectionScope});
 
   final Collection collection;
+
+  /// Область выделения: внутри коллекции она своя, иначе выделение
+  /// из библиотеки смешивалось бы с выделением здесь.
+  final String selectionScope;
 
   @override
   ConsumerState<_ItemsGrid> createState() => _ItemsGridState();
@@ -458,6 +509,7 @@ class _ItemsGridState extends ConsumerState<_ItemsGrid> {
               final media = items[index];
               return CollectionGridTile(
                 media: media,
+                selectionScope: widget.selectionScope,
                 onTap: () {                  if (media.type == MediaType.audio) {
                     unawaited(
                       context.router.push(AudioPlayerRoute(media: media)),

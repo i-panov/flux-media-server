@@ -1,4 +1,5 @@
 import 'package:flux_media_server/core/error/failures.dart';
+import 'package:flux_media_server/features/collections/domain/models/bulk_items_result.dart';
 import 'package:flux_media_server/features/collections/domain/repositories/collections_repository.dart';
 import 'package:flux_media_server/features/favorites/domain/repositories/favorites_repository.dart';
 import 'package:flux_media_server/features/lyrics/domain/repositories/lyrics_cache_repository.dart';
@@ -84,6 +85,12 @@ class FakeCollectionsRepository implements CollectionsRepository {
   Future<Either<Failure, Collection>> Function(String, String, int?)?
   onCreateCollection;
   Future<Either<Failure, void>> Function(int)? onDeleteCollection;
+  Future<Either<Failure, BulkItemsResult>> Function(int, List<int>)?
+  onAddItemsBulk;
+  Future<Either<Failure, BulkItemsResult>> Function(int, int, List<int>)?
+  onMoveItemsBulk;
+  Future<Either<Failure, BulkItemsResult>> Function(int, List<int>)?
+  onRemoveItemsBulk;
 
   int getItemsFullCalls = 0;
   final List<(int, int)> addItemCalls = [];
@@ -92,6 +99,9 @@ class FakeCollectionsRepository implements CollectionsRepository {
   final List<(int, int, int)> moveItemCalls = [];
   final List<(String, String, int?)> createCollectionCalls = [];
   final List<int> deleteCollectionCalls = [];
+  final List<(int, List<int>)> addItemsBulkCalls = [];
+  final List<(int, int, List<int>)> moveItemsBulkCalls = [];
+  final List<(int, List<int>)> removeItemsBulkCalls = [];
 
   @override
   Future<Either<Failure, List<Collection>>> getCollections() =>
@@ -160,6 +170,41 @@ class FakeCollectionsRepository implements CollectionsRepository {
   ) {
     getItemsFullCalls++;
     return onGetItemsFull!(collectionId);
+  }
+
+  @override
+  Future<Either<Failure, BulkItemsResult>> addCollectionItemsBulk(
+    int collectionId,
+    List<int> mediaIds,
+  ) {
+    addItemsBulkCalls.add((collectionId, mediaIds));
+    if (onAddItemsBulk != null) return onAddItemsBulk!(collectionId, mediaIds);
+    return Future.value(const Right(BulkItemsResult()));
+  }
+
+  @override
+  Future<Either<Failure, BulkItemsResult>> moveCollectionItemsBulk(
+    int sourceId,
+    int targetId,
+    List<int> mediaIds,
+  ) {
+    moveItemsBulkCalls.add((sourceId, targetId, mediaIds));
+    if (onMoveItemsBulk != null) {
+      return onMoveItemsBulk!(sourceId, targetId, mediaIds);
+    }
+    return Future.value(const Right(BulkItemsResult()));
+  }
+
+  @override
+  Future<Either<Failure, BulkItemsResult>> removeCollectionItemsBulk(
+    int collectionId,
+    List<int> mediaIds,
+  ) {
+    removeItemsBulkCalls.add((collectionId, mediaIds));
+    if (onRemoveItemsBulk != null) {
+      return onRemoveItemsBulk!(collectionId, mediaIds);
+    }
+    return Future.value(const Right(BulkItemsResult()));
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:chopper/chopper.dart';
 import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/network/library_api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
+import 'package:flux_media_server/features/collections/domain/models/bulk_items_result.dart';
 import 'package:flux_media_server/shared/models/collection.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 
@@ -91,6 +92,57 @@ class CollectionsRemoteDataSource {
       mediaId,
     );
     checkResponse(response, 'Failed to remove item from collection');
+  }
+
+  /// Добавляет несколько медиа в коллекцию за один запрос.
+  Future<BulkItemsResult> addCollectionItemsBulk(
+    int collectionId,
+    List<int> mediaIds,
+  ) async {
+    final response = await apiClient.addCollectionItemsBulk(
+      collectionId,
+      {'media_ids': mediaIds},
+    );
+    checkResponse(response, 'Failed to add items to collection');
+    return _bulkResult(response, 'Failed to add items to collection');
+  }
+
+  /// Переносит несколько элементов из своей коллекции в другую.
+  Future<BulkItemsResult> moveCollectionItemsBulk(
+    int sourceId,
+    int targetId,
+    List<int> mediaIds,
+  ) async {
+    final response = await apiClient.moveCollectionItemsBulk(sourceId, {
+      'media_ids': mediaIds,
+      'to_collection_id': targetId,
+    });
+    checkResponse(response, 'Failed to move items');
+    return _bulkResult(response, 'Failed to move items');
+  }
+
+  /// Убирает несколько элементов из коллекции.
+  Future<BulkItemsResult> removeCollectionItemsBulk(
+    int collectionId,
+    List<int> mediaIds,
+  ) async {
+    final response = await apiClient.removeCollectionItemsBulk(
+      collectionId,
+      {'media_ids': mediaIds},
+    );
+    checkResponse(response, 'Failed to remove items from collection');
+    return _bulkResult(response, 'Failed to remove items from collection');
+  }
+
+  BulkItemsResult _bulkResult(
+    Response<dynamic> response,
+    String message,
+  ) {
+    final body = response.body;
+    if (body is! Map<String, dynamic>) {
+      throw ServerException(message: 'Malformed response: $message');
+    }
+    return BulkItemsResult.parse(body);
   }
 
   Future<List<Media>> getCollectionItemsFull(int collectionId) async {
