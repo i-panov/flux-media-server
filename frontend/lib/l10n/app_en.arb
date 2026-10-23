@@ -717,5 +717,24 @@
   "editArtistName": "Edit artist name",
   "@editArtistName": {},
   "artistName": "Artist name",
-  "@artistName": {}
+  "@artistName": {},
+  "uploadNotificationTitle": "Uploading media",
+  "@uploadNotificationTitle": {},
+  "uploadNotificationBody": "{done} of {total}",
+  "@uploadNotificationBody": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "uploadNotificationChannel": "Uploads",
+  "@uploadNotificationChannel": {},
+  "uploadNotificationChannelDescription": "Media upload progress",
+  "@uploadNotificationChannelDescription": {},
+  "uploadNotificationOpen": "Open",
+  "@uploadNotificationOpen": {}
 }

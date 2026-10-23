@@ -6,6 +6,7 @@ import 'package:flux_media_server/core/error/exceptions.dart';
 import 'package:flux_media_server/core/network/library_api_client.dart';
 import 'package:flux_media_server/core/network/media_api_client.dart';
 import 'package:flux_media_server/core/network/response_handler.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
 import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
@@ -16,7 +17,7 @@ import 'package:http/http.dart' as http;
 /// напрямую через `http.MultipartRequest`.
 class _CountingMultipartFile extends http.MultipartFile {
   new(
-    File file, {
+    Stream<List<int>> stream, {
     required String field,
     required String filename,
     required int length,
@@ -24,17 +25,17 @@ class _CountingMultipartFile extends http.MultipartFile {
     bool Function()? isCancelled,
   }) : super(
          field,
-         _buildStream(file, onProgress, isCancelled),
+         _buildStream(stream, onProgress, isCancelled),
          length,
          filename: filename,
        );
 
   static Stream<List<int>> _buildStream(
-    File file,
+    Stream<List<int>> source,
     void Function(int sent)? onProgress,
     bool Function()? isCancelled,
   ) {
-    return file.openRead().transform(
+    return source.transform(
       StreamTransformer<List<int>, List<int>>.fromHandlers(
         handleData: (chunk, sink) {
           if (isCancelled?.call() ?? false) {
@@ -173,15 +174,17 @@ class MediaRemoteDataSource {
   /// Асинхронный контракт: сервер принимает файл и отвечает 202
   /// `{"job_id": N}`; обработка (ffprobe, thumbnails) идёт в фоне,
   /// статус опрашивается через [getUploadJobStatus].
+  ///
+  /// [length] — размер файла в байтах. Он обязателен: multipart
+  /// объявляет Content-Length, и без размера запрос не ушёл бы.
   Future<int> uploadFile({
-    required String filePath,
+    required UploadSource source,
+    required int length,
     required String mediaType,
-    required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) async {
-    final file = File(filePath);
-    final totalBytes = await file.length();
+    final totalBytes = length;
 
     var sent = 0;
     void report(int chunkSize) {
@@ -196,9 +199,9 @@ class MediaRemoteDataSource {
       // финализировать только один раз, а retry строит новый запрос.
       createFiles: () => [
         _CountingMultipartFile(
-          file,
+          source.openRead(),
           field: 'file',
-          filename: fileName,
+          filename: source.name,
           length: totalBytes,
           onProgress: report,
           isCancelled: isCancelled,
@@ -321,7 +324,7 @@ class MediaRemoteDataSource {
       fields: const {},
       createFiles: () => [
         _CountingMultipartFile(
-          file,
+          file.openRead(),
           field: 'cover',
           filename: filePath.split('/').last,
           length: length,
@@ -359,7 +362,7 @@ class MediaRemoteDataSource {
       fields: const {},
       createFiles: () => [
         _CountingMultipartFile(
-          file,
+          file.openRead(),
           field: 'cover',
           filename: filePath.split('/').last,
           length: length,

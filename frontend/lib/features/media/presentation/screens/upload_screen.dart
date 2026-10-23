@@ -5,8 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
-import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
 import 'package:flux_media_server/features/collections/presentation/widgets/select_collection_dialog.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/features/media/presentation/providers/batch_upload_controller.dart';
 import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
 import 'package:flux_media_server/l10n/app_localizations.dart';
@@ -23,19 +23,50 @@ class UploadScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadScreenState extends ConsumerState<UploadScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Состояние пачки переживает экран (иначе уход прерывал бы загрузку),
+    // поэтому на входе сбрасываем его, если ничего не грузится: экран
+    // открывается с чистым листом. Пока идёт загрузка — сброс не
+    // срабатывает, и пользователь видит текущую пачку.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(batchUploadControllerProvider.notifier).clear();
+    });
+  }
+
   /// Коллекция, в которую попадут все файлы пачки (null — без неё).
   ///
-  /// Выбор живёт в состоянии экрана, а не в контроллере загрузки:
-  /// контроллеру о коллекциях знать нечего, а в его состоянии выбор
-  /// пришлось бы дублировать в шести местах сборки нового состояния.
+  /// Выбор живёт в состоянии экрана, а сама раскладка по коллекции — в
+  /// пакетном контроллере: пачка переживает экран, поэтому id уходит в
+  /// [BatchUploadController.startAll]. Дублировать его в состоянии
+  /// контроллера незачем — там только счётчик ошибок для сводки.
   int? _collectionId;
   String? _collectionName;
 
-  /// Файлы, которые загрузились, но не попали в коллекцию.
-  int _collectionFailures = 0;
+  /// Тип коллекции, выбранной для пачки. Сервер тип пары «медиа —
+  /// коллекция» не сверяет, поэтому набор файлов и коллекция обязаны
+  /// совпадать по типу: иначе видео уедет в аудиоколлекцию.
+  MediaType? _collectionType;
 
-  MediaType get _mediaType =>
+  /// Тип файлов этого экрана.
+  MediaType get _screenType =>
       widget.mediaType == 'audio' ? MediaType.audio : MediaType.video;
+
+  /// Тип файлов, к которым относится выбор коллекции и запуск: у
+  /// существующей пачки — её тип (экран мог быть открыт с другой вкладки),
+  /// иначе — тип экрана.
+  MediaType get _filesType {
+    final batchType = ref
+        .read(batchUploadControllerProvider.notifier)
+        .mediaType;
+    return switch (batchType) {
+      'audio' => MediaType.audio,
+      'video' => MediaType.video,
+      _ => _screenType,
+    };
+  }
 
   String _formatSize(int bytes) {
     // 0 — размер ещё не догрузился: не показываем ложные «0.0 KB».
@@ -49,6 +80,16 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   /// Мультивыбор: pickFiles на Android уже отдаёт несколько файлов.
   /// Пути может не быть (облачные провайдеры) — такие пропускаем:
   /// грузить нечего, а молча ронять пачку нельзя.
+  ///
+  /// Файлы копируются плагином в кэш приложения — это его единственный
+  /// способ отдать содержимое: системный SAF-пикер отдаёт content://-ссылку,
+  /// которую без нативного кода читать нечем. Плагин file_selector
+  /// отдаёт такие ссылки, но вдобавок читает файл целиком в память
+  /// (`new byte[size]`), а на видео в гигабайты это OutOfMemory.
+  ///
+  /// Пока копирование не убрано, список появляется после него — отсюда
+  /// пауза на пустом экране. Свой пикер (content:// напрямую, без копии)
+  /// — следующий шаг.
   Future<void> _pickFiles() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
@@ -61,30 +102,45 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     AppLogger.info('Batch picker returned: ${result.length} file(s)');
     if (result.isEmpty) return;
 
-    final names = <String, String>{};
+    final sources = <UploadSource>[];
     for (final file in result) {
       final path = file.path;
       if (path == null) continue;
-      names[path] = file.name;
+      sources.add(
+        UploadSource(
+          path: path,
+          name: file.name,
+          openRead: () => File(path).openRead(),
+        ),
+      );
     }
-    if (names.isEmpty) return;
+    if (sources.isEmpty) return;
+    // Файлы нового набора — типа этого экрана. Коллекция, выбранная
+    // раньше, могла быть другого типа (picker фильтрует по типу пачки,
+    // а она могла прийти с другой вкладки) — такой выбор к новому набору
+    // не относится. Сброс до показа списка: строка коллекции не должна
+    // показывать то, куда файлы не попадут.
+    final collectionType = _collectionType;
+    if (mounted && collectionType != null && collectionType != _screenType) {
+      _clearCollection();
+    }
     // Список показываем СРАЗУ, с нулевыми размерами: экран не должен
     // ждать замеров. Размеры догружаются фоном и обновляют строки.
     ref.read(batchUploadControllerProvider.notifier).setFiles(
       [
-        for (final e in names.entries)
-          BatchUploadItem(filePath: e.key, fileName: e.value, fileSize: 0),
+        for (final source in sources)
+          BatchUploadItem(source: source, fileSize: 0),
       ],
       // 0 в размере ниже — «ещё не измерено»: старт заблокирован,
       // пока не придёт updateSizes (иначе быстрый тап = «empty file»).
       sizesPending: true,
     );
-    AppLogger.info('Batch list shown: ${names.length} file(s)');
+    AppLogger.info('Batch list shown: ${sources.length} file(s)');
 
     final sizes = await Future.wait([
-      for (final path in names.keys)
+      for (final source in sources)
         // Размер читаем асинхронно: lengthSync() блокирует UI-изолят.
-        File(path).length().then((s) => MapEntry(path, s)),
+        File(source.path).length().then((s) => MapEntry(source.path, s)),
     ]);
     if (!mounted) return;
     ref.read(batchUploadControllerProvider.notifier).updateSizes({
@@ -94,24 +150,21 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   }
 
   Future<void> _startAll() async {
-    _collectionFailures = 0;
     await ref
         .read(batchUploadControllerProvider.notifier)
-        .startAll(mediaType: widget.mediaType, onUploaded: _addToCollection);
+        .startAll(mediaType: widget.mediaType, collectionId: _collectionId);
     if (!mounted) return;
     _showSummary();
   }
 
   Future<void> _retryFailed() async {
-    // Счётчик сбрасываем и тут: повторный прогон — это новый заход, и
-    // ошибки прошлого не должны висеть в его сводке.
-    _collectionFailures = 0;
+    // Тип пачки контроллер помнит сам: экран может быть открыт с другой
+    // вкладки (например, видео при идущей аудио-пачке), и присланный
+    // отсюда тип ушёл бы на сервер чужим. Коллекция же — выбор этого
+    // экрана: после пачки его можно сменить, и повтор идёт в видимую.
     await ref
         .read(batchUploadControllerProvider.notifier)
-        .retryFailed(
-          mediaType: widget.mediaType,
-          onUploaded: _addToCollection,
-        );
+        .retryFailed(collectionId: _collectionId);
     if (!mounted) return;
     _showSummary();
   }
@@ -122,31 +175,24 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     final collection = await showSelectCollectionDialog(
       context,
       ref,
-      type: _mediaType,
+      type: _filesType,
     );
     if (collection == null || !mounted) return;
     setState(() {
       _collectionId = collection.id;
       _collectionName = collection.name;
+      _collectionType = collection.type;
     });
   }
 
-  /// Кладёт загруженный файл в выбранную коллекцию.
-  Future<void> _addToCollection(int mediaId) async {
-    final collectionId = _collectionId;
-    if (collectionId == null) return;
-    final result = await ref
-        .read(collectionsRepositoryProvider)
-        .addCollectionItem(collectionId, mediaId);
-    if (result.isLeft()) {
-      // Счётчик, а не снекбар на каждый файл: при пачке в 20 серий
-      // двадцать одинаковых сообщений — шум.
-      _collectionFailures++;
-      AppLogger.error(
-        'Failed to add media $mediaId to collection $collectionId',
-        result.fold((failure) => failure, (_) => null),
-      );
-    }
+  /// Забывает выбранную коллекцию: набор файлов сменился, и прежний
+  /// выбор к нему уже не относится.
+  void _clearCollection() {
+    setState(() {
+      _collectionId = null;
+      _collectionName = null;
+      _collectionType = null;
+    });
   }
 
   /// Итог прогона одной сводкой: зелёная только при полном успехе,
@@ -155,12 +201,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     final summary = ref.read(batchUploadControllerProvider);
     final total = summary.items.length;
     if (total == 0) return;
+    final collectionFailures = ref
+        .read(batchUploadControllerProvider.notifier)
+        .collectionFailures;
     // Зелёный только при полном успехе, иначе нейтральный итог:
     // дубликаты — не ошибка, ошибки уже видны построчно.
     final allDone =
         summary.failedCount == 0 &&
         summary.duplicateCount == 0 &&
-        _collectionFailures == 0;
+        collectionFailures == 0;
     final l = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -178,8 +227,8 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                   summary.failedCount,
                 ),
               ),
-              if (_collectionFailures > 0)
-                Text(l.failedToAddToCollection(_collectionFailures)),
+              if (collectionFailures > 0)
+                Text(l.failedToAddToCollection(collectionFailures)),
             ],
           ),
           backgroundColor: allDone ? Colors.green : null,
@@ -218,7 +267,11 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 icon: const Icon(Icons.refresh),
                 tooltip: l.retry,
               ),
-            if (batch.items.isNotEmpty)
+            // Нет pending-файлов — грузить нечего: после завершённой
+            // пачки остаётся только «Повторить» (упавшие) или ничего.
+            // Кнопка, которая молча ничего не делает, ещё и путала бы:
+            // нажатие по чужой пачке переписывало её тип и коллекцию.
+            if (batch.pendingCount > 0)
               TextButton.icon(
                 // Пока размеры не догрузились — старт запрещён: 0 в
                 // fileSize означает «не измерено», а контроллер трактует
@@ -265,10 +318,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                 name: _collectionName,
                 enabled: !batch.isRunning,
                 onTap: _pickCollection,
-                onClear: () => setState(() {
-                  _collectionId = null;
-                  _collectionName = null;
-                }),
+                onClear: _clearCollection,
               ),
             ),
           const SizedBox(height: 8),
@@ -423,7 +473,7 @@ class _BatchRow extends StatelessWidget {
     };
     return ListTile(
       leading: Icon(icon, color: color),
-      title: Text(item.fileName, overflow: TextOverflow.ellipsis),
+      title: Text(item.source.name, overflow: TextOverflow.ellipsis),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

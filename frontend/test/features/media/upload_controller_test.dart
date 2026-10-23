@@ -2,11 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
 import 'package:fpdart/fpdart.dart';
+
+import '../helpers/upload_source_helpers.dart';
 
 class _FakeRepository implements MediaRepository {
   bool hashExists = false;
@@ -32,9 +35,9 @@ class _FakeRepository implements MediaRepository {
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
-    required String filePath,
+    required UploadSource source,
+    required int length,
     required String mediaType,
-    required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) async {
@@ -94,10 +97,9 @@ void main() {
 
   Future<bool> start(UploadController controller) {
     return controller.start(
-      filePath: '/tmp/file.mp3',
+      source: fakeUploadSource(),
       mediaType: 'audio',
-      fileName: 'file.mp3',
-      fileSize: 100,
+      length: 100,
       onSuccess: (_) async => successCalls.add('ok'),
     );
   }
@@ -143,10 +145,9 @@ void main() {
 
   test('пустой файл: false с errorMessage, а не молча', () async {
     final started = await makeController().start(
-      filePath: '/tmp/empty.mp3',
+      source: fakeUploadSource(name: 'empty.mp3'),
       mediaType: 'audio',
-      fileName: 'empty.mp3',
-      fileSize: 0,
+      length: 0,
       onSuccess: (_) async => successCalls.add('ok'),
     );
     expect(started, isFalse);
@@ -159,10 +160,9 @@ void main() {
 
   test('файл больше лимита: false с errorMessage, а не молча', () async {
     final started = await makeController().start(
-      filePath: '/tmp/big.mp3',
+      source: fakeUploadSource(name: 'big.mp3'),
       mediaType: 'video',
-      fileName: 'big.mp3',
-      fileSize: 3 * 1024 * 1024 * 1024,
+      length: 3 * 1024 * 1024 * 1024,
       onSuccess: (_) async => successCalls.add('ok'),
     );
     expect(started, isFalse);
@@ -173,12 +173,11 @@ void main() {
     );
   });
 
-  test('null fileName: false с errorMessage, а не краш на !', () async {
+  test('пустое имя источника: false с errorMessage, а не краш на !', () async {
     final started = await makeController().start(
-      filePath: '/tmp/file.mp3',
+      source: fakeUploadSource(name: ''),
       mediaType: 'audio',
-      fileName: null,
-      fileSize: 100,
+      length: 100,
       onSuccess: (_) async => successCalls.add('ok'),
     );
     expect(started, isFalse);
@@ -250,10 +249,9 @@ void main() {
       ..hasher = (_, _) async => null;
 
     final started = await controller.start(
-      filePath: '/tmp/file.mp3',
+      source: fakeUploadSource(),
       mediaType: 'audio',
-      fileName: 'file.mp3',
-      fileSize: 100,
+      length: 100,
       onSuccess: (_) async => successCalls.add('ok'),
     );
 

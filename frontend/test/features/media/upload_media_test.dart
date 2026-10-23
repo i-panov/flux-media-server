@@ -6,6 +6,7 @@ import 'package:flux_media_server/features/media/data/datasources/media_remote_d
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
@@ -13,11 +14,13 @@ import 'package:flux_media_server/shared/models/media.dart';
 import 'package:flux_media_server/shared/models/progress.dart';
 import 'package:fpdart/fpdart.dart';
 
+import '../helpers/upload_source_helpers.dart';
+
 class FakeMediaRepository implements MediaRepository {
   Future<Either<Failure, UploadResult>> Function({
-    required String filePath,
+    required UploadSource source,
+    required int length,
     required String mediaType,
-    required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   })?
@@ -31,20 +34,20 @@ class FakeMediaRepository implements MediaRepository {
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
-    required String filePath,
+    required UploadSource source,
+    required int length,
     required String mediaType,
-    required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) {
-    lastFilePath = filePath;
+    lastFilePath = source.path;
     lastMediaType = mediaType;
-    lastFileName = fileName;
+    lastFileName = source.name;
     lastIsCancelled = isCancelled;
     return onUploadFile!(
-      filePath: filePath,
+      source: source,
+      length: length,
       mediaType: mediaType,
-      fileName: fileName,
       onProgress: onProgress,
       isCancelled: isCancelled,
     );
@@ -165,9 +168,9 @@ class _StubUploadDataSource extends MediaRemoteDataSource {
 
   @override
   Future<int> uploadFile({
-    required String filePath,
+    required UploadSource source,
+    required int length,
     required String mediaType,
-    required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) async {
@@ -203,9 +206,9 @@ void main() {
         );
 
         final result = await repository.uploadFile(
-          filePath: '/tmp/movie.mp4',
+          source: fakeUploadSource(name: 'movie.mp4'),
+          length: 100,
           mediaType: 'video',
-          fileName: 'movie.mp4',
         );
 
         expect(result.isLeft(), isTrue);
@@ -223,9 +226,9 @@ void main() {
         );
 
         final result = await repository.uploadFile(
-          filePath: '/tmp/movie.mp4',
+          source: fakeUploadSource(name: 'movie.mp4'),
+          length: 100,
           mediaType: 'video',
-          fileName: 'movie.mp4',
         );
 
         expect(result.isLeft(), isTrue);
@@ -239,9 +242,9 @@ void main() {
       final repository = MediaRepositoryImpl(_StubUploadDataSource(42));
 
       final result = await repository.uploadFile(
-        filePath: '/tmp/movie.mp4',
+        source: fakeUploadSource(name: 'movie.mp4'),
+        length: 100,
         mediaType: 'video',
-        fileName: 'movie.mp4',
       );
 
       expect(result.isRight(), isTrue);

@@ -6,6 +6,7 @@ import 'package:flux_media_server/features/media/data/datasources/media_remote_d
 import 'package:flux_media_server/features/media/data/repositories/media_repository_impl.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
@@ -86,9 +87,9 @@ class FakeMediaRepository implements MediaRepository {
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
-    required String filePath,
+    required UploadSource source,
+    required int length,
     required String mediaType,
-    required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) async => const Left(ServerFailure(message: 'not used'));

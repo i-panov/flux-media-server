@@ -9,6 +9,8 @@ import 'package:flux_media_server/features/media/data/datasources/media_remote_d
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import '../helpers/upload_source_helpers.dart';
+
 const _jobJson = '''
 {"job_id": 42}
 ''';
@@ -76,9 +78,9 @@ void main() {
       );
 
       final jobId = await dataSource.uploadFile(
-        filePath: _movieFile.path,
+        source: fileUploadSource(_movieFile),
+        length: await _movieFile.length(),
         mediaType: 'video',
-        fileName: 'movie.mp4',
       );
 
       expect(jobId, 42);
@@ -102,9 +104,9 @@ void main() {
 
       await expectLater(
         dataSource.uploadFile(
-          filePath: _movieFile.path,
+          source: fileUploadSource(_movieFile),
+          length: await _movieFile.length(),
           mediaType: 'video',
-          fileName: 'movie.mp4',
           isCancelled: () => true,
         ),
         throwsA(isA<UploadCancelledException>()),
@@ -127,9 +129,9 @@ void main() {
 
       await expectLater(
         dataSource.uploadFile(
-          filePath: _movieFile.path,
+          source: fileUploadSource(_movieFile),
+          length: await _movieFile.length(),
           mediaType: 'video',
-          fileName: 'movie.mp4',
         ),
         throwsA(isA<AuthException>()),
       );
@@ -142,9 +144,9 @@ void main() {
 
       final dataSource = _dataSource(client: client);
       final jobId = await dataSource.uploadFile(
-        filePath: _movieFile.path,
+        source: fileUploadSource(_movieFile),
+        length: await _movieFile.length(),
         mediaType: 'video',
-        fileName: 'movie.mp4',
       );
 
       expect(jobId, 42);
@@ -257,9 +259,9 @@ void main() {
 
       await expectLater(
         dataSource.uploadFile(
-          filePath: _movieFile.path,
+          source: fileUploadSource(_movieFile),
+          length: await _movieFile.length(),
           mediaType: 'video',
-          fileName: 'movie.mp4',
         ),
         throwsA(
           isA<ServerException>().having(
@@ -282,9 +284,9 @@ void main() {
 
       await expectLater(
         dataSource.uploadFile(
-          filePath: _movieFile.path,
+          source: fileUploadSource(_movieFile),
+          length: await _movieFile.length(),
           mediaType: 'video',
-          fileName: 'movie.mp4',
           isCancelled: () => cancelled,
         ),
         throwsA(isA<UploadCancelledException>()),

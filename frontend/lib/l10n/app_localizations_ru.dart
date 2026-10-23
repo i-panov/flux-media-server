@@ -797,4 +797,21 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get artistName => 'Имя артиста';
+
+  @override
+  String get uploadNotificationTitle => 'Загрузка медиа';
+
+  @override
+  String uploadNotificationBody(int done, int total) {
+    return '$done из $total';
+  }
+
+  @override
+  String get uploadNotificationChannel => 'Загрузки';
+
+  @override
+  String get uploadNotificationChannelDescription => 'Прогресс загрузки медиа';
+
+  @override
+  String get uploadNotificationOpen => 'Открыть';
 }

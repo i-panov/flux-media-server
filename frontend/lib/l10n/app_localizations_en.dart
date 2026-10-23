@@ -794,4 +794,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get artistName => 'Artist name';
+
+  @override
+  String get uploadNotificationTitle => 'Uploading media';
+
+  @override
+  String uploadNotificationBody(int done, int total) {
+    return '$done of $total';
+  }
+
+  @override
+  String get uploadNotificationChannel => 'Uploads';
+
+  @override
+  String get uploadNotificationChannelDescription => 'Media upload progress';
+
+  @override
+  String get uploadNotificationOpen => 'Open';
 }

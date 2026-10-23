@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/error/failures.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 
@@ -75,7 +75,7 @@ class UploadState {
 /// Второй параметр — проверка отмены: хэш 2 ГБ длится секунды, и флаг
 /// отмены должен срабатывать внутри, а не после.
 typedef FileHasher = Future<String?> Function(
-  String path,
+  UploadSource source,
   bool Function() isCancelled,
 );
 
@@ -93,13 +93,13 @@ typedef UploadSuccessCallback = Future<void> Function(int? mediaId);
 /// и отдаём управление event loop — UI не висит даже на 2 ГБ, а отмена
 /// во время hashing срабатывает сразу, а не после всего файла.
 Future<String?> _defaultHasher(
-  String path,
+  UploadSource source,
   bool Function() isCancelled,
 ) async {
   final collector = _DigestCollector();
   final sink = sha256.startChunkedConversion(collector);
   try {
-    await for (final chunk in File(path).openRead()) {
+    await for (final chunk in source.openRead()) {
       if (isCancelled()) return null;
       sink.add(chunk);
     }
@@ -165,16 +165,17 @@ class UploadController extends Notifier<UploadState> {
   bool _disposed = false;
   DateTime _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Запускает загрузку [filePath]. Возвращает true только при полном
+  /// Запускает загрузку [source]. Возвращает true только при полном
   /// успехе (включая onSuccess). См. инвариант [UploadState.errorMessage].
+  /// [length] — размер файла в байтах: multipart объявляет Content-Length,
+  /// а нулевой размер означает пустой файл.
   /// [knownHash] — заранее посчитанный хэш (пачка считает их конвейером
   /// во время заливки соседних файлов): пропускаем повторный прогон.
   /// [onDuplicateTitle] — existing title дубликата для подписи в пачке.
   Future<bool> start({
-    required String filePath,
+    required UploadSource source,
     required String mediaType,
-    required String? fileName,
-    required int fileSize,
+    required int length,
     required UploadSuccessCallback onSuccess,
     String? knownHash,
     void Function(String? existingTitle)? onDuplicateTitle,
@@ -182,15 +183,15 @@ class UploadController extends Notifier<UploadState> {
     // Backstop-проверки с сырым английским текстом (как Failure.message):
     // errorMessage обязателен — иначе нарушился бы инвариант
     // UploadState.errorMessage и экран показал бы «дубликат».
-    if (fileSize == 0) {
+    if (length == 0) {
       state = state.copyWith(errorMessage: 'Cannot upload an empty file');
       return false;
     }
-    if (fileSize > maxUploadSizeBytes) {
+    if (length > maxUploadSizeBytes) {
       state = state.copyWith(errorMessage: 'File exceeds the upload size limit');
       return false;
     }
-    if (fileName == null) {
+    if (source.name.isEmpty) {
       state = state.copyWith(errorMessage: 'Missing file name');
       return false;
     }
@@ -204,7 +205,7 @@ class UploadController extends Notifier<UploadState> {
 
     try {
       // knownHash из пачки считается тем же хэшером: null только при отмене.
-      final hash = knownHash ?? await _hasher(filePath, () => _cancelled);
+      final hash = knownHash ?? await _hasher(source, () => _cancelled);
       // null от хэшера — тоже отмена: единственный легитимный
       // производитель null — сработавшая проверка isCancelled внутри.
       if (hash == null) {
@@ -241,9 +242,9 @@ class UploadController extends Notifier<UploadState> {
       state = state.copyWith(phase: UploadPhase.uploading);
 
       final result = await _repository.uploadFile(
-        filePath: filePath,
+        source: source,
+        length: length,
         mediaType: mediaType,
-        fileName: fileName,
         onProgress: _onProgress,
         isCancelled: () => _cancelled,
       );

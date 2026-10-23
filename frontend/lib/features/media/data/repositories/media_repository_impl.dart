@@ -5,6 +5,7 @@ import 'package:flux_media_server/core/network/response_handler.dart';
 import 'package:flux_media_server/features/media/data/datasources/media_remote_datasource.dart';
 import 'package:flux_media_server/features/media/domain/models/metadata_edit.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_result.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/features/media/domain/models/upload_status.dart';
 import 'package:flux_media_server/features/media/domain/repositories/media_repository.dart';
 import 'package:flux_media_server/shared/models/artist.dart';
@@ -58,17 +59,17 @@ class MediaRepositoryImpl implements MediaRepository {
 
   @override
   Future<Either<Failure, UploadResult>> uploadFile({
-    required String filePath,
+    required UploadSource source,
+    required int length,
     required String mediaType,
-    required String fileName,
     void Function(int sent, int? total)? onProgress,
     bool Function()? isCancelled,
   }) => _cancellableCall(
     () => remoteDataSource
         .uploadFile(
-          filePath: filePath,
+          source: source,
+          length: length,
           mediaType: mediaType,
-          fileName: fileName,
           onProgress: onProgress,
           isCancelled: isCancelled,
         )

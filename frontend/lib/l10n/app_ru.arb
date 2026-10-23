@@ -667,5 +667,24 @@
   "editArtistName": "Изменить имя артиста",
   "@editArtistName": {},
   "artistName": "Имя артиста",
-  "@artistName": {}
+  "@artistName": {},
+  "uploadNotificationTitle": "Загрузка медиа",
+  "@uploadNotificationTitle": {},
+  "uploadNotificationBody": "{done} из {total}",
+  "@uploadNotificationBody": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "uploadNotificationChannel": "Загрузки",
+  "@uploadNotificationChannel": {},
+  "uploadNotificationChannelDescription": "Прогресс загрузки медиа",
+  "@uploadNotificationChannelDescription": {},
+  "uploadNotificationOpen": "Открыть",
+  "@uploadNotificationOpen": {}
 }

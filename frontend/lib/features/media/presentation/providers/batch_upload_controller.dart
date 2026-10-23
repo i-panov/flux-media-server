@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flux_media_server/core/utils/logger.dart';
+import 'package:flux_media_server/features/collections/presentation/providers/collections_provider.dart';
+import 'package:flux_media_server/features/media/domain/models/upload_source.dart';
 import 'package:flux_media_server/features/media/presentation/providers/media_list_provider.dart';
 import 'package:flux_media_server/features/media/presentation/providers/upload_controller.dart';
+import 'package:flux_media_server/features/media/presentation/services/upload_notifications.dart';
 
 /// Статус одного файла в пакетной загрузке.
 enum BatchItemStatus { pending, active, done, duplicate, failed, cancelled }
@@ -11,16 +14,17 @@ enum BatchItemStatus { pending, active, done, duplicate, failed, cancelled }
 /// Один файл пакетной загрузки.
 class BatchUploadItem {
   const new({
-    required this.filePath,
-    required this.fileName,
+    required this.source,
     required this.fileSize,
     this.status = BatchItemStatus.pending,
     this.errorMessage,
     this.existingTitle,
   });
 
-  final String filePath;
-  final String fileName;
+  /// Источник файла: имя и поток с содержимым.
+  final UploadSource source;
+
+  /// Размер в байтах; 0 — размер ещё не измерен.
   final int fileSize;
   final BatchItemStatus status;
   final String? errorMessage;
@@ -35,8 +39,7 @@ class BatchUploadItem {
     int? fileSize,
   }) {
     return BatchUploadItem(
-      filePath: filePath,
-      fileName: fileName,
+      source: source,
       fileSize: fileSize ?? this.fileSize,
       status: status ?? this.status,
       errorMessage: errorMessage,
@@ -69,6 +72,8 @@ class BatchUploadState {
 
   bool get isHashing => hashingDone < hashingTotal;
 
+  int get pendingCount =>
+      items.where((i) => i.status == BatchItemStatus.pending).length;
   int get doneCount =>
       items.where((i) => i.status == BatchItemStatus.done).length;
   int get duplicateCount =>
@@ -91,10 +96,34 @@ class BatchUploadController extends Notifier<BatchUploadState> {
   bool _cancelled = false;
   bool _disposed = false;
 
+  /// Тип медиа текущей пачки ('video'/'audio'): по нему тап по уведомлению
+  /// открывает нужный экран загрузки.
+  String? _mediaType;
+
+  /// Тип медиа идущей пачки (null — пачка не идёт).
+  String? get mediaType => _mediaType;
+
+  /// Коллекция, в которую складываются загруженные файлы (null — никуда).
+  int? _collectionId;
+
+  /// Сколько файлов не удалось положить в коллекцию за текущий прогон.
+  int _collectionFailures = 0;
+
+  /// Ошибки добавления в коллекцию: экран показывает их в сводке.
+  int get collectionFailures => _collectionFailures;
+
+  /// Момент последнего обновления уведомления — для дросселя.
+  DateTime _lastNotificationUpdate = DateTime.fromMillisecondsSinceEpoch(0);
+
   UploadController get _single => ref.read(uploadControllerProvider.notifier);
 
   void setFiles(List<BatchUploadItem> items, {bool sizesPending = false}) {
     if (state.isRunning) return;
+    // Новый набор — новая пачка, и тип/коллекция прошлой к ней не
+    // относятся. Экран другого типа, открытый во время чужой пачки,
+    // иначе выбрал бы коллекцию по типу остатков старой (видеофайлы
+    // легли бы в аудиоколлекцию), а повтор ушёл бы чужим media_type.
+    _forgetBatch();
     state = BatchUploadState(
       items: List.unmodifiable(items),
       sizesPending: sizesPending,
@@ -107,7 +136,7 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     state = BatchUploadState(
       items: [
         for (final item in state.items)
-          if (sizesByPath[item.filePath] case final int size)
+          if (sizesByPath[item.source.path] case final int size)
             item.copyWith(fileSize: size)
           else
             item,
@@ -117,34 +146,66 @@ class BatchUploadController extends Notifier<BatchUploadState> {
 
   void clear() {
     if (state.isRunning) return;
+    // Тип и коллекция уходят вместе с файлами: экран, открытый после
+    // пачки другого типа, иначе фильтровал бы коллекции по типу уже
+    // стёртой пачки и принял бы новый набор за её продолжение.
+    _forgetBatch();
     state = const BatchUploadState();
+  }
+
+  /// Забывает тип и коллекцию прошлой пачки: они описывают набор файлов,
+  /// которого больше нет.
+  void _forgetBatch() {
+    _mediaType = null;
+    _collectionId = null;
   }
 
   /// Грузит все pending-файлы по очереди. Возвращает сводку для снекбара.
   /// [mediaType] — общий для пачки (экран один на аудио/видео).
   ///
-  /// [onUploaded] — вызывается с id каждого загруженного файла: экран
-  /// кладёт файл в выбранную коллекцию. Само знание о коллекциях в
-  /// контроллере не нужно — это забота вызывающего.
+  /// [collectionId] — коллекция, в которую после успеха кладётся каждый
+  /// файл. Работает именно здесь, а не колбэком экрана: пачка переживает
+  /// экран, а `ref` закрытого экрана бросает StateError — успешно
+  /// залитый файл тогда пометился бы упавшим, а добавление в коллекцию
+  /// потерялось бы.
   ///
   /// Хэши считаются пулом ВПЕРЁД, а заливка стартует по готовности
   /// хэша очередного файла — не ждёт весь пул (иначе сезон из 20 серий
   /// сначала целиком хэшируется, и только потом начинается передача).
   Future<BatchUploadState> startAll({
     required String mediaType,
-    Future<void> Function(int mediaId)? onUploaded,
+    int? collectionId,
   }) async {
     if (state.isRunning || state.items.isEmpty) return state;
+    // Грузить нечего — выход ДО смены типа и коллекции пачки. Иначе экран
+    // другого типа, нажав «Загрузить» по чужой завершённой пачке,
+    // переписал бы её тип: последующий повтор ушёл бы на сервер с чужим
+    // media_type, а коллекция — из чужого экрана.
+    if (state.pendingCount == 0) return state;
     _cancelled = false;
+    _mediaType = mediaType;
+    _collectionId = collectionId;
+    _collectionFailures = 0;
     // Держим одиночный контроллер живым всю пачку: без подписки
     // autoDispose снёс бы его между файлами, и чтение errorMessage
     // после start() вернуло бы свежий idle (ложный «дубликат»).
-    final keepAlive = ref.listen<UploadState>(
-      uploadControllerProvider,
-      (_, _) {},
-    );
+    final keepAlive = ref.listen<UploadState>(uploadControllerProvider, (
+      previous,
+      next,
+    ) {
+      // Прогресс текущего файла в уведомлении: без него на одном
+      // большом файле видно только «1 из 1» — а это и есть долгий
+      // момент. Обновления дросселируются: контроллер загрузки
+      // отдаёт прогресс пачками по 150 мс, в шторку так часто нельзя.
+      _updateNotification(
+        done: state.doneCount,
+        total: state.items.length,
+        progress: next.progress,
+      );
+    });
     state = BatchUploadState(items: state.items, isRunning: true);
     try {
+      await _showNotification(done: 0, total: state.items.length);
       final hashes = _hashPending();
       for (var i = 0; i < state.items.length; i++) {
         if (_cancelled || _disposed) break;
@@ -154,7 +215,7 @@ class BatchUploadController extends Notifier<BatchUploadState> {
         final hash = await hashes[i];
         if (_cancelled || _disposed) break;
         _setStatus(i, BatchItemStatus.active);
-        await _uploadOne(i, item, mediaType, hash, onUploaded);
+        await _uploadOne(i, item, mediaType, hash);
         if (_cancelled || _disposed) break;
       }
       // Дожимаем оставшиеся хэши, чтобы не текли за пределы пачки.
@@ -174,6 +235,9 @@ class BatchUploadController extends Notifier<BatchUploadState> {
           ],
         );
       }
+      // Уведомление — последним: сбой плагина не должен оставить пачку
+      // в isRunning навсегда. Ошибку гасит сам _clearNotification.
+      await _clearNotification();
     }
     return state;
   }
@@ -194,12 +258,17 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     Future<void> worker() async {
       while (!_cancelled && !_disposed) {
         if (cursor >= indices.length) return;
-        final i = cursor++;
+        // Индекс элемента, а не позиция в indices: pending-файлы после
+        // повтора идут не с начала пачки (0 — done, 1 — failed→pending).
+        // Взяв позицию, пул хэшировал бы не тот файл, а ожидающий
+        // настоящего индекса не дождался бы своего хэша никогда —
+        // пачка зависала бы в isRunning до перезапуска.
+        final i = indices[cursor++];
         final item = state.items[i];
         String? hash;
         try {
           hash = await _single.hasher(
-            item.filePath,
+            item.source,
             () => _cancelled || _disposed,
           );
         } catch (e) {
@@ -236,11 +305,19 @@ class BatchUploadController extends Notifier<BatchUploadState> {
 
   /// Повтор упавших без перепick'а файлов: failed → pending и прогон.
   /// Дубликаты и done не трогаем — их повторять незачем.
-  Future<BatchUploadState> retryFailed({
-    required String mediaType,
-    Future<void> Function(int mediaId)? onUploaded,
-  }) async {
+  ///
+  /// Тип берётся у прошлой пачки, а не у экрана: пачка общая для аудио и
+  /// видео, и после возврата на экран другого типа переданный извне тип
+  /// ушёл бы на сервер чужим (аудио-файлы записались бы как видео).
+  ///
+  /// [collectionId] — коллекция, выбранная на экране сейчас, а не та, с
+  /// которой стартовал прошлый прогон: после пачки выбор можно сменить,
+  /// и повтор обязан уйти в видимую пользователю коллекцию.
+  Future<BatchUploadState> retryFailed({required int? collectionId}) async {
     if (state.isRunning) return state;
+    final mediaType = _mediaType;
+    // Повтор возможен только после прогона — тип у него уже есть.
+    if (mediaType == null) return state;
     state = BatchUploadState(
       items: [
         for (final item in state.items)
@@ -250,7 +327,7 @@ class BatchUploadController extends Notifier<BatchUploadState> {
             item,
       ],
     );
-    return await startAll(mediaType: mediaType, onUploaded: onUploaded);
+    return await startAll(mediaType: mediaType, collectionId: collectionId);
   }
 
   Future<void> _uploadOne(
@@ -258,16 +335,14 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     BatchUploadItem item,
     String mediaType,
     String? knownHash,
-    Future<void> Function(int mediaId)? onUploaded,
   ) async {
     var ok = false;
     String? duplicateTitle;
     try {
       ok = await _single.start(
-        filePath: item.filePath,
+        source: item.source,
         mediaType: mediaType,
-        fileName: item.fileName,
-        fileSize: item.fileSize,
+        length: item.fileSize,
         knownHash: knownHash,
         onDuplicateTitle: (title) => duplicateTitle = title,
         // Без pop экрана: пачка продолжается. Списки обновляем теми же
@@ -277,7 +352,7 @@ class BatchUploadController extends Notifier<BatchUploadState> {
           ref
             ..invalidate(mediaListProvider('video'))
             ..invalidate(mediaListProvider('audio'));
-          if (mediaId != null) await onUploaded?.call(mediaId);
+          if (mediaId != null) await _addToCollection(mediaId);
         },
       );
     } catch (e, st) {
@@ -303,6 +378,86 @@ class BatchUploadController extends Notifier<BatchUploadState> {
     }
   }
 
+  /// Кладёт загруженный файл в выбранную коллекцию.
+  ///
+  /// Сбой добавления не должен валить загрузку: файл уже на сервере, и
+  /// `false` из `start` пометил бы его упавшим. Поэтому и Left, и
+  /// исключение здесь только считаются и логируются.
+  Future<void> _addToCollection(int mediaId) async {
+    final collectionId = _collectionId;
+    if (collectionId == null) return;
+    try {
+      final result = await ref
+          .read(collectionsRepositoryProvider)
+          .addCollectionItem(collectionId, mediaId);
+      if (result.isRight()) return;
+      AppLogger.error(
+        'Failed to add media $mediaId to collection $collectionId',
+        result.fold((failure) => failure, (_) => null),
+      );
+    } catch (e, st) {
+      AppLogger.error(
+        'Failed to add media $mediaId to collection $collectionId',
+        e,
+        st,
+      );
+    }
+    // Счётчик, а не снекбар на каждый файл: при пачке в 20 серий
+    // двадцать одинаковых сообщений — шум.
+    _collectionFailures++;
+  }
+
+  /// Показывает уведомление о прогрессе пачки.
+  ///
+  /// Уведомление — единственный экран прогресса вне приложения: без него
+  /// ушедший с экрана загрузки не видит, что загрузка идёт.
+  ///
+  /// Сбой плагина гасится здесь: уведомления не должны ломать загрузку
+  /// (на Linux без демона уведомлений, при отозванном разрешении и т.п.).
+  Future<void> _showNotification({
+    required int done,
+    required int total,
+    double? progress,
+  }) async {
+    final notifications = ref.read(uploadNotificationsProvider);
+    if (notifications == null) return;
+    try {
+      await notifications.showProgress(
+        done: done,
+        total: total,
+        progress: progress,
+      );
+    } catch (e, st) {
+      AppLogger.error('Upload notification failed', e, st);
+    }
+  }
+
+  /// Обновление уведомления с дросселем: в шторку нельзя писать часто.
+  void _updateNotification({
+    required int done,
+    required int total,
+    double? progress,
+  }) {
+    final now = DateTime.now();
+    if (now.difference(_lastNotificationUpdate) <
+        const Duration(milliseconds: 800)) {
+      return;
+    }
+    _lastNotificationUpdate = now;
+    unawaited(_showNotification(done: done, total: total, progress: progress));
+  }
+
+  /// Убирает уведомление: пачка закончилась или отменена.
+  Future<void> _clearNotification() async {
+    final notifications = ref.read(uploadNotificationsProvider);
+    if (notifications == null) return;
+    try {
+      await notifications.clear();
+    } catch (e, st) {
+      AppLogger.error('Upload notification clear failed', e, st);
+    }
+  }
+
   void _setStatus(
     int index,
     BatchItemStatus status, [
@@ -320,11 +475,20 @@ class BatchUploadController extends Notifier<BatchUploadState> {
   }
 }
 
-/// Провайдер пакетной загрузки. autoDispose: состояние — состояние
-/// экрана; уход гасит цикл (серверные джобы при этом живут дальше,
-/// как и у одиночной — семантика та же).
+/// Провайдер пакетной загрузки.
+///
+/// НЕ autoDispose: уход с экрана загрузки не должен прерывать пачку.
+/// Раньше состояние жило вместе с экраном, и при закрытии экрана
+/// контроллер умирал — цикл пачки выходил по «_disposed» и остальные
+/// файлы просто отбрасывались (пользователь видел, что загрузка
+/// «отменилась»). Теперь состояние живёт вместе с процессом: пачка
+/// доезжает до конца, а повторный вход на экран показывает, что
+/// грузится и с каким прогрессом.
+///
+/// Плата: состояние переживает экран, поэтому экран сбрасывает его
+/// при входе, если ничего не грузится (см. UploadScreen).
 final batchUploadControllerProvider =
-    NotifierProvider.autoDispose<BatchUploadController, BatchUploadState>(
+    NotifierProvider<BatchUploadController, BatchUploadState>(
       BatchUploadController.new,
     );
 

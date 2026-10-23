@@ -1513,6 +1513,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Artist name'**
   String get artistName;
+
+  /// No description provided for @uploadNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading media'**
+  String get uploadNotificationTitle;
+
+  /// No description provided for @uploadNotificationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total}'**
+  String uploadNotificationBody(int done, int total);
+
+  /// No description provided for @uploadNotificationChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploads'**
+  String get uploadNotificationChannel;
+
+  /// No description provided for @uploadNotificationChannelDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Media upload progress'**
+  String get uploadNotificationChannelDescription;
+
+  /// No description provided for @uploadNotificationOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get uploadNotificationOpen;
 }
 
 class _AppLocalizationsDelegate

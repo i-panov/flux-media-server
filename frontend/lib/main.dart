@@ -8,9 +8,12 @@ import 'package:flux_media_server/app.dart';
 import 'package:flux_media_server/core/router/app_router.dart';
 import 'package:flux_media_server/core/session/settings_local_datasource.dart';
 import 'package:flux_media_server/core/session/settings_provider.dart';
+import 'package:flux_media_server/core/utils/logger.dart';
 import 'package:flux_media_server/features/auth/presentation/auth_guard.dart';
 import 'package:flux_media_server/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flux_media_server/features/favorites/presentation/providers/favorite_toggle_provider.dart';
+import 'package:flux_media_server/features/media/presentation/providers/batch_upload_controller.dart';
+import 'package:flux_media_server/features/media/presentation/services/upload_notifications.dart';
 import 'package:flux_media_server/features/offline/data/file_export_service.dart';
 import 'package:flux_media_server/features/player/data/artwork_fetcher.dart';
 import 'package:flux_media_server/features/player/data/audio_handler.dart';
@@ -30,6 +33,12 @@ void main() async {
   final packageName = (await PackageInfo.fromPlatform()).packageName;
   setNotificationChannelName('$packageName/notifications');
   setFileChannelName('$packageName/files');
+
+  // Уведомление о ходе загрузки: экран загрузки можно закрыть, а
+  // загрузка — нет (она живёт вместе с процессом).
+  final uploadNotifications = UploadNotifications(
+    channelId: '$packageName/uploads',
+  );
 
   // Загрузчик обложек для audio_service собирается ДО контейнера:
   // хендлер создаётся в фоновом изоляте, куда нельзя пробросить ни
@@ -57,6 +66,7 @@ void main() async {
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
       audioHandlerProvider.overrideWithValue(audioHandler),
+      uploadNotificationsProvider.overrideWithValue(uploadNotifications),
     ],
     // Riverpod 3 по умолчанию ретраит упавшие build-и (до 10 раз с
     // бэкоффом), оставляя состояние в loading — экраны показывали бы
@@ -127,6 +137,28 @@ void main() async {
   }
 
   final router = AppRouter(authGuard: AuthGuard(container));
+
+  // Инициализация уведомлений — после роутера: тап по уведомлению
+  // открывает экран загрузки, а навигация живёт в роутере.
+  // Строки уведомления — на языке интерфейса.
+  uploadNotifications.localeOf = () =>
+      Locale(container.read(settingsProvider).settings.locale);
+  try {
+    await uploadNotifications.init(
+      onTap: (response) {
+        // Тап по уведомлению открывает экран загрузки того типа, который
+        // грузится сейчас.
+        final mediaType = container
+            .read(batchUploadControllerProvider.notifier)
+            .mediaType;
+        unawaited(router.push(UploadRoute(mediaType: mediaType ?? 'video')));
+      },
+    );
+  } catch (e, st) {
+    // Уведомления — не критичная часть: сбой плагина не должен мешать
+    // ни запуску приложения, ни самой загрузке.
+    AppLogger.error('Upload notifications init failed', e, st);
+  }
 
   runApp(
     UncontrolledProviderScope(
