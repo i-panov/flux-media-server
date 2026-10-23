@@ -50,7 +50,7 @@ dev_dependencies:
   # с поддержкой 4.1+. Убрать пин вместе с апгрейдом build_runner.
   build: '>=4.0.9 <4.1.0'
   build_runner: ^2.16.1
-  chopper_generator: ^8.7.0
+  chopper_generator: ^8.7.1
   fake_async: ^1.3.1
   flutter_launcher_icons: ^0.14.4
   flutter_test:
