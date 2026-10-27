@@ -100,7 +100,9 @@ export default defineConfig([
 			"vitest.setup.ts",
 			"postcss.config.mjs",
 			"playwright.config.ts",
+			"playwright.proxy.config.ts",
 			"e2e/**/*.ts",
+			"e2e/**/*.mjs",
 		],
 		languageOptions: {
 			globals: globals.node,

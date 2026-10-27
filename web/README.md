@@ -18,6 +18,7 @@ npm run lint         # Biome + ESLint
 npm run lint:deadcode # Knip
 npm run test         # Vitest
 npm run test:e2e     # Playwright
+npm run test:e2e:proxy # сквозной тест через реальный прокси
 npm run size         # бюджеты бандла
 ```
 

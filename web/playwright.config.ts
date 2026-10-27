@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
 	testDir: "./e2e",
+	// Сквозной proxy-тест живёт в отдельном конфиге со своим Vite:
+	// ему нужен гарантированно свежий сервер с VITE_API_PROXY.
+	testIgnore: "**/proxy-*.spec.ts",
 	fullyParallel: true,
 	forbidOnly: Boolean(process.env.CI),
 	retries: process.env.CI ? 2 : 0,

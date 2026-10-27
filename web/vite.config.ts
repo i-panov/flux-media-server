@@ -9,9 +9,13 @@ const pkg = JSON.parse(
 	readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
-// Бэкенд для локальной разработки и проверки сборки: dev-сервер
-// и preview проксируют /api на него.
-const apiProxy = process.env.VITE_API_PROXY ?? "http://localhost:8080";
+// Бэкенд сверяет Origin с Host (защита от login CSRF), поэтому Host
+// обязан остаться браузерным: changeOrigin переписал бы его на адрес
+// target-а, и все cookie-эндпоинты отвечали бы 403.
+const apiProxy = {
+	target: process.env.VITE_API_PROXY ?? "http://localhost:8080",
+	changeOrigin: false,
+};
 
 export default defineConfig({
 	plugins: [

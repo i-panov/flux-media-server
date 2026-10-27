@@ -1,4 +1,5 @@
 import { createRouter } from "@tanstack/react-router";
+import { queryClient } from "./queryClient";
 import { routeTree } from "./routeTree.gen";
 
 declare module "@tanstack/react-router" {
@@ -9,6 +10,7 @@ declare module "@tanstack/react-router" {
 
 export const router = createRouter({
 	routeTree,
+	context: { queryClient },
 	defaultPreload: "intent",
 	defaultPreloadStaleTime: 0,
 });

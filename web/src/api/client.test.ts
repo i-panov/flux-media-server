@@ -77,4 +77,47 @@ describe("apiFetch", () => {
 			expect.objectContaining({ credentials: "include" }),
 		);
 	});
+
+	it("обновляет токены и повторяет запрос при 401", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(jsonResponse({ error: "expired" }, 401))
+			.mockResolvedValueOnce(jsonResponse({ ok: true }))
+			.mockResolvedValueOnce(jsonResponse({ ok: true }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(apiFetch("/x")).resolves.toEqual({ ok: true });
+		expect(fetchMock).toHaveBeenNthCalledWith(
+			2,
+			"/api/auth/refresh",
+			expect.objectContaining({ method: "POST", body: "{}" }),
+		);
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+	});
+
+	it("пробрасывает исходный 401, если refresh не удался", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(jsonResponse({ error: "expired" }, 401))
+			.mockResolvedValueOnce(jsonResponse({ error: "revoked" }, 401));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(apiFetch("/x")).rejects.toMatchObject({
+			status: 401,
+			message: "expired",
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("не обновляет токены для публичных auth-эндпоинтов", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ error: "expired" }, 401));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			apiFetch("/auth/refresh", { method: "POST", body: "{}" }),
+		).rejects.toMatchObject({ status: 401 });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
 });

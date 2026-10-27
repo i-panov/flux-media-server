@@ -1,8 +1,24 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 const healthBody = JSON.stringify({ status: "ok", version: "1.0.8" });
+const userBody = JSON.stringify({
+	id: 1,
+	email: "user@example.com",
+	is_admin: false,
+});
+
+async function stubAuthedSession(page: Page) {
+	await page.route("**/api/auth/me", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: userBody,
+		}),
+	);
+}
 
 test("главная показывает приложение и статус сервера", async ({ page }) => {
+	await stubAuthedSession(page);
 	await page.route("**/api/health", (route) =>
 		route.fulfill({
 			status: 200,
@@ -21,6 +37,7 @@ test("главная показывает приложение и статус �
 });
 
 test("настройки открываются из шапки", async ({ page }) => {
+	await stubAuthedSession(page);
 	await page.route("**/api/health", (route) =>
 		route.fulfill({
 			status: 200,
@@ -39,6 +56,7 @@ test("настройки открываются из шапки", async ({ page 
 });
 
 test("неизвестный маршрут показывает страницу 404", async ({ page }) => {
+	await stubAuthedSession(page);
 	await page.goto("/unknown");
 
 	await expect(

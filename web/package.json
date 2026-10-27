@@ -1,7 +1,7 @@
 {
 	"name": "flux-web",
 	"private": true,
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"type": "module",
 	"engines": {
 		"node": ">=22"
@@ -24,6 +24,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:e2e": "playwright test",
+		"test:e2e:proxy": "playwright test -c playwright.proxy.config.ts",
 		"test:coverage": "vitest run --coverage",
 		"format": "biome format --write",
 		"lint": "biome check && eslint .",
