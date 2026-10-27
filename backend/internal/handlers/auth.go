@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/mail"
+	"net/url"
 	"strings"
 	"time"
 
@@ -53,6 +54,81 @@ type RequestCodeRequest struct {
 type VerifyCodeRequest struct {
 	Email string `json:"email"`
 	Code  string `json:"code"`
+}
+
+// checkSameOrigin защищает эндпоинты, выставляющие сессионные куки,
+// от login CSRF: SameSite=Lax не мешает кросс-сайтовому ответу положить
+// куки в браузер жертвы, он лишь не отправляет куки в кросс-сайтовых
+// запросах. Поэтому запрос с Origin/Referer чужого хоста отклоняется,
+// а клиенты без этих заголовков (нативные приложения, curl) пропускаются.
+// Сравнение идёт с Host запроса: предполагается прямое подключение без
+// переписывающего Host прокси (поддержки прокси в сервере пока нет);
+// при её появлении проверку нужно пересмотреть.
+func checkSameOrigin(c *fiber.Ctx) bool {
+	if origin := c.Get("Origin"); origin != "" {
+		u, err := url.Parse(origin)
+		if err != nil || u.Host == "" || !strings.EqualFold(u.Host, c.Get(fiber.HeaderHost)) {
+			return false
+		}
+		return true
+	}
+	if referer := c.Get("Referer"); referer != "" {
+		u, err := url.Parse(referer)
+		if err != nil || u.Host == "" || !strings.EqualFold(u.Host, c.Get(fiber.HeaderHost)) {
+			return false
+		}
+	}
+	return true
+}
+
+// setSessionCookies сохраняет пару токенов в httpOnly-куки для веб-клиента.
+// JSON с токенами отдаётся как раньше — мобильные клиенты ходят по Bearer.
+// SameSite=Lax не даёт чужому сайту отправлять эти куки, но не мешает
+// кросс-сайтовому ответу их выставить — от login CSRF verify-code прикрыт
+// проверкой Origin/Referer в checkSameOrigin.
+func (h *AuthHandler) setSessionCookies(c *fiber.Ctx, accessToken, refreshToken string) {
+	secure := h.config.Server.CookieSecure
+	c.Cookie(&fiber.Cookie{
+		Name:     middleware.CookieAccessToken,
+		Value:    accessToken,
+		Path:     "/",
+		MaxAge:   h.config.Auth.JWTExpiry * 3600,
+		HTTPOnly: true,
+		Secure:   secure,
+		SameSite: fiber.CookieSameSiteLaxMode,
+	})
+	c.Cookie(&fiber.Cookie{
+		Name:     middleware.CookieRefreshToken,
+		Value:    refreshToken,
+		Path:     "/api/auth",
+		MaxAge:   h.config.Auth.RefreshExpiry * 3600,
+		HTTPOnly: true,
+		Secure:   secure,
+		SameSite: fiber.CookieSameSiteLaxMode,
+	})
+}
+
+// clearSessionCookies гасит обе сессионные куки. Истёкшее значение ставится
+// с тем же Path, что при установке (у refresh-куки — /api/auth),
+// иначе браузер проигнорирует удаление.
+func (h *AuthHandler) clearSessionCookies(c *fiber.Ctx) {
+	secure := h.config.Server.CookieSecure
+	paths := map[string]string{
+		middleware.CookieAccessToken:  "/",
+		middleware.CookieRefreshToken: "/api/auth",
+	}
+	for name, path := range paths {
+		c.Cookie(&fiber.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     path,
+			MaxAge:   -1,
+			Expires:  time.Unix(0, 0).UTC(),
+			HTTPOnly: true,
+			Secure:   secure,
+			SameSite: fiber.CookieSameSiteLaxMode,
+		})
+	}
 }
 
 func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
@@ -124,6 +200,12 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
+	// Первой — до разбора тела и проверки кода: кросс-сайтовый запрос
+	// не должен ни тратить чужой OTP, ни получать сессионные куки.
+	if !checkSameOrigin(c) {
+		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
+	}
+
 	var req VerifyCodeRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
@@ -161,6 +243,8 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 		log.Printf("Failed to store refresh token: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
 	}
+
+	h.setSessionCookies(c, tokens.AccessToken, tokens.RefreshToken)
 
 	return c.JSON(fiber.Map{
 		"token":         tokens.AccessToken,
@@ -222,6 +306,8 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 		}
 	}
 
+	h.clearSessionCookies(c)
+
 	return c.JSON(fiber.Map{"message": "Logged out successfully"})
 }
 
@@ -230,16 +316,28 @@ type RefreshRequest struct {
 }
 
 func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
-	var req RefreshRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	// Как и verify-code, выставляет сессионные куки на публичном роуте —
+	// без проверки это второй вход для login CSRF.
+	if !checkSameOrigin(c) {
+		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
 	}
 
-	if req.RefreshToken == "" {
+	// Веб-клиент присылает refresh-токен в httpOnly-куке и может вообще
+	// не слать тело — куку читаем до разбора тела, иначе запрос без тела
+	// упрётся в ошибку BodyParser и до куки дело не дойдёт.
+	refreshToken := c.Cookies(middleware.CookieRefreshToken)
+	if refreshToken == "" {
+		var req RefreshRequest
+		if err := c.BodyParser(&req); err != nil {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+		}
+		refreshToken = req.RefreshToken
+	}
+	if refreshToken == "" {
 		return response.Error(c, fiber.StatusBadRequest, "Refresh token is required")
 	}
 
-	claims, err := h.jwtService.ValidateRefreshToken(req.RefreshToken)
+	claims, err := h.jwtService.ValidateRefreshToken(refreshToken)
 	if err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired refresh token")
 	}
@@ -262,7 +360,7 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	// RotateToken возвращает сохранённый новый токен; в ответ отдаём
 	// только что сгенерированный из GenerateTokenPair.
 	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
-	if _, err := h.refreshTokenDB.RotateToken(ctx, req.RefreshToken, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
+	if _, err := h.refreshTokenDB.RotateToken(ctx, refreshToken, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
 		// A missing row means the token was already rotated (replay) or
 		// revoked — treat it as an auth failure, not a server error.
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -271,6 +369,8 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 		log.Printf("Failed to rotate refresh token: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to rotate session")
 	}
+
+	h.setSessionCookies(c, tokens.AccessToken, tokens.RefreshToken)
 
 	return c.JSON(fiber.Map{
 		"token":         tokens.AccessToken,

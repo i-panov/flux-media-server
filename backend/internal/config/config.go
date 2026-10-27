@@ -27,6 +27,7 @@ type ServerConfig struct {
 	Debug         bool   `yaml:"debug"`
 	Env           string `yaml:"env"` // "dev" | "production" (default)
 	CORSOrigins   string `yaml:"cors_origins"`
+	CookieSecure  bool   `yaml:"cookie_secure"` // Secure-флаг сессионных кук, нужен HTTPS
 	MaxUploadSize int64  `yaml:"max_upload_size"`
 }
 
@@ -47,15 +48,15 @@ type AuthConfig struct {
 }
 
 type SMTPConfig struct {
-	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
-	Username    string `yaml:"username"`
-	Password    string `yaml:"password"`
-	From        string `yaml:"from"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	From     string `yaml:"from"`
 	// RequireTLS — *bool, чтобы отличать «не задано» от явного false:
 	// по умолчанию (nil) TLS обязателен, require_tls: false отключает.
-	RequireTLS  *bool  `yaml:"require_tls"`
-	ImplicitTLS bool   `yaml:"implicit_tls"`
+	RequireTLS  *bool `yaml:"require_tls"`
+	ImplicitTLS bool  `yaml:"implicit_tls"`
 }
 
 type ScannerConfig struct {
@@ -126,9 +127,9 @@ func Load(path string) (*Config, error) {
 	// Whitelist вместо свободной строки: опечатка («prod») молча
 	// превращала бы конфиг в production и ломала проверку debug ниже.
 	switch cfg.Server.Env {
-		case "dev", "production":
-		default:
-			return nil, fmt.Errorf("server.env must be \"dev\" or \"production\", got %q", cfg.Server.Env)
+	case "dev", "production":
+	default:
+		return nil, fmt.Errorf("server.env must be \"dev\" or \"production\", got %q", cfg.Server.Env)
 	}
 	if cfg.Server.MaxUploadSize == 0 {
 		cfg.Server.MaxUploadSize = 100 * 1024 * 1024 // 100MB

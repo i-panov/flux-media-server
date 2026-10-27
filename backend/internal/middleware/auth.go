@@ -16,6 +16,14 @@ const (
 	LocalsUserEmail = "user_email"
 )
 
+// Имена сессионных кук для веб-клиента. Мобильные клиенты ходят
+// по Bearer-токенам из JSON, веб — по httpOnly-кукам; middleware
+// принимает оба варианта, заголовок в приоритете.
+const (
+	CookieAccessToken  = "flux_access"
+	CookieRefreshToken = "flux_refresh"
+)
+
 // GetUserID возвращает ID аутентифицированного пользователя из Locals.
 func GetUserID(c *fiber.Ctx) (uint, bool) {
 	userID, ok := c.Locals(LocalsUserID).(uint)
@@ -30,17 +38,22 @@ func GetUserEmail(c *fiber.Ctx) (string, bool) {
 
 func AuthMiddleware(jwtService services.JWTService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return response.Error(c, fiber.StatusUnauthorized, "Missing authorization header")
+		token := ""
+		if authHeader := c.Get("Authorization"); authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+				return response.Error(c, fiber.StatusUnauthorized, "Invalid authorization header format")
+			}
+			token = parts[1]
+		} else {
+			// Заголовка нет — веб-клиент присылает access-токен в httpOnly-куке.
+			token = c.Cookies(CookieAccessToken)
+			if token == "" {
+				return response.Error(c, fiber.StatusUnauthorized, "Missing authorization header")
+			}
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			return response.Error(c, fiber.StatusUnauthorized, "Invalid authorization header format")
-		}
-
-		claims, err := jwtService.ValidateToken(parts[1])
+		claims, err := jwtService.ValidateToken(token)
 		if err != nil {
 			return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired token")
 		}

@@ -11,6 +11,10 @@ server:
   # logging (including secrets). NEVER enable outside local development.
   debug: false
   cors_origins: "*"  # Set to your frontend origin in production
+  # cookie_secure: true включает Secure-флаг у сессионных кук веб-клиента
+  # (flux_access, flux_refresh). Нужен HTTPS; в LAN по HTTP оставьте false,
+  # иначе браузер не будет отправлять куки.
+  cookie_secure: false
   # IMPORTANT (memory): the HTTP engine (fasthttp) buffers the ENTIRE request
   # body of an upload in RAM before the handler runs. One upload consumes up
   # to max_upload_size of memory; budget RAM for (limit × concurrent uploads)

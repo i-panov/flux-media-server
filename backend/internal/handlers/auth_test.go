@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"flux/internal/app"
 	"flux/internal/config"
 	"flux/internal/handlers"
+	"flux/internal/middleware"
 	"flux/internal/services"
 )
 
@@ -27,6 +29,7 @@ func newTestAppForAuth(t *testing.T) *app.App {
 		Auth: config.AuthConfig{
 			JWTSecret:         "test-secret-that-is-at-least-32-characters-long",
 			JWTExpiry:         24,
+			RefreshExpiry:     720,
 			CodeLength:        6,
 			CodeExpiry:        300,
 			MaxOTPEntries:     1000,
@@ -265,4 +268,217 @@ func TestAuthLogoutWithoutBody(t *testing.T) {
 	resp, err = application.Fiber.Test(req)
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
+// loginWithCookies выполняет полный вход через OTP и возвращает пару
+// токенов из JSON вместе с выставленными сессионными куками.
+func loginWithCookies(t *testing.T, application *app.App, email string) (string, string, []*http.Cookie) {
+	t.Helper()
+
+	code, err := application.OTPStore.Generate(email)
+	require.NoError(t, err)
+	b, _ := json.Marshal(map[string]string{"email": email, "code": code})
+	req := httptest.NewRequest("POST", "/api/auth/verify-code", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var body map[string]interface{}
+	parseJSONResponse(t, resp, &body)
+	accessToken, ok := body["token"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, accessToken)
+	refreshToken, ok := body["refresh_token"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, refreshToken)
+
+	return accessToken, refreshToken, resp.Cookies()
+}
+
+func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
+	for _, c := range cookies {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
+func TestAuthVerifySetsSessionCookies(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	_, _, cookies := loginWithCookies(t, application, "cookies@example.com")
+
+	access := findCookie(cookies, middleware.CookieAccessToken)
+	require.NotNil(t, access, "нет куки flux_access")
+	assert.NotEmpty(t, access.Value)
+	assert.True(t, access.HttpOnly)
+	assert.Equal(t, "/", access.Path)
+
+	refresh := findCookie(cookies, middleware.CookieRefreshToken)
+	require.NotNil(t, refresh, "нет куки flux_refresh")
+	assert.NotEmpty(t, refresh.Value)
+	assert.True(t, refresh.HttpOnly)
+	// Долгоживущий refresh-токен нужен только auth-эндпоинтам —
+	// браузер не должен слать его на каждый запрос /api/...
+	assert.Equal(t, "/api/auth", refresh.Path)
+}
+
+func TestAuthMeWithAccessCookie(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	accessToken, _, _ := loginWithCookies(t, application, "me-cookie@example.com")
+
+	// Без заголовка Authorization: доступ только по куке.
+	req := httptest.NewRequest("GET", "/api/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: middleware.CookieAccessToken, Value: accessToken})
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var body map[string]interface{}
+	parseJSONResponse(t, resp, &body)
+	assert.Equal(t, "me-cookie@example.com", body["email"])
+}
+
+func TestAuthRefreshFromCookie(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	_, refreshToken, _ := loginWithCookies(t, application, "refresh-cookie@example.com")
+
+	// Пустое тело: refresh-токен едет в httpOnly-куке.
+	b, _ := json.Marshal(map[string]string{})
+	req := httptest.NewRequest("POST", "/api/auth/refresh", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: middleware.CookieRefreshToken, Value: refreshToken})
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var body map[string]interface{}
+	parseJSONResponse(t, resp, &body)
+	assert.NotEmpty(t, body["token"])
+	assert.NotEmpty(t, body["refresh_token"])
+
+	// Ротация перевыставляет обе куки новой парой.
+	rotated := resp.Cookies()
+	assert.NotEmpty(t, findCookie(rotated, middleware.CookieAccessToken).Value)
+	assert.NotEmpty(t, findCookie(rotated, middleware.CookieRefreshToken).Value)
+}
+
+func TestAuthRefreshWithoutBody(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	_, refreshToken, _ := loginWithCookies(t, application, "refresh-nobody@example.com")
+
+	// Тела и Content-Type нет вовсе: только кука.
+	req := httptest.NewRequest("POST", "/api/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: middleware.CookieRefreshToken, Value: refreshToken})
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var body map[string]interface{}
+	parseJSONResponse(t, resp, &body)
+	assert.NotEmpty(t, body["token"])
+	assert.NotEmpty(t, body["refresh_token"])
+}
+
+func TestAuthVerifyCrossOriginRejected(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	code, err := application.OTPStore.Generate("victim@example.com")
+	require.NoError(t, err)
+	b, _ := json.Marshal(map[string]string{"email": "victim@example.com", "code": code})
+	req := httptest.NewRequest("POST", "/api/auth/verify-code", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://evil.example")
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+
+	// Сессионные куки не выставляются.
+	assert.Nil(t, findCookie(resp.Cookies(), middleware.CookieAccessToken))
+	assert.Nil(t, findCookie(resp.Cookies(), middleware.CookieRefreshToken))
+}
+
+func TestAuthVerifySameOriginAllowed(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	code, err := application.OTPStore.Generate("same-origin@example.com")
+	require.NoError(t, err)
+	b, _ := json.Marshal(map[string]string{"email": "same-origin@example.com", "code": code})
+	req := httptest.NewRequest("POST", "/api/auth/verify-code", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	// httptest шлёт Host example.com — Origin того же хоста свой.
+	req.Header.Set("Origin", "http://example.com")
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
+func TestAuthRefreshCrossOriginRejected(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	_, refreshToken, _ := loginWithCookies(t, application, "refresh-xorigin@example.com")
+
+	b, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req := httptest.NewRequest("POST", "/api/auth/refresh", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://evil.example")
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+
+	assert.Nil(t, findCookie(resp.Cookies(), middleware.CookieAccessToken))
+	assert.Nil(t, findCookie(resp.Cookies(), middleware.CookieRefreshToken))
+}
+
+func TestAuthRefreshCrossOriginFormRejected(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	_, refreshToken, _ := loginWithCookies(t, application, "refresh-xform@example.com")
+
+	// Реалистичный вектор login CSRF: обычная HTML-форма шлёт
+	// application/x-www-form-urlencoded без префлайта.
+	form := strings.NewReader("RefreshToken=" + refreshToken)
+	req := httptest.NewRequest("POST", "/api/auth/refresh", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "https://evil.example")
+
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+
+	assert.Nil(t, findCookie(resp.Cookies(), middleware.CookieAccessToken))
+	assert.Nil(t, findCookie(resp.Cookies(), middleware.CookieRefreshToken))
+}
+
+func TestAuthLogoutClearsCookies(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	accessToken, _, _ := loginWithCookies(t, application, "logout-cookie@example.com")
+
+	req := httptest.NewRequest("POST", "/api/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	for _, name := range []string{middleware.CookieAccessToken, middleware.CookieRefreshToken} {
+		cleared := findCookie(resp.Cookies(), name)
+		require.NotNil(t, cleared, "нет куки %s", name)
+		assert.Empty(t, cleared.Value)
+		expired := cleared.MaxAge <= 0 ||
+			(!cleared.Expires.IsZero() && cleared.Expires.Before(time.Now()))
+		assert.True(t, expired, "кука %s должна быть истёкшей", name)
+	}
 }
