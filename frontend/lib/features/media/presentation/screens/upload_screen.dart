@@ -50,6 +50,15 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   /// совпадать по типу: иначе видео уедет в аудиоколлекцию.
   MediaType? _collectionType;
 
+  /// Плагин пикера отдаёт файл только после того, как целиком скопирует
+  /// его в кэш приложения: без этой полосы экран на время копии пуст.
+  bool _copyingFiles = false;
+
+  void _setCopying(bool value) {
+    if (!mounted || _copyingFiles == value) return;
+    setState(() => _copyingFiles = value);
+  }
+
   /// Тип файлов этого экрана.
   MediaType get _screenType =>
       widget.mediaType == 'audio' ? MediaType.audio : MediaType.video;
@@ -87,66 +96,81 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   /// отдаёт такие ссылки, но вдобавок читает файл целиком в память
   /// (`new byte[size]`), а на видео в гигабайты это OutOfMemory.
   ///
-  /// Пока копирование не убрано, список появляется после него — отсюда
-  /// пауза на пустом экране. Свой пикер (content:// напрямую, без копии)
-  /// — следующий шаг.
+  /// Пока копирование не убрано, список появляется после него — на это
+  /// время показываем полосу, иначе экран выглядит зависшим.
   Future<void> _pickFiles() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: widget.mediaType == 'audio'
-          ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
-          : ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v'],
-    );
-    // Метки этапов: если между «пикер вернулся» и списком есть дыра,
-    // видно в logcat, где именно (плагин/размеры/построение).
-    AppLogger.info('Batch picker returned: ${result.length} file(s)');
-    if (result.isEmpty) return;
-
-    final sources = <UploadSource>[];
-    for (final file in result) {
-      final path = file.path;
-      if (path == null) continue;
-      sources.add(
-        UploadSource(
-          path: path,
-          name: file.name,
-          openRead: () => File(path).openRead(),
-        ),
+    // Полоса включается сразу: на iOS копию делает сама система и никаких
+    // событий не шлёт, поэтому иначе про копирование не узнать.
+    _setCopying(true);
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: widget.mediaType == 'audio'
+            ? ['mp3', 'flac', 'ogg', 'm4a', 'aac', 'wav', 'opus', 'wma']
+            : ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v'],
+        // Android шлёт picking ровно перед копированием, а done — сразу
+        // после: до picking системный пикер ещё открыт и полоса не нужна.
+        onFileLoading: (status) {
+          if (status == FilePickerStatus.picking) _setCopying(true);
+        },
       );
-    }
-    if (sources.isEmpty) return;
-    // Файлы нового набора — типа этого экрана. Коллекция, выбранная
-    // раньше, могла быть другого типа (picker фильтрует по типу пачки,
-    // а она могла прийти с другой вкладки) — такой выбор к новому набору
-    // не относится. Сброс до показа списка: строка коллекции не должна
-    // показывать то, куда файлы не попадут.
-    final collectionType = _collectionType;
-    if (mounted && collectionType != null && collectionType != _screenType) {
-      _clearCollection();
-    }
-    // Список показываем СРАЗУ, с нулевыми размерами: экран не должен
-    // ждать замеров. Размеры догружаются фоном и обновляют строки.
-    ref.read(batchUploadControllerProvider.notifier).setFiles(
-      [
-        for (final source in sources)
-          BatchUploadItem(source: source, fileSize: 0),
-      ],
-      // 0 в размере ниже — «ещё не измерено»: старт заблокирован,
-      // пока не придёт updateSizes (иначе быстрый тап = «empty file»).
-      sizesPending: true,
-    );
-    AppLogger.info('Batch list shown: ${sources.length} file(s)');
+      // Метки этапов: если между «пикер вернулся» и списком есть дыра,
+      // видно в logcat, где именно (плагин/размеры/построение).
+      AppLogger.info('Batch picker returned: ${result.length} file(s)');
+      if (result.isEmpty) return;
 
-    final sizes = await Future.wait([
-      for (final source in sources)
-        // Размер читаем асинхронно: lengthSync() блокирует UI-изолят.
-        File(source.path).length().then((s) => MapEntry(source.path, s)),
-    ]);
-    if (!mounted) return;
-    ref.read(batchUploadControllerProvider.notifier).updateSizes({
-      for (final e in sizes) e.key: e.value,
-    });
-    AppLogger.info('Batch sizes resolved: ${sizes.length}');
+      final sources = <UploadSource>[];
+      for (final file in result) {
+        final path = file.path;
+        if (path == null) continue;
+        sources.add(
+          UploadSource(
+            path: path,
+            name: file.name,
+            openRead: () => File(path).openRead(),
+          ),
+        );
+      }
+      if (sources.isEmpty) return;
+      // Файлы нового набора — типа этого экрана. Коллекция, выбранная
+      // раньше, могла быть другого типа (picker фильтрует по типу пачки,
+      // а она могла прийти с другой вкладки) — такой выбор к новому набору
+      // не относится. Сброс до показа списка: строка коллекции не должна
+      // показывать то, куда файлы не попадут.
+      final collectionType = _collectionType;
+      if (mounted && collectionType != null && collectionType != _screenType) {
+        _clearCollection();
+      }
+      // Список показываем СРАЗУ, с нулевыми размерами: экран не должен
+      // ждать замеров. Размеры догружаются фоном и обновляют строки.
+      ref.read(batchUploadControllerProvider.notifier).setFiles(
+        [
+          for (final source in sources)
+            BatchUploadItem(source: source, fileSize: 0),
+        ],
+        // 0 в размере ниже — «ещё не измерено»: старт заблокирован,
+        // пока не придёт updateSizes (иначе быстрый тап = «empty file»).
+        sizesPending: true,
+      );
+      AppLogger.info('Batch list shown: ${sources.length} file(s)');
+      // Список уже на экране: дальше идут только замеры размеров,
+      // и держать из-за них блокирующую полосу незачем.
+      _setCopying(false);
+
+      final sizes = await Future.wait([
+        for (final source in sources)
+          // Размер читаем асинхронно: lengthSync() блокирует UI-изолят.
+          File(source.path).length().then((s) => MapEntry(source.path, s)),
+      ]);
+      if (!mounted) return;
+      ref.read(batchUploadControllerProvider.notifier).updateSizes({
+        for (final e in sizes) e.key: e.value,
+      });
+      AppLogger.info('Batch sizes resolved: ${sizes.length}');
+    } finally {
+      // Отмена пикера, ошибка копирования или пустой выбор.
+      _setCopying(false);
+    }
   }
 
   Future<void> _startAll() async {
@@ -250,134 +274,187 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       (i) => i.status == BatchItemStatus.active,
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l.uploadMedia),
-        actions: [
-          if (batch.isRunning)
-            IconButton(
-              onPressed: _cancelAll,
-              icon: const Icon(Icons.close),
-              tooltip: l.cancel,
-            )
-          else ...[
-            if (batch.failedCount > 0)
-              IconButton(
-                onPressed: _retryFailed,
-                icon: const Icon(Icons.refresh),
-                tooltip: l.retry,
-              ),
-            // Нет pending-файлов — грузить нечего: после завершённой
-            // пачки остаётся только «Повторить» (упавшие) или ничего.
-            // Кнопка, которая молча ничего не делает, ещё и путала бы:
-            // нажатие по чужой пачке переписывало её тип и коллекцию.
-            if (batch.pendingCount > 0)
-              TextButton.icon(
-                // Пока размеры не догрузились — старт запрещён: 0 в
-                // fileSize означает «не измерено», а контроллер трактует
-                // 0 как пустой файл и валит его backstop-ошибкой.
-                onPressed: batch.sizesPending ? null : _startAll,
-                icon: const Icon(Icons.cloud_upload),
-                label: Text(l.upload),
-              ),
-          ],
-        ],
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: batch.isRunning ? null : _pickFiles,
-                icon: Icon(
-                  batch.items.isNotEmpty
-                      ? Icons.check_circle
-                      : Icons.attach_file,
-                ),
-                label: Text(
-                  batch.items.isEmpty
-                      ? l.selectFiles
-                      : l.selectedFiles(batch.items.length),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Куда сложить загруженное: одна коллекция на всю пачку.
-          // Без этого сезон из 20 серий после загрузки лежал в общем
-          // списке, и раскладывать его по коллекциям приходилось вручную,
-          // по одному файлу.
-          if (batch.items.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _CollectionPicker(
-                name: _collectionName,
-                enabled: !batch.isRunning,
-                onTap: _pickCollection,
-                onClear: _clearCollection,
-              ),
-            ),
-          const SizedBox(height: 8),
-          // Фаза хэширования видна честным прогрессом: иначе пачка
-          // на 20 серий молчит, пока пул считает хэши.
-          if (batch.isHashing) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                children: [
-                  LinearProgressIndicator(
-                    value: batch.hashingTotal > 0
-                        ? batch.hashingDone / batch.hashingTotal
-                        : null,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: Text(l.uploadMedia),
+            actions: [
+              if (batch.isRunning)
+                IconButton(
+                  onPressed: _cancelAll,
+                  icon: const Icon(Icons.close),
+                  tooltip: l.cancel,
+                )
+              else ...[
+                if (batch.failedCount > 0)
+                  IconButton(
+                    onPressed: _retryFailed,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: l.retry,
                   ),
-                  const SizedBox(height: 8),
+                // Нет pending-файлов — грузить нечего: после завершённой
+                // пачки остаётся только «Повторить» (упавшие) или ничего.
+                // Кнопка, которая молча ничего не делает, ещё и путала бы:
+                // нажатие по чужой пачке переписывало её тип и коллекцию.
+                if (batch.pendingCount > 0)
+                  TextButton.icon(
+                    // Пока размеры не догрузились — старт запрещён: 0 в
+                    // fileSize означает «не измерено», а контроллер трактует
+                    // 0 как пустой файл и валит его backstop-ошибкой.
+                    onPressed: batch.sizesPending ? null : _startAll,
+                    icon: const Icon(Icons.cloud_upload),
+                    label: Text(l.upload),
+                  ),
+              ],
+            ],
+          ),
+          body: Column(
+            children: [
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: batch.isRunning ? null : _pickFiles,
+                    icon: Icon(
+                      batch.items.isNotEmpty
+                          ? Icons.check_circle
+                          : Icons.attach_file,
+                    ),
+                    label: Text(
+                      batch.items.isEmpty
+                          ? l.selectFiles
+                          : l.selectedFiles(batch.items.length),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Куда сложить загруженное: одна коллекция на всю пачку.
+              // Без этого сезон из 20 серий после загрузки лежал в общем
+              // списке, и раскладывать его по коллекциям приходилось вручную,
+              // по одному файлу.
+              if (batch.items.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _CollectionPicker(
+                    name: _collectionName,
+                    enabled: !batch.isRunning,
+                    onTap: _pickCollection,
+                    onClear: _clearCollection,
+                  ),
+                ),
+              const SizedBox(height: 8),
+              // Фаза хэширования видна честным прогрессом: иначе пачка
+              // на 20 серий молчит, пока пул считает хэши.
+              if (batch.isHashing) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: [
+                      LinearProgressIndicator(
+                        value: batch.hashingTotal > 0
+                            ? batch.hashingDone / batch.hashingTotal
+                            : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${l.hashingFile} ${batch.hashingDone}/${batch.hashingTotal}',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Expanded(
+                child: batch.items.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.cloud_upload_outlined,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              l.noFilesSelected,
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: batch.items.length,
+                        itemBuilder: (context, index) {
+                          final item = batch.items[index];
+                          final isActive = index == activeIndex;
+                          return _BatchRow(
+                            item: item,
+                            progress: isActive ? single.progress : null,
+                            phase: isActive ? single.phase : null,
+                            formatSize: _formatSize,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+        if (_copyingFiles) const _CopyingOverlay(),
+      ],
+    );
+  }
+}
+
+/// Полоса на время копирования выбранных файлов в кэш приложения.
+///
+/// Процента нет: плагин копирует файл внутри себя и не сообщает, сколько
+/// байт уже перенесено, поэтому полоса бегущая — без выдуманных цифр.
+class _CopyingOverlay extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Stack(
+      children: [
+        const Positioned.fill(
+          child: ModalBarrier(dismissible: false, color: Colors.black54),
+        ),
+        Center(
+          child: Card(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 220, child: LinearProgressIndicator()),
+                  const SizedBox(height: 16),
                   Text(
-                    '${l.hashingFile} ${batch.hashingDone}/${batch.hashingTotal}',
+                    l.copyingFiles,
+                    style: theme.textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l.copyingFilesHint,
+                    style: theme.textTheme.bodySmall,
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-          ],
-          Expanded(
-            child: batch.items.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.cloud_upload_outlined,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          l.noFilesSelected,
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: batch.items.length,
-                    itemBuilder: (context, index) {
-                      final item = batch.items[index];
-                      final isActive = index == activeIndex;
-                      return _BatchRow(
-                        item: item,
-                        progress: isActive ? single.progress : null,
-                        phase: isActive ? single.phase : null,
-                        formatSize: _formatSize,
-                      );
-                    },
-                  ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

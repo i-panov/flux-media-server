@@ -656,6 +656,18 @@ abstract class AppLocalizations {
   /// **'No files selected'**
   String get noFilesSelected;
 
+  /// No description provided for @copyingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Copying files...'**
+  String get copyingFiles;
+
+  /// No description provided for @copyingFilesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Large videos can take a few seconds to copy'**
+  String get copyingFilesHint;
+
   /// No description provided for @uploading.
   ///
   /// In en, this message translates to:

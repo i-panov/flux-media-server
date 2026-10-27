@@ -310,6 +310,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noFilesSelected => 'No files selected';
 
   @override
+  String get copyingFiles => 'Copying files...';
+
+  @override
+  String get copyingFilesHint => 'Large videos can take a few seconds to copy';
+
+  @override
   String get uploading => 'Uploading...';
 
   @override

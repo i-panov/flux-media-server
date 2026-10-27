@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -82,6 +83,35 @@ final class _FakeFilePicker extends FilePickerPlatform {
     LinuxOptions linuxOptions = const LinuxOptions(),
     WebOptions webOptions = const WebOptions(),
   }) async => files;
+}
+
+/// Пикер, который «копирует» файл столько, сколько скажет тест:
+/// событие picking приходит сразу, результат — только после [finishCopy].
+final class _SlowFilePicker extends FilePickerPlatform {
+  new(this.files);
+
+  final List<PlatformFile> files;
+  final Completer<List<PlatformFile>> _copyDone = Completer();
+
+  void finishCopy() => _copyDone.complete(files);
+
+  @override
+  Future<List<PlatformFile>> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    void Function(FilePickerStatus)? onFileLoading,
+    int compressionQuality = 0,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) {
+    onFileLoading?.call(FilePickerStatus.picking);
+    return _copyDone.future;
+  }
 }
 
 /// Выбранный файл: экран берёт из него имя и путь, содержимое ему не нужно.
@@ -261,5 +291,51 @@ void main() {
 
     expect(container.read(batchUploadControllerProvider).doneCount, 1);
     expect(collections.addItemCalls, isEmpty);
+  });
+
+  testWidgets('на время копирования файлов видна полоса прогресса', (
+    tester,
+  ) async {
+    // Копия в кэш занимает секунды на больших видео, а пикер возвращает
+    // результат только после неё. Без полосы экран выглядит зависшим.
+    final container = makeContainer(FakeCollectionsRepository());
+    final dir = Directory.systemTemp.createTempSync('flux_upload_copy');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/a.mp4')
+      ..writeAsBytesSync(const [1, 2, 3, 4]);
+    final previous = FilePickerPlatform.instance;
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    final picker = _SlowFilePicker([_FakePlatformFile(file.uri)]);
+    FilePickerPlatform.instance = picker;
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: UploadScreen(mediaType: 'video'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Select Files'));
+    await tester.pump();
+
+    expect(find.text('Copying files...'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    picker.finishCopy();
+    await tester.pump();
+    await tester.pump();
+
+    // Список готов — полоса уступает ему место.
+    expect(find.text('Copying files...'), findsNothing);
+    expect(container.read(batchUploadControllerProvider).items, hasLength(1));
+
+    // Замеры размеров идут вне тестового времени: даём им завершиться.
+    await waitForSizes(tester, container);
   });
 }

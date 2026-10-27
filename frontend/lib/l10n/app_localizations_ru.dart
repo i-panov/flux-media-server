@@ -312,6 +312,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noFilesSelected => 'Файлы не выбраны';
 
   @override
+  String get copyingFiles => 'Копирование файлов...';
+
+  @override
+  String get copyingFilesHint =>
+      'Большие видео могут копироваться несколько секунд';
+
+  @override
   String get uploading => 'Загрузка...';
 
   @override
