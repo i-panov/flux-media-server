@@ -204,3 +204,117 @@ func TestUploadQueueCancelDuringProcessingNoRace(t *testing.T) {
 	_, _, _, ok := q.Get(id)
 	assert.False(t, ok, "cancelled job stays removed from the map")
 }
+
+// TestUploadQueueDuplicateStatus: похожий мем фиксируется в статусе
+// duplicate, а файл и запись новой загрузки удаляются.
+func TestUploadQueueDuplicateStatus(t *testing.T) {
+	q, mediaRepo := setupUploadTestQueue(t, 10)
+	ctx := context.Background()
+
+	existing := &models.Media{
+		Title:    "Старый мем",
+		Type:     models.MediaTypeImage,
+		FilePath: filepath.Join(t.TempDir(), "old.png"),
+	}
+	require.NoError(t, mediaRepo.Create(ctx, existing))
+
+	job := enqueueTestJob(t, q, "new.png")
+	newMedia := &models.Media{
+		Title:    "Новый мем",
+		Type:     models.MediaTypeImage,
+		FilePath: job.filePath,
+	}
+	require.NoError(t, mediaRepo.Create(ctx, newMedia))
+
+	q.mu.Lock()
+	job.mediaType = models.MediaTypeImage
+	job.MediaID = newMedia.ID
+	q.mu.Unlock()
+
+	q.duplicate(job, existing)
+
+	status, ok := q.Status(job.ID)
+	require.True(t, ok)
+	assert.Equal(t, UploadJobDuplicate, status.Status)
+	assert.Equal(t, existing.ID, status.DuplicateMediaID)
+	assert.Equal(t, existing.Title, status.DuplicateTitle)
+
+	_, err := os.Stat(job.filePath)
+	assert.True(t, os.IsNotExist(err), "файл дубля удалён")
+	_, err = mediaRepo.FindByID(ctx, newMedia.ID)
+	assert.Error(t, err, "запись дубля удалена")
+}
+
+// TestUploadQueueConcurrentSimilarUploadsKeepOne: два воркера с похожими
+// картинками не должны счесть дублями друг друга и удалить обе.
+func TestUploadQueueConcurrentSimilarUploadsKeepOne(t *testing.T) {
+	q, mediaRepo := setupUploadTestQueue(t, 10)
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	createMedia := func(title string) (*models.Media, string) {
+		path := filepath.Join(dir, title+".png")
+		require.NoError(t, os.WriteFile(path, []byte("image"), 0644))
+		media := &models.Media{
+			Title:    title,
+			Type:     models.MediaTypeImage,
+			FilePath: path,
+		}
+		require.NoError(t, mediaRepo.Create(ctx, media))
+		return media, path
+	}
+
+	mediaA, pathA := createMedia("a")
+	mediaB, pathB := createMedia("b")
+	const phash int64 = 0x0F0F_0F0F_0F0F_0F0F
+	require.NoError(t, mediaRepo.SetPHash(ctx, mediaA.ID, phash))
+	require.NoError(t, mediaRepo.SetPHash(ctx, mediaB.ID, phash^0x3))
+
+	jobs := []*UploadJob{
+		{
+			ID:        1,
+			Status:    UploadJobProcessing,
+			filePath:  pathA,
+			mediaType: models.MediaTypeImage,
+			MediaID:   mediaA.ID,
+		},
+		{
+			ID:        2,
+			Status:    UploadJobProcessing,
+			filePath:  pathB,
+			mediaType: models.MediaTypeImage,
+			MediaID:   mediaB.ID,
+		},
+	}
+
+	start := make(chan struct{})
+	type result struct {
+		duplicate bool
+		err       error
+	}
+	results := make(chan result, len(jobs))
+	for _, job := range jobs {
+		go func(j *UploadJob) {
+			<-start
+			duplicate, err := q.resolveDuplicate(ctx, j, phash)
+			results <- result{duplicate: duplicate, err: err}
+		}(job)
+	}
+	close(start)
+
+	duplicates := 0
+	for range jobs {
+		res := <-results
+		require.NoError(t, res.err)
+		if res.duplicate {
+			duplicates++
+		}
+	}
+	assert.Equal(t, 1, duplicates, "дублем должен оказаться ровно один файл")
+
+	left, _, err := mediaRepo.FindAll(ctx, repository.MediaFilters{
+		Type: models.MediaTypeImage,
+	}, 10, 0)
+	require.NoError(t, err)
+	assert.Len(t, left, 1, "в библиотеке должен остаться один мем")
+}

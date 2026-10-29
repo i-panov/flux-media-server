@@ -126,7 +126,10 @@ export function AudioDetailPage() {
 						<Music size={48} className="text-[var(--mantine-color-dimmed)]" />
 					)}
 				</div>
-				<Stack gap="md" className="min-w-0 flex-1">
+				<Stack
+					gap="md"
+					className="min-w-0 flex-1 basis-full min-[48em]:basis-auto"
+				>
 					<Title order={1} size="h2">
 						{item.title}
 					</Title>

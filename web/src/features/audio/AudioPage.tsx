@@ -1,6 +1,7 @@
 import {
 	Alert,
 	Button,
+	Group,
 	SimpleGrid,
 	Skeleton,
 	Stack,
@@ -12,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAudioList } from "../../api/media";
 import { ContinueWatching } from "../media/ContinueWatching";
+import { UploadButton } from "../upload/UploadButton";
 import { AudioCard } from "./AudioCard";
 
 const SKELETON_COUNT = 12;
@@ -19,7 +21,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 function AudioSkeletons() {
 	return (
-		<SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
+		<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing="md">
 			{Array.from({ length: SKELETON_COUNT }, (_, index) => (
 				// Скелетоны без данных: индекс здесь — стабильный
 				// идентификатор позиции, а не сущности.
@@ -53,9 +55,12 @@ export function AudioPage() {
 
 	return (
 		<Stack gap="lg">
-			<Title order={1} size="h2">
-				{t("audio.title")}
-			</Title>
+			<Group justify="space-between" align="center" wrap="wrap">
+				<Title order={1} size="h2">
+					{t("audio.title")}
+				</Title>
+				<UploadButton type="audio" />
+			</Group>
 			<TextInput
 				placeholder={t("audio.search")}
 				aria-label={t("audio.search")}
@@ -86,7 +91,10 @@ export function AudioPage() {
 				<Text c="dimmed">{t("audio.empty")}</Text>
 			) : (
 				<>
-					<SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
+					<SimpleGrid
+						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+						spacing="md"
+					>
 						{items.map((media) => (
 							<AudioCard key={media.id} media={media} />
 						))}

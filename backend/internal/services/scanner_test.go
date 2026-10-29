@@ -510,3 +510,87 @@ func TestScannerIndexesImageByExtension(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.MediaTypeImage, media.Type)
 }
+
+// Картинка, проиндексированная до появления pHash, не менялась —
+// значит updateChangedFile выходит по quick hash. Догоняющий расчёт
+// обязан посчитать хэш с уже готового превью.
+func TestScannerBackfillsImagePHashForUnchangedFile(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	ctx := context.Background()
+
+	tempDir := t.TempDir()
+	imagePath := filepath.Join(tempDir, "meme.jpg")
+	writeGradientJPEG(t, imagePath, false)
+
+	thumbDir := t.TempDir()
+	cfg := &config.Config{
+		Media: config.MediaConfig{
+			ThumbnailPath: thumbDir,
+			ImagePath:     tempDir,
+		},
+	}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	media, err := mediaRepo.FindByPath(ctx, imagePath)
+	require.NoError(t, err)
+	require.Equal(t, models.MediaTypeImage, media.Type)
+	require.NoError(t, mediaRepo.SetPHash(ctx, media.ID, 0))
+
+	// Превью кладём вручную: ffmpeg в тестовом окружении может
+	// отсутствовать, а бэкфиллу нужен именно файл превью.
+	writeGradientJPEG(t, filepath.Join(thumbDir, fmt.Sprintf("%d.jpg", media.ID)), true)
+
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	updated, err := mediaRepo.FindByPath(ctx, imagePath)
+	require.NoError(t, err)
+	assert.NotZero(t, updated.PHash, "pHash должен досчитаться без изменения файла")
+}
+
+// Изменённый файл + сбой генерации превью не должен оставлять старое
+// превью: иначе следующий скан посчитает pHash по чужой картинке.
+func TestScannerDropsStalePreviewOnThumbnailFailure(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	ctx := context.Background()
+
+	tempDir := t.TempDir()
+	imagePath := filepath.Join(tempDir, "meme.jpg")
+	writeGradientJPEG(t, imagePath, false)
+
+	thumbDir := t.TempDir()
+	cfg := &config.Config{
+		Media: config.MediaConfig{
+			ThumbnailPath: thumbDir,
+			ImagePath:     tempDir,
+		},
+	}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	media, err := mediaRepo.FindByPath(ctx, imagePath)
+	require.NoError(t, err)
+	require.Equal(t, models.MediaTypeImage, media.Type)
+
+	thumbPath := filepath.Join(thumbDir, fmt.Sprintf("%d.jpg", media.ID))
+	writeGradientJPEG(t, thumbPath, true)
+	require.NoError(t, mediaRepo.SetPHash(ctx, media.ID, 12345))
+
+	// Ломаем картинку: quick hash изменится, а ffmpeg не сможет
+	// пересоздать превью.
+	require.NoError(t, os.WriteFile(imagePath, []byte("broken image"), 0644))
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	updated, err := mediaRepo.FindByPath(ctx, imagePath)
+	require.NoError(t, err)
+	assert.Zero(t, updated.PHash, "pHash изменённого файла обнуляется")
+	_, err = os.Stat(thumbPath)
+	assert.True(t, os.IsNotExist(err), "старое превью удалено")
+
+	// Повторный скан: файл уже не менялся, бэкфилл не должен
+	// воскресить хэш из удалённого (устаревшего) превью.
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+	again, err := mediaRepo.FindByPath(ctx, imagePath)
+	require.NoError(t, err)
+	assert.Zero(t, again.PHash)
+}

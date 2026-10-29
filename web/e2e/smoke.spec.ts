@@ -69,6 +69,28 @@ test("настройки открываются из шапки", async ({ page 
 	await expect(page.getByText("Версия бэкенда")).toBeVisible();
 });
 
+test("каркас адаптируется под мобильный, десктоп и ТВ", async ({ page }) => {
+	await stubAuthedSession(page);
+
+	await page.goto("/");
+	const desktopNav = page.getByRole("navigation", {
+		name: "Основная навигация",
+	});
+	const mobileNav = page.getByRole("navigation", {
+		name: "Мобильная навигация",
+	});
+	await expect(desktopNav).toBeVisible();
+	await expect(mobileNav).toBeHidden();
+
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect(mobileNav).toBeVisible();
+	await expect(desktopNav).toBeHidden();
+
+	await page.setViewportSize({ width: 1920, height: 1080 });
+	await expect(desktopNav).toBeVisible();
+	await expect(mobileNav).toBeHidden();
+});
+
 test("неизвестный маршрут показывает страницу 404", async ({ page }) => {
 	await stubAuthedSession(page);
 	await page.goto("/unknown");

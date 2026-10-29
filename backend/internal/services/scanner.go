@@ -422,6 +422,10 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 	}
 
 	if existing.QuickHash == qh {
+		// Файл не менялся, но pHash мог отсутствовать: картинки,
+		// проиндексированные до появления pHash, иначе навсегда
+		// остались бы невидимыми для дедупа.
+		s.backfillImagePHash(ctx, existing)
 		return // unchanged
 	}
 
@@ -482,8 +486,21 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 
 	// Regenerate thumbnail for changed file. В БД сохраняем
 	// относительный URL — фронтенд строит полный адрес сам.
-	if thumbPath := s.thumbService.GenerateWithContext(ctx, existing.ID, path); thumbPath != "" {
+	thumbPath := s.thumbService.GenerateWithContext(ctx, existing.ID, path)
+	if thumbPath != "" {
 		existing.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", existing.ID)
+	}
+	if existing.Type == models.MediaTypeImage {
+		if thumbPath == "" {
+			// ffmpeg при раннем сбое декодирования оставляет старый
+			// файл превью на диске. Он описывает прежнюю картинку —
+			// удаляем, иначе бэкфилл посчитает pHash по устаревшему
+			// превью и дедуп начнёт врать.
+			s.thumbService.RemoveThumbnail(existing.ID)
+		}
+		// Хэш пересчитываем всегда: у изменённого файла старое значение
+		// уже не описывает картинку. Пустое превью обнуляет хэш.
+		s.updateImagePHash(ctx, existing.ID, thumbPath)
 	}
 
 	// Extract embedded cover art (if file has one). У картинки «обложка» —
@@ -605,11 +622,77 @@ func (s *ScannerService) createNewMedia(ctx context.Context, path string, info o
 
 	// Generate thumbnail. В БД сохраняем относительный URL — фронтенд
 	// строит полный адрес сам.
-	if thumbPath := s.thumbService.GenerateWithContext(ctx, media.ID, path); thumbPath != "" {
+	thumbPath := s.thumbService.GenerateWithContext(ctx, media.ID, path)
+	if thumbPath != "" {
 		media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
 		if err := s.mediaRepo.Update(ctx, media); err != nil {
 			log.Printf("Error updating media thumbnail for %s: %v", path, err)
 		}
+	}
+
+	// pHash считается с превью: похожие мемы пропускаем молча, как и
+	// точные дубли (файл на диске не удаляем — им распоряжается владелец
+	// библиотеки).
+	if detectedType == models.MediaTypeImage && thumbPath != "" {
+		phash, hashErr := ImagePHash(thumbPath)
+		if hashErr != nil {
+			log.Printf("image phash for %s: %v", path, hashErr)
+			return
+		}
+		similar, findErr := FindSimilarImage(ctx, s.mediaRepo, phash, media.ID)
+		if findErr != nil {
+			log.Printf("find similar image for %s: %v", path, findErr)
+		} else if similar != nil {
+			log.Printf("Skipping similar image: %s (matches media %d %q)", path, similar.ID, similar.Title)
+			if err := s.mediaRepo.PurgeMedia(ctx, media.ID); err != nil {
+				log.Printf("remove similar image record %d: %v", media.ID, err)
+			}
+			s.thumbService.RemoveThumbnail(media.ID)
+			return
+		}
+		if err := s.mediaRepo.SetPHash(ctx, media.ID, phash); err != nil {
+			log.Printf("save image phash for %s: %v", path, err)
+		}
+	}
+}
+
+// updateImagePHash пересчитывает pHash по превью. Пустое превью обнуляет
+// хэш, чтобы изменённый файл не находился по старому значению.
+func (s *ScannerService) updateImagePHash(ctx context.Context, mediaID uint, thumbPath string) {
+	phash := int64(0)
+	if thumbPath != "" {
+		hash, err := ImagePHash(thumbPath)
+		if err != nil {
+			log.Printf("image phash for media %d: %v", mediaID, err)
+		} else {
+			phash = hash
+		}
+	}
+	if err := s.mediaRepo.SetPHash(ctx, mediaID, phash); err != nil {
+		log.Printf("save image phash for media %d: %v", mediaID, err)
+	}
+}
+
+// backfillImagePHash досчитывает pHash для неизменившейся картинки.
+// Превью уже есть на диске; оригинал повторно не читаем.
+func (s *ScannerService) backfillImagePHash(ctx context.Context, media *models.Media) {
+	if media.Type != models.MediaTypeImage || media.PHash != 0 {
+		return
+	}
+	thumbPath := s.thumbService.GetPath(media.ID)
+	if _, err := os.Stat(thumbPath); err != nil {
+		return
+	}
+	phash, err := ImagePHash(thumbPath)
+	if err != nil {
+		log.Printf("backfill image phash for media %d: %v", media.ID, err)
+		return
+	}
+	if phash == 0 {
+		return
+	}
+	if err := s.mediaRepo.SetPHash(ctx, media.ID, phash); err != nil {
+		log.Printf("save backfilled image phash for media %d: %v", media.ID, err)
 	}
 }
 

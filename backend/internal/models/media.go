@@ -34,6 +34,9 @@ type Media struct {
 	FilePath string `gorm:"index" json:"-"`
 	FileSize int64  `json:"file_size"`
 	FileHash string `gorm:"index" json:"file_hash"`
+	// PHash — perceptual hash мема (64 бита), считается с превью.
+	// 0 — хэш ещё не посчитан; в JSON не отдаётся.
+	PHash int64 `gorm:"column:phash" json:"-"`
 	// SourceHash — sha256 исходника в карантине, из которого получен
 	// этот файл (нормализация). У direct-файлов совпадает с FileHash.
 	// Нужен для дедупа повторных заливок: хэш результата отличается.

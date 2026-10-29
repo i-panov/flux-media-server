@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -74,6 +75,11 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 			return response.Error(c, fiber.StatusBadRequest, "Invalid media_type")
 		}
 	}
+
+	// force пропускает проверку похожих картинок (pHash), но не точного
+	// дубля по хэшу: подтверждение пользователя относится только к
+	// «похоже, уже есть».
+	force, _ := strconv.ParseBool(c.FormValue("force"))
 
 	// Get uploaded file.
 	fileHeader, err := c.FormFile("file")
@@ -166,6 +172,7 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		FilePath:  dstPath,
 		Filename:  filename,
 		MediaType: mediaType,
+		Force:     force,
 	})
 	if err != nil {
 		log.Printf("upload: enqueue: %v", err)
@@ -283,7 +290,7 @@ func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 
-	status, errMsg, mediaID, ok := h.queue.Get(uint64(id))
+	status, ok := h.queue.Status(uint64(id))
 	if !ok {
 		if st, ok := h.transQueue.Get(uint64(id)); ok {
 			return c.JSON(transcodeStatusResponse(c, h.mediaRepo, id, st))
@@ -293,19 +300,25 @@ func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 
 	resp := fiber.Map{
 		"id":     id,
-		"status": status,
+		"status": status.Status,
 		"error":  nil,
 		"media":  nil,
 	}
-	if errMsg != "" {
-		resp["error"] = errMsg
+	if status.Error != "" {
+		resp["error"] = status.Error
 	}
-	if status == services.UploadJobDone && mediaID != 0 {
-		media, err := h.mediaRepo.FindByID(c.UserContext(), mediaID)
+	if status.Status == services.UploadJobDuplicate && status.DuplicateMediaID != 0 {
+		resp["duplicate"] = fiber.Map{
+			"id":    status.DuplicateMediaID,
+			"title": status.DuplicateTitle,
+		}
+	}
+	if status.Status == services.UploadJobDone && status.MediaID != 0 {
+		media, err := h.mediaRepo.FindByID(c.UserContext(), status.MediaID)
 		if err != nil {
 			// Запись удалена отдельно (например, через DELETE /media/:id) —
 			// отдаём media:null, это не сбой API.
-			log.Printf("UploadStatus: FindByID %d: %v", mediaID, err)
+			log.Printf("UploadStatus: FindByID %d: %v", status.MediaID, err)
 		} else {
 			resp["media"] = media
 		}

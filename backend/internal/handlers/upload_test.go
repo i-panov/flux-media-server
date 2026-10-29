@@ -5,11 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -235,7 +240,7 @@ func waitForUploadJob(t *testing.T, app *fiber.App, jobID int64) (map[string]int
 		resp, out = uploadJobStatus(t, app, jobID)
 		require.Equal(t, fiber.StatusOK, resp.StatusCode)
 		status, _ := out["status"].(string)
-		if status == services.UploadJobDone || status == services.UploadJobError {
+		if status == services.UploadJobDone || status == services.UploadJobError || status == services.UploadJobDuplicate {
 			return out, resp
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -255,6 +260,36 @@ func countFilesInDir(t *testing.T, dir string) int {
 		t.Fatalf("read dir %s: %v", dir, err)
 	}
 	return len(entries)
+}
+
+// testMemeImage рисует детерминированную картинку и кодирует её в png
+// или jpeg: один и тот же кадр в разных форматах нужен для проверки
+// pHash-дубля (точный хэш при этом разный).
+func testMemeImage(t *testing.T, format string) []byte {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := range 64 {
+		for x := range 64 {
+			img.Set(x, y, color.RGBA{R: uint8(x * 4), G: uint8(y * 4), B: 128, A: 255})
+		}
+	}
+	for y := range 16 {
+		for x := range 16 {
+			img.Set(x, y, color.RGBA{R: 255, A: 255})
+		}
+	}
+
+	var buf bytes.Buffer
+	switch format {
+	case "png":
+		require.NoError(t, png.Encode(&buf, img))
+	case "jpeg":
+		require.NoError(t, jpeg.Encode(&buf, img, nil))
+	default:
+		t.Fatalf("unsupported image format: %s", format)
+	}
+	return buf.Bytes()
 }
 
 func TestUploadSuccess(t *testing.T) {
@@ -566,6 +601,46 @@ func TestUploadImageGoesToImagePath(t *testing.T) {
 			assert.Equal(t, models.MediaTypeImage, mediaList[0].Type)
 		})
 	}
+}
+
+func TestUploadSimilarImageReturnsDuplicate(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg не установлен")
+	}
+
+	app, mediaRepo, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
+	defer cleanup()
+
+	// Первый мем — PNG, второй — тот же кадр в JPEG: точные хэши разные,
+	// pHash должен совпасть в пределах порога.
+	resp := uploadFile(t, app, "meme.png", testMemeImage(t, "png"), string(models.MediaTypeImage))
+	require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
+	firstJob := jobIDFromResponse(t, resp)
+	first, _ := waitForUploadJob(t, app, firstJob)
+	require.Equal(t, services.UploadJobDone, first["status"])
+
+	mediaList, _, err := mediaRepo.FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, mediaList, 1)
+	firstID := mediaList[0].ID
+
+	resp = uploadFile(t, app, "meme-copy.jpg", testMemeImage(t, "jpeg"), string(models.MediaTypeImage))
+	require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
+	secondJob := jobIDFromResponse(t, resp)
+	second, _ := waitForUploadJob(t, app, secondJob)
+
+	assert.Equal(t, services.UploadJobDuplicate, second["status"])
+	duplicate, ok := second["duplicate"].(map[string]interface{})
+	require.True(t, ok, "status duplicate должен нести похожий мем")
+	assert.Equal(t, float64(firstID), duplicate["id"])
+	assert.Equal(t, "meme", duplicate["title"])
+
+	// Файл дубля удалён, в библиотеке остался один мем.
+	_, err = os.Stat(filepath.Join(libraryPath, "images", "meme-copy.jpg"))
+	assert.True(t, os.IsNotExist(err))
+	mediaList, _, err = mediaRepo.FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
+	require.NoError(t, err)
+	assert.Len(t, mediaList, 1)
 }
 
 func TestUploadVideoGoesToQuarantine(t *testing.T) {

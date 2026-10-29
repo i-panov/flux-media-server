@@ -35,6 +35,12 @@ type MediaRepository interface {
 	FindByIDs(ctx context.Context, ids []uint) ([]models.Media, error)
 	FindByID(ctx context.Context, id uint) (*models.Media, error)
 	FindByPath(ctx context.Context, path string) (*models.Media, error)
+	// SetPHash записывает perceptual hash без «только непустые поля»:
+	// ноль обязан затирать устаревший хэш изменённого файла.
+	SetPHash(ctx context.Context, mediaID uint, phash int64) error
+	// FindImagesWithPHash — кандидаты для поиска похожих мемов: только
+	// живые картинки с посчитанным хэшем, кроме excludeID.
+	FindImagesWithPHash(ctx context.Context, excludeID uint) ([]models.Media, error)
 	// FindByPathBasic ищет по пути одним SELECT без Preload — для горячих
 	// путей, где Metadata/Artists не нужны (сканирование больших библиотек).
 	FindByPathBasic(ctx context.Context, path string) (*models.Media, error)

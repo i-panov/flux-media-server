@@ -111,6 +111,11 @@ async function requestWithRefresh<T>(
 		throw error;
 	}
 
+	// 204 (отмена задания) тела не имеет — json() бросил бы.
+	if (response.status === 204) {
+		return undefined as T;
+	}
+
 	return (await response.json()) as T;
 }
 

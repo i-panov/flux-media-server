@@ -1,6 +1,7 @@
 import {
 	Alert,
 	Button,
+	Group,
 	SimpleGrid,
 	Skeleton,
 	Stack,
@@ -12,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVideoList } from "../../api/media";
 import { ContinueWatching } from "../media/ContinueWatching";
+import { UploadButton } from "../upload/UploadButton";
 import { VideoCard } from "./VideoCard";
 
 const SKELETON_COUNT = 12;
@@ -19,7 +21,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 function VideoSkeletons() {
 	return (
-		<SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
+		<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing="md">
 			{Array.from({ length: SKELETON_COUNT }, (_, index) => (
 				// Скелетоны без данных: индекс здесь — стабильный
 				// идентификатор позиции, а не сущности.
@@ -52,9 +54,12 @@ export function VideoPage() {
 
 	return (
 		<Stack gap="lg">
-			<Title order={1} size="h2">
-				{t("video.title")}
-			</Title>
+			<Group justify="space-between" align="center" wrap="wrap">
+				<Title order={1} size="h2">
+					{t("video.title")}
+				</Title>
+				<UploadButton type="video" />
+			</Group>
 			<TextInput
 				placeholder={t("video.search")}
 				aria-label={t("video.search")}
@@ -85,7 +90,10 @@ export function VideoPage() {
 				<Text c="dimmed">{t("video.empty")}</Text>
 			) : (
 				<>
-					<SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
+					<SimpleGrid
+						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+						spacing="md"
+					>
 						{items.map((media) => (
 							<VideoCard key={media.id} media={media} />
 						))}

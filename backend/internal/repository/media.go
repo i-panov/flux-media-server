@@ -125,6 +125,26 @@ func (r *MediaStore) FindByPathBasic(ctx context.Context, path string) (*models.
 	return &media, err
 }
 
+// SetPHash пишет perceptual hash напрямую: Update пропускает нулевые
+// значения, а при изменении файла старый хэш нужно уметь обнулить.
+func (r *MediaStore) SetPHash(ctx context.Context, mediaID uint, phash int64) error {
+	return r.db.WithContext(ctx).Model(&models.Media{}).
+		Where("id = ?", mediaID).
+		Update("phash", phash).Error
+}
+
+// FindImagesWithPHash отдаёт живые картинки с посчитанным хэшем для
+// линейного поиска похожих. Soft-deleted отсекает дефолтный scope.
+func (r *MediaStore) FindImagesWithPHash(ctx context.Context, excludeID uint) ([]models.Media, error) {
+	var media []models.Media
+	err := r.db.WithContext(ctx).
+		Select("id", "title", "phash").
+		Where("type = ? AND phash <> 0 AND id <> ?", models.MediaTypeImage, excludeID).
+		Order("id ASC").
+		Find(&media).Error
+	return media, err
+}
+
 // FindVideosMissingDimensions отдаёт живые видео без размеров кадра.
 //
 // Фильтр по ОБОИМ размерам (width = 0 OR height = 0): клиенту нужна

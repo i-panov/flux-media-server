@@ -129,7 +129,7 @@ export function ContinueWatching({
 			<Title order={2} size="h3">
 				{t(kind === "video" ? "continue.watching" : "continue.listening")}
 			</Title>
-			<SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+			<SimpleGrid cols={{ base: 1, sm: 2, md: 3, xl: 4 }} spacing="md">
 				{items.map((entry) => (
 					<ContinueCard key={entry.id} entry={entry} kind={kind} />
 				))}

@@ -10,6 +10,21 @@ export function formatDuration(totalSeconds: number): string {
 	return `${hours > 0 ? `${hours}:` : ""}${minutePart}:${String(seconds).padStart(2, "0")}`;
 }
 
+// Размер файла для списка загрузок. Один десятичный знак у KB+.
+export function formatFileSize(bytes: number): string {
+	const size = Math.max(0, bytes);
+	if (size < 1024) {
+		return `${size} B`;
+	}
+	if (size < 1024 * 1024) {
+		return `${(size / 1024).toFixed(1)} KB`;
+	}
+	if (size < 1024 * 1024 * 1024) {
+		return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+	}
+	return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 const SUB_LANG_SUFFIX_PATTERN = /\d+$/;
 const BCP47_TAG_PATTERN = /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/;
 

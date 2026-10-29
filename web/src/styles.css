@@ -21,3 +21,19 @@ body {
 		var(--mantine-color-indigo-5)
 	);
 }
+
+/* ТВ и большие экраны: интерфейс читается с дивана, не меняя
+   сетку и логику. Отдельного ТВ-управления пока нет. */
+@media (min-width: 120em) {
+	html {
+		font-size: 18px;
+	}
+}
+
+/* Нижняя навигация на мобильном: контент не должен уезжать под неё.
+   Mantine задаёт padding инлайном, поэтому переопределяем по классу. */
+@media (max-width: 61.99em) {
+	main.app-shell-main-mobile {
+		padding-bottom: calc(64px + 1rem);
+	}
+}

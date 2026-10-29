@@ -10,6 +10,7 @@ import {
 } from "@mantine/core";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
+import { Play } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
@@ -86,14 +87,29 @@ export function LoginPage() {
 	};
 
 	return (
-		<Container size="xs" py="xl">
-			<Card withBorder padding="lg" radius="md" shadow="sm">
-				<Stack gap="md">
-					<Stack gap={4}>
-						<Title order={1} size="h2">
+		<Container
+			size="xs"
+			px={{ base: "md", sm: "lg" }}
+			py={{ base: "xl", md: 96, xl: 120 }}
+		>
+			<Card
+				withBorder
+				padding="lg"
+				radius="lg"
+				shadow="sm"
+				maw={480}
+				mx="auto"
+				data-testid="login-card"
+			>
+				<Stack gap="lg">
+					<Stack gap="xs" align="center">
+						<div className="flux-brand-gradient grid h-12 w-12 place-items-center rounded-xl text-white">
+							<Play size={24} fill="currentColor" />
+						</div>
+						<Title order={1} size="h2" ta="center">
 							{t("auth.title")}
 						</Title>
-						<Text size="sm" c="dimmed">
+						<Text size="sm" c="dimmed" ta="center">
 							{t("auth.subtitle")}
 						</Text>
 					</Stack>

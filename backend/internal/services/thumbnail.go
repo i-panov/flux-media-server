@@ -90,6 +90,14 @@ func (s *ThumbnailService) RemoveCovers(mediaID uint) {
 	}
 }
 
+// RemoveThumbnail удаляет превью mediaID. Нужно, когда запись отбракована
+// как похожий мем и файл превью больше не нужен.
+func (s *ThumbnailService) RemoveThumbnail(mediaID uint) {
+	if err := os.Remove(s.GetPath(mediaID)); err != nil && !os.IsNotExist(err) {
+		log.Printf("thumb: remove thumb %s: %v", s.GetPath(mediaID), err)
+	}
+}
+
 // GetPath returns the thumbnail path for a media ID.
 func (s *ThumbnailService) GetPath(mediaID uint) string {
 	return filepath.Join(s.thumbnailsDir, fmt.Sprintf("%d.jpg", mediaID))

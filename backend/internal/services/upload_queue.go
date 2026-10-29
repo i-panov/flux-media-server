@@ -23,6 +23,9 @@ const (
 	UploadJobProcessing = "processing"
 	UploadJobDone       = "done"
 	UploadJobError      = "error"
+	// UploadJobDuplicate — картинка похожа на уже существующий мем;
+	// запись и файл новой загрузки удалены.
+	UploadJobDuplicate = "duplicate"
 	// uploadJobCancelled — внутренний статус отменённого задания. Наружу
 	// не возвращается: задание удаляется из очереди при отмене.
 	uploadJobCancelled = "cancelled"
@@ -62,6 +65,9 @@ type UploadJobInput struct {
 	FilePath  string
 	Filename  string
 	MediaType models.MediaType
+	// Force — пропустить проверку похожих картинок (пользователь
+	// подтвердил, что это не дубль). Точный хэш всё равно проверяется.
+	Force bool
 }
 
 // UploadJob — задание фоновой обработки загрузки. Все поля доступны только
@@ -74,7 +80,20 @@ type UploadJob struct {
 	filePath  string
 	filename  string
 	mediaType models.MediaType
-	createdAt time.Time
+	force     bool
+	// Заполняются при статусе duplicate: id и название похожего мема.
+	duplicateMediaID uint
+	duplicateTitle   string
+	createdAt        time.Time
+}
+
+// UploadJobStatus — снимок статуса для API без доступа к внутренним полям.
+type UploadJobStatus struct {
+	Status           string
+	Error            string
+	MediaID          uint
+	DuplicateMediaID uint
+	DuplicateTitle   string
 }
 
 // UploadQueue — in-memory очередь фоновой обработки загрузок. Файл
@@ -85,7 +104,10 @@ type UploadJob struct {
 // GET/DELETE по ID. Stop() отменяет контекст (прерывая ffprobe/ffmpeg/
 // хэширование через CommandContext/contextReader) и ждёт воркеров.
 type UploadQueue struct {
-	mu       sync.Mutex
+	mu sync.Mutex
+	// phashMu сериализует проверку похожести и решение duplicate:
+	// иначе два воркера видят друг друга и удаляют обе загрузки.
+	phashMu  sync.Mutex
 	jobs     map[uint64]*UploadJob
 	queue    chan *UploadJob
 	nextID   uint64
@@ -147,6 +169,7 @@ func (q *UploadQueue) Enqueue(in UploadJobInput) (uint64, error) {
 		filePath:  in.FilePath,
 		filename:  in.Filename,
 		mediaType: in.MediaType,
+		force:     in.Force,
 		createdAt: time.Now(),
 	}
 	q.jobs[job.ID] = job
@@ -174,9 +197,27 @@ func (q *UploadQueue) Get(id uint64) (status, errMsg string, mediaID uint, ok bo
 	return job.Status, job.Error, job.MediaID, true
 }
 
+// Status возвращает полный снимок задания, включая данные о похожем меме
+// для статуса duplicate. ok=false — задания нет.
+func (q *UploadQueue) Status(id uint64) (UploadJobStatus, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	job, found := q.jobs[id]
+	if !found {
+		return UploadJobStatus{}, false
+	}
+	return UploadJobStatus{
+		Status:           job.Status,
+		Error:            job.Error,
+		MediaID:          job.MediaID,
+		DuplicateMediaID: job.duplicateMediaID,
+		DuplicateTitle:   job.duplicateTitle,
+	}, true
+}
+
 // Cancel отменяет задание, если оно ещё не завершено: удаляет файл,
-// запись Media (если создана) и само задание. Done-задание отменить
-// нельзя — ErrUploadJobDone.
+// запись Media (если создана) и само задание. Завершённое задание
+// (done/duplicate) отменить нельзя — ErrUploadJobDone.
 func (q *UploadQueue) Cancel(id uint64) error {
 	q.mu.Lock()
 	job, found := q.jobs[id]
@@ -184,7 +225,7 @@ func (q *UploadQueue) Cancel(id uint64) error {
 		q.mu.Unlock()
 		return ErrUploadJobNotFound
 	}
-	if job.Status == UploadJobDone {
+	if job.Status == UploadJobDone || job.Status == UploadJobDuplicate {
 		q.mu.Unlock()
 		return ErrUploadJobDone
 	}
@@ -371,9 +412,10 @@ func (q *UploadQueue) process(job *UploadJob) {
 		return
 	}
 
-	// Превью (ffmpeg) для видео. В БД кладём относительный URL — фронтенд
-	// строит полный адрес сам.
-	if thumbPath := q.thumbSvc.GenerateWithContext(ctx, media.ID, job.filePath); thumbPath != "" {
+	// Превью (ffmpeg) для видео и картинок. В БД кладём относительный
+	// URL — фронтенд строит полный адрес сам.
+	thumbPath := q.thumbSvc.GenerateWithContext(ctx, media.ID, job.filePath)
+	if thumbPath != "" {
 		media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
 		if err := q.media.Update(ctx, media); err != nil {
 			q.fail(job, err, "Failed to update media thumbnail")
@@ -383,6 +425,36 @@ func (q *UploadQueue) process(job *UploadJob) {
 	if res, cancelled := q.cancelledSnapshot(job); cancelled {
 		q.cleanupJobResources(res)
 		return
+	}
+
+	// pHash считается с превью. Похожий мем не добавляем повторно:
+	// точный дубль отсечён выше, force пропускает только эту проверку.
+	if job.mediaType.IsImage() {
+		phash := int64(0)
+		if thumbPath != "" {
+			hash, hashErr := ImagePHash(thumbPath)
+			if hashErr != nil {
+				// Битый файл не повод терять загрузку: запись остаётся,
+				// просто без pHash.
+				log.Printf("upload queue: image phash for job %d: %v", job.ID, hashErr)
+			} else {
+				phash = hash
+			}
+		}
+		if phash != 0 {
+			if err := q.media.SetPHash(ctx, media.ID, phash); err != nil {
+				q.fail(job, err, "Failed to save image hash")
+				return
+			}
+			duplicate, err := q.resolveDuplicate(ctx, job, phash)
+			if err != nil {
+				q.fail(job, err, "Failed to check for similar images")
+				return
+			}
+			if duplicate {
+				return
+			}
+		}
 	}
 
 	// Обложка из встроенного арта — только для аудио.
@@ -420,6 +492,51 @@ func (q *UploadQueue) succeedRestore(job *UploadJob, mediaID uint) {
 	job.Status = UploadJobDone
 	job.MediaID = mediaID
 	job.Error = ""
+}
+
+// duplicate завершает задание статусом duplicate: новая запись, файл и
+// превью удаляются, клиент получает id и название похожего мема.
+func (q *UploadQueue) duplicate(job *UploadJob, similar *models.Media) {
+	q.mu.Lock()
+	if job.Status == uploadJobCancelled {
+		q.mu.Unlock()
+		return
+	}
+	job.Status = UploadJobDuplicate
+	job.Error = ""
+	job.duplicateMediaID = similar.ID
+	job.duplicateTitle = similar.Title
+	res := snapshotJobLocked(job)
+	q.mu.Unlock()
+
+	q.cleanupJobResources(res)
+	log.Printf("upload queue: job %d duplicate of media %d (%s)", job.ID, similar.ID, similar.Title)
+}
+
+// resolveDuplicate под phashMu проверяет похожесть и сразу принимает
+// решение. Два воркера с одинаковыми картинками не могут одновременно
+// счесть друг друга дублями: первый удаляет свою запись до того, как
+// второй начнёт поиск.
+func (q *UploadQueue) resolveDuplicate(
+	ctx context.Context,
+	job *UploadJob,
+	phash int64,
+) (bool, error) {
+	if job.force {
+		return false, nil
+	}
+	q.phashMu.Lock()
+	defer q.phashMu.Unlock()
+
+	similar, err := FindSimilarImage(ctx, q.media, phash, job.MediaID)
+	if err != nil {
+		return false, err
+	}
+	if similar == nil {
+		return false, nil
+	}
+	q.duplicate(job, similar)
+	return true, nil
 }
 
 // cancelledSnapshot под одним локом проверяет отмену задания и снимает

@@ -1,6 +1,7 @@
 import {
 	Alert,
 	Button,
+	Group,
 	SimpleGrid,
 	Skeleton,
 	Stack,
@@ -11,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useImageList } from "../../api/media";
+import { UploadButton } from "../upload/UploadButton";
 import { MemeCard } from "./MemeCard";
 
 const SKELETON_COUNT = 12;
@@ -18,7 +20,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 function MemeSkeletons() {
 	return (
-		<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="md">
+		<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing="md">
 			{Array.from({ length: SKELETON_COUNT }, (_, index) => (
 				// Индекс — стабильный идентификатор позиции скелетона.
 				// biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholder
@@ -47,9 +49,12 @@ export function MemesPage() {
 
 	return (
 		<Stack gap="lg">
-			<Title order={1} size="h2">
-				{t("memes.title")}
-			</Title>
+			<Group justify="space-between" align="center" wrap="wrap">
+				<Title order={1} size="h2">
+					{t("memes.title")}
+				</Title>
+				<UploadButton type="image" />
+			</Group>
 			<TextInput
 				placeholder={t("memes.search")}
 				aria-label={t("memes.search")}
@@ -78,7 +83,10 @@ export function MemesPage() {
 				<Text c="dimmed">{t("memes.empty")}</Text>
 			) : (
 				<>
-					<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="md">
+					<SimpleGrid
+						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+						spacing="md"
+					>
 						{items.map((media) => (
 							<MemeCard key={media.id} media={media} />
 						))}

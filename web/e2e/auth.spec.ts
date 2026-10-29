@@ -52,6 +52,34 @@ test("гость перенаправляется на страницу вход
 	await expect(page.getByLabel("Электронная почта")).toBeVisible();
 });
 
+test("карточка входа центрирована по вьюпорту", async ({ page }) => {
+	await stubMe(page, () => false);
+	await stubRefreshUnauthorized(page);
+	await stubHealth(page);
+
+	await page.goto("/login");
+	const card = page.getByTestId("login-card");
+
+	const desktopViewport = page.viewportSize();
+	if (desktopViewport === null) {
+		throw new Error("viewport is not set");
+	}
+	const desktopBox = await card.boundingBox();
+	if (desktopBox === null) {
+		throw new Error("login card is not rendered");
+	}
+	expect(
+		Math.abs(desktopBox.x + desktopBox.width / 2 - desktopViewport.width / 2),
+	).toBeLessThan(5);
+
+	await page.setViewportSize({ width: 390, height: 844 });
+	const mobileBox = await card.boundingBox();
+	if (mobileBox === null) {
+		throw new Error("login card disappeared after resize");
+	}
+	expect(Math.abs(mobileBox.x + mobileBox.width / 2 - 390 / 2)).toBeLessThan(5);
+});
+
 test("вход по коду и выход", async ({ page }) => {
 	let authed = false;
 	await stubMe(page, () => authed);

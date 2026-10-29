@@ -2,12 +2,17 @@ import { expect, type Page, test } from "@playwright/test";
 
 const MEMES_LIST_PATTERN = /\/memes$/;
 const MEME_DETAIL_PATTERN = /\/memes\/1$/;
+const UPLOAD_IMAGE_PATTERN = /\/upload\?type=image$/;
+// biome-ignore lint/security/noSecrets: CSS-селектор, не секрет.
+const FILE_INPUT_SELECTOR = 'input[type="file"]';
 
-const userBody = JSON.stringify({
-	id: 1,
-	email: "user@example.com",
-	is_admin: false,
-});
+function sessionBody(isAdmin: boolean): string {
+	return JSON.stringify({
+		id: 1,
+		email: "user@example.com",
+		is_admin: isAdmin,
+	});
+}
 
 function imageItem(id: number, title: string) {
 	return {
@@ -42,12 +47,12 @@ const PIXEL_PNG = Buffer.from(
 	"base64",
 );
 
-async function stubAuthedSession(page: Page) {
+async function stubAuthedSession(page: Page, isAdmin = false) {
 	await page.route("**/api/auth/me", (route) =>
 		route.fulfill({
 			status: 200,
 			contentType: "application/json",
-			body: userBody,
+			body: sessionBody(isAdmin),
 		}),
 	);
 }
@@ -124,6 +129,8 @@ test("мемы: сетка, поиск, просмотрщик и скачива
 	await expect(page.getByRole("link", { name: "Первый мем" })).toBeVisible();
 	await expect(page.locator('img[src="/api/media/1/thumb"]')).toBeVisible();
 	await expect(page.getByRole("link", { name: "Второй мем" })).toBeVisible();
+	// Не админ не видит кнопку загрузки.
+	await expect(page.locator(FILE_INPUT_SELECTOR)).toHaveCount(0);
 
 	await page.getByLabel("Поиск по названию").fill("небылица");
 	await expect(page.getByText("Ничего не найдено")).toBeVisible();
@@ -160,4 +167,78 @@ test("мемы открываются из навигации", async ({ page })
 	await page.goto("/");
 	await page.getByRole("link", { name: "Мемы" }).click();
 	await expect(page).toHaveURL(MEMES_LIST_PATTERN);
+});
+
+test("мемы: админ видит похожий мем и может добавить поверх", async ({
+	page,
+}) => {
+	await stubAuthedSession(page, true);
+	await stubMemesApi(page);
+
+	const uploadBodies: string[] = [];
+	await page.route(
+		(url) => url.pathname === "/api/media/upload",
+		(route) => {
+			uploadBodies.push(route.request().postDataBuffer()?.toString() ?? "");
+			return route.fulfill({
+				status: 202,
+				contentType: "application/json",
+				body: JSON.stringify({
+					job_id: uploadBodies.length,
+					job_type: "upload",
+				}),
+			});
+		},
+	);
+	await page.route(
+		(url) => url.pathname === "/api/media/uploads/1",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					id: 1,
+					status: "duplicate",
+					error: null,
+					media: null,
+					duplicate: { id: 9, title: "Старый мем" },
+				}),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/media/uploads/2",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					id: 2,
+					status: "done",
+					error: null,
+					media: imageItem(3, "Новый мем"),
+				}),
+			}),
+	);
+
+	await page.goto("/memes");
+	await page.getByRole("button", { name: "Загрузить мем" }).click();
+	await expect(page).toHaveURL(UPLOAD_IMAGE_PATTERN);
+	await page.locator(FILE_INPUT_SELECTOR).setInputFiles({
+		name: "new.png",
+		mimeType: "image/png",
+		buffer: PIXEL_PNG,
+	});
+
+	await expect(page.getByText("Похоже, уже есть: Старый мем")).toBeVisible();
+	expect(uploadBodies[0]).toContain('name="media_type"');
+	expect(uploadBodies[0]).toContain("image");
+
+	await page.getByRole("button", { name: "Всё равно добавить" }).click();
+	await expect(page.getByText("Готово", { exact: false })).toBeVisible();
+	expect(uploadBodies[1]).toContain('name="force"');
+	expect(uploadBodies[1]).toContain("true");
+
+	await page.getByRole("button", { name: "Назад" }).click();
+	await expect(page).toHaveURL(MEMES_LIST_PATTERN);
+	await expect(page.getByRole("link", { name: "Первый мем" })).toBeVisible();
 });

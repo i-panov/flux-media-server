@@ -1,26 +1,54 @@
 import {
+	Badge,
+	Button,
 	Card,
 	Group,
 	SegmentedControl,
 	Select,
+	SimpleGrid,
 	Stack,
 	Text,
 	Title,
 	useMantineColorScheme,
 } from "@mantine/core";
+import { LogOut } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useHealthQuery } from "../../api/health";
+import { useSession } from "../../api/session";
 import { pickLang, SUPPORTED_LANGS, type SupportedLang } from "../../i18n";
+import { useLogout } from "../auth/useLogout";
 
 const languageNames: Record<SupportedLang, string> = {
 	ru: "Русский",
 	en: "English",
 };
 
+function SettingsCard({
+	title,
+	children,
+}: {
+	title: string;
+	children: ReactNode;
+}) {
+	return (
+		<Card withBorder padding="lg" radius="md" h="100%">
+			<Stack gap="md">
+				<Title order={2} size="h4">
+					{title}
+				</Title>
+				{children}
+			</Stack>
+		</Card>
+	);
+}
+
 export function SettingsPage() {
 	const { t, i18n } = useTranslation();
 	const { colorScheme, setColorScheme } = useMantineColorScheme();
 	const { data } = useHealthQuery();
+	const { data: session } = useSession();
+	const { logout, isPending: logoutPending } = useLogout();
 	const currentLang = pickLang(i18n.language);
 
 	return (
@@ -29,11 +57,8 @@ export function SettingsPage() {
 				{t("settings.title")}
 			</Title>
 
-			<Card withBorder padding="lg" radius="md">
-				<Stack gap="md">
-					<Title order={2} size="h4">
-						{t("settings.appearance.title")}
-					</Title>
+			<SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+				<SettingsCard title={t("settings.appearance.title")}>
 					<Stack gap={4}>
 						<Text size="sm" c="dimmed">
 							{t("settings.appearance.theme")}
@@ -46,17 +71,13 @@ export function SettingsPage() {
 								{ value: "light", label: t("settings.appearance.light") },
 								{ value: "dark", label: t("settings.appearance.dark") },
 							]}
-							w="fit-content"
+							fullWidth
+							size="xs"
 						/>
 					</Stack>
-				</Stack>
-			</Card>
+				</SettingsCard>
 
-			<Card withBorder padding="lg" radius="md">
-				<Stack gap="md">
-					<Title order={2} size="h4">
-						{t("settings.language.title")}
-					</Title>
+				<SettingsCard title={t("settings.language.title")}>
 					<Select
 						label={t("settings.language.label")}
 						value={currentLang}
@@ -72,21 +93,41 @@ export function SettingsPage() {
 						allowDeselect={false}
 						w={{ base: "100%", sm: 280 }}
 					/>
-				</Stack>
-			</Card>
+				</SettingsCard>
 
-			<Card withBorder padding="lg" radius="md">
-				<Stack gap="md">
-					<Title order={2} size="h4">
-						{t("settings.about.title")}
-					</Title>
-					<Stack gap="xs">
-						<Group justify="space-between">
-							<Text size="sm" c="dimmed">
-								{t("settings.about.webVersion")}
+				<SettingsCard title={t("settings.account.title")}>
+					<Stack gap="sm">
+						<Group justify="space-between" wrap="nowrap">
+							<Text size="sm" truncate>
+								{session?.email ?? "—"}
 							</Text>
-							<Text size="sm" fw={600}>
-								{__APP_VERSION__}
+							{session?.is_admin === true && (
+								<Badge variant="light" color="violet">
+									{t("settings.account.admin")}
+								</Badge>
+							)}
+						</Group>
+						<Button
+							variant="light"
+							color="red"
+							leftSection={<LogOut size={16} />}
+							loading={logoutPending}
+							onClick={logout}
+							w="fit-content"
+						>
+							{t("settings.account.logout")}
+						</Button>
+					</Stack>
+				</SettingsCard>
+
+				<SettingsCard title={t("settings.server.title")}>
+					<Stack gap="xs">
+						<Group justify="space-between" wrap="nowrap">
+							<Text size="sm" c="dimmed">
+								{t("settings.server.origin")}
+							</Text>
+							<Text size="sm" fw={600} ta="right" truncate>
+								{window.location.origin}
 							</Text>
 						</Group>
 						<Group justify="space-between">
@@ -97,17 +138,30 @@ export function SettingsPage() {
 								{data?.version ?? "—"}
 							</Text>
 						</Group>
-						<Group justify="space-between">
-							<Text size="sm" c="dimmed">
-								{t("settings.about.stack")}
-							</Text>
-							<Text size="sm" fw={600} ta="right">
-								{t("settings.about.stackValue")}
-							</Text>
-						</Group>
 					</Stack>
+				</SettingsCard>
+			</SimpleGrid>
+
+			<SettingsCard title={t("settings.about.title")}>
+				<Stack gap="xs">
+					<Group justify="space-between">
+						<Text size="sm" c="dimmed">
+							{t("settings.about.webVersion")}
+						</Text>
+						<Text size="sm" fw={600}>
+							{__APP_VERSION__}
+						</Text>
+					</Group>
+					<Group justify="space-between">
+						<Text size="sm" c="dimmed">
+							{t("settings.about.stack")}
+						</Text>
+						<Text size="sm" fw={600} ta="right">
+							{t("settings.about.stackValue")}
+						</Text>
+					</Group>
 				</Stack>
-			</Card>
+			</SettingsCard>
 		</Stack>
 	);
 }
