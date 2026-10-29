@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { RefObject } from "react";
 import { useCallback, useRef, useState } from "react";
 import {
+	audioListOptions,
 	mediaOptions,
 	mediaSubsOptions,
 	videoListOptions,
@@ -10,6 +11,10 @@ import { apiFetch } from "./client";
 
 export function useVideoList(q: string) {
 	return useInfiniteQuery(videoListOptions(apiFetch, q));
+}
+
+export function useAudioList(q: string) {
+	return useInfiniteQuery(audioListOptions(apiFetch, q));
 }
 
 export function useMedia(id: number, enabled = true) {
@@ -54,10 +59,10 @@ export function useMediaReload(mediaId: number) {
 	return { nonce, failed, handleError, retry };
 }
 
-// Позиция воспроизведения переживает remount <video key={nonce}>:
-// save() — перед ЛЮБЫМ изменением nonce (ошибка video, ошибка track,
+// Позиция воспроизведения переживает remount <video>/<audio key={nonce}>:
+// save() — перед ЛЮБЫМ изменением nonce (ошибка элемента, ошибка track,
 // кнопка retry), restore — напрямую в onLoadedMetadata (стабилен).
-export function useSavedTime(ref: RefObject<HTMLVideoElement | null>) {
+export function useSavedTime(ref: RefObject<HTMLMediaElement | null>) {
 	const saved = useRef(0);
 	const save = useCallback(() => {
 		saved.current = ref.current?.currentTime ?? 0;

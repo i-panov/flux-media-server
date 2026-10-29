@@ -17,7 +17,7 @@ func NewProgressRepository(db *gorm.DB) *ProgressStore {
 	return &ProgressStore{db: db}
 }
 
-func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.WatchProgress, int64, error) {
+func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, mediaType models.MediaType, limit, offset int) ([]models.WatchProgress, int64, error) {
 	var progress []models.WatchProgress
 	var total int64
 	query := r.db.WithContext(ctx).
@@ -28,6 +28,12 @@ func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, limit, offs
 	// нечего). Подзапрос — имя таблицы прогресса не хардкодим.
 	trashed := r.db.Model(&models.Media{}).Unscoped().Where("deleted_at IS NOT NULL").Select("id")
 	query = query.Where("media_id NOT IN (?)", trashed)
+	// Тип фильтруется в БД, а не на клиенте: общая страница последних
+	// записей вытесняла бы блок одного типа записями другого.
+	if mediaType != "" {
+		typed := r.db.Model(&models.Media{}).Where("type = ?", mediaType).Select("id")
+		query = query.Where("media_id IN (?)", typed)
+	}
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useVideoProgress } from "./useVideoProgress";
+import { useMediaProgress } from "./useMediaProgress";
 
 function jsonResponse(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -23,7 +23,7 @@ function progressBody(mediaId: number, position: number, duration = 3600) {
 	};
 }
 
-// Фейковый <video>: хуку нужны только currentTime и duration.
+// Фейковый медиаэлемент: хуку нужны только currentTime и duration.
 function fakeVideo(currentTime = 0, duration = 3600): HTMLVideoElement {
 	return { currentTime, duration } as HTMLVideoElement;
 }
@@ -71,7 +71,7 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-describe("useVideoProgress", () => {
+describe("useMediaProgress", () => {
 	it("не восстанавливает позицию до прихода данных прогресса", async () => {
 		let resolveProgress: ((response: Response) => void) | null = null;
 		const fetchMock = vi.fn().mockImplementation((url: string) => {
@@ -86,7 +86,7 @@ describe("useVideoProgress", () => {
 
 		const video = fakeVideo(0, 3600);
 		const ref = { current: video };
-		const { result } = renderHook(() => useVideoProgress(7, ref), {
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
 			wrapper: TestWrapper,
 		});
 
@@ -109,7 +109,7 @@ describe("useVideoProgress", () => {
 
 		const video = fakeVideo(0, 3600);
 		const ref = { current: video };
-		const { result } = renderHook(() => useVideoProgress(7, ref), {
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
 			wrapper: TestWrapper,
 		});
 
@@ -131,7 +131,7 @@ describe("useVideoProgress", () => {
 
 		const video = fakeVideo(42, 3600);
 		const ref = { current: video };
-		const { result } = renderHook(() => useVideoProgress(7, ref), {
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
 			wrapper: TestWrapper,
 		});
 
@@ -147,7 +147,7 @@ describe("useVideoProgress", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		const ref = { current: fakeVideo() };
-		renderHook(() => useVideoProgress(Number.NaN, ref, false), {
+		renderHook(() => useMediaProgress(Number.NaN, ref, false), {
 			wrapper: TestWrapper,
 		});
 
@@ -163,7 +163,7 @@ describe("useVideoProgress", () => {
 
 		const video = fakeVideo(0, 3600);
 		const ref = { current: video };
-		const { result } = renderHook(() => useVideoProgress(7, ref), {
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
 			wrapper: TestWrapper,
 		});
 		await waitFor(() => {
@@ -204,7 +204,7 @@ describe("useVideoProgress", () => {
 
 		const video = fakeVideo(0, 100);
 		const ref = { current: video };
-		const { result } = renderHook(() => useVideoProgress(7, ref), {
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
 			wrapper: TestWrapper,
 		});
 		await waitFor(() => {
@@ -230,7 +230,7 @@ describe("useVideoProgress", () => {
 
 		const video = fakeVideo(0, 3600);
 		const ref = { current: video };
-		const { result } = renderHook(() => useVideoProgress(7, ref), {
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
 			wrapper: TestWrapper,
 		});
 
@@ -252,7 +252,7 @@ describe("useVideoProgress", () => {
 		const video = fakeVideo(0, 3600);
 		const ref = { current: video };
 		const { result, rerender } = renderHook(
-			({ mediaId }) => useVideoProgress(mediaId, ref),
+			({ mediaId }) => useMediaProgress(mediaId, ref),
 			{ wrapper: TestWrapper, initialProps: { mediaId: 7 } },
 		);
 		await waitFor(() => {

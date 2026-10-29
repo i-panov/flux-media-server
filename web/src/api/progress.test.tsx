@@ -11,13 +11,16 @@ function jsonResponse(body: unknown, status = 200): Response {
 	});
 }
 
-function mediaItem(id: number) {
+function mediaItem(id: number, type = "video") {
 	return {
 		id,
 		title: `Film ${id}`,
 		year: 2024,
 		description: "",
-		type: "video",
+		type,
+		artists: [],
+		album: "",
+		genre: "",
 		duration: 3600,
 		width: 1920,
 		height: 1080,
@@ -35,6 +38,7 @@ function entry(
 	position: number,
 	duration: number,
 	completed = false,
+	type = "video",
 ) {
 	return {
 		id,
@@ -44,7 +48,7 @@ function entry(
 		duration,
 		completed,
 		updated_at: "2026-01-01T00:00:00Z",
-		media: mediaItem(mediaId),
+		media: mediaItem(mediaId, type),
 	};
 }
 
@@ -77,10 +81,7 @@ describe("useContinueWatching", () => {
 					{ ...entry(6, 15, 300, 3600), media: null },
 					// Прогресс по аудио пишет мобильный клиент: на странице
 					// видео такой записи не место.
-					{
-						...entry(7, 16, 120, 3600),
-						media: { ...mediaItem(16), type: "audio" },
-					},
+					entry(7, 16, 120, 3600, false, "audio"),
 				],
 				total: 7,
 				limit: 20,
@@ -89,7 +90,7 @@ describe("useContinueWatching", () => {
 		);
 		vi.stubGlobal("fetch", fetchMock);
 
-		const { result } = renderHook(() => useContinueWatching(), {
+		const { result } = renderHook(() => useContinueWatching("video"), {
 			wrapper: TestWrapper,
 		});
 
@@ -103,7 +104,39 @@ describe("useContinueWatching", () => {
 			"http://localhost",
 		);
 		expect(requested.pathname).toBe("/api/progress");
+		expect(requested.searchParams.get("type")).toBe("video");
 		expect(requested.searchParams.get("limit")).toBe("20");
 		expect(requested.searchParams.get("offset")).toBe("0");
+	});
+
+	it("для аудио берёт только аудио-записи", async () => {
+		const fetchMock = vi.fn().mockResolvedValue(
+			jsonResponse({
+				items: [
+					entry(1, 10, 120, 3600, false, "video"),
+					entry(2, 11, 30, 240, false, "audio"),
+					entry(3, 12, 200, 240, false, "audio"),
+				],
+				total: 3,
+				limit: 20,
+				offset: 0,
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		const { result } = renderHook(() => useContinueWatching("audio"), {
+			wrapper: TestWrapper,
+		});
+
+		await waitFor(() => {
+			expect(result.current.isSuccess).toBe(true);
+		});
+		expect(result.current.data?.map((item) => item.media_id)).toEqual([11, 12]);
+		// Biome принимает строку с query за секрет: сверяем URL по частям.
+		const requested = new URL(
+			String(fetchMock.mock.calls[0]?.[0] ?? ""),
+			"http://localhost",
+		);
+		expect(requested.searchParams.get("type")).toBe("audio");
 	});
 });

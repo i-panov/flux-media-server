@@ -12,6 +12,11 @@ export type CoreFetcher = (
 	init?: { signal?: AbortSignal },
 ) => Promise<unknown>;
 
+const artistSchema = z.object({
+	id: z.number(),
+	name: z.string(),
+});
+
 export const mediaSchema = z.object({
 	id: z.number(),
 	title: z.string(),
@@ -20,6 +25,13 @@ export const mediaSchema = z.object({
 	// Бэкенд отдаёт "video" или "audio"; пустая строка возможна у старых
 	// записей, поэтому фильтр «Продолжить просмотр» проверяет точное значение.
 	type: z.string(),
+	// В прогрессии медиа приходит без artists (Preload без связей) — null.
+	artists: z
+		.array(artistSchema)
+		.nullish()
+		.transform((list) => list ?? []),
+	album: z.string().default(""),
+	genre: z.string().default(""),
 	duration: z.number(),
 	width: z.number(),
 	height: z.number(),
@@ -41,23 +53,26 @@ const mediaListSchema = z.object({
 
 export type MediaList = z.infer<typeof mediaListSchema>;
 
-const VIDEO_PAGE_SIZE = 24;
+const MEDIA_PAGE_SIZE = 24;
 
 const MEDIA_PATH = "/media";
 
-interface VideoListRequest {
+export type MediaKind = "video" | "audio";
+
+interface MediaListRequest {
+	type: MediaKind;
 	q: string;
 	limit: number;
 	offset: number;
 	signal?: AbortSignal;
 }
 
-export async function fetchVideoList(
+export async function fetchMediaList(
 	fetch: CoreFetcher,
-	{ q, limit, offset, signal }: VideoListRequest,
+	{ type, q, limit, offset, signal }: MediaListRequest,
 ): Promise<MediaList> {
 	const params = new URLSearchParams({
-		type: "video",
+		type,
 		limit: String(limit),
 		offset: String(offset),
 	});
@@ -68,13 +83,14 @@ export async function fetchVideoList(
 	return mediaListSchema.parse(body);
 }
 
-export function videoListOptions(fetch: CoreFetcher, q: string) {
+function mediaListOptions(fetch: CoreFetcher, type: MediaKind, q: string) {
 	return infiniteQueryOptions({
-		queryKey: ["media", "video", q],
+		queryKey: ["media", type, q],
 		queryFn: ({ pageParam, signal }) =>
-			fetchVideoList(fetch, {
+			fetchMediaList(fetch, {
+				type,
 				q,
-				limit: VIDEO_PAGE_SIZE,
+				limit: MEDIA_PAGE_SIZE,
 				offset: pageParam,
 				signal,
 			}),
@@ -91,6 +107,14 @@ export function videoListOptions(fetch: CoreFetcher, q: string) {
 		retry: false,
 		refetchOnWindowFocus: false,
 	});
+}
+
+export function videoListOptions(fetch: CoreFetcher, q: string) {
+	return mediaListOptions(fetch, "video", q);
+}
+
+export function audioListOptions(fetch: CoreFetcher, q: string) {
+	return mediaListOptions(fetch, "audio", q);
 }
 
 export async function fetchMediaById(

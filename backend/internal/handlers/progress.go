@@ -39,8 +39,17 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 
 	limit, offset := response.ClampPage(c.QueryInt("limit", defaultPageSize), c.QueryInt("offset", 0), defaultPageSize)
 
+	// Тип необязателен: без него старые клиенты получают весь список.
+	var mediaType models.MediaType
+	if rawType := c.Query("type"); rawType != "" {
+		mediaType = models.ParseMediaType(rawType)
+		if !mediaType.Valid() {
+			return response.Error(c, fiber.StatusBadRequest, "invalid type")
+		}
+	}
+
 	ctx := c.UserContext()
-	progress, total, err := h.progressRepo.FindByUser(ctx, userID, limit, offset)
+	progress, total, err := h.progressRepo.FindByUser(ctx, userID, mediaType, limit, offset)
 	if err != nil {
 		log.Printf("FindByUser: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch progress")

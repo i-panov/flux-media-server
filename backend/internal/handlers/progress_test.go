@@ -33,6 +33,11 @@ func setupProgressTestApp(t *testing.T) *fiber.App {
 		Type:     models.MediaTypeVideo,
 		FilePath: "/test.mkv",
 	}))
+	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
+		Title:    "Test Song",
+		Type:     models.MediaTypeAudio,
+		FilePath: "/test.mp3",
+	}))
 
 	handler := NewProgressHandler(progressRepo, mediaRepo)
 	app := fiber.New()
@@ -220,4 +225,50 @@ func TestProgressHandler_GetOneOmitsMedia(t *testing.T) {
 	buf := bytes.Buffer{}
 	_, _ = buf.ReadFrom(resp.Body)
 	assert.NotContains(t, buf.String(), `"media":`)
+}
+
+// ?type=audio сужает список в БД: блоки «Продолжить просмотр» и
+// «Продолжить прослушивание» получают каждый свои 20 записей.
+func TestProgressHandler_ListFiltersByType(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	for _, id := range []string{"1", "2"} {
+		updateBody, _ := json.Marshal(map[string]interface{}{
+			"position": 10,
+			"duration": 100,
+		})
+		updateReq := httptest.NewRequest("PUT", "/api/progress/"+id, bytes.NewReader(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateResp, err := app.Test(updateReq)
+		require.NoError(t, err)
+		updateResp.Body.Close()
+		require.Equal(t, fiber.StatusOK, updateResp.StatusCode)
+	}
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress?type=audio", nil))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var body struct {
+		Items []struct {
+			MediaID uint          `json:"media_id"`
+			Media   *models.Media `json:"media"`
+		} `json:"items"`
+		Total int64 `json:"total"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Len(t, body.Items, 1)
+	require.NotNil(t, body.Items[0].Media)
+	assert.Equal(t, models.MediaTypeAudio, body.Items[0].Media.Type)
+	assert.Equal(t, int64(1), body.Total)
+}
+
+func TestProgressHandler_ListRejectsInvalidType(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress?type=image", nil))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 }

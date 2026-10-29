@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { AboutCard } from "../../components/AboutCard";
 import { HealthCard } from "../../components/HealthCard";
 import { NextCard } from "../../components/NextCard";
-import { ContinueWatching } from "../video/ContinueWatching";
+import { ContinueWatching } from "../media/ContinueWatching";
 
-// На главной хватает превью: полный список живёт в разделе «Видео».
+// На главной хватает превью: полные списки живут в разделах «Видео» и «Аудио».
 const CONTINUE_PREVIEW_LIMIT = 6;
 
 export function HomePage() {
@@ -26,7 +26,8 @@ export function HomePage() {
 				<Text>{t("home.description")}</Text>
 			</Stack>
 
-			<ContinueWatching limit={CONTINUE_PREVIEW_LIMIT} />
+			<ContinueWatching kind="video" limit={CONTINUE_PREVIEW_LIMIT} />
+			<ContinueWatching kind="audio" limit={CONTINUE_PREVIEW_LIMIT} />
 
 			<SimpleGrid cols={{ base: 1, md: 2 }}>
 				<HealthCard />

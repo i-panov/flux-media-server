@@ -182,7 +182,7 @@ test("видео: «Продолжить просмотр» показывает
 	// 3725 - 1200 = 2525 с = 42:05 — до конца.
 	await expect(page.getByText("Осталось 42:05")).toBeVisible();
 	await expect(
-		page.getByRole("progressbar", { name: "Просмотрено 20:00 из 1:02:05" }),
+		page.getByRole("progressbar", { name: "Пройдено 20:00 из 1:02:05" }),
 	).toBeVisible();
 	// Досмотренная запись отфильтрована.
 	await expect(

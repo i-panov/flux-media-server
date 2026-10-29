@@ -85,7 +85,8 @@ type MediaRepository interface {
 
 // ProgressRepository defines data access methods for WatchProgress entities.
 type ProgressRepository interface {
-	FindByUser(ctx context.Context, userID uint, limit, offset int) ([]models.WatchProgress, int64, error)
+	// mediaType — фильтр по типу медиа; пустая строка означает «все типы».
+	FindByUser(ctx context.Context, userID uint, mediaType models.MediaType, limit, offset int) ([]models.WatchProgress, int64, error)
 	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.WatchProgress, error)
 	Upsert(ctx context.Context, progress *models.WatchProgress) error
 	Delete(ctx context.Context, userID, mediaID uint) error

@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProgress, useSaveProgress } from "../../api/progress";
 
-// Позиция уходит на сервер не чаще раза в столько секунд просмотра.
+// Позиция уходит на сервер не чаще раза в столько секунд воспроизведения.
 const SAVE_EVERY_SECONDS = 10;
 // Ближе этого к концу считаем просмотр завершённым.
 const COMPLETED_TAIL_SECONDS = 5;
 
-// Состояние прогресса живёт в refs: объект результата useMutation —
-// новый на каждом рендере, и попадание его в зависимости эффекта
-// запускает бесконечный цикл «cleanup → mutate → рендер → cleanup».
-export function useVideoProgress(
+// Общий прогресс для видео и аудио: HTMLMediaElement, поэтому тип элемента
+// задаёт вызывающий (HTMLVideoElement / HTMLAudioElement).
+//
+// Состояние живёт в refs: объект результата useMutation — новый на каждом
+// рендере, и попадание его в зависимости эффекта запускает бесконечный
+// цикл «cleanup → mutate → рендер → cleanup».
+export function useMediaProgress<E extends HTMLMediaElement>(
 	mediaId: number,
-	videoRef: React.RefObject<HTMLVideoElement | null>,
+	mediaRef: React.RefObject<E | null>,
 	enabled = true,
 ) {
 	const progressQuery = useProgress(enabled ? mediaId : 0, enabled);
@@ -68,7 +71,7 @@ export function useVideoProgress(
 		savedPosition.current = -1;
 	}, [mediaId]);
 
-	const readElement = useCallback((el: HTMLVideoElement) => {
+	const readElement = useCallback((el: E) => {
 		const current = Math.floor(el.currentTime);
 		if (current >= 0) {
 			lastPosition.current = current;
@@ -79,16 +82,16 @@ export function useVideoProgress(
 	}, []);
 
 	const handleLoadedMetadata = useCallback(() => {
-		const el = videoRef.current;
+		const el = mediaRef.current;
 		if (el === null) {
 			return;
 		}
 		readElement(el);
 		setMetadataFor(mediaId);
-	}, [mediaId, readElement, videoRef]);
+	}, [mediaId, readElement, mediaRef]);
 
 	const handleTimeUpdate = useCallback(() => {
-		const el = videoRef.current;
+		const el = mediaRef.current;
 		if (el === null) {
 			return;
 		}
@@ -101,23 +104,23 @@ export function useVideoProgress(
 		) {
 			flush(mediaId, current, lastDuration.current);
 		}
-	}, [flush, mediaId, readElement, videoRef]);
+	}, [flush, mediaId, readElement, mediaRef]);
 
 	const handlePause = useCallback(() => {
-		const el = videoRef.current;
+		const el = mediaRef.current;
 		if (el !== null) {
 			readElement(el);
 		}
 		flush(mediaId, lastPosition.current, lastDuration.current);
-	}, [flush, mediaId, readElement, videoRef]);
+	}, [flush, mediaId, readElement, mediaRef]);
 
 	const handleEnded = useCallback(() => {
-		const el = videoRef.current;
+		const el = mediaRef.current;
 		if (el !== null) {
 			readElement(el);
 		}
 		flush(mediaId, lastPosition.current, lastDuration.current);
-	}, [flush, mediaId, readElement, videoRef]);
+	}, [flush, mediaId, readElement, mediaRef]);
 
 	// Восстановление запускается и по приходу данных, и по готовности
 	// метаданных: порядок этих событий не определён. Флаг restored
@@ -131,7 +134,7 @@ export function useVideoProgress(
 			return;
 		}
 		restored.current = true;
-		const el = videoRef.current;
+		const el = mediaRef.current;
 		if (el === null || el.currentTime !== 0) {
 			return;
 		}
@@ -146,7 +149,7 @@ export function useVideoProgress(
 			lastDuration.current = Math.floor(duration);
 		}
 		savedPosition.current = position;
-	}, [enabled, metadataReady, progressQuery.data, videoRef]);
+	}, [enabled, metadataReady, progressQuery.data, mediaRef]);
 
 	// Сохранение при уходе со страницы и при смене mediaId. Слушатели
 	// пересоздаются вместе с id, а cleanup попадает в замыкание со старым

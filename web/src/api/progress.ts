@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { type Media, mediaSchema } from "../core/media";
+import { type Media, type MediaKind, mediaSchema } from "../core/media";
 import { ApiError, apiFetch } from "./client";
 
 const progressSchema = z.object({
@@ -103,29 +103,32 @@ function isUnfinished(entry: ProgressEntry): boolean {
 	return entry.duration > 0 || entry.position > 0;
 }
 
-async function fetchContinueWatching(): Promise<ContinueEntry[]> {
+async function fetchContinueWatching(
+	kind: MediaKind,
+): Promise<ContinueEntry[]> {
 	const params = new URLSearchParams({
+		type: kind,
 		limit: String(CONTINUE_LIMIT),
 		offset: "0",
 	});
 	const body = await apiFetch<unknown>(`/progress?${params.toString()}`);
 	const parsed = progressListSchema.parse(body);
-	// Записи без медиа (удалённое или ещё не подгруженное) показывать нечем,
-	// а прогресс по аудио сюда попадает из мобильного клиента: на странице
-	// видео он открылся бы в плеере без картинки.
+	// Сервер фильтрует по типу, иначе более свежие записи другого типа
+	// вытесняли бы весь блок. Повторная проверка на клиенте нужна старым
+	// бэкендам, которые параметр type ещё не знают, и записям без медиа.
 	return parsed.items.filter(
 		(entry): entry is ContinueEntry =>
 			entry.media !== null &&
 			entry.media !== undefined &&
-			entry.media.type === "video" &&
+			entry.media.type === kind &&
 			isUnfinished(entry),
 	);
 }
 
-export function useContinueWatching() {
+export function useContinueWatching(kind: MediaKind) {
 	return useQuery({
-		queryKey: ["progress", "continue"],
-		queryFn: fetchContinueWatching,
+		queryKey: ["progress", "continue", kind],
+		queryFn: () => fetchContinueWatching(kind),
 		retry: false,
 		refetchOnWindowFocus: false,
 	});

@@ -18,20 +18,8 @@ import {
 	useSavedTime,
 } from "../../api/media";
 import { formatDuration, splitSubLang } from "../../core/format";
-import { useVideoProgress } from "./useVideoProgress";
-
-function MetaItem({ label, value }: { label: string; value: string }) {
-	return (
-		<Stack gap={2}>
-			<Text size="xs" c="dimmed">
-				{label}
-			</Text>
-			<Text size="sm" fw={600}>
-				{value}
-			</Text>
-		</Stack>
-	);
-}
+import { MetaItem } from "../media/MetaItem";
+import { useMediaProgress } from "../media/useMediaProgress";
 
 // React не поддерживает onError на <track> (только audio/video/img/...),
 // поэтому ошибку загрузки дорожки ловим нативным слушателем: при истёкшей
@@ -76,7 +64,7 @@ export function VideoDetailPage() {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const position = useSavedTime(videoRef);
 	const played = useRef(false);
-	const videoProgress = useVideoProgress(mediaId, videoRef, valid);
+	const videoProgress = useMediaProgress(mediaId, videoRef, valid);
 
 	const goBack = () => {
 		void navigate({ to: "/video" });
