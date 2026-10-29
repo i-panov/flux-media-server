@@ -67,6 +67,12 @@ func TestMimeTypeByExt(t *testing.T) {
 	assert.Equal(t, "audio/flac", MimeTypeByExt(".flac"))
 	assert.Equal(t, "audio/ogg", MimeTypeByExt(".ogg"))
 	assert.Equal(t, "audio/wav", MimeTypeByExt(".wav"))
+	assert.Equal(t, "image/jpeg", MimeTypeByExt(".jpg"))
+	assert.Equal(t, "image/jpeg", MimeTypeByExt(".jpeg"))
+	assert.Equal(t, "image/png", MimeTypeByExt(".png"))
+	assert.Equal(t, "image/gif", MimeTypeByExt(".gif"))
+	assert.Equal(t, "image/webp", MimeTypeByExt(".webp"))
+	assert.Equal(t, "image/bmp", MimeTypeByExt(".bmp"))
 	assert.Equal(t, "application/octet-stream", MimeTypeByExt(".xyz"))
 }
 

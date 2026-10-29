@@ -20,6 +20,8 @@ const artistSchema = z.object({
 export const mediaSchema = z.object({
 	id: z.number(),
 	title: z.string(),
+	// Имя файла с расширением: нужно для скачивания мема.
+	filename: z.string().default(""),
 	year: z.number(),
 	description: z.string(),
 	// Бэкенд отдаёт "video" или "audio"; пустая строка возможна у старых
@@ -57,19 +59,23 @@ const MEDIA_PAGE_SIZE = 24;
 
 const MEDIA_PATH = "/media";
 
-export type MediaKind = "video" | "audio";
+export type MediaType = "video" | "audio" | "image";
+
+// «Продолжить просмотр/прослушивание» — только медиа с прогрессом.
+export type MediaKind = Exclude<MediaType, "image">;
 
 interface MediaListRequest {
-	type: MediaKind;
+	type: MediaType;
 	q: string;
 	limit: number;
 	offset: number;
+	sort?: "asc" | "desc";
 	signal?: AbortSignal;
 }
 
 export async function fetchMediaList(
 	fetch: CoreFetcher,
-	{ type, q, limit, offset, signal }: MediaListRequest,
+	{ type, q, limit, offset, sort, signal }: MediaListRequest,
 ): Promise<MediaList> {
 	const params = new URLSearchParams({
 		type,
@@ -79,19 +85,28 @@ export async function fetchMediaList(
 	if (q !== "") {
 		params.set("q", q);
 	}
+	if (sort !== undefined) {
+		params.set("sort", sort);
+	}
 	const body = await fetch(`${MEDIA_PATH}?${params.toString()}`, { signal });
 	return mediaListSchema.parse(body);
 }
 
-function mediaListOptions(fetch: CoreFetcher, type: MediaKind, q: string) {
+function mediaListOptions(
+	fetch: CoreFetcher,
+	type: MediaType,
+	q: string,
+	sort?: "asc" | "desc",
+) {
 	return infiniteQueryOptions({
-		queryKey: ["media", type, q],
+		queryKey: ["media", type, q, sort ?? ""],
 		queryFn: ({ pageParam, signal }) =>
 			fetchMediaList(fetch, {
 				type,
 				q,
 				limit: MEDIA_PAGE_SIZE,
 				offset: pageParam,
+				sort,
 				signal,
 			}),
 		initialPageParam: 0,
@@ -115,6 +130,11 @@ export function videoListOptions(fetch: CoreFetcher, q: string) {
 
 export function audioListOptions(fetch: CoreFetcher, q: string) {
 	return mediaListOptions(fetch, "audio", q);
+}
+
+// Мемы — новые сверху: сервер сортирует по id DESC.
+export function imageListOptions(fetch: CoreFetcher, q: string) {
+	return mediaListOptions(fetch, "image", q, "desc");
 }
 
 export async function fetchMediaById(

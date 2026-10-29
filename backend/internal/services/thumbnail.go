@@ -36,10 +36,14 @@ func (s *ThumbnailService) Generate(mediaID uint, filePath string) string {
 // (используется сканером; ffmpeg убивается через CommandContext).
 func (s *ThumbnailService) GenerateWithContext(ctx context.Context, mediaID uint, filePath string) string {
 	ext := strings.ToLower(filepath.Ext(filePath))
-	if videoExtensions[ext] {
+	switch {
+	case videoExtensions[ext]:
 		return s.generateVideoThumbnail(ctx, mediaID, filePath)
+	case imageExtensions[ext]:
+		return s.generateImageThumbnail(ctx, mediaID, filePath)
+	default:
+		return ""
 	}
-	return ""
 }
 
 // ExtractCover extracts embedded album art from audio or video files.
@@ -133,6 +137,48 @@ func (s *ThumbnailService) generateVideoThumbnail(ctx context.Context, mediaID u
 
 	if err := cmd.Run(); err != nil {
 		log.Printf("thumb: ffmpeg for %s: %v: %s", filePath, err, stderr.String())
+		return ""
+	}
+
+	return outPath
+}
+
+// imageThumbMaxSide — длинная сторона превью мема. 512 px хватает
+// квадратной плитке на retina-экране и не тянет из сети оригинал.
+const imageThumbMaxSide = 512
+
+// generateImageThumbnail делает JPEG-превью картинки: вписывает её в
+// квадрат 512×512 без апскейла, сохраняя пропорции. Для GIF берётся
+// первый кадр.
+func (s *ThumbnailService) generateImageThumbnail(ctx context.Context, mediaID uint, filePath string) string {
+	outPath := s.GetPath(mediaID)
+
+	if err := os.MkdirAll(s.thumbnailsDir, 0755); err != nil {
+		log.Printf("thumb: mkdir %s: %v", s.thumbnailsDir, err)
+		return ""
+	}
+
+	// Один битый файл не должен подвешивать скан.
+	cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	scale := fmt.Sprintf(
+		"scale=w='min(%d,iw)':h='min(%d,ih)':force_original_aspect_ratio=decrease",
+		imageThumbMaxSide, imageThumbMaxSide,
+	)
+	cmd := exec.CommandContext(cmdCtx, "ffmpeg",
+		"-i", filePath,
+		"-vf", scale,
+		"-frames:v", "1",
+		"-q:v", "3",
+		"-y",
+		outPath,
+	)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("thumb: ffmpeg image for %s: %v: %s", filePath, err, stderr.String())
 		return ""
 	}
 

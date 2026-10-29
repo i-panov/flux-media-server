@@ -266,7 +266,7 @@ func TestProgressHandler_ListFiltersByType(t *testing.T) {
 func TestProgressHandler_ListRejectsInvalidType(t *testing.T) {
 	app := setupProgressTestApp(t)
 
-	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress?type=image", nil))
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress?type=meme", nil))
 	require.NoError(t, err)
 	defer resp.Body.Close()
 

@@ -51,6 +51,7 @@ func setupUploadTest(t *testing.T, workers, queueLimit int) (*fiber.App, reposit
 	mediaCfg := config.MediaConfig{
 		VideoPath:     filepath.Join(libraryPath, "video"),
 		AudioPath:     filepath.Join(libraryPath, "audio"),
+		ImagePath:     filepath.Join(libraryPath, "images"),
 		ThumbnailPath: thumbDir,
 	}
 	quarantinePath := filepath.Join(tempDir, "originals")
@@ -532,6 +533,39 @@ func TestUploadErrorResponseHidesPaths(t *testing.T) {
 	out, _ := waitForUploadJob(t, app, jobID)
 	assert.Equal(t, services.UploadJobDone, out["status"])
 	require.NotContains(t, fmt.Sprint(out), libraryPath)
+}
+
+func TestUploadImageGoesToImagePath(t *testing.T) {
+	cases := []struct {
+		name      string
+		filename  string
+		mediaType string
+	}{
+		{name: "explicit", filename: "meme.png", mediaType: string(models.MediaTypeImage)},
+		{name: "by extension", filename: "meme.webp", mediaType: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app, mediaRepo, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
+			defer cleanup()
+
+			resp := uploadFile(t, app, tc.filename, []byte("image content"), tc.mediaType)
+			require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
+			jobID := jobIDFromResponse(t, resp)
+			out, _ := waitForUploadJob(t, app, jobID)
+			assert.Equal(t, services.UploadJobDone, out["status"])
+
+			// Картинка кладётся в image_path, а не в video/audio.
+			_, err := os.Stat(filepath.Join(libraryPath, "images", tc.filename))
+			require.NoError(t, err)
+
+			mediaList, _, err := mediaRepo.FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
+			require.NoError(t, err)
+			require.Len(t, mediaList, 1)
+			assert.Equal(t, models.MediaTypeImage, mediaList[0].Type)
+		})
+	}
 }
 
 func TestUploadVideoGoesToQuarantine(t *testing.T) {

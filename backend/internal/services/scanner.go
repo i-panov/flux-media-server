@@ -40,6 +40,10 @@ var (
 		".mp3": true, ".flac": true, ".ogg": true, ".oga": true,
 		".m4a": true, ".aac": true, ".wav": true, ".opus": true, ".wma": true,
 	}
+	imageExtensions = map[string]bool{
+		".jpg": true, ".jpeg": true, ".png": true,
+		".gif": true, ".webp": true, ".bmp": true,
+	}
 )
 
 // ApplyVideoDimensions переносит размеры кадра из метаданных файла в
@@ -64,7 +68,7 @@ func ApplyVideoDimensions(media *models.Media, meta *FileMetadata) {
 }
 
 func IsAllowedExtension(ext string) bool {
-	return videoExtensions[ext] || audioExtensions[ext]
+	return videoExtensions[ext] || audioExtensions[ext] || imageExtensions[ext]
 }
 
 type ScannerService struct {
@@ -96,6 +100,11 @@ func (s *ScannerService) ScanAll(ctx context.Context) error {
 	paths := s.config.Media.MediaPaths()
 	var firstErr error
 	for _, mp := range paths {
+		// Пустой путь — библиотека не настроена: Walk("") обошёл бы
+		// текущую папку и проиндексировал бы лишнее.
+		if mp.Path == "" {
+			continue
+		}
 		if err := s.ScanPath(ctx, mp.Path); err != nil {
 			log.Printf("Error scanning %s: %v", mp.Path, err)
 			if firstErr == nil {
@@ -477,9 +486,12 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 		existing.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", existing.ID)
 	}
 
-	// Extract embedded cover art (if file has one).
-	if coverPath := s.thumbService.ExtractCoverContext(ctx, existing.ID, path); coverPath != "" {
-		existing.CoverURL = fmt.Sprintf("/api/media/%d/cover", existing.ID)
+	// Extract embedded cover art (if file has one). У картинки «обложка» —
+	// это сам файл, отдельный арт из неё извлекать не нужно.
+	if existing.Type != models.MediaTypeImage {
+		if coverPath := s.thumbService.ExtractCoverContext(ctx, existing.ID, path); coverPath != "" {
+			existing.CoverURL = fmt.Sprintf("/api/media/%d/cover", existing.ID)
+		}
 	}
 
 	if err := s.mediaRepo.Update(ctx, existing); err != nil {
@@ -521,20 +533,22 @@ func (s *ScannerService) createNewMedia(ctx context.Context, path string, info o
 	// Parse filename for metadata
 	title, year := metadata.ParseFilename(filepath.Base(path))
 
-	// Probe once for both media type and video metadata. Inherit from the
-	// scan context so a cancelled scan also cancels the ffprobe call.
+	// Тип определяется по расширению, а для видео/аудио уточняется
+	// пробой. Для картинок ffprobe не используется для типа: JPEG/PNG
+	// отдаёт видеопоток и увёл бы файл в видео.
+	detectedType := determineMediaTypeByExt(path)
+
+	// Probe once for video metadata. Inherit from the scan context so a
+	// cancelled scan also cancels the ffprobe call. Картинкам проба нужна
+	// только ради Width/Height — тип по ней не меняем.
 	probeCtx, probeCancel := context.WithTimeout(ctx, 10*time.Second)
 	probeData, probeErr := ffprobe.ProbeURL(probeCtx, path)
 	probeCancel()
 
-	// Тип записи определяется по факту: через ffprobe, при сбое — по
-	// расширению. Пользовательский хинт типа не используется.
-	detectedType := models.MediaTypeVideo
-	if probeErr == nil {
+	if probeErr == nil && detectedType != models.MediaTypeImage {
 		detectedType = DetermineMediaTypeFromProbe(probeData)
-	} else {
-		log.Printf("Probe failed for %s: %v, using extension fallback", path, probeErr)
-		detectedType = determineMediaTypeByExt(path)
+	} else if probeErr != nil {
+		log.Printf("Probe failed for %s: %v", path, probeErr)
 	}
 
 	media := &models.Media{
@@ -715,6 +729,13 @@ func quickHashFile(ctx context.Context, path string) (string, error) {
 
 // DetermineMediaType probes the file with ffprobe to detect its real type.
 func DetermineMediaType(filePath string) models.MediaType {
+	// Картинки определяем по расширению до пробы: ffprobe видит в них
+	// видеопоток и вернул бы video.
+	ext := strings.ToLower(filepath.Ext(filePath))
+	if imageExtensions[ext] {
+		return models.MediaTypeImage
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -731,8 +752,12 @@ func DetermineMediaType(filePath string) models.MediaType {
 // determineMediaTypeByExt is the fallback when ffprobe is unavailable.
 func determineMediaTypeByExt(filePath string) models.MediaType {
 	ext := strings.ToLower(filepath.Ext(filePath))
-	if audioExtensions[ext] {
+	switch {
+	case imageExtensions[ext]:
+		return models.MediaTypeImage
+	case audioExtensions[ext]:
 		return models.MediaTypeAudio
+	default:
+		return models.MediaTypeVideo
 	}
-	return models.MediaTypeVideo
 }

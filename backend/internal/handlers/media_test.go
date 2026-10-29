@@ -100,6 +100,38 @@ func TestMediaHandler_ListInvalidYear(t *testing.T) {
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 }
 
+func TestMediaHandler_ListSortDesc(t *testing.T) {
+	app, libraryPath := setupMediaTestApp(t)
+	for _, name := range []string{"first.mkv", "second.mkv", "third.mkv"} {
+		createTestMedia(t, app, libraryPath, name)
+	}
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/media?sort=desc", nil))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	var body struct {
+		Items []struct {
+			ID uint `json:"id"`
+		} `json:"items"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Len(t, body.Items, 3)
+	assert.Equal(t, uint(3), body.Items[0].ID)
+	assert.Equal(t, uint(2), body.Items[1].ID)
+	assert.Equal(t, uint(1), body.Items[2].ID)
+}
+
+func TestMediaHandler_ListInvalidSort(t *testing.T) {
+	app, _ := setupMediaTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/media?sort=random", nil))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}
+
 func TestMediaHandler_GetInvalidID(t *testing.T) {
 	app, _ := setupMediaTestApp(t)
 

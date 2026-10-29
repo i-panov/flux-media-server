@@ -23,6 +23,9 @@ type MediaFilters struct {
 	Type models.MediaType
 	Year int
 	Q    string
+	// SortDesc — новые сверху (по id). Нужен мем-галерее; остальные
+	// разделы сохраняют исторический порядок id ASC.
+	SortDesc bool
 }
 
 // MediaRepository defines data access methods for Media entities.

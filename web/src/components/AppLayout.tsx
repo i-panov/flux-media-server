@@ -30,7 +30,7 @@ function NavItem({
 	label,
 	exact = true,
 }: {
-	to: "/" | "/video" | "/audio" | "/settings";
+	to: "/" | "/video" | "/audio" | "/memes" | "/settings";
 	label: string;
 	exact?: boolean;
 }) {
@@ -101,6 +101,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 									<NavItem to="/" label={t("nav.home")} />
 									<NavItem to="/video" label={t("nav.video")} exact={false} />
 									<NavItem to="/audio" label={t("nav.audio")} exact={false} />
+									<NavItem to="/memes" label={t("nav.memes")} exact={false} />
 									<NavItem to="/settings" label={t("nav.settings")} />
 								</>
 							)}

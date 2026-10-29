@@ -85,6 +85,7 @@ media:
 
 	// Media
 	assert.Equal(t, "./thumbnails", cfg.Media.ThumbnailPath)
+	assert.Equal(t, "./data/images", cfg.Media.ImagePath)
 }
 
 func TestLoadConfigDefaults(t *testing.T) {
@@ -113,6 +114,7 @@ auth:
 		"require_tls по умолчанию должен быть true (защита от plaintext)")
 	assert.Equal(t, "./data/originals", cfg.Storage.OriginalsDir)
 	assert.Equal(t, "./data/tmp", cfg.Storage.TempDir)
+	assert.Equal(t, "./data/images", cfg.Media.ImagePath)
 	assert.False(t, cfg.Storage.AutoCleanupOriginals)
 	assert.Equal(t, 20, *cfg.Transcode.CRF)
 	assert.Equal(t, "fast", cfg.Transcode.Preset)

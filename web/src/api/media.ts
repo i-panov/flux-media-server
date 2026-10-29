@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import { useCallback, useRef, useState } from "react";
 import {
 	audioListOptions,
+	imageListOptions,
 	mediaOptions,
 	mediaSubsOptions,
 	videoListOptions,
@@ -15,6 +16,10 @@ export function useVideoList(q: string) {
 
 export function useAudioList(q: string) {
 	return useInfiniteQuery(audioListOptions(apiFetch, q));
+}
+
+export function useImageList(q: string) {
+	return useInfiniteQuery(imageListOptions(apiFetch, q));
 }
 
 export function useMedia(id: number, enabled = true) {

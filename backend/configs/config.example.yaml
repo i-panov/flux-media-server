@@ -63,6 +63,9 @@ media:
   thumbnail_path: "./data/thumbnails"
   video_path: "./data/video"
   audio_path: "./data/audio"
+  # Мемы: jpg/jpeg/png/gif/webp/bmp. Пусто — config.Load подставит
+  # ./data/images; сканер и загрузка кладут картинки сюда.
+  image_path: "./data/images"
 
 storage:
   # Карантин оригиналов: сюда падают все видеозагрузки до нормализации.

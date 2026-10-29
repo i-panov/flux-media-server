@@ -68,6 +68,18 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 	if q := strings.TrimSpace(c.Query("q")); q != "" {
 		filters.Q = q
 	}
+	// Порядок по id: по умолчанию старый (совместимо с прежним
+	// поведением), sort=desc — новые сверху для мем-галереи.
+	if sortOrder := c.Query("sort"); sortOrder != "" {
+		switch sortOrder {
+		case "asc":
+			filters.SortDesc = false
+		case "desc":
+			filters.SortDesc = true
+		default:
+			return response.Error(c, fiber.StatusBadRequest, "invalid sort")
+		}
+	}
 
 	limit, offset := response.ClampPage(c.QueryInt("limit", defaultMediaPageSize), c.QueryInt("offset", 0), defaultMediaPageSize)
 

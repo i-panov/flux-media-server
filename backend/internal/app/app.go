@@ -291,13 +291,24 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// Каталоги контента не должны пересекаться: иначе сканер
 	// проиндексирует карантин как библиотеку, а чистка удалит не то.
 	// Fail fast с понятной ошибкой вместо тихих дублей.
-	if err := services.ValidateContentDirs(map[string]string{
+	contentDirs := map[string]string{
 		"media.video_path":      cfg.Media.VideoPath,
 		"media.audio_path":      cfg.Media.AudioPath,
 		"storage.originals_dir": cfg.Storage.OriginalsDir,
 		"storage.temp_dir":      cfg.Storage.TempDir,
-	}); err != nil {
+	}
+	// image_path необязателен в конфиге (config.Load подставляет дефолт),
+	// но тесты и встраиваемые конфиги могут его не задавать.
+	if cfg.Media.ImagePath != "" {
+		contentDirs["media.image_path"] = cfg.Media.ImagePath
+	}
+	if err := services.ValidateContentDirs(contentDirs); err != nil {
 		return nil, fmt.Errorf("validate content dirs: %w", err)
+	}
+	if cfg.Media.ImagePath != "" {
+		if err := os.MkdirAll(cfg.Media.ImagePath, 0755); err != nil {
+			return nil, fmt.Errorf("create image dir: %w", err)
+		}
 	}
 
 	progressHandler := handlers.NewProgressHandler(progressRepo, mediaRepo)

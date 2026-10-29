@@ -77,6 +77,7 @@ type MediaConfig struct {
 	ThumbnailPath string `yaml:"thumbnail_path"`
 	VideoPath     string `yaml:"video_path"`
 	AudioPath     string `yaml:"audio_path"`
+	ImagePath     string `yaml:"image_path"` // мемы: jpg/jpeg/png/gif/webp/bmp
 }
 
 // StorageConfig — пути нового конвейера приёма: карантин оригиналов
@@ -114,6 +115,7 @@ func (m MediaConfig) MediaPaths() []MediaPath {
 	return []MediaPath{
 		{Path: m.VideoPath, Type: models.MediaTypeVideo},
 		{Path: m.AudioPath, Type: models.MediaTypeAudio},
+		{Path: m.ImagePath, Type: models.MediaTypeImage},
 	}
 }
 
@@ -187,6 +189,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Storage.TempDir == "" {
 		cfg.Storage.TempDir = "./data/tmp"
+	}
+	if cfg.Media.ImagePath == "" {
+		cfg.Media.ImagePath = "./data/images"
 	}
 	if cfg.Transcode.CRF == nil {
 		defCRF := 20

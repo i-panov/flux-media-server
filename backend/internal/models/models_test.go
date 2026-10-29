@@ -199,10 +199,27 @@ func TestMediaTypeScan(t *testing.T) {
 	require.NoError(t, mt.Scan("AUDIO"))
 	assert.Equal(t, MediaTypeAudio, mt)
 
+	require.NoError(t, mt.Scan(" Image "))
+	assert.Equal(t, MediaTypeImage, mt)
+
 	// nil не меняет текущее значение.
 	require.NoError(t, mt.Scan(nil))
-	assert.Equal(t, MediaTypeAudio, mt)
+	assert.Equal(t, MediaTypeImage, mt)
 
 	var zero MediaType
 	require.Error(t, zero.Scan(42))
+}
+
+func TestMediaTypeParseAndValid(t *testing.T) {
+	assert.Equal(t, MediaTypeImage, ParseMediaType(" image "))
+	assert.Equal(t, MediaTypeImage, ParseMediaType("IMAGE"))
+	assert.Equal(t, MediaTypeAudio, ParseMediaType("audio"))
+	assert.Equal(t, MediaTypeVideo, ParseMediaType("video"))
+	assert.Equal(t, MediaType(""), ParseMediaType("meme"))
+
+	assert.True(t, MediaTypeImage.Valid())
+	assert.True(t, MediaTypeImage.IsImage())
+	assert.False(t, MediaTypeImage.IsAudio())
+	assert.False(t, MediaTypeImage.IsVideo())
+	assert.False(t, MediaType("meme").Valid())
 }

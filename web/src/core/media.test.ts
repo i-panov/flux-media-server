@@ -6,6 +6,7 @@ import {
 	fetchMediaById,
 	fetchMediaList,
 	fetchMediaSubs,
+	imageListOptions,
 	mediaOptions,
 	mediaSubsOptions,
 	videoListOptions,
@@ -15,6 +16,7 @@ function videoItem(id: number) {
 	return {
 		id,
 		title: `Film ${id}`,
+		filename: `film-${id}.mkv`,
 		year: 2024,
 		description: "desc",
 		type: "video",
@@ -186,6 +188,25 @@ describe("audioListOptions", () => {
 		);
 
 		expect(page.pages[0]?.items).toHaveLength(1);
+	});
+});
+
+describe("imageListOptions", () => {
+	it("запрашивает type=image и новые сверху", async () => {
+		const calls: string[] = [];
+		const images = [{ ...videoItem(7), type: "image", title: "Meme" }];
+		const client = new QueryClient();
+		const page = await client.fetchInfiniteQuery(
+			imageListOptions(
+				stubFetcher({ items: images, total: 1, limit: 24, offset: 0 }, calls),
+				"",
+			),
+		);
+
+		expect(page.pages[0]?.items[0]?.title).toBe("Meme");
+		const requested = new URL(String(calls[0] ?? ""), "http://localhost");
+		expect(requested.searchParams.get("type")).toBe("image");
+		expect(requested.searchParams.get("sort")).toBe("desc");
 	});
 });
 

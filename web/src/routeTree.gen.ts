@@ -12,10 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AudioRouteImport } from './routes/audio'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MemesRouteImport } from './routes/memes'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as VideoRouteImport } from './routes/video'
 import { Route as AudioIndexRouteImport } from './routes/audio.index'
 import { Route as AudioIdRouteImport } from './routes/audio.$id'
+import { Route as MemesIndexRouteImport } from './routes/memes.index'
+import { Route as MemesIdRouteImport } from './routes/memes.$id'
 import { Route as VideoIndexRouteImport } from './routes/video.index'
 import { Route as VideoIdRouteImport } from './routes/video.$id'
 
@@ -32,6 +35,11 @@ const AudioRoute = AudioRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemesRoute = MemesRouteImport.update({
+  id: '/memes',
+  path: '/memes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -54,6 +62,16 @@ const AudioIdRoute = AudioIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AudioRoute,
 } as any)
+const MemesIndexRoute = MemesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MemesRoute,
+} as any)
+const MemesIdRoute = MemesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => MemesRoute,
+} as any)
 const VideoIndexRoute = VideoIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -69,11 +87,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audio': typeof AudioRouteWithChildren
   '/login': typeof LoginRoute
+  '/memes': typeof MemesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/video': typeof VideoRouteWithChildren
   '/audio/$id': typeof AudioIdRoute
+  '/memes/$id': typeof MemesIdRoute
   '/video/$id': typeof VideoIdRoute
   '/audio/': typeof AudioIndexRoute
+  '/memes/': typeof MemesIndexRoute
   '/video/': typeof VideoIndexRoute
 }
 export interface FileRoutesByTo {
@@ -81,8 +102,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/audio/$id': typeof AudioIdRoute
+  '/memes/$id': typeof MemesIdRoute
   '/video/$id': typeof VideoIdRoute
   '/audio': typeof AudioIndexRoute
+  '/memes': typeof MemesIndexRoute
   '/video': typeof VideoIndexRoute
 }
 export interface FileRoutesById {
@@ -90,11 +113,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/audio': typeof AudioRouteWithChildren
   '/login': typeof LoginRoute
+  '/memes': typeof MemesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/video': typeof VideoRouteWithChildren
   '/audio/$id': typeof AudioIdRoute
+  '/memes/$id': typeof MemesIdRoute
   '/video/$id': typeof VideoIdRoute
   '/audio/': typeof AudioIndexRoute
+  '/memes/': typeof MemesIndexRoute
   '/video/': typeof VideoIndexRoute
 }
 export interface FileRouteTypes {
@@ -103,11 +129,14 @@ export interface FileRouteTypes {
     | '/'
     | '/audio'
     | '/login'
+    | '/memes'
     | '/settings'
     | '/video'
     | '/audio/$id'
+    | '/memes/$id'
     | '/video/$id'
     | '/audio/'
+    | '/memes/'
     | '/video/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -115,19 +144,24 @@ export interface FileRouteTypes {
     | '/login'
     | '/settings'
     | '/audio/$id'
+    | '/memes/$id'
     | '/video/$id'
     | '/audio'
+    | '/memes'
     | '/video'
   id:
     | '__root__'
     | '/'
     | '/audio'
     | '/login'
+    | '/memes'
     | '/settings'
     | '/video'
     | '/audio/$id'
+    | '/memes/$id'
     | '/video/$id'
     | '/audio/'
+    | '/memes/'
     | '/video/'
   fileRoutesById: FileRoutesById
 }
@@ -135,6 +169,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AudioRoute: typeof AudioRouteWithChildren
   LoginRoute: typeof LoginRoute
+  MemesRoute: typeof MemesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   VideoRoute: typeof VideoRouteWithChildren
 }
@@ -160,6 +195,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/memes': {
+      id: '/memes'
+      path: '/memes'
+      fullPath: '/memes'
+      preLoaderRoute: typeof MemesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -190,6 +232,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AudioIdRouteImport
       parentRoute: typeof AudioRoute
     }
+    '/memes/': {
+      id: '/memes/'
+      path: '/'
+      fullPath: '/memes/'
+      preLoaderRoute: typeof MemesIndexRouteImport
+      parentRoute: typeof MemesRoute
+    }
+    '/memes/$id': {
+      id: '/memes/$id'
+      path: '/$id'
+      fullPath: '/memes/$id'
+      preLoaderRoute: typeof MemesIdRouteImport
+      parentRoute: typeof MemesRoute
+    }
     '/video/': {
       id: '/video/'
       path: '/'
@@ -219,6 +275,18 @@ const AudioRouteChildren: AudioRouteChildren = {
 
 const AudioRouteWithChildren = AudioRoute._addFileChildren(AudioRouteChildren)
 
+interface MemesRouteChildren {
+  MemesIdRoute: typeof MemesIdRoute
+  MemesIndexRoute: typeof MemesIndexRoute
+}
+
+const MemesRouteChildren: MemesRouteChildren = {
+  MemesIdRoute: MemesIdRoute,
+  MemesIndexRoute: MemesIndexRoute,
+}
+
+const MemesRouteWithChildren = MemesRoute._addFileChildren(MemesRouteChildren)
+
 interface VideoRouteChildren {
   VideoIdRoute: typeof VideoIdRoute
   VideoIndexRoute: typeof VideoIndexRoute
@@ -235,6 +303,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AudioRoute: AudioRouteWithChildren,
   LoginRoute: LoginRoute,
+  MemesRoute: MemesRouteWithChildren,
   SettingsRoute: SettingsRoute,
   VideoRoute: VideoRouteWithChildren,
 }

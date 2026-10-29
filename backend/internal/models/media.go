@@ -12,7 +12,7 @@ type Media struct {
 	Filename    string    `gorm:"index" json:"filename"`
 	Year        int       `gorm:"index" json:"year"`
 	Description string    `json:"description"`
-	Type        MediaType `gorm:"index;type:text" json:"type"` // video, audio
+	Type        MediaType `gorm:"index;type:text" json:"type"` // video, audio, image
 	// constraint на many2many создаёт FK на join-таблице media_artists
 	// (media_id → media.id, artist_id → artists.id) с каскадами — но только
 	// на свежих БД; старые БД не пересоздаются (ручные каскады в

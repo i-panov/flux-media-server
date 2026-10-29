@@ -58,7 +58,11 @@ func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, o
 
 	// ORDER BY is required for stable pagination: without it SQLite does not
 	// guarantee row order, causing duplicates/missing items between pages.
-	query = query.Order("media.id ASC")
+	order := "media.id ASC"
+	if filters.SortDesc {
+		order = "media.id DESC"
+	}
+	query = query.Order(order)
 
 	err := query.Find(&media).Error
 	if err != nil {

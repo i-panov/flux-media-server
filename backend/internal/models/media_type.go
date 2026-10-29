@@ -6,16 +6,17 @@ import (
 	"strings"
 )
 
-// MediaType represents a media type: video or audio.
+// MediaType represents a media type: video, audio or image.
 type MediaType string
 
 const (
 	MediaTypeVideo MediaType = "video"
 	MediaTypeAudio MediaType = "audio"
+	MediaTypeImage MediaType = "image"
 )
 
 func (mt MediaType) Valid() bool {
-	return mt == MediaTypeVideo || mt == MediaTypeAudio
+	return mt == MediaTypeVideo || mt == MediaTypeAudio || mt == MediaTypeImage
 }
 
 // Scan implements sql.Scanner so that MediaType can be used as a gorm datatype.
@@ -46,6 +47,9 @@ func (mt MediaType) IsVideo() bool { return mt == MediaTypeVideo }
 // IsAudio returns true if the type is audio.
 func (mt MediaType) IsAudio() bool { return mt == MediaTypeAudio }
 
+// IsImage returns true if the type is image.
+func (mt MediaType) IsImage() bool { return mt == MediaTypeImage }
+
 // ParseMediaType returns the MediaType for the given string, or empty string if invalid.
 func ParseMediaType(s string) MediaType {
 	switch strings.ToLower(strings.TrimSpace(s)) {
@@ -53,6 +57,8 @@ func ParseMediaType(s string) MediaType {
 		return MediaTypeVideo
 	case "audio":
 		return MediaTypeAudio
+	case "image":
+		return MediaTypeImage
 	default:
 		return ""
 	}

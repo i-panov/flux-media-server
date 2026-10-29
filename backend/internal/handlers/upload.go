@@ -39,8 +39,8 @@ type UploadConfig struct {
 // NewUploadHandler creates a new UploadHandler. Файл валидируется и
 // сохраняется синхронно, обработка (хэш/ffprobe/превью) — в фоне через
 // queue; thumbSvc передаётся внутрь очереди, хендлеру он не нужен.
-// Видео уходят в карантин и нормализуются transQueue, аудио — старым
-// путём через queue.
+// Видео уходят в карантин и нормализуются transQueue, аудио и картинки —
+// старым путём через queue.
 func NewUploadHandler(
 	mediaRepo repository.MediaRepository,
 	queue *services.UploadQueue,
@@ -111,8 +111,11 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		return h.uploadVideo(c, fileHeader, filename)
 	}
 	destPath := h.mediaCfg.VideoPath
-	if mediaType == models.MediaTypeAudio {
+	switch mediaType {
+	case models.MediaTypeAudio:
 		destPath = h.mediaCfg.AudioPath
+	case models.MediaTypeImage:
+		destPath = h.mediaCfg.ImagePath
 	}
 	if destPath == "" {
 		return response.Error(c, fiber.StatusInternalServerError, "No path configured for media type: "+string(mediaType))

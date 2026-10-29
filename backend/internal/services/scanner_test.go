@@ -479,4 +479,34 @@ func TestScannerSkipsExtractTmpFiles(t *testing.T) {
 	assert.False(t, services.IsAllowedExtension(filepath.Ext("Clip (2).flac.part-12")))
 	assert.True(t, services.IsAllowedExtension(".m4a"))
 	assert.True(t, services.IsAllowedExtension(".opus"))
+	assert.True(t, services.IsAllowedExtension(".jpg"))
+	assert.True(t, services.IsAllowedExtension(".png"))
+	assert.True(t, services.IsAllowedExtension(".webp"))
+	assert.True(t, services.IsAllowedExtension(".bmp"))
+}
+
+// Тип картинки определяется по расширению до ffprobe: иначе PNG/JPEG
+// получили бы video (ffprobe видит в них видеопоток).
+func TestScannerIndexesImageByExtension(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+
+	tempDir := t.TempDir()
+	imagePath := filepath.Join(tempDir, "meme.png")
+	// Содержимое намеренно не PNG: сбой пробы и превью не должен мешать
+	// создать запись правильного типа.
+	require.NoError(t, os.WriteFile(imagePath, []byte("not really a png"), 0644))
+
+	cfg := &config.Config{
+		Media: config.MediaConfig{
+			ThumbnailPath: t.TempDir(),
+			ImagePath:     tempDir,
+		},
+	}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+
+	require.NoError(t, scanner.ScanPath(context.Background(), tempDir))
+
+	media, err := mediaRepo.FindByPath(context.Background(), imagePath)
+	require.NoError(t, err)
+	assert.Equal(t, models.MediaTypeImage, media.Type)
 }

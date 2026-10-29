@@ -50,7 +50,9 @@ func (e *MetadataExtractor) ExtractFromFileContext(ctx context.Context, path str
 	switch {
 	case audioExtensions[ext]:
 		return e.extractAudio(ctx, path)
-	case videoExtensions[ext]:
+	case videoExtensions[ext], imageExtensions[ext]:
+		// Картинкам из пробы нужны только Width/Height — их отдаёт тот
+		// же поток, что и у видео. Длительность у картинки нулевая.
 		if len(probeData) > 0 && probeData[0] != nil {
 			return extractVideoFromData(probeData[0])
 		}

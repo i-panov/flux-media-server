@@ -129,6 +129,16 @@ func MimeTypeByExt(ext string) string {
 		return "audio/opus"
 	case ".wma":
 		return "audio/x-ms-wma"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".bmp":
+		return "image/bmp"
 	default:
 		return "application/octet-stream"
 	}
