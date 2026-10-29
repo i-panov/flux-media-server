@@ -18,6 +18,7 @@ import {
 	useSavedTime,
 } from "../../api/media";
 import { formatDuration, splitSubLang } from "../../core/format";
+import { useVideoProgress } from "./useVideoProgress";
 
 function MetaItem({ label, value }: { label: string; value: string }) {
 	return (
@@ -75,6 +76,7 @@ export function VideoDetailPage() {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const position = useSavedTime(videoRef);
 	const played = useRef(false);
+	const videoProgress = useVideoProgress(mediaId, videoRef, valid);
 
 	const goBack = () => {
 		void navigate({ to: "/video" });
@@ -168,7 +170,10 @@ export function VideoDetailPage() {
 				poster={item.thumbnail_url === "" ? undefined : item.thumbnail_url}
 				className="aspect-video w-full rounded-md bg-black"
 				onError={handleMediaError}
-				onLoadedMetadata={position.restore}
+				onLoadedMetadata={() => {
+					position.restore();
+					videoProgress.handleLoadedMetadata();
+				}}
 				onPlay={() => {
 					// Счётчик backend инкрементирует в Stream: подтягиваем
 					// свежее значение один раз за просмотр, плеер не трогаем.
@@ -177,6 +182,9 @@ export function VideoDetailPage() {
 						void media.refetch();
 					}
 				}}
+				onPause={videoProgress.handlePause}
+				onTimeUpdate={videoProgress.handleTimeUpdate}
+				onEnded={videoProgress.handleEnded}
 			>
 				{(subs.data ?? []).map((track) => {
 					const { base, label } = splitSubLang(track.lang);

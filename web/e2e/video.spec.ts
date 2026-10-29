@@ -300,3 +300,69 @@ test("видео: ошибка догрузки не скрывает загру
 	).toBeVisible();
 	await expect(page.getByText("Первый фильм", { exact: true })).toBeVisible();
 });
+
+test("видео: сохранённая позиция восстанавливается при открытии", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+	await stubVideoApi(page);
+	// Реального медиафайла нет: подменяем currentTime/duration, иначе
+	// браузер бросает InvalidStateError на установку времени.
+	await page.addInitScript(() => {
+		let stored = 0;
+		Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+			configurable: true,
+			get() {
+				return stored;
+			},
+			set(value: number) {
+				stored = value;
+			},
+		});
+		Object.defineProperty(HTMLMediaElement.prototype, "duration", {
+			configurable: true,
+			get() {
+				return 3725;
+			},
+		});
+	});
+	await page.route("**/api/progress/1", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				id: 1,
+				user_id: 1,
+				media_id: 1,
+				position: 1200,
+				duration: 3725,
+				completed: false,
+				updated_at: "2026-01-01T00:00:00Z",
+			}),
+		}),
+	);
+	// Медиафайла нет: фиксируем ошибку потока, чтобы поведение не зависело
+	// от того, успел ли браузер запросить реальный /stream.
+	await page.route("**/api/media/1/stream", (route) =>
+		route.fulfill({
+			status: 404,
+			contentType: "text/plain",
+			body: "no stream",
+		}),
+	);
+
+	await page.goto("/video/1");
+	const video = page.locator("video");
+	await expect(video).toBeVisible();
+	// Ошибка потока запускает зонд и перемонтирование плеера. Ждём, пока
+	// попытки исчерпаются: иначе loadedmetadata может достаться элементу,
+	// который тут же заменят, и восстановленная позиция потеряется.
+	await expect(page.getByText("Не удалось загрузить видео")).toBeVisible();
+	await video.evaluate((el) => el.dispatchEvent(new Event("loadedmetadata")));
+
+	await expect
+		.poll(() =>
+			video.evaluate((el) => Number((el as HTMLVideoElement).currentTime)),
+		)
+		.toBe(1200);
+});
