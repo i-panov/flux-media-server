@@ -2,6 +2,9 @@ import { expect, type Page, test } from "@playwright/test";
 
 const VIDEO_LIST_PATTERN = /\/video$/;
 const VIDEO_DETAIL_PATTERN = /\/video\/1$/;
+// Ссылка карточки «Продолжить просмотр»: имя собирается из названия,
+// остатка и aria-label полосы прогресса, поэтому ищем по фрагменту.
+const CONTINUE_LINK_PATTERN = /Осталось \d{2}:\d{2}/;
 
 const userBody = JSON.stringify({
 	id: 1,
@@ -15,6 +18,7 @@ function videoItem(id: number, title: string) {
 		title,
 		year: 2024,
 		description: `Описание ${title}`,
+		type: "video",
 		duration: 3725,
 		width: 1920,
 		height: 1080,
@@ -29,6 +33,30 @@ function videoItem(id: number, title: string) {
 function listBody(items: ReturnType<typeof videoItem>[], total: number) {
 	return JSON.stringify({ items, total, limit: 24, offset: 0 });
 }
+
+function progressItem(
+	id: number,
+	media: ReturnType<typeof videoItem>,
+	position: number,
+) {
+	return {
+		id,
+		user_id: 1,
+		media_id: media.id,
+		position,
+		duration: 3725,
+		completed: false,
+		updated_at: "2026-01-01T00:00:00Z",
+		media,
+	};
+}
+
+// 1×1 прозрачный PNG: превью должно декодироваться как настоящая картинка.
+const PIXEL_PNG = Buffer.from(
+	// biome-ignore lint/security/noSecrets: это картинка-фикстура, а не секрет.
+	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+	"base64",
+);
 
 async function stubAuthedSession(page: Page) {
 	await page.route("**/api/auth/me", (route) =>
@@ -71,6 +99,16 @@ async function stubVideoApi(page: Page) {
 			body: JSON.stringify([{ lang: "ru", url: "/api/media/1/subs/ru" }]),
 		}),
 	);
+	// Блок «Продолжить просмотр» не должен зависеть от живого бэкенда.
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: [], total: 0, limit: 20, offset: 0 }),
+			}),
+	);
 }
 
 test("видео: список, поиск и переход в детали с плеером", async ({ page }) => {
@@ -96,6 +134,158 @@ test("видео: список, поиск и переход в детали с 
 	await expect(page.locator("video")).toBeVisible();
 	await expect(page.getByText("Описание Первый фильм")).toBeVisible();
 	await expect(page.getByText("1:02:05")).toBeVisible();
+});
+
+test("видео: «Продолжить просмотр» показывает незавершённое и ведёт к деталям", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+	await stubVideoApi(page);
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					items: [
+						progressItem(1, videoItem(1, "Первый фильм"), 1200),
+						// 99% — просмотрено по порогу, в блок не попадает.
+						progressItem(2, videoItem(2, "Второй фильм"), 3688),
+					],
+					total: 2,
+					limit: 20,
+					offset: 0,
+				}),
+			}),
+	);
+	await page.route("**/api/progress/1", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				id: 1,
+				user_id: 1,
+				media_id: 1,
+				position: 1200,
+				duration: 3725,
+				completed: false,
+				updated_at: "2026-01-01T00:00:00Z",
+			}),
+		}),
+	);
+
+	await page.goto("/video");
+
+	const block = page.getByRole("heading", { name: "Продолжить просмотр" });
+	await expect(block).toBeVisible();
+	// 3725 - 1200 = 2525 с = 42:05 — до конца.
+	await expect(page.getByText("Осталось 42:05")).toBeVisible();
+	await expect(
+		page.getByRole("progressbar", { name: "Просмотрено 20:00 из 1:02:05" }),
+	).toBeVisible();
+	// Досмотренная запись отфильтрована.
+	await expect(
+		page.getByRole("link", { name: CONTINUE_LINK_PATTERN }),
+	).toHaveCount(1);
+
+	// При поиске блок скрыт: ряды не фильтруются вместе со списком.
+	await page.getByLabel("Поиск по названию").fill("небылица");
+	await expect(block).toBeHidden();
+	await page.getByLabel("Поиск по названию").fill("");
+	await expect(block).toBeVisible();
+
+	await page.getByRole("link", { name: CONTINUE_LINK_PATTERN }).click();
+	await expect(page).toHaveURL(VIDEO_DETAIL_PATTERN);
+	await expect(page.locator("video")).toBeVisible();
+});
+
+test("видео: превью «Продолжить просмотр» чинится после ошибки и не остаётся битым", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+	// Пустой список: единственные картинки на странице — превью блока.
+	await page.route(
+		(url) => url.pathname === "/api/media",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: listBody([], 0),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					items: [
+						progressItem(1, videoItem(3, "Третий фильм"), 120),
+						progressItem(2, videoItem(4, "Четвёртый фильм"), 240),
+					],
+					total: 2,
+					limit: 20,
+					offset: 0,
+				}),
+			}),
+	);
+	// Зонд useMediaReload ходит за деталями медиа.
+	for (const id of [3, 4]) {
+		await page.route(
+			(url) => url.pathname === `/api/media/${id}`,
+			(route) =>
+				route.fulfill({
+					status: 200,
+					contentType: "application/json",
+					body: JSON.stringify(videoItem(id, `Фильм ${id}`)),
+				}),
+		);
+	}
+	// 401 на первом запросе превью: зонд подтверждает сессию, элемент
+	// перемонтируется по nonce и картинка приходит заново.
+	let recoveredHits = 0;
+	await page.route(
+		(url) => url.pathname === "/api/media/3/thumb",
+		(route) => {
+			recoveredHits += 1;
+			if (recoveredHits === 1) {
+				return route.fulfill({
+					status: 401,
+					contentType: "application/json",
+					body: JSON.stringify({ error: "expired" }),
+				});
+			}
+			return route.fulfill({
+				status: 200,
+				contentType: "image/png",
+				body: PIXEL_PNG,
+			});
+		},
+	);
+	// 404: превью нет — вместо битой картинки плейсхолдер и повтор.
+	await page.route(
+		(url) => url.pathname === "/api/media/4/thumb",
+		(route) =>
+			route.fulfill({
+				status: 404,
+				contentType: "application/json",
+				body: JSON.stringify({ error: "no thumbnail" }),
+			}),
+	);
+
+	await page.goto("/video");
+	await expect(
+		page.getByRole("heading", { name: "Продолжить просмотр" }),
+	).toBeVisible();
+
+	const recovered = page.locator('img[src="/api/media/3/thumb"]');
+	await expect(recovered).toBeVisible();
+	await expect.poll(() => recoveredHits).toBeGreaterThanOrEqual(2);
+
+	await expect(page.locator('img[src="/api/media/4/thumb"]')).toHaveCount(0);
+	await expect(page.getByRole("button", { name: "Повторить" })).toBeVisible();
 });
 
 test("видео открывается из навигации", async ({ page }) => {

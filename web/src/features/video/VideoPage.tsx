@@ -11,6 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVideoList } from "../../api/media";
+import { ContinueWatching } from "./ContinueWatching";
 import { VideoCard } from "./VideoCard";
 
 const SKELETON_COUNT = 12;
@@ -63,6 +64,8 @@ export function VideoPage() {
 				}}
 				w={{ base: "100%", sm: 320 }}
 			/>
+			{/* При поиске ряды продолжения не нужны: они не фильтруются. */}
+			{debounced === "" && <ContinueWatching />}
 			{list.isPending ? (
 				<VideoSkeletons />
 			) : list.isError && items.length === 0 ? (

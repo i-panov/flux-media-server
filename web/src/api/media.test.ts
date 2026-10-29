@@ -16,6 +16,7 @@ function videoItem(id: number) {
 		title: `Film ${id}`,
 		year: 2024,
 		description: "desc",
+		type: "video",
 		duration: 3600,
 		width: 1920,
 		height: 1080,

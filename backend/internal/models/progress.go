@@ -16,7 +16,10 @@ type WatchProgress struct {
 	Duration  int  `json:"duration"` // общая длительность в секундах (присылает клиент)
 	Completed bool `json:"completed"`
 	// FK-ассоциации с каскадным удалением (для новых инсталляций).
-	User      *User     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
-	Media     *Media    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	User *User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	// Media заполняется только в списке прогресса (Preload): клиенту
+	// «Продолжить просмотр» нужны название и превью без N+1 запросов.
+	// В остальных ответах связи нет — поле опускается.
+	Media     *Media    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"media,omitempty"`
 	UpdatedAt time.Time `gorm:"index:idx_progress_user_updated,priority:2" json:"updated_at"`
 }

@@ -165,3 +165,59 @@ func TestProgressHandler_ListEmptyItems(t *testing.T) {
 	buf.ReadFrom(resp.Body)
 	assert.Contains(t, buf.String(), `"items":[]`)
 }
+
+// Список прогресса несёт вложенное медиа: клиенту блока «Продолжить
+// просмотр» нужны название и превью без запроса на каждую позицию.
+func TestProgressHandler_ListIncludesMedia(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	updateBody, _ := json.Marshal(map[string]interface{}{
+		"position": 120,
+		"duration": 5400,
+	})
+	updateReq := httptest.NewRequest("PUT", "/api/progress/1", bytes.NewReader(updateBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp, err := app.Test(updateReq)
+	require.NoError(t, err)
+	updateResp.Body.Close()
+	require.Equal(t, fiber.StatusOK, updateResp.StatusCode)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress", nil))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var body struct {
+		Items []struct {
+			MediaID uint          `json:"media_id"`
+			Media   *models.Media `json:"media"`
+		} `json:"items"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Len(t, body.Items, 1)
+	require.NotNil(t, body.Items[0].Media, "media должен быть заполнен Preload")
+	assert.Equal(t, body.Items[0].MediaID, body.Items[0].Media.ID)
+	assert.Equal(t, "Test Movie", body.Items[0].Media.Title)
+}
+
+// Одиночный прогресс не тянет медиа: поле опускается, контракт не меняется.
+func TestProgressHandler_GetOneOmitsMedia(t *testing.T) {
+	app := setupProgressTestApp(t)
+
+	updateBody, _ := json.Marshal(map[string]interface{}{
+		"position": 30,
+		"duration": 100,
+	})
+	updateReq := httptest.NewRequest("PUT", "/api/progress/1", bytes.NewReader(updateBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp, err := app.Test(updateReq)
+	require.NoError(t, err)
+	updateResp.Body.Close()
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress/1", nil))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	buf := bytes.Buffer{}
+	_, _ = buf.ReadFrom(resp.Body)
+	assert.NotContains(t, buf.String(), `"media":`)
+}

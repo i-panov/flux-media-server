@@ -12,11 +12,14 @@ export type CoreFetcher = (
 	init?: { signal?: AbortSignal },
 ) => Promise<unknown>;
 
-const mediaSchema = z.object({
+export const mediaSchema = z.object({
 	id: z.number(),
 	title: z.string(),
 	year: z.number(),
 	description: z.string(),
+	// Бэкенд отдаёт "video" или "audio"; пустая строка возможна у старых
+	// записей, поэтому фильтр «Продолжить просмотр» проверяет точное значение.
+	type: z.string(),
 	duration: z.number(),
 	width: z.number(),
 	height: z.number(),

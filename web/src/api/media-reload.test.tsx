@@ -16,6 +16,7 @@ function videoItem() {
 		title: "Film 7",
 		year: 2024,
 		description: "",
+		type: "video",
 		duration: 60,
 		width: 1280,
 		height: 720,
