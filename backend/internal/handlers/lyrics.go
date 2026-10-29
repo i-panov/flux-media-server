@@ -46,6 +46,10 @@ type UpsertLyricsRequest struct {
 	Translation string `json:"translation"`
 	SyncData    string `json:"sync_data"`
 	Source      string `json:"source"`
+	// Clear applies empty fields as erasure. Without it an empty string
+	// means "not sent": older clients save lyrics_text alone and send
+	// translation/sync_data empty.
+	Clear bool `json:"clear"`
 }
 
 // UpsertLyrics creates or updates lyrics for a media item.
@@ -81,22 +85,25 @@ func (h *LyricsHandler) UpsertLyrics(c *fiber.Ctx) error {
 	// If a record already exists, preserve fields that the client did not
 	// send (empty string in the request). This prevents PUT from erasing
 	// translation/sync_data when only lyrics_text is being saved.
+	// Clear opts out: empty fields then erase the stored values.
 	existing, findErr := h.lyricsRepo.FindByMediaID(ctx, mediaID)
 	if findErr == nil && existing != nil {
-		if req.LyricsText == "" {
-			lyrics.LyricsText = existing.LyricsText
-		}
-		if req.Translation == "" {
-			lyrics.Translation = existing.Translation
-		}
-		if req.SyncData == "" {
-			lyrics.SyncData = existing.SyncData
-		}
-		if req.Source == "" {
-			lyrics.Source = existing.Source
-		}
 		// Preserve the ID so OnConflict updates the existing row.
 		lyrics.ID = existing.ID
+		if !req.Clear {
+			if req.LyricsText == "" {
+				lyrics.LyricsText = existing.LyricsText
+			}
+			if req.Translation == "" {
+				lyrics.Translation = existing.Translation
+			}
+			if req.SyncData == "" {
+				lyrics.SyncData = existing.SyncData
+			}
+			if req.Source == "" {
+				lyrics.Source = existing.Source
+			}
+		}
 	}
 
 	if err := h.lyricsRepo.Upsert(ctx, lyrics); err != nil {

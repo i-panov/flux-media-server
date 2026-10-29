@@ -8,16 +8,15 @@ import {
 	Title,
 } from "@mantine/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { Music } from "lucide-react";
-import { useRef } from "react";
+import { Music, Pause, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
-import { useMedia, useMediaReload, useSavedTime } from "../../api/media";
+import { useMedia } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MetaItem } from "../media/MetaItem";
-import { useMediaProgress } from "../media/useMediaProgress";
+import { useAudioPlayer } from "../player/AudioPlayerProvider";
 
 export function AudioDetailPage() {
 	const { t } = useTranslation();
@@ -27,26 +26,12 @@ export function AudioDetailPage() {
 	const valid = Number.isInteger(mediaId) && mediaId > 0;
 
 	const media = useMedia(valid ? mediaId : 0, valid);
-	const reload = useMediaReload(valid ? mediaId : 0);
-	const audioRef = useRef<HTMLAudioElement | null>(null);
-	const position = useSavedTime(audioRef);
-	const progress = useMediaProgress(mediaId, audioRef, valid);
+	const player = useAudioPlayer();
 
 	const goBack = () => {
 		void navigate({ to: "/audio" });
 	};
 	const backLabel = t("audio.back");
-
-	// Позиция сохраняется перед ЛЮБЫМ изменением nonce (ошибка потока,
-	// кнопка retry) — иначе remount сбрасывает её в 0.
-	const handleMediaError = () => {
-		position.save();
-		reload.handleError();
-	};
-	const handleRetry = () => {
-		position.save();
-		reload.retry();
-	};
 
 	if (!valid) {
 		return (
@@ -106,6 +91,7 @@ export function AudioDetailPage() {
 	}
 
 	const item = media.data;
+	const isCurrent = player.current?.id === item.id;
 	const artists = item.artists.map((artist) => artist.name).join(", ");
 	// Обложка — декоративный фон: битая картинка не должна оставлять иконку.
 	const coverStyle =
@@ -141,28 +127,39 @@ export function AudioDetailPage() {
 							<AddToCollectionButton mediaId={item.id} type="audio" />
 						</Group>
 					</Group>
-					{/* biome-ignore lint/a11y/useMediaCaption: у аудио нет видеоряда и субтитров. */}
-					<audio
-						ref={audioRef}
-						key={reload.nonce}
-						controls
-						preload="metadata"
-						src={`/api/media/${item.id}/stream`}
-						className="w-full"
-						onError={handleMediaError}
-						onLoadedMetadata={() => {
-							position.restore();
-							progress.handleLoadedMetadata();
-						}}
-						onPause={progress.handlePause}
-						onTimeUpdate={progress.handleTimeUpdate}
-						onEnded={progress.handleEnded}
-					/>
-					{reload.failed && (
-						<Alert color="red" variant="light" title={t("audio.loadError")}>
-							<Button variant="light" size="xs" mt="xs" onClick={handleRetry}>
-								{t("common.retry")}
+					<Group gap="xs">
+						<Button
+							leftSection={
+								isCurrent && player.playing ? (
+									<Pause size={16} />
+								) : (
+									<Play size={16} fill="currentColor" />
+								)
+							}
+							onClick={() => {
+								if (isCurrent) {
+									player.toggle();
+								} else {
+									player.playMedia(item);
+								}
+							}}
+						>
+							{isCurrent && player.playing
+								? t("player.pause")
+								: t("player.play")}
+						</Button>
+						{isCurrent && (
+							<Button
+								variant="light"
+								onClick={() => void navigate({ to: "/player" })}
+							>
+								{t("player.open")}
 							</Button>
+						)}
+					</Group>
+					{isCurrent && player.error !== null && (
+						<Alert color="red" variant="light" title={t("player.error")}>
+							{player.error}
 						</Alert>
 					)}
 					<Group gap="xl">

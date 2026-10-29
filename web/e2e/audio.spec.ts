@@ -6,6 +6,17 @@ const AUDIO_DETAIL_PATTERN = /\/audio\/1$/;
 // Имя ссылки блока складывается из названия, остатка и aria-label полосы.
 const CONTINUE_LINK_PATTERN = /Осталось 3:15/;
 
+// Клиентский переход TanStack Router сначала меняет URL, а страницу списка
+// держит до коммита новой: в этот момент кнопок «Слушать» несколько (по одной
+// на карточку). Поэтому ждём уникальный заголовок детальной страницы.
+async function expectAudioDetail(page: Page): Promise<void> {
+	await expect(page).toHaveURL(AUDIO_DETAIL_PATTERN);
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Первая песня" }),
+	).toBeVisible();
+	await expect(page.getByRole("button", { name: "Слушать" })).toHaveCount(1);
+}
+
 const userBody = JSON.stringify({
 	id: 1,
 	email: "user@example.com",
@@ -163,11 +174,7 @@ test("аудио: список, поиск и переход в детали с 
 	await expect(page.getByText("Первая песня", { exact: true })).toBeVisible();
 
 	await page.getByRole("link", { name: "Первая песня" }).click();
-	await expect(page).toHaveURL(AUDIO_DETAIL_PATTERN);
-	await expect(page.locator("audio")).toBeVisible();
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Первая песня" }),
-	).toBeVisible();
+	await expectAudioDetail(page);
 	await expect(
 		page.getByText("Исполнитель Один, Исполнитель Два"),
 	).toBeVisible();
@@ -255,8 +262,7 @@ test("аудио: «Продолжить прослушивание» отбир
 	await expect(block).toBeVisible();
 
 	await page.getByRole("link", { name: CONTINUE_LINK_PATTERN }).click();
-	await expect(page).toHaveURL(AUDIO_DETAIL_PATTERN);
-	await expect(page.locator("audio")).toBeVisible();
+	await expectAudioDetail(page);
 });
 
 test("аудио открывается из навигации", async ({ page }) => {

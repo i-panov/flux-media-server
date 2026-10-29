@@ -111,3 +111,46 @@ func TestLyricsHandler_UpsertAndGetLyrics(t *testing.T) {
 	assert.Equal(t, "La la la", lyrics.LyricsText)
 	assert.Equal(t, "Ля ля ля", lyrics.Translation)
 }
+
+// TestLyricsHandler_ClearLyrics: без флага clear пустые поля означают
+// «не передано» (старые клиенты сохраняют только текст), с флагом —
+// стирают сохранённое.
+func TestLyricsHandler_ClearLyrics(t *testing.T) {
+	app := setupLyricsTestApp(t)
+
+	upsert := func(body map[string]any) models.Lyrics {
+		payload, err := json.Marshal(body)
+		require.NoError(t, err)
+		req := httptest.NewRequest("PUT", "/api/media/1/lyrics", bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		require.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+		var lyrics models.Lyrics
+		buf := bytes.Buffer{}
+		buf.ReadFrom(resp.Body)
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &lyrics))
+		return lyrics
+	}
+
+	upsert(map[string]any{
+		"lyrics_text": "La la la",
+		"translation": "Ля ля ля",
+		"source":      "manual",
+	})
+
+	// Без clear прежние значения сохраняются.
+	kept := upsert(map[string]any{"lyrics_text": "", "translation": ""})
+	assert.Equal(t, "La la la", kept.LyricsText)
+	assert.Equal(t, "Ля ля ля", kept.Translation)
+
+	// С clear поля стираются.
+	cleared := upsert(map[string]any{
+		"lyrics_text": "",
+		"translation": "",
+		"clear":       true,
+	})
+	assert.Empty(t, cleared.LyricsText)
+	assert.Empty(t, cleared.Translation)
+}

@@ -36,4 +36,27 @@ body {
 	main.app-shell-main-mobile {
 		padding-bottom: calc(64px + 1rem);
 	}
+	main.app-shell-main-player {
+		padding-bottom: calc(64px + 1rem + 76px);
+	}
+}
+
+@media (min-width: 62em) {
+	main.app-shell-main-player {
+		padding-bottom: 96px;
+	}
+}
+
+.audio-mini-player {
+	position: fixed;
+	right: 0;
+	bottom: 64px;
+	left: 0;
+	z-index: 200;
+}
+
+@media (min-width: 62em) {
+	.audio-mini-player {
+		bottom: 0;
+	}
 }

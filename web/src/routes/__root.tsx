@@ -20,6 +20,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { sessionQueryOptions } from "../api/session";
 import { AppLayout } from "../components/AppLayout";
+import { AudioPlayerProvider } from "../features/player/AudioPlayerProvider";
 import i18n, { pickLang } from "../i18n";
 import { queryClient } from "../queryClient";
 import { theme } from "../theme";
@@ -87,10 +88,12 @@ function RootDocument() {
 	return (
 		<MantineProvider theme={theme} defaultColorScheme="auto">
 			<QueryClientProvider client={queryClient}>
-				<Notifications position="top-right" limit={3} />
-				<AppLayout>
-					<Outlet />
-				</AppLayout>
+				<AudioPlayerProvider>
+					<Notifications position="top-right" limit={3} />
+					<AppLayout>
+						<Outlet />
+					</AppLayout>
+				</AudioPlayerProvider>
 			</QueryClientProvider>
 		</MantineProvider>
 	);

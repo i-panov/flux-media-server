@@ -9,6 +9,7 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFavoriteMedia } from "../../api/favorites";
@@ -16,6 +17,7 @@ import { useAudioList } from "../../api/media";
 import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
+import { useAudioPlayer } from "../player/AudioPlayerProvider";
 import { UploadButton } from "../upload/UploadButton";
 import { AudioCard } from "./AudioCard";
 
@@ -41,6 +43,8 @@ function AudioSkeletons() {
 
 export function AudioPage() {
 	const { t } = useTranslation();
+	const navigate = useNavigate();
+	const player = useAudioPlayer();
 	const [query, setQuery] = useState("");
 	const [debounced, setDebounced] = useState("");
 
@@ -107,7 +111,14 @@ export function AudioPage() {
 						spacing="md"
 					>
 						{visibleItems.map((media) => (
-							<AudioCard key={media.id} media={media} />
+							<AudioCard
+								key={media.id}
+								media={media}
+								onPlay={() => {
+									player.playQueue(items, items.indexOf(media));
+									void navigate({ to: "/player" });
+								}}
+							/>
 						))}
 					</SimpleGrid>
 					{list.isFetchNextPageError ? (

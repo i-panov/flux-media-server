@@ -24,6 +24,8 @@ import type { ComponentType, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "../api/session";
 import { useLogout } from "../features/auth/useLogout";
+import { AudioMiniPlayer } from "../features/player/AudioMiniPlayer";
+import { useMiniPlayerVisible } from "../features/player/useMiniPlayerVisible";
 
 type NavTo = "/" | "/video" | "/audio" | "/memes" | "/settings";
 
@@ -127,6 +129,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 	const { t } = useTranslation();
 	const { data: session } = useSession();
 	const { logout, isPending: logoutPending } = useLogout();
+	const miniPlayerVisible = useMiniPlayerVisible();
 
 	const logoutButton = (
 		<Tooltip label={t("auth.logout")} withArrow>
@@ -203,7 +206,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
 				</AppShell.Navbar>
 			)}
 
-			<AppShell.Main className={authed ? "app-shell-main-mobile" : undefined}>
+			<AppShell.Main
+				className={[
+					authed ? "app-shell-main-mobile" : "",
+					miniPlayerVisible ? "app-shell-main-player" : "",
+				]
+					.filter(Boolean)
+					.join(" ")}
+			>
 				<Container
 					size="xl"
 					maw={1600}
@@ -228,6 +238,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 					</Group>
 				</AppShell.Footer>
 			)}
+
+			<AudioMiniPlayer />
 		</AppShell>
 	);
 }

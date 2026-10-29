@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AudioRouteImport } from './routes/audio'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MemesRouteImport } from './routes/memes'
+import { Route as PlayerRouteImport } from './routes/player'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TrashRouteImport } from './routes/trash'
 import { Route as UploadRouteImport } from './routes/upload'
@@ -43,6 +44,11 @@ const LoginRoute = LoginRouteImport.update({
 const MemesRoute = MemesRouteImport.update({
   id: '/memes',
   path: '/memes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayerRoute = PlayerRouteImport.update({
+  id: '/player',
+  path: '/player',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/audio': typeof AudioRouteWithChildren
   '/login': typeof LoginRoute
   '/memes': typeof MemesRouteWithChildren
+  '/player': typeof PlayerRoute
   '/settings': typeof SettingsRoute
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/player': typeof PlayerRoute
   '/settings': typeof SettingsRoute
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/audio': typeof AudioRouteWithChildren
   '/login': typeof LoginRoute
   '/memes': typeof MemesRouteWithChildren
+  '/player': typeof PlayerRoute
   '/settings': typeof SettingsRoute
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/audio'
     | '/login'
     | '/memes'
+    | '/player'
     | '/settings'
     | '/trash'
     | '/upload'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/player'
     | '/settings'
     | '/trash'
     | '/upload'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/audio'
     | '/login'
     | '/memes'
+    | '/player'
     | '/settings'
     | '/trash'
     | '/upload'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   AudioRoute: typeof AudioRouteWithChildren
   LoginRoute: typeof LoginRoute
   MemesRoute: typeof MemesRouteWithChildren
+  PlayerRoute: typeof PlayerRoute
   SettingsRoute: typeof SettingsRoute
   TrashRoute: typeof TrashRoute
   UploadRoute: typeof UploadRoute
@@ -241,6 +254,13 @@ declare module '@tanstack/react-router' {
       path: '/memes'
       fullPath: '/memes'
       preLoaderRoute: typeof MemesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/player': {
+      id: '/player'
+      path: '/player'
+      fullPath: '/player'
+      preLoaderRoute: typeof PlayerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -364,6 +384,7 @@ const rootRouteChildren: RootRouteChildren = {
   AudioRoute: AudioRouteWithChildren,
   LoginRoute: LoginRoute,
   MemesRoute: MemesRouteWithChildren,
+  PlayerRoute: PlayerRoute,
   SettingsRoute: SettingsRoute,
   TrashRoute: TrashRoute,
   UploadRoute: UploadRoute,
