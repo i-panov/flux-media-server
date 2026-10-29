@@ -24,6 +24,7 @@ type TrashHandler struct {
 	colRepo   repository.CollectionRepository
 	streamer  services.StreamerInterface
 	thumbSvc  *services.ThumbnailService
+	subRepo   repository.SubtitleRepository
 }
 
 func NewTrashHandler(
@@ -31,12 +32,14 @@ func NewTrashHandler(
 	colRepo repository.CollectionRepository,
 	streamer services.StreamerInterface,
 	thumbSvc *services.ThumbnailService,
+	subRepo repository.SubtitleRepository,
 ) *TrashHandler {
 	return &TrashHandler{
 		mediaRepo: mediaRepo,
 		colRepo:   colRepo,
 		streamer:  streamer,
 		thumbSvc:  thumbSvc,
+		subRepo:   subRepo,
 	}
 }
 
@@ -135,12 +138,13 @@ func (h *TrashHandler) PurgeMedia(c *fiber.Ctx) error {
 		return h.mapTrashError(c, err)
 	}
 
+	// Сначала файлы (включая сайдкары — их строки сносит каскад),
+	// затем строка: в обратном порядке ListByMedia уже ничего не найдёт.
+	h.removeMediaFiles(ctx, media)
 	if err := h.mediaRepo.PurgeMedia(ctx, id); err != nil {
 		log.Printf("Trash purge media: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to purge media")
 	}
-
-	h.removeMediaFiles(ctx, media)
 
 	return c.JSON(fiber.Map{"message": "Media permanently deleted"})
 }
@@ -213,11 +217,12 @@ func (h *TrashHandler) Empty(c *fiber.Ctx) error {
 			break
 		}
 		for i := range media {
+			// Файлы до строки (см. PurgeMedia): каскад сносит строки сабов.
+			h.removeMediaFiles(ctx, &media[i])
 			if err := h.mediaRepo.PurgeMedia(ctx, media[i].ID); err != nil {
 				log.Printf("Trash empty purge media %d: %v", media[i].ID, err)
 				return response.Error(c, fiber.StatusInternalServerError, "Failed to empty trash")
 			}
-			h.removeMediaFiles(ctx, &media[i])
 		}
 	}
 
@@ -276,8 +281,10 @@ func (h *TrashHandler) mapTrashError(c *fiber.Ctx, err error) error {
 	return response.Error(c, fiber.StatusInternalServerError, "Trash operation failed")
 }
 
-// removeMediaFiles стирает файл и обложки — только внутри
-// зарегистрированных библиотек (та же защита, что была в Delete).
+// removeMediaFiles стирает файл, обложки и WebVTT-сайдкары — только
+// внутри зарегистрированных библиотек (та же защита, что была в Delete).
+// Строки сабов сносит FK-каскад, а файлы без этого вызова копились бы
+// невидимыми для БД.
 func (h *TrashHandler) removeMediaFiles(ctx context.Context, media *models.Media) {
 	if media.FilePath != "" {
 		allowed, err := h.streamer.IsPathAllowed(ctx, media.FilePath)
@@ -287,6 +294,24 @@ func (h *TrashHandler) removeMediaFiles(ctx context.Context, media *models.Media
 			log.Printf("Trash purge: skip removing %s — outside registered libraries", media.FilePath)
 		} else if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Trash purge: remove file %s: %v", media.FilePath, err)
+		}
+	}
+	if h.subRepo != nil {
+		if subs, err := h.subRepo.ListByMedia(ctx, media.ID); err != nil {
+			log.Printf("Trash purge: list subs %d: %v", media.ID, err)
+		} else {
+			for _, sub := range subs {
+				// Та же проверка, что у медиа-файла: строка БД —
+				// не доказательство безопасности пути.
+				allowed, err := h.streamer.IsPathAllowed(ctx, sub.Path)
+				if err != nil {
+					log.Printf("Trash purge: IsPathAllowed %s: %v", sub.Path, err)
+				} else if !allowed {
+					log.Printf("Trash purge: skip removing %s — outside registered libraries", sub.Path)
+				} else if err := os.Remove(sub.Path); err != nil && !os.IsNotExist(err) {
+					log.Printf("Trash purge: remove subtitle %s: %v", sub.Path, err)
+				}
+			}
 		}
 	}
 	if h.thumbSvc != nil {

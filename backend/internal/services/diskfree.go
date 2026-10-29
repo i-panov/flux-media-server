@@ -5,6 +5,12 @@ import (
 	"path/filepath"
 )
 
+// DiskUsage возвращает (total, free) байт ФС для path. -1 — узнать
+// нельзя (не-unix или ошибка): вызывающий показывает прочерк.
+func DiskUsage(path string) (totalBytes, freeBytes int64) {
+	return diskTotalBytes(path), diskFreeBytes(path)
+}
+
 // checkDiskSpace — best-effort проверка места перед ffmpeg: результат
 // (особенно FLAC) может весить сравнимо с исходником. needBytes <= 0
 // или неизвестный остаток (-1) — пропуск без ошибки.

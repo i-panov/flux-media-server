@@ -19,6 +19,8 @@ type Config struct {
 	Scanner     ScannerConfig     `yaml:"scanner"`
 	RateLimiter RateLimiterConfig `yaml:"rate_limiter"`
 	Media       MediaConfig       `yaml:"media"`
+	Storage     StorageConfig     `yaml:"storage"`
+	Transcode   TranscodeConfig   `yaml:"transcode"`
 }
 
 type ServerConfig struct {
@@ -74,6 +76,30 @@ type MediaConfig struct {
 	ThumbnailPath string `yaml:"thumbnail_path"`
 	VideoPath     string `yaml:"video_path"`
 	AudioPath     string `yaml:"audio_path"`
+}
+
+// StorageConfig — пути нового конвейера приёма: карантин оригиналов
+// и временные файлы транскода. Библиотекой остаются video_path/audio_path.
+type StorageConfig struct {
+	OriginalsDir string `yaml:"originals_dir"`
+	TempDir      string `yaml:"temp_dir"`
+	// AutoCleanupOriginals — опциональная авточистка карантина при
+	// нехватке места под заливку (по умолчанию выключена: удаление
+	// только руками админа).
+	AutoCleanupOriginals bool `yaml:"auto_cleanup_originals"`
+}
+
+// TranscodeConfig — параметры нормализации видео в домашний формат
+// (MP4 + H.264, потолок — MaxHeight).
+type TranscodeConfig struct {
+	// CRF — указатель, чтобы отличать «не задано» (nil → 20) от
+	// явного 0: lossless-CRF 0 противоречит задаче (огромные файлы,
+	// браузеры не играют) и потому запрещён валидацией.
+	CRF            *int    `yaml:"crf"`
+	Preset         string  `yaml:"preset"`
+	MaxHeight      int     `yaml:"max_height"`
+	EstimateFactor float64 `yaml:"estimate_factor"`
+	MaxAttempts    int     `yaml:"max_attempts"`
 }
 
 // MediaPath represents a scan path with its media type.
@@ -155,6 +181,28 @@ func Load(path string) (*Config, error) {
 	if cfg.RateLimiter.Expiration == 0 {
 		cfg.RateLimiter.Expiration = 60
 	}
+	if cfg.Storage.OriginalsDir == "" {
+		cfg.Storage.OriginalsDir = "./data/originals"
+	}
+	if cfg.Storage.TempDir == "" {
+		cfg.Storage.TempDir = "./data/tmp"
+	}
+	if cfg.Transcode.CRF == nil {
+		defCRF := 20
+		cfg.Transcode.CRF = &defCRF
+	}
+	if cfg.Transcode.Preset == "" {
+		cfg.Transcode.Preset = "fast"
+	}
+	if cfg.Transcode.MaxHeight == 0 {
+		cfg.Transcode.MaxHeight = 1080
+	}
+	if cfg.Transcode.EstimateFactor == 0 {
+		cfg.Transcode.EstimateFactor = 1.5
+	}
+	if cfg.Transcode.MaxAttempts == 0 {
+		cfg.Transcode.MaxAttempts = 3
+	}
 	// По умолчанию TLS обязателен: без явного require_tls:false OTP-письма
 	// не должны уходить по plaintext (см. smtp.go — при отсутствии STARTTLS
 	// и ImplicitTLS отправка блокируется ошибкой).
@@ -182,7 +230,28 @@ func Load(path string) (*Config, error) {
 	if cfg.RateLimiter.Max <= 0 {
 		return nil, fmt.Errorf("rate_limiter.max must be > 0, got %d", cfg.RateLimiter.Max)
 	}
-
+	crf := 0
+	if cfg.Transcode.CRF != nil {
+		crf = *cfg.Transcode.CRF
+	}
+	if crf < 1 || crf > 51 {
+		return nil, fmt.Errorf("transcode.crf must be between 1 and 51 (lossless 0 is not supported), got %d", crf)
+	}
+	switch cfg.Transcode.Preset {
+	case "ultrafast", "superfast", "veryfast", "faster", "fast",
+		"medium", "slow", "slower", "veryslow", "placebo":
+	default:
+		return nil, fmt.Errorf("transcode.preset must be a valid x264 preset, got %q", cfg.Transcode.Preset)
+	}
+	if cfg.Transcode.MaxHeight <= 0 {
+		return nil, fmt.Errorf("transcode.max_height must be > 0, got %d", cfg.Transcode.MaxHeight)
+	}
+	if cfg.Transcode.EstimateFactor <= 0 {
+		return nil, fmt.Errorf("transcode.estimate_factor must be > 0, got %v", cfg.Transcode.EstimateFactor)
+	}
+	if cfg.Transcode.MaxAttempts < 1 {
+		return nil, fmt.Errorf("transcode.max_attempts must be >= 1, got %d", cfg.Transcode.MaxAttempts)
+	}
 	// "*" нельзя комбинировать с конкретными origins: браузеры в этом
 	// случае игнорируют Access-Control-Allow-Origin, а Allow-Credentials
 	// с wildcard запрещён спецификацией.

@@ -37,6 +37,7 @@ func setupTrashTestApp(t *testing.T) (*fiber.App, string, *gorm.DB) {
 		colRepo,
 		&fakeStreamer{allowedPaths: []string{libraryPath}},
 		services.NewThumbnailService(t.TempDir()),
+		repository.NewSubtitleRepository(db),
 	)
 	mediaHandler := NewMediaHandler(mediaRepo, &fakeStreamer{allowedPaths: []string{libraryPath}}, services.NewThumbnailService(t.TempDir()))
 	colHandler := NewCollectionHandler(colRepo, repository.NewCollectionItemRepository(db), mediaRepo)
@@ -154,6 +155,62 @@ func TestTrash_PurgeMediaRemovesFile(t *testing.T) {
 
 	_, err = os.Stat(videoPath)
 	assert.True(t, os.IsNotExist(err), "purge стирает файл с диска")
+}
+
+func TestTrash_PurgeMediaRemovesSubs(t *testing.T) {
+	app, libraryPath, db := setupTrashTestApp(t)
+
+	videoPath := filepath.Join(libraryPath, "subbed.mkv")
+	require.NoError(t, os.WriteFile(videoPath, []byte("data"), 0644))
+	subPath := filepath.Join(libraryPath, "subbed.rus.vtt")
+	require.NoError(t, os.WriteFile(subPath, []byte("WEBVTT"), 0644))
+	ctx := context.Background()
+
+	mediaRepo := repository.NewMediaRepository(db)
+	require.NoError(t, mediaRepo.Create(ctx, &models.Media{
+		Title: "Subbed", Type: models.MediaTypeVideo, FilePath: videoPath,
+	}))
+	subRepo := repository.NewSubtitleRepository(db)
+	require.NoError(t, subRepo.ReplaceForMedia(ctx, 1, []models.Subtitle{{Lang: "rus", Path: subPath}}))
+	require.NoError(t, mediaRepo.Delete(ctx, 1))
+
+	req := httptest.NewRequest("DELETE", "/api/trash/media/1", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	_, err = os.Stat(subPath)
+	assert.True(t, os.IsNotExist(err), "purge стирает сайдкары субтитров")
+	subs, err := subRepo.ListByMedia(ctx, 1)
+	require.NoError(t, err)
+	assert.Empty(t, subs)
+}
+
+func TestTrash_PurgeMediaKeepsForeignSubFile(t *testing.T) {
+	app, libraryPath, db := setupTrashTestApp(t)
+
+	videoPath := filepath.Join(libraryPath, "v.mkv")
+	require.NoError(t, os.WriteFile(videoPath, []byte("data"), 0644))
+	// Строка указывает за пределы библиотеки: файл трогать нельзя.
+	foreignPath := filepath.Join(t.TempDir(), "foreign.rus.vtt")
+	require.NoError(t, os.WriteFile(foreignPath, []byte("WEBVTT"), 0644))
+	ctx := context.Background()
+
+	mediaRepo := repository.NewMediaRepository(db)
+	require.NoError(t, mediaRepo.Create(ctx, &models.Media{
+		Title: "V", Type: models.MediaTypeVideo, FilePath: videoPath,
+	}))
+	subRepo := repository.NewSubtitleRepository(db)
+	require.NoError(t, subRepo.ReplaceForMedia(ctx, 1, []models.Subtitle{{Lang: "rus", Path: foreignPath}}))
+	require.NoError(t, mediaRepo.Delete(ctx, 1))
+
+	req := httptest.NewRequest("DELETE", "/api/trash/media/1", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	_, err = os.Stat(foreignPath)
+	assert.NoError(t, err, "чужой файл должен уцелеть")
 }
 
 func TestTrash_Stats(t *testing.T) {

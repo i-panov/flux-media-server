@@ -538,3 +538,20 @@ func (r *MediaStore) TrashedMedia(ctx context.Context, limit, offset int) ([]mod
 	}
 	return media, q.Find(&media).Error
 }
+
+// IncrementViews добавляет один старт стриминга. Ошибка не должна ронять
+// стрим — вызывающий только логирует.
+func (r *MediaStore) IncrementViews(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Model(&models.Media{}).
+		Where("id = ?", id).
+		UpdateColumn("view_count", gorm.Expr("view_count + 1")).Error
+}
+
+// FindBySourceHash ищет по хэшу исходника из карантина (дедуп повторных
+// заливок нормализованных файлов). Семантика как у FindByHash: видит
+// корзину, детерминированный порядок — живые раньше trashed.
+func (r *MediaStore) FindBySourceHash(ctx context.Context, hash string) (*models.Media, error) {
+	var media models.Media
+	err := r.db.WithContext(ctx).Unscoped().Where("source_hash = ?", hash).Order("deleted_at").Order("id").First(&media).Error
+	return &media, err
+}

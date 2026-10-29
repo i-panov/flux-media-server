@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"log"
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,10 +23,12 @@ import (
 
 // UploadHandler handles file uploads.
 type UploadHandler struct {
-	mediaRepo repository.MediaRepository
-	queue     *services.UploadQueue
-	config    UploadConfig
-	mediaCfg  config.MediaConfig
+	mediaRepo  repository.MediaRepository
+	queue      *services.UploadQueue
+	transQueue TranscodeQueue
+	mediaCfg   config.MediaConfig
+	storageCfg config.StorageConfig
+	config     UploadConfig
 }
 
 // UploadConfig holds upload-specific configuration.
@@ -34,17 +39,23 @@ type UploadConfig struct {
 // NewUploadHandler creates a new UploadHandler. Файл валидируется и
 // сохраняется синхронно, обработка (хэш/ffprobe/превью) — в фоне через
 // queue; thumbSvc передаётся внутрь очереди, хендлеру он не нужен.
+// Видео уходят в карантин и нормализуются transQueue, аудио — старым
+// путём через queue.
 func NewUploadHandler(
 	mediaRepo repository.MediaRepository,
 	queue *services.UploadQueue,
+	transQueue TranscodeQueue,
 	mediaCfg config.MediaConfig,
+	storageCfg config.StorageConfig,
 	config UploadConfig,
 ) *UploadHandler {
 	return &UploadHandler{
-		mediaRepo: mediaRepo,
-		queue:     queue,
-		mediaCfg:  mediaCfg,
-		config:    config,
+		mediaRepo:  mediaRepo,
+		queue:      queue,
+		transQueue: transQueue,
+		mediaCfg:   mediaCfg,
+		storageCfg: storageCfg,
+		config:     config,
 	}
 }
 
@@ -95,6 +106,9 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	// Resolve destination path by media_type.
 	if rawType == "" {
 		mediaType = services.DetermineMediaType(filename)
+	}
+	if mediaType == models.MediaTypeVideo {
+		return h.uploadVideo(c, fileHeader, filename)
 	}
 	destPath := h.mediaCfg.VideoPath
 	if mediaType == models.MediaTypeAudio {
@@ -162,10 +176,104 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to queue file")
 	}
 
-	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"job_id": jobID})
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"job_id": jobID, "job_type": "upload"})
+}
+
+// uploadVideo принимает видео в карантин для нормализации. В отличие от
+// аудио-пути, 409 за то же имя здесь нет: коллизии разруливаются
+// уникальным именем, а настоящие дубли — асинхронным хэш-дедупом
+// в воркере (файл уже на диске, синхронно хэшировать гигабайты нельзя).
+func (h *UploadHandler) uploadVideo(c *fiber.Ctx, fileHeader *multipart.FileHeader, filename string) error {
+	if h.storageCfg.OriginalsDir == "" {
+		return response.Error(c, fiber.StatusInternalServerError, "Originals directory is not configured")
+	}
+	if err := os.MkdirAll(h.storageCfg.OriginalsDir, 0755); err != nil {
+		log.Printf("upload: mkdir %s: %v", h.storageCfg.OriginalsDir, err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to create directory")
+	}
+
+	// Место в карантине — до сохранения (с авточисткой, если включена).
+	if err := h.transQueue.EnsureSpaceForUpload(fileHeader.Size); err != nil {
+		if errors.Is(err, services.ErrInsufficientSpace) {
+			return response.Error(c, fiber.StatusInsufficientStorage, "Not enough disk space for upload")
+		}
+		log.Printf("upload: space check: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to check disk space")
+	}
+
+	dstPath, err := saveUploadExclusive(c, fileHeader, h.storageCfg.OriginalsDir, filename)
+	if err != nil {
+		if errors.Is(err, services.ErrDestinationExists) {
+			return response.Error(c, fiber.StatusConflict, "Too many files with this name, rename and retry")
+		}
+		log.Printf("upload: save file: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to save file")
+	}
+
+	taskID, err := h.transQueue.Enqueue(dstPath, filename)
+	if err != nil {
+		log.Printf("upload: enqueue transcode: %v", err)
+		if rmErr := os.Remove(dstPath); rmErr != nil {
+			log.Printf("upload: remove orphaned file %s: %v", dstPath, rmErr)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to queue file")
+	}
+
+	// Ключ ответа — тот же job_id плюс тип задания: клиент с job_type
+	// опрашивает нужный эндпоинт (/uploads/:id или /transcodes/:id),
+	// а fallback в UploadStatus остаётся для старых клиентов.
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"job_id": taskID, "job_type": "transcode"})
+}
+
+// saveUploadExclusive сохраняет загрузку под свободным именем:
+// исходное, затем `base (2).ext`… Создание — O_EXCL, поэтому две
+// параллельные загрузки не перезаписывают друг друга: вторая
+// получает следующее имя. Исчерпание (1000 попыток) — ошибка,
+// а не молчаливая перезапись существующего файла.
+func saveUploadExclusive(c *fiber.Ctx, fileHeader *multipart.FileHeader, dir, filename string) (string, error) {
+	ext := filepath.Ext(filename)
+	base := strings.TrimSuffix(filename, ext)
+	for i := 0; i < 1000; i++ {
+		candidate := filename
+		if i > 0 {
+			candidate = fmt.Sprintf("%s (%d)%s", base, i+1, ext)
+		}
+		full := filepath.Join(dir, candidate)
+		if !services.IsSubPath(dir, full) {
+			return "", fmt.Errorf("invalid filename: %s", filename)
+		}
+		out, err := os.OpenFile(full, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		if err != nil {
+			if os.IsExist(err) {
+				continue
+			}
+			return "", err
+		}
+		src, err := fileHeader.Open()
+		if err != nil {
+			out.Close()
+			os.Remove(full)
+			return "", err
+		}
+		_, copyErr := io.Copy(out, src)
+		src.Close()
+		closeErr := out.Close()
+		if copyErr != nil || closeErr != nil {
+			os.Remove(full)
+			if copyErr != nil {
+				return "", copyErr
+			}
+			return "", closeErr
+		}
+		return full, nil
+	}
+	return "", fmt.Errorf("%w: %s", services.ErrDestinationExists, filename)
 }
 
 // UploadStatus returns the current status of an upload job.
+// Задания нормализации (job_id из видео-загрузок) тоже резолвятся здесь:
+// пространства ID могут пересекаться, поэтому сначала очередь загрузок
+// (старое поведение — без изменений), затем транскод.
 func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id < 0 {
@@ -174,6 +282,9 @@ func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 
 	status, errMsg, mediaID, ok := h.queue.Get(uint64(id))
 	if !ok {
+		if st, ok := h.transQueue.Get(uint64(id)); ok {
+			return c.JSON(transcodeStatusResponse(c, h.mediaRepo, id, st))
+		}
 		return response.Error(c, fiber.StatusNotFound, "Upload job not found")
 	}
 
@@ -201,6 +312,7 @@ func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 
 // CancelUpload cancels a pending or in-flight upload job (204) and removes
 // the file and media record. Finished jobs cannot be cancelled (409).
+// Задания транскода отменяются тем же путём (fallback, как в статусе).
 func (h *UploadHandler) CancelUpload(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id < 0 {
@@ -209,7 +321,18 @@ func (h *UploadHandler) CancelUpload(c *fiber.Ctx) error {
 
 	switch err := h.queue.Cancel(uint64(id)); {
 	case errors.Is(err, services.ErrUploadJobNotFound):
-		return response.Error(c, fiber.StatusNotFound, "Upload job not found")
+		switch err := h.transQueue.Cancel(uint64(id)); {
+		case errors.Is(err, services.ErrTranscodeJobNotFound):
+			return response.Error(c, fiber.StatusNotFound, "Upload job not found")
+		case errors.Is(err, services.ErrTranscodeJobDone):
+			return response.Error(c, fiber.StatusConflict, "Upload job already completed")
+		case errors.Is(err, services.ErrTranscodeConflict):
+			return response.Error(c, fiber.StatusConflict, "Upload job state changed, retry")
+		case err != nil:
+			log.Printf("CancelUpload: %v", err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to cancel upload job")
+		}
+		return c.SendStatus(fiber.StatusNoContent)
 	case errors.Is(err, services.ErrUploadJobDone):
 		return response.Error(c, fiber.StatusConflict, "Upload job already completed")
 	case err != nil:

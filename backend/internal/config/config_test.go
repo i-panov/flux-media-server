@@ -111,6 +111,14 @@ auth:
 	assert.Equal(t, 10000, cfg.Auth.MaxOTPEntries)
 	assert.True(t, cfg.Auth.SMTP.RequireTLS != nil && *cfg.Auth.SMTP.RequireTLS,
 		"require_tls по умолчанию должен быть true (защита от plaintext)")
+	assert.Equal(t, "./data/originals", cfg.Storage.OriginalsDir)
+	assert.Equal(t, "./data/tmp", cfg.Storage.TempDir)
+	assert.False(t, cfg.Storage.AutoCleanupOriginals)
+	assert.Equal(t, 20, *cfg.Transcode.CRF)
+	assert.Equal(t, "fast", cfg.Transcode.Preset)
+	assert.Equal(t, 1080, cfg.Transcode.MaxHeight)
+	assert.Equal(t, 1.5, cfg.Transcode.EstimateFactor)
+	assert.Equal(t, 3, cfg.Transcode.MaxAttempts)
 }
 
 func TestLoadConfigExplicitInsecureSMTPAllowed(t *testing.T) {
@@ -231,6 +239,26 @@ func TestLoadConfigInvalidValues(t *testing.T) {
 			name:    "negative rate_limiter.max",
 			yaml:    "rate_limiter:\n  max: -1\n",
 			errPart: "rate_limiter.max",
+		},
+		{
+			name:    "bad transcode preset",
+			yaml:    "transcode:\n  preset: turbo\n",
+			errPart: "transcode.preset",
+		},
+		{
+			name:    "negative transcode max_height",
+			yaml:    "transcode:\n  max_height: -1080\n",
+			errPart: "transcode.max_height",
+		},
+		{
+			name:    "lossless crf 0 rejected",
+			yaml:    "transcode:\n  crf: 0\n",
+			errPart: "transcode.crf",
+		},
+		{
+			name:    "negative transcode max_attempts",
+			yaml:    "transcode:\n  max_attempts: -2\n",
+			errPart: "transcode.max_attempts",
 		},
 	}
 	for _, tc := range cases {

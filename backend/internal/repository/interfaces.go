@@ -36,6 +36,12 @@ type MediaRepository interface {
 	// путей, где Metadata/Artists не нужны (сканирование больших библиотек).
 	FindByPathBasic(ctx context.Context, path string) (*models.Media, error)
 	FindByHash(ctx context.Context, hash string) (*models.Media, error)
+	// FindBySourceHash ищет по хэшу исходника из карантина (дедуп
+	// повторных заливок: у результата хэш уже другой).
+	FindBySourceHash(ctx context.Context, hash string) (*models.Media, error)
+	// IncrementViews добавляет один старт стриминга; ошибка не должна
+	// ронять стрим, вызывающий только логирует.
+	IncrementViews(ctx context.Context, id uint) error
 	// FindBySourceMediaID возвращает аудиотрек, извлечённый из видео
 	// mediaID (связка POST /extract). Отсутствие — gorm.ErrRecordNotFound
 	// (как у FindByHash), а не nil-пара: вызывающий различает через errors.Is.
@@ -172,6 +178,37 @@ type LyricsRepository interface {
 	FindByMediaID(ctx context.Context, mediaID uint) (*models.Lyrics, error)
 	Upsert(ctx context.Context, lyrics *models.Lyrics) error
 	Delete(ctx context.Context, mediaID uint) error
+}
+
+// TranscodeTaskRepository defines data access methods for
+// TranscodeTask entities (нормализация видео из карантина).
+type TranscodeTaskRepository interface {
+	Create(ctx context.Context, task *models.TranscodeTask) error
+	Get(ctx context.Context, id uint) (*models.TranscodeTask, error)
+	Update(ctx context.Context, task *models.TranscodeTask) error
+	// UpdateIfStatus — условная запись для воркера (см. реализацию):
+	// не даёт прогрессу/финалу затоптать чужой terminal-статус.
+	UpdateIfStatus(ctx context.Context, task *models.TranscodeTask, allowed ...string) (bool, error)
+	FindLatestBySourcePath(ctx context.Context, sourcePath string) (*models.TranscodeTask, error)
+	FindActiveBySourceHash(ctx context.Context, hash string, active ...string) (*models.TranscodeTask, error)
+	// ClaimNextQueued атомарно забирает старейшее queued-задание.
+	// Нет заданий — gorm.ErrRecordNotFound (как и проигрыш гонки).
+	ClaimNextQueued(ctx context.Context, queued, processing string) (*models.TranscodeTask, error)
+	ResetStuckProcessing(ctx context.Context, processing, queued string) (int64, error)
+	DeleteTerminalBefore(ctx context.Context, before time.Time, terminal ...string) (int64, error)
+	// ListTerminalBefore — терминальные задания старше порога для
+	// выборочной чистки (sweep проверяет файлы перед удалением).
+	ListTerminalBefore(ctx context.Context, before time.Time, afterID uint, limit int, terminal ...string) ([]models.TranscodeTask, error)
+	DeleteByIDs(ctx context.Context, ids []uint) error
+	ListRecent(ctx context.Context, limit int) ([]models.TranscodeTask, error)
+}
+
+// SubtitleRepository defines data access methods for Subtitle entities
+// (WebVTT-сайдкары текстовых дорожек).
+type SubtitleRepository interface {
+	ListByMedia(ctx context.Context, mediaID uint) ([]models.Subtitle, error)
+	ReplaceForMedia(ctx context.Context, mediaID uint, subs []models.Subtitle) error
+	DeleteByMedia(ctx context.Context, mediaID uint) error
 }
 
 // RefreshTokenRepository defines data access methods for RefreshToken entities.

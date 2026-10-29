@@ -366,3 +366,32 @@ func TestMediaHandler_StreamDenied(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
 }
+
+func TestMediaHandler_StreamIncrementsViews(t *testing.T) {
+	libDir := t.TempDir()
+	filePath := filepath.Join(libDir, "movie.mp4")
+	require.NoError(t, os.WriteFile(filePath, []byte("fake mp4 content"), 0644))
+
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+	mediaRepo := repository.NewMediaRepository(db)
+	require.NoError(t, mediaRepo.Create(context.Background(), &models.Media{
+		Title: "Stream Me", Type: models.MediaTypeVideo, FilePath: filePath,
+	}))
+	cfg := &config.Config{Media: config.MediaConfig{VideoPath: libDir}}
+	handler := NewMediaHandler(mediaRepo, services.NewStreamerService(cfg), services.NewThumbnailService(t.TempDir()))
+	app := fiber.New()
+	app.Get("/api/media/:id/stream", handler.Stream)
+
+	for i := 0; i < 2; i++ {
+		resp, err := app.Test(httptest.NewRequest("GET", "/api/media/1/stream", nil))
+		require.NoError(t, err)
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	}
+
+	media, err := mediaRepo.FindByID(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2), media.ViewCount)
+}

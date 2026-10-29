@@ -11,7 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,7 +29,9 @@ import (
 // setupUploadTest создаёт приложение с очередью обработки загрузок.
 // workers=0 останавливает обработку — задания остаются в статусе queued
 // (нужно для тестов отмены и переполнения очереди).
-func setupUploadTest(t *testing.T, workers, queueLimit int) (*fiber.App, repository.MediaRepository, string, func()) {
+// Видео-загрузки идут в карантин через stubTranscodeQueue (настоящий
+// транскод с ffmpeg тестируется на уровне сервисов).
+func setupUploadTest(t *testing.T, workers, queueLimit int) (*fiber.App, repository.MediaRepository, string, *stubTranscodeQueue, string, func()) {
 	t.Helper()
 
 	db, err := repository.InitDB(":memory:")
@@ -51,11 +53,19 @@ func setupUploadTest(t *testing.T, workers, queueLimit int) (*fiber.App, reposit
 		AudioPath:     filepath.Join(libraryPath, "audio"),
 		ThumbnailPath: thumbDir,
 	}
+	quarantinePath := filepath.Join(tempDir, "originals")
+	require.NoError(t, os.MkdirAll(quarantinePath, 0755))
+	storageCfg := config.StorageConfig{
+		OriginalsDir: quarantinePath,
+		TempDir:      filepath.Join(tempDir, "tmp"),
+	}
+	require.NoError(t, os.MkdirAll(storageCfg.TempDir, 0755))
 	queue := services.NewUploadQueue(context.Background(), mediaRepo, thumbSvc, workers, queueLimit)
+	stub := &stubTranscodeQueue{}
 	cfg := handlers.UploadConfig{
 		MaxFileSize: 10 * 1024 * 1024,
 	}
-	handler := handlers.NewUploadHandler(mediaRepo, queue, mediaCfg, cfg)
+	handler := handlers.NewUploadHandler(mediaRepo, queue, stub, mediaCfg, storageCfg, cfg)
 
 	app := fiber.New(fiber.Config{
 		BodyLimit: 5 * 1024 * 1024,
@@ -64,11 +74,85 @@ func setupUploadTest(t *testing.T, workers, queueLimit int) (*fiber.App, reposit
 	app.Get("/api/media/uploads/:id", handler.UploadStatus)
 	app.Delete("/api/media/uploads/:id", handler.CancelUpload)
 
-	return app, mediaRepo, libraryPath, func() {
+	return app, mediaRepo, libraryPath, stub, quarantinePath, func() {
 		queue.Stop()
 		sqlDB, _ := db.DB()
 		sqlDB.Close()
 	}
+}
+
+// stubTranscodeQueue — стаб очереди нормализации для тестов хендлера:
+// фиксирует вызовы, файлы не трогает (кроме Cancel, который убирает
+// исходник — как настоящая очередь).
+type stubTranscodeQueue struct {
+	mu        sync.Mutex
+	enqueued  []transcodeEnqueueCall
+	byID      map[uint64]string
+	nextID    uint64
+	status    services.TranscodeJobStatus
+	statusOK  bool
+	cancelErr error
+	cancelled []uint64
+	retryErr  error
+	spaceErr  error
+}
+
+type transcodeEnqueueCall struct {
+	sourcePath string
+	filename   string
+}
+
+func (s *stubTranscodeQueue) Enqueue(sourcePath, filename string) (uint64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextID++
+	if s.byID == nil {
+		s.byID = make(map[uint64]string)
+	}
+	s.byID[s.nextID] = sourcePath
+	s.enqueued = append(s.enqueued, transcodeEnqueueCall{sourcePath: sourcePath, filename: filename})
+	return s.nextID, nil
+}
+
+func (s *stubTranscodeQueue) Get(id uint64) (services.TranscodeJobStatus, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_ = id
+	return s.status, s.statusOK
+}
+
+func (s *stubTranscodeQueue) Cancel(id uint64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancelErr != nil {
+		return s.cancelErr
+	}
+	s.cancelled = append(s.cancelled, id)
+	// Эмулируем настоящую отмену: исходник задания удаляется.
+	if src := s.byID[id]; src != "" {
+		_ = os.Remove(src)
+	}
+	return nil
+}
+
+func (s *stubTranscodeQueue) CancelBySource(string) error { return nil }
+
+func (s *stubTranscodeQueue) Retry(uint64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.retryErr
+}
+
+func (s *stubTranscodeQueue) EnsureSpaceForUpload(int64) error { return s.spaceErr }
+
+func (s *stubTranscodeQueue) OriginalsStatus() ([]services.OriginalInfo, error) {
+	return nil, nil
+}
+
+func (s *stubTranscodeQueue) enqueuedCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.enqueued)
 }
 
 func createMultipartForm(t *testing.T, filename string, content []byte, mediaType string) (*bytes.Buffer, string) {
@@ -110,6 +194,21 @@ func jobIDFromResponse(t *testing.T, resp *http.Response) int64 {
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	return out.JobID
+}
+
+// uploadAndParseJob загружает файл и возвращает (job_id, job_type).
+// job_type (upload/transcode) говорит клиенту, какой эндпоинт опрашивать:
+// числовые ID пространств могут пересекаться.
+func uploadAndParseJob(t *testing.T, app *fiber.App, filename string, content []byte, mediaType string) (int64, string) {
+	t.Helper()
+	resp := uploadFile(t, app, filename, content, mediaType)
+	require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
+	var out struct {
+		JobID   int64  `json:"job_id"`
+		JobType string `json:"job_type"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	return out.JobID, out.JobType
 }
 
 // uploadJobStatus делает GET /uploads/:id.
@@ -158,36 +257,34 @@ func countFilesInDir(t *testing.T, dir string) int {
 }
 
 func TestUploadSuccess(t *testing.T) {
-	app, mediaRepo, libraryPath, cleanup := setupUploadTest(t, 2, 50)
+	app, mediaRepo, _, stub, quarantinePath, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
+	// Видео уходит в карантин и ставится в очередь нормализации
+	// (настоящий транскод — на уровне сервисов с фейковым раннером).
 	resp := uploadFile(t, app, "test.mp4", []byte("test file content"), string(models.MediaTypeVideo))
 	assert.Equal(t, fiber.StatusAccepted, resp.StatusCode)
 	jobID := jobIDFromResponse(t, resp)
 	require.Greater(t, jobID, int64(0))
+	require.Equal(t, 1, stub.enqueuedCount())
 
-	out, _ := waitForUploadJob(t, app, jobID)
-	assert.Equal(t, services.UploadJobDone, out["status"])
-
-	// done: media-объект в ответе и запись в БД.
-	mediaObj, ok := out["media"].(map[string]interface{})
-	require.True(t, ok, "done job must include media object")
-	assert.NotEqual(t, float64(0), mediaObj["id"])
-	assert.Equal(t, "test.mp4", mediaObj["filename"])
-
-	// Файл сохранён на диске.
-	_, err := os.Stat(filepath.Join(libraryPath, "video", "test.mp4"))
+	// Файл в карантине, в библиотеке и БД пока ничего нет.
+	_, err := os.Stat(filepath.Join(quarantinePath, "test.mp4"))
 	require.NoError(t, err)
-
 	mediaList, _, err := mediaRepo.FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
 	require.NoError(t, err)
-	require.Len(t, mediaList, 1)
-	assert.Equal(t, models.MediaTypeVideo, mediaList[0].Type)
-	assert.NotEmpty(t, mediaList[0].FileHash)
+	assert.Empty(t, mediaList)
+
+	// Статус задания виден через fallback /uploads/:id.
+	stub.status = services.TranscodeJobStatus{Status: services.TranscodeTaskQueued}
+	stub.statusOK = true
+	statusResp, out := uploadJobStatus(t, app, jobID)
+	require.Equal(t, fiber.StatusOK, statusResp.StatusCode)
+	assert.Equal(t, services.TranscodeTaskQueued, out["status"])
 }
 
 func TestUploadStatusNotFound(t *testing.T) {
-	app, _, _, cleanup := setupUploadTest(t, 2, 50)
+	app, _, _, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/media/uploads/999", nil))
@@ -200,7 +297,7 @@ func TestUploadStatusNotFound(t *testing.T) {
 }
 
 func TestUploadMissingFile(t *testing.T) {
-	app, _, libraryPath, cleanup := setupUploadTest(t, 2, 50)
+	app, _, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	body := new(bytes.Buffer)
@@ -219,7 +316,7 @@ func TestUploadMissingFile(t *testing.T) {
 }
 
 func TestUploadInvalidMediaType(t *testing.T) {
-	app, _, libraryPath, cleanup := setupUploadTest(t, 2, 50)
+	app, _, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	resp := uploadFile(t, app, "test.mp4", []byte("test file content"), "garbage")
@@ -228,7 +325,7 @@ func TestUploadInvalidMediaType(t *testing.T) {
 }
 
 func TestUploadInvalidFilename(t *testing.T) {
-	app, _, libraryPath, cleanup := setupUploadTest(t, 2, 50)
+	app, _, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	// Имя с backslash-разделителем: fasthttp вырезает "/..", но backslash
@@ -240,7 +337,7 @@ func TestUploadInvalidFilename(t *testing.T) {
 }
 
 func TestUploadFileTooLarge(t *testing.T) {
-	app, _, libraryPath, cleanup := setupUploadTest(t, 2, 50)
+	app, _, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	fileContent := make([]byte, 7*1024*1024)
@@ -256,12 +353,12 @@ func TestUploadFileTooLarge(t *testing.T) {
 }
 
 func TestUploadDuplicateFile(t *testing.T) {
-	app, mediaRepo, libraryPath, cleanup := setupUploadTest(t, 2, 50)
+	app, mediaRepo, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	fileContent := []byte("duplicate content")
 
-	first := uploadFile(t, app, "dup.mp4", fileContent, string(models.MediaTypeVideo))
+	first := uploadFile(t, app, "dup.mp3", fileContent, string(models.MediaTypeAudio))
 	require.Equal(t, fiber.StatusAccepted, first.StatusCode)
 	firstID := jobIDFromResponse(t, first)
 
@@ -270,7 +367,7 @@ func TestUploadDuplicateFile(t *testing.T) {
 
 	// Тот же контент — тот же хэш: второе задание падает с error,
 	// а не создаёт запись. Статус об ошибке без утечки путей.
-	second := uploadFile(t, app, "dup2.mp4", fileContent, string(models.MediaTypeVideo))
+	second := uploadFile(t, app, "dup2.mp3", fileContent, string(models.MediaTypeAudio))
 	require.Equal(t, fiber.StatusAccepted, second.StatusCode)
 	secondID := jobIDFromResponse(t, second)
 
@@ -280,9 +377,9 @@ func TestUploadDuplicateFile(t *testing.T) {
 	require.NotContains(t, fmt.Sprint(secondOut), libraryPath)
 
 	// Файл дубликата удалён с диска, запись одна.
-	_, err := os.Stat(filepath.Join(libraryPath, "video", "dup2.mp4"))
+	_, err := os.Stat(filepath.Join(libraryPath, "audio", "dup2.mp3"))
 	require.True(t, os.IsNotExist(err))
-	_, err = os.Stat(filepath.Join(libraryPath, "video", "dup.mp4"))
+	_, err = os.Stat(filepath.Join(libraryPath, "audio", "dup.mp3"))
 	require.NoError(t, err)
 
 	mediaList, _, err := mediaRepo.FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
@@ -292,15 +389,15 @@ func TestUploadDuplicateFile(t *testing.T) {
 
 func TestUploadCancel(t *testing.T) {
 	// workers=0: задание гарантированно остаётся queued — отмена
-	// детерминированна.
-	app, _, libraryPath, cleanup := setupUploadTest(t, 0, 50)
+	// детерминированна. Видео отменяется через fallback транскода.
+	app, _, _, _, quarantinePath, cleanup := setupUploadTest(t, 0, 50)
 	defer cleanup()
 
 	resp := uploadFile(t, app, "cancel.mp4", []byte("to be cancelled"), string(models.MediaTypeVideo))
 	require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
 	jobID := jobIDFromResponse(t, resp)
 
-	filePath := filepath.Join(libraryPath, "video", "cancel.mp4")
+	filePath := filepath.Join(quarantinePath, "cancel.mp4")
 	_, err := os.Stat(filePath)
 	require.NoError(t, err)
 
@@ -318,10 +415,10 @@ func TestUploadCancel(t *testing.T) {
 }
 
 func TestUploadCancelDoneConflict(t *testing.T) {
-	app, _, _, cleanup := setupUploadTest(t, 2, 50)
+	app, _, _, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
-	resp := uploadFile(t, app, "done.mp4", []byte("done content"), string(models.MediaTypeVideo))
+	resp := uploadFile(t, app, "done.mp3", []byte("done content"), string(models.MediaTypeAudio))
 	require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
 	jobID := jobIDFromResponse(t, resp)
 
@@ -334,37 +431,49 @@ func TestUploadCancelDoneConflict(t *testing.T) {
 }
 
 func TestUploadCancelNotFound(t *testing.T) {
-	app, _, _, cleanup := setupUploadTest(t, 0, 50)
+	app, _, _, stub, _, cleanup := setupUploadTest(t, 0, 50)
 	defer cleanup()
+	stub.cancelErr = services.ErrTranscodeJobNotFound
 
 	resp, err := app.Test(httptest.NewRequest("DELETE", "/api/media/uploads/4242", nil))
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 }
 
+func TestUploadCancelConflict(t *testing.T) {
+	// Гонка проиграна (транскод-очередь вернула конфликт) — 409, а не 500.
+	app, _, _, stub, _, cleanup := setupUploadTest(t, 0, 50)
+	defer cleanup()
+	stub.cancelErr = services.ErrTranscodeConflict
+
+	resp, err := app.Test(httptest.NewRequest("DELETE", "/api/media/uploads/4242", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+}
+
 func TestUploadQueueFull(t *testing.T) {
 	// Лимит очереди 1, воркеры не обрабатывают: второе задание получает 429.
-	app, _, libraryPath, cleanup := setupUploadTest(t, 0, 1)
+	app, _, libraryPath, _, _, cleanup := setupUploadTest(t, 0, 1)
 	defer cleanup()
 
-	first := uploadFile(t, app, "one.mp4", []byte("one"), string(models.MediaTypeVideo))
+	first := uploadFile(t, app, "one.mp3", []byte("one"), string(models.MediaTypeAudio))
 	require.Equal(t, fiber.StatusAccepted, first.StatusCode)
 
-	second := uploadFile(t, app, "two.mp4", []byte("two"), string(models.MediaTypeVideo))
+	second := uploadFile(t, app, "two.mp3", []byte("two"), string(models.MediaTypeAudio))
 	assert.Equal(t, fiber.StatusTooManyRequests, second.StatusCode)
 	body, err := io.ReadAll(second.Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "Upload queue is full")
 
 	// Файл переполненной загрузки удалён: на диске только первый файл.
-	_, err = os.Stat(filepath.Join(libraryPath, "video", "one.mp4"))
+	_, err = os.Stat(filepath.Join(libraryPath, "audio", "one.mp3"))
 	require.NoError(t, err)
-	_, err = os.Stat(filepath.Join(libraryPath, "video", "two.mp4"))
+	_, err = os.Stat(filepath.Join(libraryPath, "audio", "two.mp3"))
 	require.True(t, os.IsNotExist(err), "rejected upload file must be removed")
 }
 
 func TestUploadMediaTypeFromForm(t *testing.T) {
-	app, mediaRepo, _, cleanup := setupUploadTest(t, 2, 50)
+	app, mediaRepo, _, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	// media_type=audio задан явно: в Type записи сохраняется именно он,
@@ -382,7 +491,7 @@ func TestUploadMediaTypeFromForm(t *testing.T) {
 }
 
 func TestUploadMediaTypeByExtension(t *testing.T) {
-	app, mediaRepo, _, cleanup := setupUploadTest(t, 2, 50)
+	app, mediaRepo, _, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	// media_type не задан: тип определяется по расширению (.mp3 → audio).
@@ -410,20 +519,109 @@ func TestUploadMediaTypeByExtension(t *testing.T) {
 }
 
 func TestUploadErrorResponseHidesPaths(t *testing.T) {
-	app, _, libraryPath, cleanup := setupUploadTest(t, 2, 50)
+	app, _, libraryPath, _, _, cleanup := setupUploadTest(t, 2, 50)
 	defer cleanup()
 
 	// Битый файл не сломает задание: обработка не падает в панику даже
-	// на невалидном контенте — задание доходит до терминального статуса.
-	resp := uploadFile(t, app, "bad.mp4", []byte("garbage"), string(models.MediaTypeVideo))
+	// на невалидном контенте — задание доходит до терминального статуса,
+	// а ответ не содержит путей ФС.
+	resp := uploadFile(t, app, "bad.mp3", []byte("garbage"), string(models.MediaTypeAudio))
 	require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
 	jobID := jobIDFromResponse(t, resp)
 
 	out, _ := waitForUploadJob(t, app, jobID)
-	status, _ := out["status"].(string)
-	if status == services.UploadJobError {
-		// Сообщение об ошибке не должно содержать путей ФС.
-		require.NotContains(t, strings.ToLower(fmt.Sprint(out["error"])), "tmp")
-		require.NotContains(t, fmt.Sprint(out["error"]), libraryPath)
+	assert.Equal(t, services.UploadJobDone, out["status"])
+	require.NotContains(t, fmt.Sprint(out), libraryPath)
+}
+
+func TestUploadVideoGoesToQuarantine(t *testing.T) {
+	app, _, libraryPath, stub, quarantinePath, cleanup := setupUploadTest(t, 0, 50)
+	defer cleanup()
+
+	resp := uploadFile(t, app, "movie.mkv", []byte("video bytes"), string(models.MediaTypeVideo))
+	require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
+
+	// Файл в карантине с исходным именем, в библиотеке пусто.
+	_, err := os.Stat(filepath.Join(quarantinePath, "movie.mkv"))
+	require.NoError(t, err)
+	assert.Equal(t, 0, countFilesInDir(t, filepath.Join(libraryPath, "video")))
+	require.Equal(t, 1, stub.enqueuedCount())
+}
+
+func TestUploadJobTypeContract(t *testing.T) {
+	app, _, _, _, _, cleanup := setupUploadTest(t, 0, 50)
+	defer cleanup()
+
+	_, videoType := uploadAndParseJob(t, app, "movie.mkv", []byte("video"), string(models.MediaTypeVideo))
+	assert.Equal(t, "transcode", videoType)
+	_, audioType := uploadAndParseJob(t, app, "song.mp3", []byte("audio"), string(models.MediaTypeAudio))
+	assert.Equal(t, "upload", audioType)
+}
+
+func TestUploadVideoParallelSameName(t *testing.T) {
+	// Десять параллельных загрузок с одним именем: O_EXCL гарантирует,
+	// что ни одна не перезапишет другую — все приняты под разными именами.
+	app, _, _, stub, quarantinePath, cleanup := setupUploadTest(t, 0, 50)
+	defer cleanup()
+
+	const parallel = 10
+	var wg sync.WaitGroup
+	ids := make([]int64, parallel)
+	for i := 0; i < parallel; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			body, contentType := createMultipartForm(t, "same.mp4", []byte{byte(i), 1, 2, 3}, string(models.MediaTypeVideo))
+			req := httptest.NewRequest("POST", "/api/media/upload", body)
+			req.Header.Set("Content-Type", contentType)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+			require.Equal(t, fiber.StatusAccepted, resp.StatusCode)
+			var out struct {
+				JobID int64 `json:"job_id"`
+			}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+			ids[i] = out.JobID
+		}(i)
 	}
+	wg.Wait()
+
+	// Все ID различны, файлов на диске ровно столько же.
+	seen := make(map[int64]bool)
+	for _, id := range ids {
+		require.Greater(t, id, int64(0))
+		require.False(t, seen[id], "duplicate job id")
+		seen[id] = true
+	}
+	entries, err := os.ReadDir(quarantinePath)
+	require.NoError(t, err)
+	assert.Len(t, entries, parallel)
+	assert.Equal(t, parallel, stub.enqueuedCount())
+}
+
+func TestUploadVideoSameNameUnique(t *testing.T) {
+	app, _, _, stub, quarantinePath, cleanup := setupUploadTest(t, 0, 50)
+	defer cleanup()
+
+	first := uploadFile(t, app, "same.mp4", []byte("one"), string(models.MediaTypeVideo))
+	require.Equal(t, fiber.StatusAccepted, first.StatusCode)
+	second := uploadFile(t, app, "same.mp4", []byte("two"), string(models.MediaTypeVideo))
+	require.Equal(t, fiber.StatusAccepted, second.StatusCode)
+
+	// Никаких 409: второе имя уникализировано, оба задания в очереди.
+	_, err := os.Stat(filepath.Join(quarantinePath, "same.mp4"))
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(quarantinePath, "same (2).mp4"))
+	require.NoError(t, err)
+	require.Equal(t, 2, stub.enqueuedCount())
+}
+
+func TestUploadVideoNoSpace(t *testing.T) {
+	app, _, _, stub, _, cleanup := setupUploadTest(t, 0, 50)
+	defer cleanup()
+	stub.spaceErr = services.ErrInsufficientSpace
+
+	resp := uploadFile(t, app, "big.mp4", []byte("data"), string(models.MediaTypeVideo))
+	assert.Equal(t, fiber.StatusInsufficientStorage, resp.StatusCode)
+	assert.Equal(t, 0, stub.enqueuedCount())
 }

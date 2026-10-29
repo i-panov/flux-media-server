@@ -93,11 +93,13 @@ type App struct {
 	Watcher      *services.WatcherService
 	UploadQueue  *services.UploadQueue
 	ExtractQueue *services.ExtractService
-	Version      string
-	sqlDB        *sql.DB
-	cleanupStop  chan struct{}
-	cleanupOnce  sync.Once
-	scanner      *services.ScannerService
+	// TranscodeQueue — очередь нормализации видео из карантина.
+	TranscodeQueue *services.TranscodeQueue
+	Version        string
+	sqlDB          *sql.DB
+	cleanupStop    chan struct{}
+	cleanupOnce    sync.Once
+	scanner        *services.ScannerService
 	// scanCancelFn отменяет фоновый первичный скан при Shutdown.
 	// nil, если фоновый скан не был запущен.
 	scanCancelFn context.CancelFunc
@@ -159,6 +161,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	lyricsRepo := repository.NewLyricsRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
+	taskRepo := repository.NewTranscodeTaskRepository(db)
+	subRepo := repository.NewSubtitleRepository(db)
 
 	// Services
 	otpStore := services.NewOTPStore(
@@ -197,6 +201,47 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	streamer := services.NewStreamerService(cfg)
 	thumbSvc := services.NewThumbnailService(cfg.Media.ThumbnailPath)
 
+	// Дефолты новых секций: тесты обходят config.Load, где живут
+	// основные дефолты, поэтому здесь те же значения (дублирование
+	// осознанное — в одном месте их не собрать без рефакторинга Load).
+	if cfg.Storage.OriginalsDir == "" {
+		cfg.Storage.OriginalsDir = "./data/originals"
+	}
+	if cfg.Storage.TempDir == "" {
+		cfg.Storage.TempDir = "./data/tmp"
+	}
+	crf := 20
+	if cfg.Transcode.CRF != nil {
+		crf = *cfg.Transcode.CRF
+	}
+
+	// Очередь нормализации видео: один воркер (ffmpeg тяжёлый),
+	// задания в БД (переживают рестарт).
+	transcodeQueue := services.NewTranscodeQueue(
+		context.Background(),
+		services.TranscodeWorkerConfig{
+			CRF:             crf,
+			Preset:          cfg.Transcode.Preset,
+			MaxHeight:       cfg.Transcode.MaxHeight,
+			EstimateFactor:  cfg.Transcode.EstimateFactor,
+			MaxAttempts:     cfg.Transcode.MaxAttempts,
+			LibraryVideoDir: cfg.Media.VideoPath,
+			OriginalsDir:    cfg.Storage.OriginalsDir,
+			TempDir:         cfg.Storage.TempDir,
+			AutoCleanup:     cfg.Storage.AutoCleanupOriginals,
+		},
+		taskRepo,
+		mediaRepo,
+		subRepo,
+		thumbSvc,
+		services.NewSystemFFmpegRunner(),
+	)
+	if n, err := transcodeQueue.RequeueInterrupted(context.Background()); err != nil {
+		log.Printf("transcode: requeue interrupted: %v", err)
+	} else if n > 0 {
+		log.Printf("transcode: requeued %d interrupted tasks", n)
+	}
+
 	// Фоновая очередь обработки загрузок: POST /upload сохраняет файл и
 	// отвечает 202, хэш/ffprobe/ffmpeg выполняют воркеры очереди.
 	uploadQueue := services.NewUploadQueue(context.Background(), mediaRepo, thumbSvc,
@@ -212,9 +257,12 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer, thumbSvc)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
-	uploadHandler := handlers.NewUploadHandler(mediaRepo, uploadQueue, cfg.Media, handlers.UploadConfig{
+	uploadHandler := handlers.NewUploadHandler(mediaRepo, uploadQueue, transcodeQueue, cfg.Media, cfg.Storage, handlers.UploadConfig{
 		MaxFileSize: cfg.Server.MaxUploadSize,
 	})
+	transcodeHandler := handlers.NewTranscodeHandler(mediaRepo, transcodeQueue)
+	subsHandler := handlers.NewSubsHandler(mediaRepo, subRepo, cfg.Media)
+	adminHandler := handlers.NewAdminHandler(mediaRepo, taskRepo, transcodeQueue, cfg.Storage, cfg.Media)
 	// Очередь извлечения аудио из видео: отдельный воркер (ffmpeg тяжёлый),
 	// механика статусов — как у загрузок.
 	extractQueue := services.NewExtractService(
@@ -234,12 +282,29 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	if err := os.MkdirAll(cfg.Media.AudioPath, 0755); err != nil {
 		return nil, fmt.Errorf("create audio dir: %w", err)
 	}
+	if err := os.MkdirAll(cfg.Storage.OriginalsDir, 0755); err != nil {
+		return nil, fmt.Errorf("create originals dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Storage.TempDir, 0755); err != nil {
+		return nil, fmt.Errorf("create temp dir: %w", err)
+	}
+	// Каталоги контента не должны пересекаться: иначе сканер
+	// проиндексирует карантин как библиотеку, а чистка удалит не то.
+	// Fail fast с понятной ошибкой вместо тихих дублей.
+	if err := services.ValidateContentDirs(map[string]string{
+		"media.video_path":      cfg.Media.VideoPath,
+		"media.audio_path":      cfg.Media.AudioPath,
+		"storage.originals_dir": cfg.Storage.OriginalsDir,
+		"storage.temp_dir":      cfg.Storage.TempDir,
+	}); err != nil {
+		return nil, fmt.Errorf("validate content dirs: %w", err)
+	}
 
 	progressHandler := handlers.NewProgressHandler(progressRepo, mediaRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
 	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
-	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc)
+	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc, subRepo)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
 	artistHandler := handlers.NewArtistHandler(artistRepo, cfg.Media.ThumbnailPath)
 
@@ -413,6 +478,14 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// Admin-only middleware for destructive/administrative operations.
 	requireAdmin := middleware.RequireAdmin(userRepo)
 
+	// Админка хранилища: диск, карантин оригиналов, ретрай заданий.
+	admin := api.Group("/admin", requireAdmin)
+	admin.Get("/storage", adminHandler.StorageInfo)
+	admin.Get("/originals", adminHandler.OriginalsList)
+	admin.Get("/originals/:name/download", uploadRateLimiter, adminHandler.OriginalDownload)
+	admin.Delete("/originals/:name", adminHandler.OriginalDelete)
+	admin.Post("/transcodes/:id/retry", adminHandler.TranscodeRetry)
+
 	media := api.Group("/media")
 	// /bulk регистрируем ДО /:id — статический путь имеет приоритет
 	// в fiber, но явный порядок исключает сюрпризы при рефакторинге.
@@ -423,6 +496,14 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Post(uploadRouteSuffix, requireAdmin, uploadRateLimiter, uploadHandler.Upload)
 	media.Get("/uploads/:id", requireAdmin, uploadHandler.UploadStatus)
 	media.Delete("/uploads/:id", requireAdmin, uploadHandler.CancelUpload)
+	// Нормализации: статусы заданий карантина (та же форма, что у
+	// загрузок, плюс прогресс). UploadStatus/CancelUpload тоже умеют
+	// отдавать их как fallback по job_id.
+	media.Get("/transcodes/:id", requireAdmin, transcodeHandler.TranscodeStatus)
+	media.Delete("/transcodes/:id", requireAdmin, transcodeHandler.TranscodeCancel)
+	// Субтитры: список дорожек и WebVTT-файлы (как превью — всем).
+	media.Get("/:id/subs", subsHandler.ListSubs)
+	media.Get("/:id/subs/:lang", subsHandler.ServeSub)
 	// Извлечение аудио: POST ставит джоб (202) или сразу отдаёт готовый
 	// трек (200); статусы — той же формы, что у загрузок. Тяжёлый лимитер
 	// тот же, что у загрузок: ffmpeg жрёт CPU не меньше multipart-парсинга.
@@ -569,18 +650,19 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	ok = true
 	return &App{
-		Fiber:        fiberApp,
-		Config:       cfg,
-		OTPStore:     otpStore,
-		Watcher:      watcherService,
-		UploadQueue:  uploadQueue,
-		ExtractQueue: extractQueue,
-		Version:      version,
-		sqlDB:        sqlDB,
-		cleanupStop:  cleanupStop,
-		scanner:      scanner,
-		scanCancelFn: scanCancelFn,
-		scanWG:       scanWG,
+		Fiber:          fiberApp,
+		Config:         cfg,
+		OTPStore:       otpStore,
+		Watcher:        watcherService,
+		UploadQueue:    uploadQueue,
+		ExtractQueue:   extractQueue,
+		TranscodeQueue: transcodeQueue,
+		Version:        version,
+		sqlDB:          sqlDB,
+		cleanupStop:    cleanupStop,
+		scanner:        scanner,
+		scanCancelFn:   scanCancelFn,
+		scanWG:         scanWG,
 	}, nil
 }
 
@@ -637,6 +719,9 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 	}
 	if a.ExtractQueue != nil {
 		a.ExtractQueue.Stop()
+	}
+	if a.TranscodeQueue != nil {
+		a.TranscodeQueue.Stop()
 	}
 	a.OTPStore.Stop()
 

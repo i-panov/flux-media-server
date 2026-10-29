@@ -31,10 +31,17 @@ type Media struct {
 	// delete — a file re-appearing after its record was soft-deleted would
 	// fail with a UNIQUE error and the media would be lost. Duplicate
 	// detection is done in the scanner via FindByPath/FindByHash.
-	FilePath     string `gorm:"index" json:"-"`
-	FileSize     int64  `json:"file_size"`
-	FileHash     string `gorm:"index" json:"file_hash"`
-	QuickHash    string `gorm:"index" json:"quick_hash"`
+	FilePath string `gorm:"index" json:"-"`
+	FileSize int64  `json:"file_size"`
+	FileHash string `gorm:"index" json:"file_hash"`
+	// SourceHash — sha256 исходника в карантине, из которого получен
+	// этот файл (нормализация). У direct-файлов совпадает с FileHash.
+	// Нужен для дедупа повторных заливок: хэш результата отличается.
+	SourceHash string `gorm:"index" json:"-"`
+	QuickHash  string `gorm:"index" json:"quick_hash"`
+	// ViewCount — счётчик стартов стриминга. Только для сортировки
+	// в админке (чистка оригиналов), не для пользовательских топов.
+	ViewCount    uint64 `json:"view_count"`
 	ThumbnailURL string `json:"thumbnail_url"`
 	CoverURL     string `json:"cover_url"`
 	// SourceURL — ссылка на источник (например, страница YouTube).
