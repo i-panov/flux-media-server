@@ -25,13 +25,21 @@ const inactiveLink =
 const activeLink =
 	"rounded-md px-3 py-1.5 text-sm font-medium text-[var(--mantine-color-text)] bg-[var(--mantine-color-default-hover)]";
 
-function NavItem({ to, label }: { to: "/" | "/settings"; label: string }) {
+function NavItem({
+	to,
+	label,
+	exact = true,
+}: {
+	to: "/" | "/video" | "/settings";
+	label: string;
+	exact?: boolean;
+}) {
 	return (
 		<Link
 			to={to}
 			className={inactiveLink}
 			activeProps={{ className: activeLink }}
-			activeOptions={{ exact: true }}
+			activeOptions={{ exact }}
 		>
 			{label}
 		</Link>
@@ -91,6 +99,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 							{session != null && (
 								<>
 									<NavItem to="/" label={t("nav.home")} />
+									<NavItem to="/video" label={t("nav.video")} exact={false} />
 									<NavItem to="/settings" label={t("nav.settings")} />
 								</>
 							)}
