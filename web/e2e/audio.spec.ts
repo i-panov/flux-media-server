@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { stubEmptyLibraryMeta } from "./stubs";
 
 const AUDIO_LIST_PATTERN = /\/audio$/;
 const AUDIO_DETAIL_PATTERN = /\/audio\/1$/;
@@ -72,10 +73,8 @@ async function stubAuthedSession(page: Page) {
 			body: userBody,
 		}),
 	);
+	await stubEmptyLibraryMeta(page);
 }
-
-// Список отдаёт элементы только на type=audio: так видно, что страница
-// не запрашивает видео. Остальные запросы стабов — минимум для страницы.
 async function stubAudioApi(page: Page) {
 	await page.route(
 		(url) => url.pathname === "/api/media",

@@ -45,7 +45,32 @@ func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, mediaType s
 	// Preload the media object so the client does not need an N+1 request
 	// per favorite row.
 	err := query.Preload("Media").Find(&favs).Error
-	return favs, total, err
+	if err != nil {
+		return favs, total, err
+	}
+	// Preload artists отдельным запросом: many2many preload через GORM
+	// даёт декартово произведение, а карточке аудио нужны исполнители.
+	media := make([]models.Media, 0, len(favs))
+	for i := range favs {
+		if favs[i].Media != nil {
+			media = append(media, *favs[i].Media)
+		}
+	}
+	if len(media) > 0 {
+		if err := LoadArtistsForMedia(r.db.WithContext(ctx), media); err != nil {
+			return favs, total, err
+		}
+		artistsByID := make(map[uint][]models.Artist, len(media))
+		for i := range media {
+			artistsByID[media[i].ID] = media[i].Artists
+		}
+		for i := range favs {
+			if favs[i].Media != nil {
+				favs[i].Media.Artists = artistsByID[favs[i].Media.ID]
+			}
+		}
+	}
+	return favs, total, nil
 }
 
 func (r *FavoriteStore) FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error) {

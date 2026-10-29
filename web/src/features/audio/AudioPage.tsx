@@ -11,7 +11,10 @@ import {
 } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useFavoriteMedia } from "../../api/favorites";
 import { useAudioList } from "../../api/media";
+import { CollectionsSection } from "../collections/CollectionsSection";
+import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
 import { UploadButton } from "../upload/UploadButton";
 import { AudioCard } from "./AudioCard";
@@ -52,6 +55,12 @@ export function AudioPage() {
 
 	const list = useAudioList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
+	const favoriteMedia = useFavoriteMedia("audio");
+	const favoriteSectionIds = new Set(favoriteMedia.map((media) => media.id));
+	const visibleItems =
+		debounced === ""
+			? items.filter((media) => !favoriteSectionIds.has(media.id))
+			: items;
 
 	return (
 		<Stack gap="lg">
@@ -72,6 +81,8 @@ export function AudioPage() {
 			/>
 			{/* При поиске ряд продолжения не нужен: он не фильтруется. */}
 			{debounced === "" && <ContinueWatching kind="audio" />}
+			{debounced === "" && <FavoriteSection type="audio" />}
+			{debounced === "" && <CollectionsSection type="audio" />}
 			{list.isPending ? (
 				<AudioSkeletons />
 			) : list.isError && items.length === 0 ? (
@@ -95,7 +106,7 @@ export function AudioPage() {
 						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
 						spacing="md"
 					>
-						{items.map((media) => (
+						{visibleItems.map((media) => (
 							<AudioCard key={media.id} media={media} />
 						))}
 					</SimpleGrid>

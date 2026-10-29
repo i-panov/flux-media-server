@@ -4,6 +4,7 @@ import { Image as ImageIcon, RotateCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import type { Media } from "../../core/media";
+import { FavoriteButton } from "../favorites/FavoriteButton";
 
 // Квадратная плитка галереи: подписи нет, название уходит в aria-label
 // ссылки. Превью — серверный JPEG до 512 px, оригинал грузится только
@@ -50,6 +51,11 @@ export function MemeCard({ media }: { media: Media }) {
 					</div>
 				</Card>
 			</Link>
+			<FavoriteButton
+				mediaId={media.id}
+				type="image"
+				className="absolute top-2 left-2 z-10"
+			/>
 			{reload.failed && (
 				<ActionIcon
 					variant="filled"

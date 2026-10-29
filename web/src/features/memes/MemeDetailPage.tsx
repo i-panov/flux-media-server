@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useMedia, useMediaReload } from "../../api/media";
 import type { Media } from "../../core/media";
+import { AddToCollectionButton } from "../collections/AddToCollectionButton";
+import { FavoriteButton } from "../favorites/FavoriteButton";
 
 // Просмотрщик мема: оригинал отдаётся стримом (превью — только для
 // сетки), поэтому картинка грузится в исходном качестве.
@@ -115,14 +117,18 @@ export function MemeDetailPage() {
 				<Button variant="subtle" onClick={goBack}>
 					{backLabel}
 				</Button>
-				<Button
-					component="a"
-					variant="light"
-					href={`/api/media/${item.id}/stream`}
-					download={filename}
-				>
-					{t("memes.download")}
-				</Button>
+				<Group gap="xs">
+					<FavoriteButton mediaId={item.id} type="image" />
+					<AddToCollectionButton mediaId={item.id} type="image" />
+					<Button
+						component="a"
+						variant="light"
+						href={`/api/media/${item.id}/stream`}
+						download={filename}
+					>
+						{t("memes.download")}
+					</Button>
+				</Group>
 			</Group>
 			<MemeImage item={item} />
 			<Stack gap={4} align="center">

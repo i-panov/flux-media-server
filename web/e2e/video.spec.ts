@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { stubEmptyLibraryMeta } from "./stubs";
 
 const VIDEO_LIST_PATTERN = /\/video$/;
 const VIDEO_DETAIL_PATTERN = /\/video\/1$/;
@@ -66,8 +67,8 @@ async function stubAuthedSession(page: Page) {
 			body: userBody,
 		}),
 	);
+	await stubEmptyLibraryMeta(page);
 }
-
 async function stubVideoApi(page: Page) {
 	await page.route(
 		(url) => url.pathname === "/api/media",

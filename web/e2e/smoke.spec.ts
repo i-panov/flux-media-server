@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { stubEmptyLibraryMeta } from "./stubs";
 
 const healthBody = JSON.stringify({ status: "ok", version: "1.0.8" });
 const userBody = JSON.stringify({
@@ -29,6 +30,7 @@ async function stubAuthedSession(page: Page) {
 				body: JSON.stringify({ items: [], total: 0, limit: 20, offset: 0 }),
 			}),
 	);
+	await stubEmptyLibraryMeta(page);
 }
 
 test("главная показывает приложение и статус сервера", async ({ page }) => {

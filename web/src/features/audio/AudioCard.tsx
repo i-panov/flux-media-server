@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
+import { FavoriteButton } from "../favorites/FavoriteButton";
 
 export function AudioCard({ media }: { media: Media }) {
 	const { t } = useTranslation();
@@ -60,6 +61,11 @@ export function AudioCard({ media }: { media: Media }) {
 					</Text>
 				</Card>
 			</Link>
+			<FavoriteButton
+				mediaId={media.id}
+				type="audio"
+				className="absolute top-2 left-2 z-10"
+			/>
 			{/* Retry — сосед ссылки, а не её потомок: кнопка внутри <a>
 			ломает content model и путает скринридеры. */}
 			{reload.failed && (

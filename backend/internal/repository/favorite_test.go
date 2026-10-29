@@ -36,6 +36,35 @@ func TestFavoriteStore_CreateAndFindByUser(t *testing.T) {
 	assert.Equal(t, int64(1), total)
 }
 
+func TestFavoriteStore_FindByUserLoadsMediaArtists(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	require.NoError(t, db.Create(&models.User{ID: 1, Email: "u1@test.com"}).Error)
+	mediaID := uint(10)
+	require.NoError(t, db.Create(&models.Media{
+		ID:      mediaID,
+		Title:   "Song",
+		Type:    models.MediaTypeAudio,
+		Artists: []models.Artist{{Name: "Artist"}},
+	}).Error)
+
+	store := NewFavoriteRepository(db)
+	ctx := context.Background()
+	require.NoError(t, store.Create(ctx, &models.Favorite{
+		UserID:  1,
+		MediaID: &mediaID,
+	}))
+
+	favs, _, err := store.FindByUser(ctx, 1, "audio", 50, 0)
+	require.NoError(t, err)
+	require.Len(t, favs, 1)
+	require.NotNil(t, favs[0].Media)
+	require.Len(t, favs[0].Media.Artists, 1)
+	assert.Equal(t, "Artist", favs[0].Media.Artists[0].Name)
+}
+
 func TestFavoriteStore_FindByUserAndMedia(t *testing.T) {
 	db, err := InitDB(":memory:")
 	require.NoError(t, err)

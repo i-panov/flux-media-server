@@ -11,7 +11,10 @@ import {
 } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useFavoriteMedia } from "../../api/favorites";
 import { useImageList } from "../../api/media";
+import { CollectionsSection } from "../collections/CollectionsSection";
+import { FavoriteSection } from "../favorites/FavoriteSection";
 import { UploadButton } from "../upload/UploadButton";
 import { MemeCard } from "./MemeCard";
 
@@ -46,6 +49,12 @@ export function MemesPage() {
 
 	const list = useImageList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
+	const favoriteMedia = useFavoriteMedia("image");
+	const favoriteSectionIds = new Set(favoriteMedia.map((media) => media.id));
+	const visibleItems =
+		debounced === ""
+			? items.filter((media) => !favoriteSectionIds.has(media.id))
+			: items;
 
 	return (
 		<Stack gap="lg">
@@ -64,6 +73,8 @@ export function MemesPage() {
 				}}
 				w={{ base: "100%", sm: 320 }}
 			/>
+			{debounced === "" && <FavoriteSection type="image" />}
+			{debounced === "" && <CollectionsSection type="image" />}
 			{list.isPending ? (
 				<MemeSkeletons />
 			) : list.isError && items.length === 0 ? (
@@ -87,7 +98,7 @@ export function MemesPage() {
 						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
 						spacing="md"
 					>
-						{items.map((media) => (
+						{visibleItems.map((media) => (
 							<MemeCard key={media.id} media={media} />
 						))}
 					</SimpleGrid>

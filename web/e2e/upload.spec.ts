@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { stubEmptyLibraryMeta } from "./stubs";
 
 // biome-ignore lint/security/noSecrets: CSS-селектор, не секрет.
 const FILE_INPUT_SELECTOR = 'input[type="file"]';
@@ -29,6 +30,7 @@ async function stubSession(page: Page, isAdmin: boolean) {
 				body: JSON.stringify({ items: [], total: 0, limit: 20, offset: 0 }),
 			}),
 	);
+	await stubEmptyLibraryMeta(page);
 }
 
 test("загрузка видео показывает прогресс нормализации", async ({ page }) => {

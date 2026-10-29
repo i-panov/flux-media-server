@@ -14,6 +14,8 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useMedia, useMediaReload, useSavedTime } from "../../api/media";
 import { formatDuration } from "../../core/format";
+import { AddToCollectionButton } from "../collections/AddToCollectionButton";
+import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MetaItem } from "../media/MetaItem";
 import { useMediaProgress } from "../media/useMediaProgress";
 
@@ -130,9 +132,15 @@ export function AudioDetailPage() {
 					gap="md"
 					className="min-w-0 flex-1 basis-full min-[48em]:basis-auto"
 				>
-					<Title order={1} size="h2">
-						{item.title}
-					</Title>
+					<Group justify="space-between" align="flex-start" wrap="wrap">
+						<Title order={1} size="h2">
+							{item.title}
+						</Title>
+						<Group gap="xs">
+							<FavoriteButton mediaId={item.id} type="audio" />
+							<AddToCollectionButton mediaId={item.id} type="audio" />
+						</Group>
+					</Group>
 					{/* biome-ignore lint/a11y/useMediaCaption: у аудио нет видеоряда и субтитров. */}
 					<audio
 						ref={audioRef}

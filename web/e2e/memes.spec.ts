@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { stubEmptyLibraryMeta } from "./stubs";
 
 const MEMES_LIST_PATTERN = /\/memes$/;
 const MEME_DETAIL_PATTERN = /\/memes\/1$/;
@@ -55,10 +56,8 @@ async function stubAuthedSession(page: Page, isAdmin = false) {
 			body: sessionBody(isAdmin),
 		}),
 	);
+	await stubEmptyLibraryMeta(page);
 }
-
-// Список отдаёт мемы только при type=image&sort=desc: так тест ловит
-// и правильный тип запроса, и сортировку «новые сверху».
 async function stubMemesApi(page: Page) {
 	await page.route(
 		(url) => url.pathname === "/api/media",

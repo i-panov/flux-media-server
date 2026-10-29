@@ -18,6 +18,8 @@ import {
 	useSavedTime,
 } from "../../api/media";
 import { formatDuration, splitSubLang } from "../../core/format";
+import { AddToCollectionButton } from "../collections/AddToCollectionButton";
+import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MetaItem } from "../media/MetaItem";
 import { useMediaProgress } from "../media/useMediaProgress";
 
@@ -200,9 +202,15 @@ export function VideoDetailPage() {
 				</Alert>
 			)}
 			<Stack gap="xs">
-				<Title order={1} size="h2">
-					{item.title}
-				</Title>
+				<Group justify="space-between" align="center" wrap="wrap">
+					<Title order={1} size="h2">
+						{item.title}
+					</Title>
+					<Group gap="xs">
+						<FavoriteButton mediaId={item.id} type="video" />
+						<AddToCollectionButton mediaId={item.id} type="video" />
+					</Group>
+				</Group>
 				<Group gap="xl">
 					<MetaItem
 						label={t("video.meta.year")}

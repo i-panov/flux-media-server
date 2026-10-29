@@ -11,7 +11,8 @@ import {
 	Title,
 	useMantineColorScheme,
 } from "@mantine/core";
-import { LogOut } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { LogOut, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useHealthQuery } from "../../api/health";
@@ -116,6 +117,15 @@ export function SettingsPage() {
 							w="fit-content"
 						>
 							{t("settings.account.logout")}
+						</Button>
+						<Button
+							component={Link}
+							to="/trash"
+							variant="light"
+							leftSection={<Trash2 size={16} />}
+							w="fit-content"
+						>
+							{t("settings.trash")}
 						</Button>
 					</Stack>
 				</SettingsCard>

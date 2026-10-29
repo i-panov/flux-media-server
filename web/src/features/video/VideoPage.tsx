@@ -11,7 +11,10 @@ import {
 } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useFavoriteMedia } from "../../api/favorites";
 import { useVideoList } from "../../api/media";
+import { CollectionsSection } from "../collections/CollectionsSection";
+import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
 import { UploadButton } from "../upload/UploadButton";
 import { VideoCard } from "./VideoCard";
@@ -51,6 +54,12 @@ export function VideoPage() {
 
 	const list = useVideoList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
+	const favoriteMedia = useFavoriteMedia("video");
+	const favoriteSectionIds = new Set(favoriteMedia.map((media) => media.id));
+	const visibleItems =
+		debounced === ""
+			? items.filter((media) => !favoriteSectionIds.has(media.id))
+			: items;
 
 	return (
 		<Stack gap="lg">
@@ -71,6 +80,8 @@ export function VideoPage() {
 			/>
 			{/* При поиске ряды продолжения не нужны: они не фильтруются. */}
 			{debounced === "" && <ContinueWatching kind="video" />}
+			{debounced === "" && <FavoriteSection type="video" />}
+			{debounced === "" && <CollectionsSection type="video" />}
 			{list.isPending ? (
 				<VideoSkeletons />
 			) : list.isError && items.length === 0 ? (
@@ -94,7 +105,7 @@ export function VideoPage() {
 						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
 						spacing="md"
 					>
-						{items.map((media) => (
+						{visibleItems.map((media) => (
 							<VideoCard key={media.id} media={media} />
 						))}
 					</SimpleGrid>
