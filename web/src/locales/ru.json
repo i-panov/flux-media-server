@@ -20,7 +20,7 @@
 	"home.about.webVersion": "Версия веба",
 	"home.about.stack": "React, TypeScript, Vite",
 	"home.next.title": "Что дальше",
-	"home.next.body": "Разделы видео, аудио и мемов появятся в следующих коммитах.",
+	"home.next.body": "Видео уже доступно в разделе «Видео». Аудио и мемы появятся в следующих коммитах.",
 	"auth.title": "Вход",
 	"auth.subtitle": "Войдите по коду из письма",
 	"auth.email": "Электронная почта",

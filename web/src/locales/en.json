@@ -20,7 +20,7 @@
 	"home.about.webVersion": "Web version",
 	"home.about.stack": "React, TypeScript, Vite",
 	"home.next.title": "What's next",
-	"home.next.body": "Video, audio and memes sections will arrive in the next commits.",
+	"home.next.body": "Video is already available in the Video section. Audio and memes will arrive in the next commits.",
 	"auth.title": "Sign in",
 	"auth.subtitle": "Sign in with the code from the email",
 	"auth.email": "Email",

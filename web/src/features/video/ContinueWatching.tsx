@@ -100,10 +100,10 @@ function ContinueCard({ entry }: { entry: ContinueEntry }) {
 // Блок «Продолжить просмотр»: последние начатые и недосмотренные записи.
 // Ошибку запроса не показываем — это вспомогательная секция, основной
 // список должен работать и без неё.
-export function ContinueWatching() {
+export function ContinueWatching({ limit }: { limit?: number }) {
 	const { t } = useTranslation();
 	const list = useContinueWatching();
-	const items = list.data ?? [];
+	const items = (list.data ?? []).slice(0, limit);
 	if (items.length === 0) {
 		return null;
 	}
