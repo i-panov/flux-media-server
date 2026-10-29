@@ -31,6 +31,7 @@ type ServerConfig struct {
 	CORSOrigins   string `yaml:"cors_origins"`
 	CookieSecure  bool   `yaml:"cookie_secure"` // Secure-флаг сессионных кук, нужен HTTPS
 	MaxUploadSize int64  `yaml:"max_upload_size"`
+	WebDist       string `yaml:"web_dist"` // каталог собранного веба (web/dist); пусто — API-only
 }
 
 type DatabaseConfig struct {

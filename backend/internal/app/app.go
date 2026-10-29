@@ -574,6 +574,18 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Get("/media/:id/lyrics", lyricsHandler.GetLyrics)
 	api.Put("/media/:id/lyrics", requireAdmin, lyricsHandler.UpsertLyrics)
 
+	// Веб-клиент: same-origin раздача web/dist (SPA) — последним
+	// маршрутом, после всех /api. Пустой web_dist — API-only режим
+	// (мобильные клиенты, разработка через Vite).
+	if cfg.Server.WebDist != "" {
+		webHandler, err := handlers.NewWebHandler(cfg.Server.WebDist)
+		if err != nil {
+			return nil, err
+		}
+		webHandler.RegisterRoutes(fiberApp)
+		log.Printf("web client: serving %s", cfg.Server.WebDist)
+	}
+
 	// Start file watcher if enabled.
 	opt := options{backgroundWorkers: true}
 	for _, apply := range opts {
