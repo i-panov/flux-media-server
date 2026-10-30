@@ -466,3 +466,54 @@ func TestUploadRateLimiter(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusTooManyRequests, resp.StatusCode)
 }
+
+func TestReadRateLimiter(t *testing.T) {
+	cfg := &config.Config{
+		Server:   config.ServerConfig{Port: 0, Debug: true, MaxUploadSize: 100 << 20},
+		Database: config.DatabaseConfig{Path: ":memory:"},
+		Auth: config.AuthConfig{
+			JWTSecret:         "test-secret-that-is-at-least-32-characters-long",
+			JWTExpiry:         24,
+			CodeLength:        6,
+			CodeExpiry:        300,
+			MaxOTPEntries:     1000,
+			AllowUnknownEmail: true,
+		},
+		RateLimiter: config.RateLimiterConfig{Max: 100, Expiration: 60, ReadMax: 2, ReadExpiration: 60},
+		Media:       config.MediaConfig{VideoPath: t.TempDir() + "/video", AudioPath: t.TempDir() + "/audio"},
+	}
+	application, err := New(cfg, "test")
+	require.NoError(t, err)
+	t.Cleanup(func() { application.Shutdown(context.Background()) })
+
+	token := getAuthToken(t, application, "reader@example.com")
+
+	// Общий бакет: запросы к РАЗНЫМ read-ручкам тратят один лимит.
+	resp, err := application.Fiber.Test(authReq("GET", "/api/media", token))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode, "GET /api/media should pass")
+	resp.Body.Close()
+
+	resp, err = application.Fiber.Test(authReq("GET", "/api/favorites", token))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode, "GET /api/favorites should pass")
+	resp.Body.Close()
+
+	// ...а следующий (любой из них) получает 429 от read-лимитера.
+	resp, err = application.Fiber.Test(authReq("GET", "/api/media", token))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusTooManyRequests, resp.StatusCode)
+	resp.Body.Close()
+
+	// Мутация и health под read-бакет не попадают.
+	resp, err = application.Fiber.Test(httptest.NewRequest("GET", "/api/health", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+	mutReq := testReq("POST", "/api/collections", jsonBody(t, map[string]string{"name": "rl-test"}))
+	mutReq.Header.Set("Authorization", "Bearer "+token)
+	resp, err = application.Fiber.Test(mutReq)
+	require.NoError(t, err)
+	assert.NotEqual(t, fiber.StatusTooManyRequests, resp.StatusCode)
+	resp.Body.Close()
+}

@@ -72,6 +72,7 @@ type UploadJobInput struct {
 
 // UploadJob — задание фоновой обработки загрузки. Все поля доступны только
 // под mutex'ом очереди (воркер и хендлеры разделяют объект).
+// ID — из БД (upload_tasks.id, стабилен между рестартами).
 type UploadJob struct {
 	ID        uint64
 	Status    string
@@ -81,6 +82,9 @@ type UploadJob struct {
 	filename  string
 	mediaType models.MediaType
 	force     bool
+	// fileHash — sha256 файла, заполняется после хэширования и
+	// персистится в строку (дедуп параллельных заливок одного контента).
+	fileHash string
 	// Заполняются при статусе duplicate: id и название похожего мема.
 	duplicateMediaID uint
 	duplicateTitle   string
@@ -96,28 +100,41 @@ type UploadJobStatus struct {
 	DuplicateTitle   string
 }
 
-// UploadQueue — in-memory очередь фоновой обработки загрузок. Файл
-// сохраняется синхронно в хендлере, а хэш/ffprobe/ffmpeg выполняются
-// воркерами: запрос POST не висит по ~30 секунд на превью.
+// UploadQueue — очередь фоновой обработки загрузок с персистентными
+// строками (upload_tasks). Файл сохраняется синхронно в хендлере, а
+// хэш/ffprobe/ffmpeg выполняются воркерами: запрос POST не висит
+// по ~30 секунд на превью.
 //
 // Очередь — буферизованный канал размера limit + мапа заданий для
 // GET/DELETE по ID. Stop() отменяет контекст (прерывая ffprobe/ffmpeg/
 // хэширование через CommandContext/contextReader) и ждёт воркеров.
+// Незавершённые строки переживают рестарт и перевыставляются в очередь
+// при старте (см. recoverInterrupted).
 type UploadQueue struct {
 	mu sync.Mutex
 	// phashMu сериализует проверку похожести и решение duplicate:
 	// иначе два воркера видят друг друга и удаляют обе загрузки.
-	phashMu  sync.Mutex
-	jobs     map[uint64]*UploadJob
-	queue    chan *UploadJob
-	nextID   uint64
-	limit    int
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	media    repository.MediaRepository
-	thumbSvc *ThumbnailService
-	extract  *MetadataExtractor
+	phashMu sync.Mutex
+	// fileHashMu сериализует позднюю проверку-и-создание (FindByHash по
+	// Media → Create → фиксация MediaID): иначе два воркера, прошедшие
+	// раннюю проверку, видят пустой результат и плодят дубли. Зеркало
+	// pHash-пути: первый создаёт, второй видит запись и уходит в тот же
+	// failDuplicateUpload. Ранняя проверка остаётся fast-path оптимизацией.
+	fileHashMu sync.Mutex
+	jobs       map[uint64]*UploadJob
+	queue      chan *UploadJob
+	limit      int
+	// enqueueMu сериализует постановки: без него параллельные Enqueue
+	// одного файла одновременно проходят проверку дедупа и плодят
+	// дубли (check-then-act на карте + БД).
+	enqueueMu sync.Mutex
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	media     repository.MediaRepository
+	tasks     repository.UploadTaskRepository
+	thumbSvc  *ThumbnailService
+	extract   *MetadataExtractor
 }
 
 // NewUploadQueue создаёт очередь и запускает workers воркеров. workers<0
@@ -127,6 +144,7 @@ type UploadQueue struct {
 func NewUploadQueue(
 	ctx context.Context,
 	mediaRepo repository.MediaRepository,
+	tasks repository.UploadTaskRepository,
 	thumbSvc *ThumbnailService,
 	workers, limit int,
 ) *UploadQueue {
@@ -144,6 +162,7 @@ func NewUploadQueue(
 		ctx:      qctx,
 		cancel:   cancel,
 		media:    mediaRepo,
+		tasks:    tasks,
 		thumbSvc: thumbSvc,
 		extract:  NewMetadataExtractor(),
 	}
@@ -155,23 +174,203 @@ func NewUploadQueue(
 	// монотонно — Cancel чистит только отменённые, done/error копятся.
 	q.wg.Add(1)
 	go q.sweepLoop()
+	q.recoverInterrupted()
 	return q
+}
+
+// recoverInterrupted поднимает незавершённые строки из БД (следствие
+// рестарта посреди обработки): сбрасывает processing в queued,
+// пересоздаёт in-memory записи. ID раздаёт БД, переиспользования нет.
+// Дедуп по файлу: два unfinished на один путь — след двойной постановки
+// до краха, оставляем старейший. Отправка в канал — отдельной горутиной
+// с блокировкой: unfinished может быть больше буфера, а конструктор
+// блокироваться не должен.
+func (q *UploadQueue) recoverInterrupted() {
+	if q.tasks == nil {
+		return
+	}
+	unfinished, err := q.tasks.FindUnfinished(context.Background(), UploadJobQueued, UploadJobProcessing)
+	if err != nil {
+		log.Printf("upload queue: load unfinished jobs: %v", err)
+		return
+	}
+	seen := make(map[string]bool, len(unfinished))
+	var ids []uint64
+	for _, row := range unfinished {
+		if seen[row.FilePath] {
+			if err := q.tasks.Delete(context.Background(), row.ID); err != nil {
+				log.Printf("upload queue: delete duplicate job %d: %v", row.ID, err)
+			}
+			continue
+		}
+		seen[row.FilePath] = true
+		if row.Status == UploadJobProcessing {
+			if err := q.tasks.SetStatus(context.Background(), row.ID, UploadJobQueued, "", row.MediaID); err != nil {
+				log.Printf("upload queue: reset job %d: %v", row.ID, err)
+				continue
+			}
+		}
+		q.mu.Lock()
+		q.jobs[row.ID] = &UploadJob{
+			ID:               row.ID,
+			Status:           UploadJobQueued,
+			filePath:         row.FilePath,
+			filename:         row.Filename,
+			mediaType:        row.MediaType,
+			force:            row.Force,
+			fileHash:         row.FileHash,
+			MediaID:          row.MediaID,
+			duplicateMediaID: row.DuplicateMediaID,
+			duplicateTitle:   row.DuplicateTitle,
+			createdAt:        row.CreatedAt,
+		}
+		q.mu.Unlock()
+		ids = append(ids, row.ID)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	log.Printf("upload queue: recovered %d interrupted job(s)", len(ids))
+	q.wg.Add(1)
+	go q.recoverQueue(ids)
+}
+
+func (q *UploadQueue) recoverQueue(ids []uint64) {
+	defer q.wg.Done()
+	for _, id := range ids {
+		q.mu.Lock()
+		job, ok := q.jobs[id]
+		q.mu.Unlock()
+		if !ok {
+			continue
+		}
+		select {
+		case q.queue <- job:
+		case <-q.ctx.Done():
+			return
+		}
+	}
+}
+
+// saveStatus пишет переход в БД best-effort: недоступная БД ломает
+// и остальной сервер, поэтому воркер продолжает in-memory.
+func (q *UploadQueue) saveStatus(job *UploadJob) {
+	if q.tasks == nil {
+		return
+	}
+	q.mu.Lock()
+	id, status, errMsg, mediaID := job.ID, job.Status, job.Error, job.MediaID
+	q.mu.Unlock()
+	if err := q.tasks.SetStatus(context.Background(), id, status, errMsg, mediaID); err != nil {
+		log.Printf("upload queue: save task %d: %v", id, err)
+	}
+}
+
+// saveFileHash фиксирует хэш файла в строке best-effort.
+func (q *UploadQueue) saveFileHash(job *UploadJob, hash string) {
+	if q.tasks == nil {
+		return
+	}
+	q.mu.Lock()
+	id := job.ID
+	q.mu.Unlock()
+	if err := q.tasks.SetFileHash(context.Background(), id, hash); err != nil {
+		log.Printf("upload queue: save hash %d: %v", id, err)
+	}
+}
+
+// checkParallelDuplicate — fast-path дедупа параллельных заливок одного
+// контента под разными именами: после saveFileHash строка видна соседям,
+// а записи Media ещё нет ни у кого. Нашёлся чужой активный джоб старше
+// нас — завершаем текущее задание той же ошибкой дубликата, что поздний
+// гейт по Media. Гарантии нет: детерминированность доводит только поздний
+// гейт под fileHashMu (первый создаёт, второй уходит в failDuplicateUpload).
+// Известное ограничение: упал старший позже — оба в error, лечится ретраем.
+// true — задание завершено внутри, вызывающий возвращается.
+func (q *UploadQueue) checkParallelDuplicate(job *UploadJob, hash string) bool {
+	if hash == "" || q.tasks == nil {
+		return false
+	}
+	jobID := job.ID
+	active, err := q.tasks.FindActiveByHash(context.Background(), hash, UploadJobQueued, UploadJobProcessing)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false
+		}
+		q.fail(job, err, "Failed to check for duplicates")
+		return true
+	}
+	if active == nil || active.ID == jobID || active.ID > jobID {
+		return false
+	}
+	q.failDuplicateUpload(job)
+	return true
+}
+
+// failDuplicateUpload завершает задание как точный дубль по хэшу: запись
+// Media не создаётся, файл удаляется (см. fail/cleanupJobResources).
+// Единая точка для ранней (по строкам) и поздней (по Media) проверок.
+func (q *UploadQueue) failDuplicateUpload(job *UploadJob) {
+	q.fail(job, errDuplicateUpload, "File already exists")
 }
 
 // Enqueue ставит задание в очередь и возвращает его ID. При переполнении
 // возвращает ErrUploadQueueFull — файл на диске хендлер удаляет сам.
+// Повторный POST того же файла, пока прошлый джоб летит
+// (queued/processing, в т.ч. поднятый после рестарта), отдаёт ID
+// существующего задания вместо нового.
 func (q *UploadQueue) Enqueue(in UploadJobInput) (uint64, error) {
+	// Сериализация всего check-then-act: карта + БД + вставка.
+	q.enqueueMu.Lock()
+	defer q.enqueueMu.Unlock()
+
 	q.mu.Lock()
-	q.nextID++
+	for id, job := range q.jobs {
+		if job.filePath == in.FilePath &&
+			(job.Status == UploadJobQueued || job.Status == UploadJobProcessing) {
+			q.mu.Unlock()
+			return id, nil
+		}
+	}
+	q.mu.Unlock()
+	// Дыра после рестарта: поднятые задания уже в карте выше, но на
+	// всякий случай проверяем и БД (один дешёвый запрос на постановку).
+	if q.tasks != nil {
+		if active, err := q.tasks.FindActiveByFilePath(context.Background(), in.FilePath, UploadJobQueued, UploadJobProcessing); err == nil && active != nil {
+			return active.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("upload queue: find active job: %v", err)
+		}
+	}
+	row := &models.UploadTask{
+		FilePath:  in.FilePath,
+		Filename:  in.Filename,
+		MediaType: in.MediaType,
+		Status:    UploadJobQueued,
+		Force:     in.Force,
+	}
+	if q.tasks != nil {
+		if err := q.tasks.Create(context.Background(), row); err != nil {
+			return 0, err
+		}
+	} else {
+		// Без репозитория (только старые тесты без БД) — ID из счётчика
+		// невозможен без nextID; такой путь не используется.
+		return 0, errors.New("upload queue: no task repository")
+	}
 	job := &UploadJob{
-		ID:        q.nextID,
+		ID:        row.ID,
 		Status:    UploadJobQueued,
 		filePath:  in.FilePath,
 		filename:  in.Filename,
 		mediaType: in.MediaType,
 		force:     in.Force,
-		createdAt: time.Now(),
+		createdAt: row.CreatedAt,
 	}
+	if job.createdAt.IsZero() {
+		job.createdAt = time.Now()
+	}
+	q.mu.Lock()
 	q.jobs[job.ID] = job
 	q.mu.Unlock()
 
@@ -182,42 +381,77 @@ func (q *UploadQueue) Enqueue(in UploadJobInput) (uint64, error) {
 		q.mu.Lock()
 		delete(q.jobs, job.ID)
 		q.mu.Unlock()
+		if err := q.tasks.Delete(context.Background(), job.ID); err != nil {
+			log.Printf("upload queue: delete overflowed job %d: %v", job.ID, err)
+		}
 		return 0, ErrUploadQueueFull
 	}
 }
 
 // Get возвращает копию статуса задания. ok=false — задания нет.
+// Сначала карта, затем БД: завершённые (но ещё не выметенные) строки
+// переживают даже вытеснение из памяти и рестарт.
 func (q *UploadQueue) Get(id uint64) (status, errMsg string, mediaID uint, ok bool) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	job, found := q.jobs[id]
-	if !found {
+	var st, em string
+	var mid uint
+	if found {
+		st, em, mid = job.Status, job.Error, job.MediaID
+	}
+	q.mu.Unlock()
+	if found {
+		return st, em, mid, true
+	}
+	if q.tasks == nil {
 		return "", "", 0, false
 	}
-	return job.Status, job.Error, job.MediaID, true
+	row, err := q.tasks.Get(context.Background(), id)
+	if err != nil {
+		return "", "", 0, false
+	}
+	return row.Status, row.Error, row.MediaID, true
 }
 
 // Status возвращает полный снимок задания, включая данные о похожем меме
 // для статуса duplicate. ok=false — задания нет.
+// Сначала карта, затем БД: статус переживает вытеснение и рестарт.
 func (q *UploadQueue) Status(id uint64) (UploadJobStatus, bool) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	job, found := q.jobs[id]
-	if !found {
+	var snap UploadJobStatus
+	if found {
+		snap = UploadJobStatus{
+			Status:           job.Status,
+			Error:            job.Error,
+			MediaID:          job.MediaID,
+			DuplicateMediaID: job.duplicateMediaID,
+			DuplicateTitle:   job.duplicateTitle,
+		}
+	}
+	q.mu.Unlock()
+	if found {
+		return snap, true
+	}
+	if q.tasks == nil {
+		return UploadJobStatus{}, false
+	}
+	row, err := q.tasks.Get(context.Background(), id)
+	if err != nil {
 		return UploadJobStatus{}, false
 	}
 	return UploadJobStatus{
-		Status:           job.Status,
-		Error:            job.Error,
-		MediaID:          job.MediaID,
-		DuplicateMediaID: job.duplicateMediaID,
-		DuplicateTitle:   job.duplicateTitle,
+		Status:           row.Status,
+		Error:            row.Error,
+		MediaID:          row.MediaID,
+		DuplicateMediaID: row.DuplicateMediaID,
+		DuplicateTitle:   row.DuplicateTitle,
 	}, true
 }
 
 // Cancel отменяет задание, если оно ещё не завершено: удаляет файл,
-// запись Media (если создана) и само задание. Завершённое задание
-// (done/duplicate) отменить нельзя — ErrUploadJobDone.
+// запись Media (если создана), само задание и его строку в БД.
+// Завершённое задание (done/duplicate) отменить нельзя — ErrUploadJobDone.
 func (q *UploadQueue) Cancel(id uint64) error {
 	q.mu.Lock()
 	job, found := q.jobs[id]
@@ -235,6 +469,12 @@ func (q *UploadQueue) Cancel(id uint64) error {
 	// job.MediaID в process — чтение полей job вне q.mu было бы гонкой.
 	res := snapshotJobLocked(job)
 	q.mu.Unlock()
+
+	if q.tasks != nil {
+		if err := q.tasks.Delete(context.Background(), id); err != nil {
+			log.Printf("upload queue: delete cancelled job %d: %v", id, err)
+		}
+	}
 
 	// Файловый I/O и удаление записи — вне q.mu, чтобы не блокировать
 	// Get/Enqueue/воркеров на время os.Remove и DELETE из БД.
@@ -297,11 +537,23 @@ func (q *UploadQueue) safeProcess(job *UploadJob) {
 // этапа переводит задание в error, файл и запись удаляются.
 func (q *UploadQueue) process(job *UploadJob) {
 	q.mu.Lock()
-	if job.Status != uploadJobCancelled {
-		job.Status = UploadJobProcessing
-		job.Error = ""
+	if _, ok := q.jobs[job.ID]; !ok {
+		// Задания нет в карте (Cancel удалил его, пока оно ждало
+		// воркера): дроп без хэша/дедупа/создания. Чистить нечего —
+		// Cancel уже всё убрал.
+		q.mu.Unlock()
+		return
 	}
+	if job.Status == uploadJobCancelled {
+		// Зеркало earlyCancelled в extract: отмена между взятием из
+		// канала и стартом — выходим до saveStatus и HashFileContext.
+		q.mu.Unlock()
+		return
+	}
+	job.Status = UploadJobProcessing
+	job.Error = ""
 	q.mu.Unlock()
+	q.saveStatus(job)
 
 	ctx := q.ctx
 
@@ -310,13 +562,57 @@ func (q *UploadQueue) process(job *UploadJob) {
 		q.fail(job, err, "Failed to hash file")
 		return
 	}
+	q.mu.Lock()
+	job.fileHash = hash
+	q.mu.Unlock()
+	q.saveFileHash(job, hash)
+
+	// Ранний fast-path дедупа параллельных заливок одного контента под
+	// разными именами: дедуп по file_path их не ловит, а поздний гейт
+	// по Media ниже видит только готовые записи. Младший дубликат
+	// выходит той же ошибкой, что поздний гейт; старший идёт дальше.
+	// Полную детерминированность даёт только поздний гейт под fileHashMu.
+	if q.checkParallelDuplicate(job, hash) {
+		return
+	}
+
+	media, handled := q.checkAndCreateMedia(job, hash)
+	if handled {
+		return
+	}
+	q.continueWithMedia(job, media)
+}
+
+// checkAndCreateMedia — поздний гейт точных дубликатов под fileHashMu:
+// проверка FindByHash по Media, Create и фиксация MediaID атомарны
+// относительно друг друга (зеркало resolveDuplicate под phashMu). Даже
+// при обоюдном проходе ранней проверки первый создаёт запись, а второй
+// видит её и уходит в тот же failDuplicateUpload.
+// Возвращает (media, false) — задание продолжается в continueWithMedia
+// уже ВНЕ лока (там ffprobe/ffmpeg, держать мьютекс нельзя); (nil, true) —
+// задание завершено внутри (дубль/восстановление/ошибка/отмена).
+func (q *UploadQueue) checkAndCreateMedia(job *UploadJob, hash string) (*models.Media, bool) {
+	ctx := q.ctx
+	q.fileHashMu.Lock()
+	defer q.fileHashMu.Unlock()
+
+	q.mu.Lock()
+	ownMediaID := job.MediaID
+	q.mu.Unlock()
 
 	existing, err := q.media.FindByHash(ctx, hash)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		q.fail(job, err, "Failed to check for duplicates")
-		return
+		return nil, true
 	}
 	if existing != nil && existing.ID != 0 {
+		// Своя же недосозданная запись с прошлого прогона (крах между
+		// Create и Done): не дубль, а незавершённая работа — подхватываем
+		// её ниже вместо создания второй строки на тот же файл.
+		// Возврат без handled: continueWithMedia идёт уже вне fileHashMu.
+		if ownMediaID != 0 && existing.ID == ownMediaID {
+			return existing, false
+		}
 		// Дубль по хэшу из корзины: не 409, а восстановление —
 		// пользователь явно вернул тот же файл. Но только если файл
 		// реально на месте: иначе зальёт заново, удалит хорошую копию
@@ -325,22 +621,22 @@ func (q *UploadQueue) process(job *UploadJob) {
 			if st, statErr := os.Stat(existing.FilePath); statErr != nil || st.IsDir() {
 				os.Remove(job.filePath)
 				q.fail(job, errDuplicateUpload, "Original file is missing")
-				return
+				return nil, true
 			}
 			os.Remove(job.filePath)
 			if err := q.media.RestoreMedia(ctx, existing.ID); err != nil {
 				q.fail(job, err, "Failed to restore media")
-				return
+				return nil, true
 			}
 			// Джоба завершается успехом с восстановленной записью:
 			// клиент увидит трек без повторной загрузки.
 			q.succeedRestore(job, existing.ID)
-			return
+			return nil, true
 		}
 		// Дубль по хэшу: запись не создаём, файл удаляем. Сообщение не
 		// раскрывает путь к существующему файлу.
-		q.fail(job, errDuplicateUpload, "File already exists")
-		return
+		q.failDuplicateUpload(job)
+		return nil, true
 	}
 
 	title, year := metadata.ParseFilename(job.filename)
@@ -362,20 +658,31 @@ func (q *UploadQueue) process(job *UploadJob) {
 
 	if err := q.media.Create(ctx, media); err != nil {
 		q.fail(job, err, "Failed to save media record")
-		return
+		return nil, true
 	}
 	// MediaID фиксируем сразу после Create: и отмена, и fail обязаны
 	// удалить созданную запись, даже если задание оборвётся на этапе
-	// метаданных/превью.
+	// метаданных/превью. Строка в БД — сразу же, чтобы рестарт подхватил
+	// связь и не счёл собственную запись чужым дублем.
 	q.mu.Lock()
 	job.MediaID = media.ID
 	cancelled := job.Status == uploadJobCancelled
 	res := snapshotJobLocked(job)
 	q.mu.Unlock()
+	q.saveStatus(job)
 	if cancelled {
 		q.cleanupJobResources(res)
-		return
+		return nil, true
 	}
+
+	return media, false
+}
+
+// continueWithMedia доводит запись до done: ffprobe-метаданные,
+// превью/обложка, pHash-дедуп. Общая для свежих и поднятых после краха
+// заданий (у поднятых запись уже есть — своя же, см. process).
+func (q *UploadQueue) continueWithMedia(job *UploadJob, media *models.Media) {
+	ctx := q.ctx
 
 	// ffprobe-метаданные (длительность, теги). Сбой экстракции не роняет
 	// задание: файл может не иметь тегов или быть обрезанным — запись
@@ -479,19 +786,22 @@ func (q *UploadQueue) process(job *UploadJob) {
 	job.MediaID = media.ID
 	job.Error = ""
 	q.mu.Unlock()
+	q.saveStatus(job)
 }
 
 // succeedRestore завершает джобу успехом на восстановленной из корзины
 // записи: метаданные/обложки уже в БД и на диске, делать нечего.
 func (q *UploadQueue) succeedRestore(job *UploadJob, mediaID uint) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	if job.Status == uploadJobCancelled {
+		q.mu.Unlock()
 		return
 	}
 	job.Status = UploadJobDone
 	job.MediaID = mediaID
 	job.Error = ""
+	q.mu.Unlock()
+	q.saveStatus(job)
 }
 
 // duplicate завершает задание статусом duplicate: новая запись, файл и
@@ -507,7 +817,15 @@ func (q *UploadQueue) duplicate(job *UploadJob, similar *models.Media) {
 	job.duplicateMediaID = similar.ID
 	job.duplicateTitle = similar.Title
 	res := snapshotJobLocked(job)
+	duplicateMediaID, duplicateTitle := job.duplicateMediaID, job.duplicateTitle
+	jobID := job.ID
 	q.mu.Unlock()
+
+	if q.tasks != nil {
+		if err := q.tasks.SetDuplicate(context.Background(), jobID, duplicateMediaID, duplicateTitle); err != nil {
+			log.Printf("upload queue: save duplicate %d: %v", jobID, err)
+		}
+	}
 
 	q.cleanupJobResources(res)
 	log.Printf("upload queue: job %d duplicate of media %d (%s)", job.ID, similar.ID, similar.Title)
@@ -561,10 +879,23 @@ func (q *UploadQueue) fail(job *UploadJob, err error, errMsg string) {
 		log.Printf("upload queue: job %d already cancelled, ignoring failure: %v", job.ID, err)
 		return
 	}
+	// Остановка очереди (SIGTERM при рестарте): терминальный error не
+	// пишем, иначе управляемый рестарт терял бы задание вопреки контракту
+	// recovery (поднимаются только queued/processing). Возвращаем в queued —
+	// следующий старт подхватит задание как после краха.
+	if q.ctx.Err() != nil {
+		job.Status = UploadJobQueued
+		job.Error = ""
+		q.mu.Unlock()
+		q.saveStatus(job)
+		log.Printf("upload queue: job %d requeued on shutdown", job.ID)
+		return
+	}
 	job.Status = UploadJobError
 	job.Error = errMsg
 	res := snapshotJobLocked(job)
 	q.mu.Unlock()
+	q.saveStatus(job)
 
 	// Файловый I/O и удаление записи — вне q.mu (см. Cancel).
 	q.cleanupJobResources(res)
@@ -587,45 +918,58 @@ func (q *UploadQueue) sweepLoop() {
 	}
 }
 
-// sweep удаляет терминальные (done/error) задания старше uploadJobTTL.
-// Активные (queued/processing) не трогаются независимо от возраста.
-// Если после этого карта всё ещё больше maxKeptJobs, удаляются старейшие
-// терминальные — карта не может расти бесконечно даже при интенсивных
-// загрузках.
+// sweep удаляет терминальные (done/error/duplicate) задания старше
+// uploadJobTTL. Активные (queued/processing) не трогаются независимо
+// от возраста. Если после этого карта всё ещё больше maxKeptJobs,
+// удаляются старейшие терминальные — карта не может расти бесконечно
+// даже при интенсивных загрузках. Выметенные строки удаляются и из БД.
 func (q *UploadQueue) sweep() {
 	type agedJob struct {
 		id        uint64
 		createdAt time.Time
 	}
 
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	var evicted []uint64
+	func() {
+		q.mu.Lock()
+		defer q.mu.Unlock()
 
-	now := time.Now()
-	for id, job := range q.jobs {
-		if job.Status == UploadJobQueued || job.Status == UploadJobProcessing {
-			continue
+		now := time.Now()
+		for id, job := range q.jobs {
+			if job.Status == UploadJobQueued || job.Status == UploadJobProcessing {
+				continue
+			}
+			if now.Sub(job.createdAt) > uploadJobTTL {
+				delete(q.jobs, id)
+				evicted = append(evicted, id)
+			}
 		}
-		if now.Sub(job.createdAt) > uploadJobTTL {
-			delete(q.jobs, id)
-		}
-	}
 
-	if len(q.jobs) <= maxKeptJobs {
+		if len(q.jobs) <= maxKeptJobs {
+			return
+		}
+		var terminal []agedJob
+		for id, job := range q.jobs {
+			if job.Status != UploadJobQueued && job.Status != UploadJobProcessing {
+				terminal = append(terminal, agedJob{id: id, createdAt: job.createdAt})
+			}
+		}
+		sort.Slice(terminal, func(i, j int) bool {
+			return terminal[i].createdAt.Before(terminal[j].createdAt)
+		})
+		overflow := len(q.jobs) - maxKeptJobs
+		for i := 0; i < overflow && i < len(terminal); i++ {
+			delete(q.jobs, terminal[i].id)
+			evicted = append(evicted, terminal[i].id)
+		}
+	}()
+	if q.tasks == nil {
 		return
 	}
-	var terminal []agedJob
-	for id, job := range q.jobs {
-		if job.Status != UploadJobQueued && job.Status != UploadJobProcessing {
-			terminal = append(terminal, agedJob{id: id, createdAt: job.createdAt})
+	for _, id := range evicted {
+		if err := q.tasks.Delete(context.Background(), id); err != nil {
+			log.Printf("upload queue: delete swept job %d: %v", id, err)
 		}
-	}
-	sort.Slice(terminal, func(i, j int) bool {
-		return terminal[i].createdAt.Before(terminal[j].createdAt)
-	})
-	overflow := len(q.jobs) - maxKeptJobs
-	for i := 0; i < overflow && i < len(terminal); i++ {
-		delete(q.jobs, terminal[i].id)
 	}
 }
 

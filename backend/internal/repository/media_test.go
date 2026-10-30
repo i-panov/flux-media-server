@@ -272,6 +272,37 @@ func TestMediaStore_FindByPathPrefixLikeEscaping(t *testing.T) {
 	assert.Equal(t, "/data/my-media/b.mkv", list[0].FilePath)
 }
 
+// FindByPathPrefix обязан держать границу каталога: префикс /a/b
+// не должен захватывать сиблинга /a/b2/c, иначе sweep при скане
+// одной библиотеки сносил бы записи соседней.
+func TestMediaStore_FindByPathPrefixSiblingDir(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, &models.Media{
+		Title: "Inside", Type: models.MediaTypeVideo, FilePath: "/a/b/c.mkv",
+	}))
+	require.NoError(t, store.Create(ctx, &models.Media{
+		Title: "Sibling", Type: models.MediaTypeVideo, FilePath: "/a/b2/c.mkv",
+	}))
+
+	list, total, err := store.FindByPathPrefix(ctx, "/a/b", 10, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, list, 1)
+	assert.Equal(t, "/a/b/c.mkv", list[0].FilePath)
+
+	// Висячий слеш у префикса — то же множество.
+	list, total, err = store.FindByPathPrefix(ctx, "/a/b/", 10, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, list, 1)
+}
+
 // Update с Metadata должен сохранять ассоциацию (upsert) и проставлять
 // metadata_id — контракт сохранён от старого Save(media).
 func TestMediaStore_UpdateMetadataAssociation(t *testing.T) {

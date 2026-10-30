@@ -816,7 +816,8 @@ func (q *ExtractService) fail(job *ExtractJob, err error, errMsg string) {
 	log.Printf("extract queue: job %d failed: %v", job.ID, err)
 }
 
-// cleanupJob удаляет файл и запись Media. Идемпотентна.
+// cleanupJob удаляет файл, запись Media (purge, а не корзина — файл уже
+// стёрт, восстанавливать нечего) и превью/обложки. Идемпотентна.
 func (q *ExtractService) cleanupJob(filePath string, mediaID uint) {
 	if filePath != "" {
 		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
@@ -824,10 +825,13 @@ func (q *ExtractService) cleanupJob(filePath string, mediaID uint) {
 		}
 	}
 	if mediaID != 0 {
-		if err := q.media.Delete(context.Background(), mediaID); err != nil {
+		if err := q.media.PurgeMedia(context.Background(), mediaID); err != nil {
 			log.Printf("extract queue: delete media %d: %v", mediaID, err)
 		}
 		q.thumbSvc.RemoveCovers(mediaID)
+		if err := os.Remove(q.thumbSvc.GetPath(mediaID)); err != nil && !os.IsNotExist(err) {
+			log.Printf("extract queue: remove thumb %d: %v", mediaID, err)
+		}
 	}
 }
 

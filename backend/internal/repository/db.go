@@ -120,6 +120,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.Artist{},
 		&models.TranscodeTask{},
 		&models.ExtractTask{},
+		&models.UploadTask{},
 		&models.Subtitle{},
 	)
 }

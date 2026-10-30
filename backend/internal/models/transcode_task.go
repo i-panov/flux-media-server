@@ -23,8 +23,9 @@ type TranscodeTask struct {
 	// Progress — 0..100, Speed — последний множитель скорости ffmpeg.
 	Progress int     `json:"progress"`
 	Speed    float64 `json:"speed"`
-	// ErrorMsg — хвост stderr ffmpeg для диагностики в админке.
-	// Пути ФС в API не уходят: сообщение формируется без них.
+	// ErrorMsg — обобщённое сообщение для диагностики в админке
+	// (например, "Failed to normalize file"). Детали с путями ФС
+	// уходят только в лог — в API их нет.
 	ErrorMsg string `gorm:"type:text" json:"error,omitempty"`
 	Attempts int    `json:"attempts"`
 	// MediaID — созданная запись результата, 0 пока не готово.

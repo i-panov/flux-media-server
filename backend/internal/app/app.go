@@ -214,6 +214,14 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	if cfg.Transcode.CRF != nil {
 		crf = *cfg.Transcode.CRF
 	}
+	// Дефолты read-бюджета: тесты обходят config.Load, где живут основные
+	// дефолты, поэтому здесь те же значения через общие константы.
+	if cfg.RateLimiter.ReadMax == 0 {
+		cfg.RateLimiter.ReadMax = config.DefaultReadMax
+	}
+	if cfg.RateLimiter.ReadExpiration == 0 {
+		cfg.RateLimiter.ReadExpiration = config.DefaultReadExpiration
+	}
 
 	// Очередь нормализации видео: один воркер (ffmpeg тяжёлый),
 	// задания в БД (переживают рестарт).
@@ -244,7 +252,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	// Фоновая очередь обработки загрузок: POST /upload сохраняет файл и
 	// отвечает 202, хэш/ffprobe/ffmpeg выполняют воркеры очереди.
-	uploadQueue := services.NewUploadQueue(context.Background(), mediaRepo, thumbSvc,
+	// Строки заданий персистентны: рестарт поднимает незавершённые
+	// обратно в очередь.
+	uploadQueue := services.NewUploadQueue(context.Background(), mediaRepo, repository.NewUploadTaskRepository(db), thumbSvc,
 		services.DefaultUploadQueueWorkers, services.DefaultUploadQueueLimit)
 
 	// File watcher for automatic library monitoring.
@@ -475,6 +485,25 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 
+	// Read limiter — отдельный щедрый инстанс для чтений/стримов: плеер
+	// при сиках шлёт десятки range-запросов подряд, а списки/обложки/
+	// сабы/прогресс опрашиваются постоянно — строгий бюджет 10/мин
+	// (auth/upload/extract) их бы душил. Один токен без лимита даёт
+	// неограниченный обход всей библиотеки, поэтому чтения лимитируем
+	// отдельно, а не оставляем открытыми.
+	readRateLimiter := limiter.New(limiter.Config{
+		Max:        cfg.RateLimiter.ReadMax,
+		Expiration: time.Duration(cfg.RateLimiter.ReadExpiration) * time.Second,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return getClientIP(c)
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
+
 	// Public auth routes. All of them are rate-limited: verify-code without a
 	// limiter would allow brute-forcing the 6-digit OTP within its TTL.
 	auth := fiberApp.Group("/api/auth")
@@ -493,8 +522,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	// Админка хранилища: диск, карантин оригиналов, ретрай заданий.
 	admin := api.Group("/admin", requireAdmin)
-	admin.Get("/storage", adminHandler.StorageInfo)
-	admin.Get("/originals", adminHandler.OriginalsList)
+	admin.Get("/storage", readRateLimiter, adminHandler.StorageInfo)
+	admin.Get("/originals", readRateLimiter, adminHandler.OriginalsList)
 	admin.Get("/originals/:name/download", uploadRateLimiter, adminHandler.OriginalDownload)
 	admin.Delete("/originals/:name", adminHandler.OriginalDelete)
 	admin.Post("/transcodes/:id/retry", adminHandler.TranscodeRetry)
@@ -502,9 +531,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media := api.Group("/media")
 	// /bulk регистрируем ДО /:id — статический путь имеет приоритет
 	// в fiber, но явный порядок исключает сюрпризы при рефакторинге.
-	media.Get("/bulk", mediaHandler.Bulk)
-	media.Get("", mediaHandler.List)
-	media.Get("/:id", mediaHandler.Get)
+	media.Get("/bulk", readRateLimiter, mediaHandler.Bulk)
+	media.Get("", readRateLimiter, mediaHandler.List)
+	media.Get("/:id", readRateLimiter, mediaHandler.Get)
 	media.Post("", requireAdmin, mediaHandler.Create)
 	media.Post(uploadRouteSuffix, requireAdmin, uploadRateLimiter, uploadHandler.Upload)
 	media.Get("/uploads/:id", requireAdmin, uploadHandler.UploadStatus)
@@ -515,8 +544,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Get("/transcodes/:id", requireAdmin, transcodeHandler.TranscodeStatus)
 	media.Delete("/transcodes/:id", requireAdmin, transcodeHandler.TranscodeCancel)
 	// Субтитры: список дорожек и WebVTT-файлы (как превью — всем).
-	media.Get("/:id/subs", subsHandler.ListSubs)
-	media.Get("/:id/subs/:lang", subsHandler.ServeSub)
+	media.Get("/:id/subs", readRateLimiter, subsHandler.ListSubs)
+	media.Get("/:id/subs/:lang", readRateLimiter, subsHandler.ServeSub)
 	// Извлечение аудио: POST ставит джоб (202) или сразу отдаёт готовый
 	// трек (200); статусы — той же формы, что у загрузок. Тяжёлый лимитер
 	// тот же, что у загрузок: ffmpeg жрёт CPU не меньше multipart-парсинга.
@@ -527,39 +556,39 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Put("/:id", requireAdmin, mediaHandler.Update)
 	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
-	media.Get("/:id/stream", mediaHandler.Stream)
-	media.Get("/:id/thumb", thumbHandler.Get)
-	media.Get("/:id/cover", thumbHandler.GetCover)
+	media.Get("/:id/stream", readRateLimiter, mediaHandler.Stream)
+	media.Get("/:id/thumb", readRateLimiter, thumbHandler.Get)
+	media.Get("/:id/cover", readRateLimiter, thumbHandler.GetCover)
 	media.Put("/:id"+coverRouteSuffix, requireAdmin, thumbHandler.UploadCover)
 
 	progress := api.Group("/progress")
-	progress.Get("", progressHandler.List)
-	progress.Get("/:mediaId", progressHandler.GetOne)
+	progress.Get("", readRateLimiter, progressHandler.List)
+	progress.Get("/:mediaId", readRateLimiter, progressHandler.GetOne)
 	progress.Put("/:mediaId", progressHandler.Update)
 	progress.Delete("/:mediaId", progressHandler.Delete)
 
 	metadataGroup := api.Group("/metadata")
-	metadataGroup.Get("/search", metadataHandler.Search)
+	metadataGroup.Get("/search", readRateLimiter, metadataHandler.Search)
 	metadataGroup.Post("/:mediaId/refresh", requireAdmin, metadataHandler.Refresh)
 	metadataGroup.Put("/:mediaId", requireAdmin, metadataHandler.Update)
 
 	// Favorites
 	api.Post("/media/:id/favorite", favoriteHandler.AddFavorite)
 	api.Delete("/media/:id/favorite", favoriteHandler.RemoveFavorite)
-	api.Get("/favorites", favoriteHandler.ListFavorites)
+	api.Get("/favorites", readRateLimiter, favoriteHandler.ListFavorites)
 	api.Post("/favorites/artist", favoriteHandler.AddArtistFavorite)
 	api.Delete("/favorites/artist", favoriteHandler.RemoveArtistFavorite)
 
 	// Artists
 	artist := api.Group("/artists")
-	artist.Get("", artistHandler.List)
+	artist.Get("", readRateLimiter, artistHandler.List)
 	artist.Put("/:id", requireAdmin, artistHandler.Update)
 	artist.Post("/:id/cover", requireAdmin, artistHandler.UploadCover)
-	artist.Get("/:id/cover", artistHandler.GetCover)
+	artist.Get("/:id/cover", readRateLimiter, artistHandler.GetCover)
 
 	// Collections
 	api.Post("/collections", collectionHandler.Create)
-	api.Get("/collections", collectionHandler.List)
+	api.Get("/collections", readRateLimiter, collectionHandler.List)
 	api.Put("/collections/:id", collectionHandler.Update)
 	api.Delete("/collections/:id", collectionHandler.Delete)
 	api.Post("/collections/:id/items", collectionHandler.AddItem)
@@ -570,13 +599,13 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Post("/collections/:id/items/move/bulk", collectionHandler.MoveItemsBulk)
 	api.Delete("/collections/:id/items", collectionHandler.RemoveItemsBulk)
 	api.Delete("/collections/:id/items/:mediaId", collectionHandler.RemoveItem)
-	api.Get("/collections/:id/items", collectionHandler.ListItems)
-	api.Get("/collections/:id/stats", trashHandler.Stats)
+	api.Get("/collections/:id/items", readRateLimiter, collectionHandler.ListItems)
+	api.Get("/collections/:id/stats", readRateLimiter, trashHandler.Stats)
 
 	// Trash — корзина: плоский список, восстановление, снос навсегда.
 	// Медиа-ветки и Empty — под requireAdmin, как media.Delete/:id:
 	// медиа глобальные, чужое сносить/возвращать нельзя.
-	api.Get("/trash", trashHandler.List)
+	api.Get("/trash", readRateLimiter, trashHandler.List)
 	api.Delete("/trash", requireAdmin, trashHandler.Empty)
 	api.Post("/trash/media/:id/restore", requireAdmin, trashHandler.RestoreMedia)
 	api.Delete("/trash/media/:id", requireAdmin, trashHandler.PurgeMedia)
@@ -584,7 +613,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Delete("/trash/collections/:id", trashHandler.PurgeCollection)
 
 	// Lyrics
-	api.Get("/media/:id/lyrics", lyricsHandler.GetLyrics)
+	api.Get("/media/:id/lyrics", readRateLimiter, lyricsHandler.GetLyrics)
 	api.Put("/media/:id/lyrics", requireAdmin, lyricsHandler.UpsertLyrics)
 
 	// Веб-клиент: same-origin раздача web/dist (SPA) — последним

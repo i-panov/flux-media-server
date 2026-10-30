@@ -66,3 +66,20 @@ func TestTranscodeCancelConflict(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
 }
+
+func TestTranscodeZeroIDIsBadRequest(t *testing.T) {
+	stub := &stubTranscodeQueue{statusOK: true}
+	app := fiber.New()
+	handler := handlers.NewTranscodeHandler(nil, stub)
+	app.Get("/api/media/transcodes/:id", handler.TranscodeStatus)
+	app.Delete("/api/media/transcodes/:id", handler.TranscodeCancel)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/media/transcodes/0", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+	resp, err = app.Test(httptest.NewRequest("DELETE", "/api/media/transcodes/0", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+	assert.Empty(t, stub.cancelled, "валидация обязана отсечь 0 до вызова очереди")
+}

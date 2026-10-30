@@ -819,6 +819,13 @@ func DetermineMediaType(filePath string) models.MediaType {
 		return models.MediaTypeImage
 	}
 
+	// Голое имя без директории (несохранённый аплоад из хендлера):
+	// пробовать ffprobe не на чем — сразу fallback по расширению,
+	// без заведомо провальной пробы и лог-спама.
+	if filepath.Dir(filePath) == "." {
+		return determineMediaTypeByExt(filePath)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

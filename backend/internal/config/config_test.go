@@ -110,6 +110,10 @@ auth:
 	assert.Equal(t, 300, cfg.Auth.CodeExpiry)
 	assert.Equal(t, 1, cfg.Auth.JWTExpiry)
 	assert.Equal(t, 10000, cfg.Auth.MaxOTPEntries)
+	assert.Equal(t, 10, cfg.RateLimiter.Max)
+	assert.Equal(t, int64(60), cfg.RateLimiter.Expiration)
+	assert.Equal(t, 600, cfg.RateLimiter.ReadMax)
+	assert.Equal(t, int64(60), cfg.RateLimiter.ReadExpiration)
 	assert.True(t, cfg.Auth.SMTP.RequireTLS != nil && *cfg.Auth.SMTP.RequireTLS,
 		"require_tls по умолчанию должен быть true (защита от plaintext)")
 	assert.Equal(t, "./data/originals", cfg.Storage.OriginalsDir)
@@ -121,6 +125,32 @@ auth:
 	assert.Equal(t, 1080, cfg.Transcode.MaxHeight)
 	assert.Equal(t, 1.5, cfg.Transcode.EstimateFactor)
 	assert.Equal(t, 3, cfg.Transcode.MaxAttempts)
+}
+
+func TestLoadConfigReadRateLimiter(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+database:
+  path: "./test.db"
+auth:
+  jwt_secret: "test-secret-that-is-at-least-32-chars"
+rate_limiter:
+  max: 10
+  expiration: 60
+  read_max: 600
+  read_expiration: 30
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := Load(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, 10, cfg.RateLimiter.Max)
+	assert.Equal(t, int64(60), cfg.RateLimiter.Expiration)
+	assert.Equal(t, 600, cfg.RateLimiter.ReadMax)
+	assert.Equal(t, int64(30), cfg.RateLimiter.ReadExpiration)
 }
 
 func TestLoadConfigExplicitInsecureSMTPAllowed(t *testing.T) {
@@ -241,6 +271,16 @@ func TestLoadConfigInvalidValues(t *testing.T) {
 			name:    "negative rate_limiter.max",
 			yaml:    "rate_limiter:\n  max: -1\n",
 			errPart: "rate_limiter.max",
+		},
+		{
+			name:    "negative rate_limiter.read_max",
+			yaml:    "rate_limiter:\n  read_max: -1\n",
+			errPart: "rate_limiter.read_max",
+		},
+		{
+			name:    "negative rate_limiter.read_expiration",
+			yaml:    "rate_limiter:\n  read_expiration: -1\n",
+			errPart: "rate_limiter.read_expiration",
 		},
 		{
 			name:    "bad transcode preset",

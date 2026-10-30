@@ -236,7 +236,10 @@ func (r *MediaStore) FindByPathPrefix(ctx context.Context, prefix string, limit,
 	// Экранируем спецсимволы LIKE в префиксе: неэкранированное «_» матчит
 	// любой символ, и sweep при скане одной библиотеки мог удалить записи
 	// соседней с похожим путём (например, /data/my_media vs /data/my-media).
-	query := r.db.WithContext(ctx).Where("file_path LIKE ? ESCAPE '\\'", escapeLike(prefix)+"%").Model(&models.Media{})
+	// Граница каталога обязательна: без неё префикс /data/media матчит и
+	// сиблинга /data/media2/x (LIKE "%" после голого префикса).
+	cleaned := strings.TrimSuffix(prefix, "/")
+	query := r.db.WithContext(ctx).Where("file_path LIKE ? ESCAPE '\\'", escapeLike(cleaned)+"/%").Model(&models.Media{})
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -512,7 +515,7 @@ func (r *MediaStore) PurgeMedia(ctx context.Context, id uint) error {
 			return err
 		}
 		if err := cascadeDelete(tx, "media_id", id,
-			&models.Favorite{}, &models.WatchProgress{}, &models.Lyrics{},
+			&models.Favorite{}, &models.WatchProgress{}, &models.Lyrics{}, &models.Subtitle{},
 			&models.CollectionItem{}, &models.MediaArtist{}); err != nil {
 			return err
 		}

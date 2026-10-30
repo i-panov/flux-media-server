@@ -359,6 +359,36 @@ func TestMetadataHandler_UpdateSourceURLEdgeCases(t *testing.T) {
 	resp.Body.Close()
 }
 
+func TestMetadataHandler_UpdatePosterURLValidation(t *testing.T) {
+	// Валидный https-постер принимается и нормализуется (trim).
+	app := setupMetadataTestApp(t)
+	resp := putMetadata(t, app, map[string]interface{}{
+		"poster_url": "  https://image.tmdb.org/t/p/w500/abc.jpg  ",
+	})
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	decoded := decodeMedia(t, resp)
+	assert.Equal(t, "https://image.tmdb.org/t/p/w500/abc.jpg", decoded["metadata"].(map[string]interface{})["poster_url"])
+
+	// Мусор, не-http(s) схема и credentials — 400, как у source_url.
+	for _, raw := range []string{
+		"not a url",
+		"ftp://example.com/p.jpg",
+		"javascript:alert(1)",
+		"http://user:pass@example.com/p.jpg",
+		"/relative/path.jpg",
+	} {
+		r := putMetadata(t, app, map[string]interface{}{"poster_url": raw})
+		assert.Equal(t, fiber.StatusBadRequest, r.StatusCode, "raw %q", raw)
+		r.Body.Close()
+	}
+
+	// Пустая строка стирает постер, а не игнорируется.
+	resp = putMetadata(t, app, map[string]interface{}{"poster_url": "   "})
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	decoded = decodeMedia(t, resp)
+	assert.Equal(t, "", decoded["metadata"].(map[string]interface{})["poster_url"])
+}
+
 func TestMetadataHandler_UpdateErrorTexts(t *testing.T) {
 	app := setupMetadataTestApp(t)
 

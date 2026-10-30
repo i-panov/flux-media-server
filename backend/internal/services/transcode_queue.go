@@ -314,11 +314,20 @@ func (q *TranscodeQueue) Retry(id uint64) error {
 	return ErrTranscodeConflict
 }
 
-// RequeueInterrupted возвращает зависшие processing-задания в queued.
-// Вызывается один раз при старте: только этот процесс пишет строки,
-// значит processing — след упавшего воркера. Возвращает число строк.
+// RequeueInterrupted возвращает зависшие processing-задания в queued
+// и будит воркера: без wake подобранные задания ждали бы
+// transcodePollInterval. Вызывается один раз при старте: только этот
+// процесс пишет строки, значит processing — след упавшего воркера.
+// Возвращает число строк.
 func (q *TranscodeQueue) RequeueInterrupted(ctx context.Context) (int64, error) {
-	return q.tasks.ResetStuckProcessing(ctx, TranscodeTaskProcessing, TranscodeTaskQueued)
+	n, err := q.tasks.ResetStuckProcessing(ctx, TranscodeTaskProcessing, TranscodeTaskQueued)
+	if err != nil {
+		return n, err
+	}
+	if n > 0 {
+		q.wakeWorker()
+	}
+	return n, nil
 }
 
 // Stop останавливает воркера: отменяет контекст (прерывая текущий

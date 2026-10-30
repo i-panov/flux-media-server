@@ -201,6 +201,20 @@ type ExtractTaskRepository interface {
 	FindActiveBySource(ctx context.Context, sourceID uint, active ...string) (*models.ExtractTask, error)
 }
 
+// UploadTaskRepository defines data access methods for
+// UploadTask entities (фоновая обработка загрузок, переживает рестарт).
+type UploadTaskRepository interface {
+	Create(ctx context.Context, task *models.UploadTask) error
+	Get(ctx context.Context, id uint64) (*models.UploadTask, error)
+	SetStatus(ctx context.Context, id uint64, status, errMsg string, mediaID uint) error
+	SetFileHash(ctx context.Context, id uint64, fileHash string) error
+	SetDuplicate(ctx context.Context, id uint64, duplicateMediaID uint, duplicateTitle string) error
+	Delete(ctx context.Context, id uint64) error
+	FindUnfinished(ctx context.Context, active ...string) ([]models.UploadTask, error)
+	FindActiveByFilePath(ctx context.Context, filePath string, active ...string) (*models.UploadTask, error)
+	FindActiveByHash(ctx context.Context, hash string, active ...string) (*models.UploadTask, error)
+}
+
 // TranscodeTaskRepository defines data access methods for
 // TranscodeTask entities (нормализация видео из карантина).
 type TranscodeTaskRepository interface {

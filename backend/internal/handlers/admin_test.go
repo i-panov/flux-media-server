@@ -187,3 +187,11 @@ func TestAdminTranscodeRetryConflict(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
 }
+
+func TestAdminTranscodeRetryZeroIDIsBadRequest(t *testing.T) {
+	app, _, _, _, _ := setupAdminTestApp(t, 1)
+
+	resp, err := app.Test(httptest.NewRequest("POST", "/api/admin/transcodes/0/retry", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}

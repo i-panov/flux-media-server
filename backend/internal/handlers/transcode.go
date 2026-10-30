@@ -38,7 +38,7 @@ func NewTranscodeHandler(mediaRepo repository.MediaRepository, queue TranscodeQu
 // плюс прогресс/скорость/ETA.
 func (h *TranscodeHandler) TranscodeStatus(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-	if err != nil || id < 0 {
+	if err != nil || id <= 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 
@@ -53,7 +53,7 @@ func (h *TranscodeHandler) TranscodeStatus(c *fiber.Ctx) error {
 // TranscodeCancel отменяет задание нормализации.
 func (h *TranscodeHandler) TranscodeCancel(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-	if err != nil || id < 0 {
+	if err != nil || id <= 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 

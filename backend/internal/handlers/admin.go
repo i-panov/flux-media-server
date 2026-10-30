@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -157,7 +158,10 @@ func (h *AdminHandler) OriginalDownload(c *fiber.Ctx) error {
 	if err != nil || st.IsDir() {
 		return response.Error(c, fiber.StatusNotFound, "Original not found")
 	}
-	c.Set("Content-Disposition", "attachment; filename=\""+st.Name()+"\"")
+	// Кавычка в имени ломала бы заголовок (инъекция параметра) — меняем
+	// её только для заголовка, файл на диске не трогаем.
+	safeName := strings.ReplaceAll(st.Name(), `"`, "_")
+	c.Set("Content-Disposition", "attachment; filename=\""+safeName+"\"")
 	return c.SendFile(full)
 }
 
@@ -187,7 +191,7 @@ func (h *AdminHandler) OriginalDelete(c *fiber.Ctx) error {
 // TranscodeRetry возвращает failed-задание в очередь.
 func (h *AdminHandler) TranscodeRetry(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-	if err != nil || id < 0 {
+	if err != nil || id <= 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 

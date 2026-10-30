@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -593,4 +594,21 @@ func TestScannerDropsStalePreviewOnThumbnailFailure(t *testing.T) {
 	again, err := mediaRepo.FindByPath(ctx, imagePath)
 	require.NoError(t, err)
 	assert.Zero(t, again.PHash)
+}
+
+// TestDetermineMediaTypeBareFilenameFallback: голое имя без директории
+// (несохранённый аплоад из хендлера) сразу идёт в fallback по расширению:
+// проба ffprobe заведомо не на чем запускать, лога тоже быть не должно.
+func TestDetermineMediaTypeBareFilenameFallback(t *testing.T) {
+	var logs bytes.Buffer
+	orig := log.Writer()
+	log.SetOutput(&logs)
+	defer log.SetOutput(orig)
+
+	assert.Equal(t, models.MediaTypeAudio, services.DetermineMediaType("song.mp3"))
+	assert.Equal(t, models.MediaTypeImage, services.DetermineMediaType("meme.png"))
+	assert.Equal(t, models.MediaTypeVideo, services.DetermineMediaType("film.mkv"))
+	assert.Equal(t, models.MediaTypeVideo, services.DetermineMediaType("noext"))
+
+	assert.Empty(t, logs.String(), "fallback по голому имени обязан быть тихим")
 }

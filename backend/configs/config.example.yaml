@@ -61,6 +61,15 @@ scanner:
   interval: 30
   watch_enabled: true  # auto-scan libraries on file system changes
 
+rate_limiter:
+  # Auth/upload/extract: строгий бюджет (OTP-брутфорс, multipart, ffmpeg).
+  max: 10
+  expiration: 60  # seconds
+  # Чтения/стримы: щедрый отдельный бюджет — плеер при сиках шлёт
+  # десятки range-запросов, общий бюджет 10/мин его бы душил.
+  read_max: 600
+  read_expiration: 60  # seconds
+
 media:
   thumbnail_path: "./data/thumbnails"
   video_path: "./data/video"

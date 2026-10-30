@@ -66,7 +66,7 @@ func setupUploadTest(t *testing.T, workers, queueLimit int) (*fiber.App, reposit
 		TempDir:      filepath.Join(tempDir, "tmp"),
 	}
 	require.NoError(t, os.MkdirAll(storageCfg.TempDir, 0755))
-	queue := services.NewUploadQueue(context.Background(), mediaRepo, thumbSvc, workers, queueLimit)
+	queue := services.NewUploadQueue(context.Background(), mediaRepo, repository.NewUploadTaskRepository(db), thumbSvc, workers, queueLimit)
 	stub := &stubTranscodeQueue{}
 	cfg := handlers.UploadConfig{
 		MaxFileSize: 10 * 1024 * 1024,
@@ -328,6 +328,15 @@ func TestUploadStatusNotFound(t *testing.T) {
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 
 	resp, err = app.Test(httptest.NewRequest("GET", "/api/media/uploads/not-a-number", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+	// Нулевой ID — тоже 400 (автоинкремент начинается с 1), а не 404.
+	resp, err = app.Test(httptest.NewRequest("GET", "/api/media/uploads/0", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+
+	resp, err = app.Test(httptest.NewRequest("DELETE", "/api/media/uploads/0", nil))
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 }

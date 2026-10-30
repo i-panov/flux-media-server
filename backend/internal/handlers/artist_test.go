@@ -166,6 +166,50 @@ func TestArtistCover(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
+// Загрузка обложки несуществующему артисту — 404, файл не создаётся.
+func TestArtistUploadCoverMissingArtist(t *testing.T) {
+	app, _, coverDir := testArtistHandler(t)
+
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	fw, err := w.CreateFormFile("cover", "cover.png")
+	require.NoError(t, err)
+	_, err = fw.Write([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4})
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/artists/999/cover", &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	resp.Body.Close()
+
+	files, err := filepath.Glob(filepath.Join(coverDir, "artist_999.*"))
+	require.NoError(t, err)
+	assert.Empty(t, files)
+}
+
+// Подмена содержимого: расширение png, внутри мусор — 400.
+func TestArtistUploadCoverRejectsBadContent(t *testing.T) {
+	app, _, _ := testArtistHandler(t)
+
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	fw, err := w.CreateFormFile("cover", "cover.png")
+	require.NoError(t, err)
+	_, err = fw.Write([]byte("this is not an image at all........"))
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/artists/1/cover", &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	resp.Body.Close()
+}
+
 func TestArtistListHasCover(t *testing.T) {
 	app, _, coverDir := testArtistHandler(t)
 

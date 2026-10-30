@@ -971,3 +971,53 @@ func TestTranscodeCancelBetweenHashAndSave(t *testing.T) {
 	assert.Equal(t, TranscodeTaskCancelled, task.Status)
 	assert.Equal(t, 0, task.Attempts, "no spurious requeue after lost race")
 }
+
+// TestTranscodeRequeueInterruptedWakesWorker: после подбора зависших
+// processing-заданий очередь будит воркера — обработка начинается сразу,
+// а не через transcodePollInterval.
+func TestTranscodeRequeueInterruptedWakesWorker(t *testing.T) {
+	runner := &fakeTranscodeRunner{}
+	env := setupTranscodeTest(t, runner, false)
+	env.queue.Stop()
+	// Сливаем возможные pending-сигналы, чтобы assert ниже видел
+	// именно сигнал RequeueInterrupted.
+	select {
+	case <-env.queue.wake:
+	default:
+	}
+
+	task := &models.TranscodeTask{SourcePath: "/gone/missing.mp4", Filename: "missing.mp4", Status: TranscodeTaskProcessing}
+	require.NoError(t, env.tasks.Create(context.Background(), task))
+
+	n, err := env.queue.RequeueInterrupted(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), n)
+
+	select {
+	case <-env.queue.wake:
+	default:
+		t.Fatal("RequeueInterrupted обязан будить воркера")
+	}
+}
+
+// TestTranscodeRequeueInterruptedNoWakeWhenEmpty: без зависших заданий
+// будить некого — лишнего сигнала в канале нет.
+func TestTranscodeRequeueInterruptedNoWakeWhenEmpty(t *testing.T) {
+	runner := &fakeTranscodeRunner{}
+	env := setupTranscodeTest(t, runner, false)
+	env.queue.Stop()
+	select {
+	case <-env.queue.wake:
+	default:
+	}
+
+	n, err := env.queue.RequeueInterrupted(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), n)
+
+	select {
+	case <-env.queue.wake:
+		t.Fatal("без зависших заданий wake-сигнала быть не должно")
+	default:
+	}
+}

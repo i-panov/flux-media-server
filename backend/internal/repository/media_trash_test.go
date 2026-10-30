@@ -91,3 +91,25 @@ func TestMediaStore_PurgeRemovesMetadata(t *testing.T) {
 	require.NoError(t, db.Model(&models.Metadata{}).Count(&left).Error)
 	assert.Zero(t, left, "metadata-сироты после purge нет")
 }
+
+// Purge сносит и строки subtitles (FK-каскада нет на старых БД,
+// как и у Lyrics — чистим вручную в том же стиле).
+func TestMediaStore_PurgeRemovesSubtitles(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	m := &models.Media{Title: "M", Type: models.MediaTypeVideo, FilePath: "/m.mkv"}
+	require.NoError(t, store.Create(ctx, m))
+	require.NoError(t, db.Create(&models.Subtitle{MediaID: m.ID, Lang: "en", Path: "/m.en.vtt"}).Error)
+	require.NoError(t, db.Create(&models.Lyrics{MediaID: m.ID, LyricsText: "la"}).Error)
+
+	require.NoError(t, store.PurgeMedia(ctx, m.ID))
+
+	var subs int64
+	require.NoError(t, db.Model(&models.Subtitle{}).Where("media_id = ?", m.ID).Count(&subs).Error)
+	assert.Zero(t, subs, "subtitles-сироты после purge нет")
+}

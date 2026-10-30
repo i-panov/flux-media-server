@@ -286,7 +286,7 @@ func saveUploadExclusive(c *fiber.Ctx, fileHeader *multipart.FileHeader, dir, fi
 // (старое поведение — без изменений), затем транскод.
 func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-	if err != nil || id < 0 {
+	if err != nil || id <= 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 
@@ -331,7 +331,7 @@ func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 // Задания транскода отменяются тем же путём (fallback, как в статусе).
 func (h *UploadHandler) CancelUpload(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-	if err != nil || id < 0 {
+	if err != nil || id <= 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 

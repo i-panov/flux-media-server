@@ -69,9 +69,18 @@ type ScannerConfig struct {
 }
 
 type RateLimiterConfig struct {
-	Max        int   `yaml:"max"`
-	Expiration int64 `yaml:"expiration"` // in seconds
+	Max            int   `yaml:"max"`
+	Expiration     int64 `yaml:"expiration"` // in seconds
+	ReadMax        int   `yaml:"read_max"`
+	ReadExpiration int64 `yaml:"read_expiration"` // in seconds
 }
+
+// Дефолты read-бюджета: используются в Load и в app.New (тесты обходят
+// Load, поэтому дефолты продублированы там же — через эти константы).
+const (
+	DefaultReadMax        = 600
+	DefaultReadExpiration = 60
+)
 
 type MediaConfig struct {
 	ThumbnailPath string `yaml:"thumbnail_path"`
@@ -184,6 +193,12 @@ func Load(path string) (*Config, error) {
 	if cfg.RateLimiter.Expiration == 0 {
 		cfg.RateLimiter.Expiration = 60
 	}
+	if cfg.RateLimiter.ReadMax == 0 {
+		cfg.RateLimiter.ReadMax = DefaultReadMax
+	}
+	if cfg.RateLimiter.ReadExpiration == 0 {
+		cfg.RateLimiter.ReadExpiration = DefaultReadExpiration
+	}
 	if cfg.Storage.OriginalsDir == "" {
 		cfg.Storage.OriginalsDir = "./data/originals"
 	}
@@ -235,6 +250,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.RateLimiter.Max <= 0 {
 		return nil, fmt.Errorf("rate_limiter.max must be > 0, got %d", cfg.RateLimiter.Max)
+	}
+	if cfg.RateLimiter.ReadMax <= 0 {
+		return nil, fmt.Errorf("rate_limiter.read_max must be > 0, got %d", cfg.RateLimiter.ReadMax)
+	}
+	if cfg.RateLimiter.ReadExpiration <= 0 {
+		return nil, fmt.Errorf("rate_limiter.read_expiration must be > 0, got %d", cfg.RateLimiter.ReadExpiration)
 	}
 	crf := 0
 	if cfg.Transcode.CRF != nil {

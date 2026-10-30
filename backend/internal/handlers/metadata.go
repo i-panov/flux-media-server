@@ -121,6 +121,21 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		sourceURL = &normalized
 	}
 
+	// Постер валидируем тем же валидатором, что source_url: http(s),
+	// без credentials. Пустая строка — валидное «очистить».
+	var posterURL *string
+	if req.PosterURL != nil {
+		normalized, err := metadata.NormalizeSourceURL(*req.PosterURL)
+		if err != nil {
+			msg := "Invalid poster_url: must be an http(s) URL"
+			if errors.Is(err, metadata.ErrSourceURLTooLong) {
+				msg = "Invalid poster_url: too long (max 2048 characters)"
+			}
+			return response.Error(c, fiber.StatusBadRequest, msg)
+		}
+		posterURL = &normalized
+	}
+
 	if req.Title != nil {
 		media.Title = *req.Title
 	}
@@ -154,7 +169,7 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		media.Metadata = &models.Metadata{}
 	}
 	if req.PosterURL != nil {
-		media.Metadata.PosterURL = *req.PosterURL
+		media.Metadata.PosterURL = *posterURL
 	}
 	if req.Rating != nil {
 		if *req.Rating < 0 || *req.Rating > 10 {

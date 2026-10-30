@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -157,6 +158,10 @@ func (h *ArtistHandler) UploadCover(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid artist id")
 	}
 
+	if _, err := h.artistRepo.FindByID(ctx, id); err != nil {
+		return repoError(c, err, "Artist not found", "Failed to fetch artist")
+	}
+
 	fileHeader, err := c.FormFile("cover")
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Cover file is required")
@@ -173,12 +178,30 @@ func (h *ArtistHandler) UploadCover(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Unsupported cover format")
 	}
 
+	// Валидируем содержимое по magic bytes — расширение файла может лгать.
+	uploaded, err := fileHeader.Open()
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Failed to read cover file")
+	}
+	head := make([]byte, minImageBytes)
+	n, readErr := io.ReadFull(uploaded, head)
+	uploaded.Close()
+	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
+		return response.Error(c, fiber.StatusBadRequest, "Failed to read cover file")
+	}
+
+	// Сохраняем с расширением, соответствующим фактическому формату.
+	actualExt := detectImageFormat(head[:n])
+	if actualExt == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid image content. Allowed: JPEG, PNG, WebP")
+	}
+
 	if err := os.MkdirAll(h.coverDir, 0755); err != nil {
 		log.Printf("ArtistHandler.UploadCover mkdir: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create cover directory")
 	}
 
-	dst := filepath.Join(h.coverDir, fmt.Sprintf("artist_%d%s", id, ext))
+	dst := filepath.Join(h.coverDir, fmt.Sprintf("artist_%d%s", id, actualExt))
 	// Сохраняем новую обложку; старые (других расширений) удаляем только
 	// после успешного сохранения, чтобы при сбое осталась прежняя.
 	if err := c.SaveFile(fileHeader, dst); err != nil {

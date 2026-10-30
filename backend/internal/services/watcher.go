@@ -49,6 +49,10 @@ func (w *WatcherService) StartWithPaths(paths []string) error {
 	w.mu.Lock()
 	if w.isRunning {
 		w.cancel()
+		if w.debounce != nil {
+			w.debounce.Stop()
+			w.debounce = nil
+		}
 		if w.watcher != nil {
 			w.watcher.Close()
 		}

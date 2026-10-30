@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,7 +30,7 @@ func setupUploadTestQueue(t *testing.T, limit int) (*UploadQueue, repository.Med
 
 	mediaRepo := repository.NewMediaRepository(db)
 	thumbSvc := NewThumbnailService(t.TempDir())
-	q := NewUploadQueue(context.Background(), mediaRepo, thumbSvc, 0, limit)
+	q := NewUploadQueue(context.Background(), mediaRepo, repository.NewUploadTaskRepository(db), thumbSvc, 0, limit)
 	t.Cleanup(q.Stop)
 	return q, mediaRepo
 }
@@ -181,7 +182,7 @@ func TestUploadQueueCancelDuringProcessingNoRace(t *testing.T) {
 	release := make(chan struct{})
 	mediaRepo := &blockingCreateRepo{MediaStore: repository.NewMediaRepository(db), release: release}
 	thumbSvc := NewThumbnailService(t.TempDir())
-	q := NewUploadQueue(context.Background(), mediaRepo, thumbSvc, 1, 10)
+	q := NewUploadQueue(context.Background(), mediaRepo, repository.NewUploadTaskRepository(db), thumbSvc, 1, 10)
 	t.Cleanup(q.Stop)
 
 	dir := t.TempDir()
@@ -317,4 +318,278 @@ func TestUploadQueueConcurrentSimilarUploadsKeepOne(t *testing.T) {
 	}, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, left, 1, "в библиотеке должен остаться один мем")
+}
+
+// TestUploadQueueParallelSameContentKeepsOne: две параллельные заливки
+// одного контента под разными именами (дедуп по file_path их не ловит)
+// дают ровно одну Media-строку: младший дубликат выходит той же ошибкой,
+// что поздняя проверка по Media, старший идёт дальше. Без ffmpeg:
+// реальный хэш и реальные строки, вызывается production-ветка
+// checkParallelDuplicate (моков тяжёлых шагов нет).
+func TestUploadQueueParallelSameContentKeepsOne(t *testing.T) {
+	q, mediaRepo := setupUploadTestQueue(t, 10)
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	content := []byte("same-content-for-parallel-uploads")
+	pathA := filepath.Join(dir, "a.mp4")
+	pathB := filepath.Join(dir, "other-name.mp4")
+	require.NoError(t, os.WriteFile(pathA, content, 0644))
+	require.NoError(t, os.WriteFile(pathB, content, 0644))
+
+	idA, err := q.Enqueue(UploadJobInput{FilePath: pathA, Filename: "a.mp4", MediaType: models.MediaTypeVideo})
+	require.NoError(t, err)
+	idB, err := q.Enqueue(UploadJobInput{FilePath: pathB, Filename: "other-name.mp4", MediaType: models.MediaTypeVideo})
+	require.NoError(t, err)
+	require.Less(t, idA, idB, "старший ID выигрывает детерминированно")
+
+	// Оба воркера честно хэшируют свой файл (без ffmpeg): хэши обязаны сойтись.
+	hashA, err := HashFileContext(ctx, pathA)
+	require.NoError(t, err)
+	require.NotEmpty(t, hashA)
+	hashB, err := HashFileContext(ctx, pathB)
+	require.NoError(t, err)
+	assert.Equal(t, hashA, hashB, "одинаковый контент обязан давать одинаковый хэш")
+
+	q.mu.Lock()
+	jobA := q.jobs[idA]
+	jobB := q.jobs[idB]
+	q.mu.Unlock()
+	require.NotNil(t, jobA)
+	require.NotNil(t, jobB)
+
+	// Оба сохраняют хэш в свои строки — точка, после которой в process
+	// идёт новая проверка.
+	q.saveFileHash(jobA, hashA)
+	q.saveFileHash(jobB, hashB)
+
+	// Параллельный прогон проверочной ветки (production-код): порядок
+	// завершения не важен, исход детерминирован старшинством ID.
+	start := make(chan struct{})
+	results := make(chan bool, 2)
+	go func() { <-start; results <- q.checkParallelDuplicate(jobA, hashA) }()
+	go func() { <-start; results <- q.checkParallelDuplicate(jobB, hashB) }()
+	close(start)
+	finished := 0
+	for range 2 {
+		if <-results {
+			finished++
+		}
+	}
+	assert.Equal(t, 1, finished, "ровно одно задание обязано выйти дубликатом")
+
+	// Старший идёт дальше (активен, файл цел), младший — в ошибке тем же
+	// сообщением, что поздняя проверка по Media, файл удалён.
+	statusA, _, _, ok := q.Get(idA)
+	require.True(t, ok)
+	assert.NotEqual(t, UploadJobError, statusA, "старший не должен упасть")
+	assert.FileExists(t, pathA)
+
+	statusB, errMsgB, mediaIDB, ok := q.Get(idB)
+	require.True(t, ok)
+	assert.Equal(t, UploadJobError, statusB)
+	assert.Equal(t, "File already exists", errMsgB, "та же ошибка, что поздняя проверка по Media")
+	assert.Zero(t, mediaIDB, "проигравший не создаёт запись")
+	assert.NoFileExists(t, pathB)
+
+	// Старший доводит Create до конца (чистый INSERT без ffmpeg):
+	// в библиотеке ровно одна строка, от проигравшего — ни одной.
+	elderMedia := &models.Media{
+		Title:    "a",
+		Filename: "a.mp4",
+		Type:     models.MediaTypeVideo,
+		FilePath: pathA,
+		FileHash: hashA,
+	}
+	require.NoError(t, mediaRepo.Create(ctx, elderMedia))
+	all, _, err := mediaRepo.FindAll(ctx, repository.MediaFilters{}, 10, 0)
+	require.NoError(t, err)
+	assert.Len(t, all, 1, "в библиотеке обязана остаться ровно одна строка")
+}
+
+// slowFindByHashRepo расширяет окно гонки позднего гейта: FindByHash спит,
+// пока соседний воркер тоже добирается до проверки. Без fileHashMu обе
+// проверки вернули бы nil и создали бы два дубля; с мьютексом второй видит
+// строку первого. Без ffmpeg: только БД-операции production-ветки
+// checkAndCreateMedia.
+type slowFindByHashRepo struct {
+	repository.MediaRepository
+	delay time.Duration
+}
+
+func (r *slowFindByHashRepo) FindByHash(ctx context.Context, hash string) (*models.Media, error) {
+	time.Sleep(r.delay)
+	return r.MediaRepository.FindByHash(ctx, hash)
+}
+
+// TestUploadQueueLateExactDuplicateGateKeepsOne: оба воркера прошли раннюю
+// проверку (здесь она пропущена — вызывается только поздний гейт, как при
+// обоюдном проходе), поздний гейт детерминирован: первый создаёт, второй
+// уходит в тот же failDuplicateUpload. Детерминирован при любом
+// планировании: проверки сериализованы мьютексом, второй FindByHash всегда
+// идёт после первого Create (ловится go test -race).
+func TestUploadQueueLateExactDuplicateGateKeepsOne(t *testing.T) {
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+
+	mediaRepo := &slowFindByHashRepo{MediaRepository: repository.NewMediaRepository(db), delay: 200 * time.Millisecond}
+	thumbSvc := NewThumbnailService(t.TempDir())
+	q := NewUploadQueue(context.Background(), mediaRepo, repository.NewUploadTaskRepository(db), thumbSvc, 0, 10)
+	t.Cleanup(q.Stop)
+
+	dir := t.TempDir()
+	mkJob := func(name string) *UploadJob {
+		path := filepath.Join(dir, name)
+		require.NoError(t, os.WriteFile(path, []byte("x"), 0644))
+		id, err := q.Enqueue(UploadJobInput{FilePath: path, Filename: name, MediaType: models.MediaTypeVideo})
+		require.NoError(t, err)
+		q.mu.Lock()
+		defer q.mu.Unlock()
+		job, ok := q.jobs[id]
+		require.True(t, ok)
+		return job
+	}
+	jobA := mkJob("a.mp4")
+	jobB := mkJob("other-name.mp4")
+
+	// Один хэш на оба задания: файлы разные, контент один.
+	const hash = "same-content-hash"
+
+	start := make(chan struct{})
+	type outcome struct {
+		media   *models.Media
+		handled bool
+	}
+	jobs := []*UploadJob{jobA, jobB}
+	outcomes := make([]outcome, len(jobs))
+	var wg sync.WaitGroup
+	for i, job := range jobs {
+		wg.Add(1)
+		go func(i int, job *UploadJob) {
+			defer wg.Done()
+			<-start
+			media, handled := q.checkAndCreateMedia(job, hash)
+			outcomes[i] = outcome{media: media, handled: handled}
+		}(i, job)
+	}
+	close(start)
+	wg.Wait()
+
+	winnerIdx := -1
+	for i, o := range outcomes {
+		if !o.handled {
+			require.NotNil(t, o.media, "победитель обязан вернуть запись")
+			winnerIdx = i
+		} else {
+			assert.Nil(t, o.media, "проигравший не создаёт запись")
+		}
+	}
+	require.NotEqual(t, -1, winnerIdx, "ровно один воркер обязан создать запись")
+	loserIdx := 1 - winnerIdx
+	winner, loser := jobs[winnerIdx], jobs[loserIdx]
+
+	all, _, err := repository.NewMediaRepository(db).FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, all, 1, "в библиотеке обязана остаться ровно одна строка")
+	assert.Equal(t, hash, all[0].FileHash)
+	assert.Equal(t, all[0].ID, outcomes[winnerIdx].media.ID)
+
+	// Проигравший — в той же ошибке дубликата, что ранняя проверка, файл удалён.
+	status, errMsg, mediaID, ok := q.Get(loser.ID)
+	require.True(t, ok)
+	assert.Equal(t, UploadJobError, status)
+	assert.Equal(t, "File already exists", errMsg, "та же ошибка, что ранняя проверка по строкам")
+	assert.Zero(t, mediaID, "проигравший не фиксирует MediaID")
+	assert.NoFileExists(t, loser.filePath)
+	assert.FileExists(t, winner.filePath)
+}
+
+// TestUploadQueueLateDuplicateAfterElderDone: старший довёл process до done
+// (строка задач уже не активна — ранняя проверка младшего её не видит),
+// младший с тем же контентом проходит раннюю проверку и ловится поздним
+// гейтом по Media. Полный production-путь без ffmpeg: битый контент даёт
+// пустые метаданные/превью, но дедуп обязан сработать раньше. Старший
+// падает позже — оба в error, лечится ретраем (см. checkParallelDuplicate).
+func TestUploadQueueLateDuplicateAfterElderDone(t *testing.T) {
+	q, mediaRepo := setupUploadTestQueue(t, 10)
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	content := []byte("same-content-for-late-gate")
+	pathElder := filepath.Join(dir, "elder.mp4")
+	pathJunior := filepath.Join(dir, "junior.mp4")
+	require.NoError(t, os.WriteFile(pathElder, content, 0644))
+	require.NoError(t, os.WriteFile(pathJunior, content, 0644))
+
+	idElder, err := q.Enqueue(UploadJobInput{FilePath: pathElder, Filename: "elder.mp4", MediaType: models.MediaTypeVideo})
+	require.NoError(t, err)
+	idJunior, err := q.Enqueue(UploadJobInput{FilePath: pathJunior, Filename: "junior.mp4", MediaType: models.MediaTypeVideo})
+	require.NoError(t, err)
+
+	q.mu.Lock()
+	elder, okElder := q.jobs[idElder]
+	junior, okJunior := q.jobs[idJunior]
+	q.mu.Unlock()
+	require.True(t, okElder)
+	require.True(t, okJunior)
+
+	q.process(elder)
+	status, _, elderMediaID, ok := q.Get(idElder)
+	require.True(t, ok)
+	require.Equal(t, UploadJobDone, status, "старший обязан дойти до done")
+	require.NotZero(t, elderMediaID)
+
+	q.process(junior)
+	status, errMsg, mediaID, ok := q.Get(idJunior)
+	require.True(t, ok)
+	assert.Equal(t, UploadJobError, status)
+	assert.Equal(t, "File already exists", errMsg)
+	assert.Zero(t, mediaID)
+	assert.NoFileExists(t, pathJunior)
+	assert.FileExists(t, pathElder)
+
+	all, _, err := mediaRepo.FindAll(ctx, repository.MediaFilters{}, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, all, 1, "в библиотеке обязана остаться ровно одна строка")
+	assert.Equal(t, elderMediaID, all[0].ID)
+}
+
+// TestUploadQueueProcessDropsJobMissingFromMap: задание, удалённое из
+// карты Cancel'ом, пока ждало воркера, дропается без хэша/дедупа/создания:
+// записи Media нет, файл не тронут (его уже убрал Cancel).
+func TestUploadQueueProcessDropsJobMissingFromMap(t *testing.T) {
+	q, mediaRepo := setupUploadTestQueue(t, 10)
+
+	job := enqueueTestJob(t, q, "cancelled.mp4")
+	path := job.filePath
+	q.mu.Lock()
+	delete(q.jobs, job.ID)
+	q.mu.Unlock()
+
+	q.process(job)
+
+	all, _, err := mediaRepo.FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
+	require.NoError(t, err)
+	assert.Empty(t, all, "дропнутое задание не должно создавать запись Media")
+	assert.FileExists(t, path, "дропнутое задание не должно трогать файл")
+}
+
+// TestUploadQueueProcessDropsEarlyCancelled: задание со статусом cancelled,
+// всё ещё висящее в карте, тоже выходит до saveStatus и HashFileContext.
+func TestUploadQueueProcessDropsEarlyCancelled(t *testing.T) {
+	q, mediaRepo := setupUploadTestQueue(t, 10)
+
+	job := enqueueTestJob(t, q, "early.mp4")
+	path := job.filePath
+	q.mu.Lock()
+	job.Status = uploadJobCancelled
+	q.mu.Unlock()
+
+	q.process(job)
+
+	all, _, err := mediaRepo.FindAll(context.Background(), repository.MediaFilters{}, 10, 0)
+	require.NoError(t, err)
+	assert.Empty(t, all, "отменённое задание не должно создавать запись Media")
+	assert.FileExists(t, path, "отменённое до старта задание не должно трогать файл")
 }
