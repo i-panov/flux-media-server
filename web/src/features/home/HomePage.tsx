@@ -26,7 +26,7 @@ export function HomePage() {
 				<Text>{t("home.description")}</Text>
 			</Stack>
 
-			<ContinueWatching kind="video" limit={CONTINUE_PREVIEW_LIMIT} />
+			<ContinueWatching limit={CONTINUE_PREVIEW_LIMIT} />
 
 			<SimpleGrid cols={{ base: 1, md: 2 }}>
 				<HealthCard />

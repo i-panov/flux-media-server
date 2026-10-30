@@ -7,17 +7,53 @@ import {
 	Text,
 	TextInput,
 } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
+import { infiniteQueryOptions, useInfiniteQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "../../api/client";
 import { useAddToCollection } from "../../api/collections";
-import type { MediaType } from "../../core/media";
+import type { CoreFetcher, MediaType } from "../../core/media";
 import { fetchMediaList } from "../../core/media";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useCollectionError } from "./useCollectionError";
 
-const SEARCH_DEBOUNCE_MS = 300;
+const PICKER_PAGE_SIZE = 50;
+
+// Постраничный пикер: тот же контракт, что mediaListOptions в ядре
+// (пустая страница останавливает пагинацию), но свой ключ, размер
+// страницы и поисковая строка.
+function pickerListOptions(
+	fetch: CoreFetcher,
+	type: MediaType,
+	q: string,
+	enabled: boolean,
+) {
+	return infiniteQueryOptions({
+		queryKey: ["media", "picker", type, q],
+		queryFn: ({ pageParam, signal }) =>
+			fetchMediaList(fetch, {
+				type,
+				q,
+				limit: PICKER_PAGE_SIZE,
+				offset: pageParam,
+				signal,
+			}),
+		initialPageParam: 0,
+		getNextPageParam: (lastPage, _allPages, lastOffset) => {
+			// Пустая страница при total > offset (гонка с удалением):
+			// тот же offset запросился бы снова — останавливаемся.
+			if (lastPage.items.length === 0) {
+				return;
+			}
+			const fetched = lastOffset + lastPage.items.length;
+			return fetched < lastPage.total ? fetched : undefined;
+		},
+		retry: false,
+		refetchOnWindowFocus: false,
+		enabled,
+	});
+}
 
 export function AddMediaToCollectionModal({
 	opened,
@@ -34,34 +70,15 @@ export function AddMediaToCollectionModal({
 }) {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
-	const [debounced, setDebounced] = useState("");
+	const debounced = useDebouncedValue(query);
 	const add = useAddToCollection();
 	const notifyError = useCollectionError();
 
-	useEffect(() => {
-		const timer = setTimeout(
-			() => setDebounced(query.trim()),
-			SEARCH_DEBOUNCE_MS,
-		);
-		return () => clearTimeout(timer);
-	}, [query]);
+	const list = useInfiniteQuery(
+		pickerListOptions(apiFetch, type, debounced, opened),
+	);
 
-	const list = useQuery({
-		queryKey: ["media", "picker", type, debounced],
-		queryFn: ({ signal }) =>
-			fetchMediaList(apiFetch, {
-				type,
-				q: debounced,
-				limit: 50,
-				offset: 0,
-				signal,
-			}),
-		retry: false,
-		refetchOnWindowFocus: false,
-		enabled: opened,
-	});
-
-	const items = (list.data?.items ?? []).filter(
+	const items = (list.data?.pages.flatMap((page) => page.items) ?? []).filter(
 		(media) => !existingIds.has(media.id),
 	);
 
@@ -84,7 +101,7 @@ export function AddMediaToCollectionModal({
 					<Text size="sm" c="dimmed">
 						{t("common.loading")}
 					</Text>
-				) : list.isError ? (
+				) : list.isError && items.length === 0 ? (
 					<Alert color="red" variant="light" title={t("collections.loadError")}>
 						<Button
 							variant="light"
@@ -127,6 +144,33 @@ export function AddMediaToCollectionModal({
 								</Button>
 							</Group>
 						))}
+						{list.isFetchNextPageError ? (
+							<Alert
+								color="red"
+								variant="light"
+								title={t("collections.loadError")}
+							>
+								<Button
+									variant="light"
+									size="xs"
+									mt="xs"
+									onClick={() => void list.fetchNextPage()}
+								>
+									{t("common.retry")}
+								</Button>
+							</Alert>
+						) : (
+							list.hasNextPage && (
+								<Button
+									variant="light"
+									w="fit-content"
+									loading={list.isFetchingNextPage}
+									onClick={() => void list.fetchNextPage()}
+								>
+									{t("collections.showMore")}
+								</Button>
+							)
+						)}
 					</Stack>
 				)}
 			</Stack>

@@ -19,6 +19,14 @@ describe("parseSyncedLyrics", () => {
 		]);
 	});
 
+	it("сортирует теги в обратном порядке по времени", () => {
+		const lines = parseSyncedLyrics("[00:20.00][00:10.00] Припев");
+		expect(lines).toEqual([
+			{ time: 10, text: "Припев" },
+			{ time: 20, text: "Припев" },
+		]);
+	});
+
 	it("пропускает пустые строки и строки без тегов", () => {
 		const lines = parseSyncedLyrics("\nБез тега\n[00:05] Со тегом\n");
 		expect(lines).toEqual([{ time: 5, text: "Со тегом" }]);

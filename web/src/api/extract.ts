@@ -59,6 +59,9 @@ export function useExtractAudio(mediaId: number) {
 	const [jobId, setJobId] = useState<number | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const cancelled = useRef(false);
+	// Два быстрых start() видят один и тот же стейт: стейт-гарда
+	// недостаточно, повторный вызов упирается в синхронный флаг.
+	const startingRef = useRef(false);
 
 	useEffect(
 		() => () => {
@@ -72,11 +75,13 @@ export function useExtractAudio(mediaId: number) {
 			setJobId(null);
 			if (track !== null) {
 				queryClient.setQueryData(["media", mediaId, "extracted"], track);
-				// Списки и деталь — обновить, а связку не трогать: трек
-				// только что записан вручную, рефетч вернул бы 404/гонку.
+				// Списки и деталь — обновить, а связку и сабы не трогать:
+				// трек только что записан вручную, рефетч вернул бы 404/гонку,
+				// а сабы извлечение не меняет.
 				void queryClient.invalidateQueries({
 					queryKey: ["media"],
-					predicate: (query) => query.queryKey[2] !== "extracted",
+					predicate: (query) =>
+						query.queryKey[2] !== "extracted" && query.queryKey[2] !== "subs",
 				});
 			}
 		},
@@ -84,65 +89,70 @@ export function useExtractAudio(mediaId: number) {
 	);
 
 	const start = useCallback(async (): Promise<Media | null> => {
-		if (jobId !== null) {
+		if (jobId !== null || startingRef.current) {
 			return null;
 		}
-		setError(null);
-		cancelled.current = false;
-		let id: number;
+		startingRef.current = true;
 		try {
-			const body = await apiFetch<unknown>(`/media/${mediaId}/extract`, {
-				method: "POST",
-			});
-			if (typeof body !== "object" || body === null || !("job_id" in body)) {
-				const track = mediaSchema.parse(body);
-				finish(track);
-				return track;
-			}
-			id = jobSchema.parse(body).job_id;
-			setJobId(id);
-		} catch (startError) {
-			setError(
-				startError instanceof ApiError && startError.message !== ""
-					? startError.message
-					: "Extraction failed",
-			);
-			return null;
-		}
-		let failures = 0;
-		while (!cancelled.current) {
-			await sleep(POLL_INTERVAL_MS);
-			if (cancelled.current) {
-				return null;
-			}
+			setError(null);
+			cancelled.current = false;
+			let id: number;
 			try {
-				const raw = await apiFetch<unknown>(`/media/extract/${id}`);
-				const status = jobStatusSchema.parse(raw);
-				failures = 0;
-				if (status.status === "done") {
-					const track = status.media ?? null;
+				const body = await apiFetch<unknown>(`/media/${mediaId}/extract`, {
+					method: "POST",
+				});
+				if (typeof body !== "object" || body === null || !("job_id" in body)) {
+					const track = mediaSchema.parse(body);
 					finish(track);
 					return track;
 				}
-				if (status.status === "error") {
-					setError(status.error ?? "Extraction failed");
-					setJobId(null);
+				id = jobSchema.parse(body).job_id;
+				setJobId(id);
+			} catch (startError) {
+				setError(
+					startError instanceof ApiError && startError.message !== ""
+						? startError.message
+						: "Extraction failed",
+				);
+				return null;
+			}
+			let failures = 0;
+			while (!cancelled.current) {
+				await sleep(POLL_INTERVAL_MS);
+				if (cancelled.current) {
 					return null;
 				}
-			} catch (pollError) {
-				failures += 1;
-				if (failures >= MAX_POLL_FAILURES) {
-					setError(
-						pollError instanceof ApiError && pollError.message !== ""
-							? pollError.message
-							: "Polling failed",
-					);
-					setJobId(null);
-					return null;
+				try {
+					const raw = await apiFetch<unknown>(`/media/extract/${id}`);
+					const status = jobStatusSchema.parse(raw);
+					failures = 0;
+					if (status.status === "done") {
+						const track = status.media ?? null;
+						finish(track);
+						return track;
+					}
+					if (status.status === "error") {
+						setError(status.error ?? "Extraction failed");
+						setJobId(null);
+						return null;
+					}
+				} catch (pollError) {
+					failures += 1;
+					if (failures >= MAX_POLL_FAILURES) {
+						setError(
+							pollError instanceof ApiError && pollError.message !== ""
+								? pollError.message
+								: "Polling failed",
+						);
+						setJobId(null);
+						return null;
+					}
 				}
 			}
+			return null;
+		} finally {
+			startingRef.current = false;
 		}
-		return null;
 	}, [finish, jobId, mediaId]);
 
 	const cancel = useCallback(async () => {

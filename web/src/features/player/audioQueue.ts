@@ -105,7 +105,7 @@ export function pickNextIndex(
 		}
 		if (pool.length === 0) {
 			// Всё сыграно: без повтора — стоп, с повтором — свежий круг
-			// (вызывающий при этом сбрасывает played).
+			// (вызывающий при этом начинает новый круг с одного target).
 			if (repeat !== "all") {
 				return null;
 			}

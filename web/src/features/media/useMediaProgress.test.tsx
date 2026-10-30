@@ -66,6 +66,12 @@ function lastPutBody(fetchMock: ReturnType<typeof vi.fn>): {
 	};
 }
 
+function deleteCalls(fetchMock: ReturnType<typeof vi.fn>) {
+	return fetchMock.mock.calls.filter(
+		([, init]) => (init as RequestInit | undefined)?.method === "DELETE",
+	);
+}
+
 afterEach(() => {
 	testClient.clear();
 	vi.unstubAllGlobals();
@@ -384,5 +390,74 @@ describe("useMediaProgress", () => {
 		result.current.handleLoadedMetadata();
 		await new Promise((resolve) => setTimeout(resolve, 30));
 		expect(second.currentTime).toBe(0);
+	});
+
+	it("сброс в начало удаляет серверный прогресс", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse(progressBody(7, 120)));
+		vi.stubGlobal("fetch", fetchMock);
+
+		const video = fakeVideo(0, 3600);
+		const ref = { current: video };
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
+			wrapper: TestWrapper,
+		});
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalled();
+		});
+
+		// Восстановление ставит сохранённую позицию...
+		result.current.handleLoadedMetadata();
+		await waitFor(() => {
+			expect(video.currentTime).toBe(120);
+		});
+
+		// ...пользователь смотрит (тики времени измеряют ненулевую позицию)...
+		video.currentTime = 45;
+		result.current.handleTimeUpdate();
+
+		// ...отматывает в начало и ставит на паузу:
+		// вместо PUT уходит DELETE, переоткрытие стартует с 0.
+		video.currentTime = 0;
+		result.current.handlePause();
+		await waitFor(() => {
+			expect(deleteCalls(fetchMock).length).toBe(1);
+		});
+		const [url] = deleteCalls(fetchMock)[0] as [string, RequestInit];
+		expect(String(url)).toContain("/progress/7");
+		expect(putCalls(fetchMock).length).toBe(0);
+	});
+
+	it("нуль без воспроизведения не удаляет серверный прогресс", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse(progressBody(7, 120)));
+		vi.stubGlobal("fetch", fetchMock);
+
+		const video = fakeVideo(0, 3600);
+		const ref = { current: video };
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
+			wrapper: TestWrapper,
+		});
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalled();
+		});
+
+		// Восстановление ставит сохранённую позицию...
+		result.current.handleLoadedMetadata();
+		await waitFor(() => {
+			expect(video.currentTime).toBe(120);
+		});
+
+		// ...но поток сломался до первого измеренного кадра: элемент так
+		// и остался на нуле, ошибка зовёт сохранение — DELETE уходить
+		// не должен, иначе восстановленная позиция затёрта не действием
+		// пользователя, а сбоем.
+		video.currentTime = 0;
+		result.current.handlePause();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(deleteCalls(fetchMock).length).toBe(0);
+		expect(putCalls(fetchMock).length).toBe(0);
 	});
 });

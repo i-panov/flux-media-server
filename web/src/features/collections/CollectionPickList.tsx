@@ -1,4 +1,4 @@
-import { Button, Stack, Text } from "@mantine/core";
+import { Button, Group, Loader, Stack, Text } from "@mantine/core";
 import { FolderInput, FolderUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Collection } from "../../api/collections";
@@ -12,6 +12,7 @@ export function CollectionPickList({
 	excludeIds,
 	allowRoot,
 	pending,
+	loading = false,
 	onPick,
 }: {
 	type: MediaType;
@@ -19,9 +20,17 @@ export function CollectionPickList({
 	excludeIds: ReadonlySet<number>;
 	allowRoot: boolean;
 	pending: boolean;
+	loading?: boolean;
 	onPick: (id: number | null) => void;
 }) {
 	const { t } = useTranslation();
+	if (loading) {
+		return (
+			<Group justify="center" py="md">
+				<Loader size="sm" aria-label={t("common.loading")} />
+			</Group>
+		);
+	}
 	const matching = collections.filter(
 		(collection) => collection.type === type && !excludeIds.has(collection.id),
 	);

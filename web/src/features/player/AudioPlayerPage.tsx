@@ -26,7 +26,7 @@ import {
 	SkipForward,
 	Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useLyrics, useSaveLyrics } from "../../api/lyrics";
@@ -131,6 +131,7 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 				<Textarea
 					value={value}
 					onChange={(event) => setValue(event.currentTarget.value)}
+					aria-label={t("player.lyricsLabel")}
 					autosize
 					minRows={12}
 					maxRows={28}
@@ -149,6 +150,7 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 function QueueTab() {
 	const { t } = useTranslation();
 	const player = useAudioPlayer();
+	const currentPrefix = t("player.currentPrefix");
 	if (player.queue.length === 0) {
 		return <Text c="dimmed">{t("player.queueEmpty")}</Text>;
 	}
@@ -164,7 +166,7 @@ function QueueTab() {
 						onClick={() => player.select(index)}
 					>
 						<Text truncate>
-							{index === player.index ? "▶ " : ""}
+							{index === player.index ? currentPrefix : ""}
 							{media.title}
 						</Text>
 					</Button>
@@ -184,17 +186,74 @@ function QueueTab() {
 	);
 }
 
-export function AudioPlayerPage() {
-	const { t } = useTranslation();
-	const navigate = useNavigate();
-	const player = useAudioPlayer();
-	const current = player.current;
+function SeekSlider({
+	mediaId,
+	currentTime,
+	duration,
+	onSeek,
+}: {
+	mediaId: number;
+	currentTime: number;
+	duration: number;
+	onSeek: (value: number) => void;
+}) {
 	// Пока тянем бегунок, показываем его позицию, а не время из элемента:
 	// управляемый Slider без onChange не двигается под курсором.
 	const [seekPreview, setSeekPreview] = useState<{
 		mediaId: number;
 		seconds: number;
 	} | null>(null);
+	// Трек начала драга: если посередине переключился трек (автопереход,
+	// очередь), отпускание не должно сикать чужой трек на старую позицию.
+	const dragMediaId = useRef<number | null>(null);
+	const { t } = useTranslation();
+	const maxDuration = Math.max(duration, 1);
+	const position = Math.min(currentTime, maxDuration);
+	const preview = seekPreview?.mediaId === mediaId ? seekPreview.seconds : null;
+	const sliderValue = preview ?? position;
+	return (
+		<>
+			<Slider
+				value={sliderValue}
+				min={0}
+				max={maxDuration}
+				step={0.5}
+				label={formatDuration(sliderValue)}
+				thumbLabel={t("player.seekLabel")}
+				onChange={(value) => {
+					if (dragMediaId.current === null) {
+						dragMediaId.current = mediaId;
+					}
+					setSeekPreview({ mediaId, seconds: value });
+				}}
+				onChangeEnd={(value) => {
+					const startedId = dragMediaId.current;
+					dragMediaId.current = null;
+					if (startedId !== null && startedId !== mediaId) {
+						setSeekPreview(null);
+						return;
+					}
+					onSeek(value);
+					setSeekPreview(null);
+				}}
+			/>
+			<Group justify="space-between">
+				<Text size="xs" c="dimmed">
+					{formatDuration(sliderValue)}
+				</Text>
+				<Text size="xs" c="dimmed">
+					{formatDuration(duration)}
+				</Text>
+			</Group>
+		</>
+	);
+}
+
+export function AudioPlayerPage() {
+	const { t } = useTranslation();
+	const navigate = useNavigate();
+	const player = useAudioPlayer();
+	const current = player.current;
 	const navigateBack = () => {
 		void navigate({ to: "/audio" });
 	};
@@ -212,11 +271,6 @@ export function AudioPlayerPage() {
 	}
 
 	const artists = current.artists.map((artist) => artist.name).join(", ");
-	const maxDuration = Math.max(player.duration, 1);
-	const position = Math.min(player.currentTime, maxDuration);
-	const preview =
-		seekPreview?.mediaId === current.id ? seekPreview.seconds : null;
-	const sliderValue = preview ?? position;
 
 	return (
 		<Stack gap="lg" maw={960} mx="auto" w="100%">
@@ -248,7 +302,9 @@ export function AudioPlayerPage() {
 						<Title order={1} size="h2" lineClamp={2}>
 							{current.title}
 						</Title>
-						<Text c="dimmed">{artists === "" ? "—" : artists}</Text>
+						<Text c="dimmed">
+							{artists === "" ? t("common.emptyFallback") : artists}
+						</Text>
 						{current.album !== "" && (
 							<Text size="sm" c="dimmed">
 								{current.album}
@@ -256,28 +312,12 @@ export function AudioPlayerPage() {
 						)}
 					</Stack>
 
-					<Slider
-						value={sliderValue}
-						min={0}
-						max={maxDuration}
-						step={0.5}
-						label={formatDuration(sliderValue)}
-						onChange={(value) =>
-							setSeekPreview({ mediaId: current.id, seconds: value })
-						}
-						onChangeEnd={(value) => {
-							player.seek(value);
-							setSeekPreview(null);
-						}}
+					<SeekSlider
+						mediaId={current.id}
+						currentTime={player.currentTime}
+						duration={player.duration}
+						onSeek={(value) => player.seek(value)}
 					/>
-					<Group justify="space-between">
-						<Text size="xs" c="dimmed">
-							{formatDuration(sliderValue)}
-						</Text>
-						<Text size="xs" c="dimmed">
-							{formatDuration(player.duration)}
-						</Text>
-					</Group>
 
 					<Group justify="center" gap="md">
 						<Tooltip label={t("player.shuffle")} withArrow>
@@ -297,6 +337,7 @@ export function AudioPlayerPage() {
 								variant="subtle"
 								size="lg"
 								aria-label={t("player.previous")}
+								data-testid="player-prev"
 								onClick={player.previous}
 							>
 								<SkipBack size={22} />
@@ -307,6 +348,7 @@ export function AudioPlayerPage() {
 							radius="xl"
 							size={56}
 							aria-label={player.playing ? t("player.pause") : t("player.play")}
+							data-testid={player.playing ? "player-pause" : "player-play"}
 							onClick={player.toggle}
 						>
 							{player.playing ? (
@@ -320,6 +362,7 @@ export function AudioPlayerPage() {
 								variant="subtle"
 								size="lg"
 								aria-label={t("player.next")}
+								data-testid="player-next"
 								onClick={player.next}
 							>
 								<SkipForward size={22} />
@@ -366,6 +409,7 @@ export function AudioPlayerPage() {
 							min={0}
 							max={100}
 							label={`${Math.round(player.volume * 100)}%`}
+							thumbLabel={t("player.volumeLabel")}
 							onChange={(value) => player.setVolume(value / 100)}
 							className="flex-1"
 						/>
@@ -377,7 +421,9 @@ export function AudioPlayerPage() {
 				<Tabs.List>
 					<Tabs.Tab value="lyrics">{t("player.lyrics")}</Tabs.Tab>
 					<Tabs.Tab value="translation">{t("player.translation")}</Tabs.Tab>
-					<Tabs.Tab value="queue">{t("player.queue")}</Tabs.Tab>
+					<Tabs.Tab value="queue" data-testid="player-queue-tab">
+						{t("player.queue")}
+					</Tabs.Tab>
 				</Tabs.List>
 				<Tabs.Panel value="lyrics" pt="md">
 					{/* key: при смене трека редактирование не должно переезжать

@@ -7,6 +7,7 @@ import {
 	fetchMediaList,
 	fetchMediaSubs,
 	imageListOptions,
+	isSafeImageUrl,
 	mediaOptions,
 	mediaSubsOptions,
 	videoListOptions,
@@ -208,6 +209,24 @@ describe("imageListOptions", () => {
 		const requested = new URL(String(calls[0] ?? ""), "http://localhost");
 		expect(requested.searchParams.get("type")).toBe("image");
 		expect(requested.searchParams.get("sort")).toBe("desc");
+	});
+});
+
+// biome-ignore lint/security/noSecrets: имя тестируемой функции, не секрет.
+describe("isSafeImageUrl", () => {
+	it("принимает http, https и относительные пути", () => {
+		expect(isSafeImageUrl("https://cdn.example/cover.jpg")).toBe(true);
+		expect(isSafeImageUrl("http://cdn.example/cover.jpg")).toBe(true);
+		expect(isSafeImageUrl("/api/media/7/cover")).toBe(true);
+		expect(isSafeImageUrl("covers/7.jpg")).toBe(true);
+	});
+
+	it("отклоняет пустое и чужие схемы", () => {
+		expect(isSafeImageUrl("")).toBe(false);
+		expect(isSafeImageUrl("javascript:alert(1)")).toBe(false);
+		expect(isSafeImageUrl("data:image/png;base64,AAA")).toBe(false);
+		expect(isSafeImageUrl("blob:https://example/uuid")).toBe(false);
+		expect(isSafeImageUrl("ftp://example/cover.jpg")).toBe(false);
 	});
 });
 

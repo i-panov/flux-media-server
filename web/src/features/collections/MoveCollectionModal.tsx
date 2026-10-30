@@ -62,6 +62,7 @@ export function MoveCollectionModal({
 							excludeIds={excludeIds}
 							allowRoot
 							pending={move.isPending}
+							loading={collections.isPending}
 							onPick={(parentId) => {
 								move.mutate(
 									{ id: sourceId, parentId },

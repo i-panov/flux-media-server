@@ -35,13 +35,17 @@ function favoritesAllQueryOptions(type: MediaType) {
 		queryFn: async () => {
 			const media: Media[] = [];
 			let offset = 0;
-			let total = 0;
+			// total фиксируем с первой страницы: счётчик на сервере может
+			// расти между запросами — иначе догоняли бы его вечно.
+			let firstTotal: number | null = null;
 			do {
 				const body = await apiFetch<unknown>(
 					`/favorites?type=${type}&limit=${FAVORITES_LIMIT}&offset=${offset}`,
 				);
 				const page = favoritesListSchema.parse(body);
-				total = page.total;
+				if (firstTotal === null) {
+					firstTotal = page.total;
+				}
 				for (const entry of page.items) {
 					if (entry.media !== null && entry.media !== undefined) {
 						media.push(entry.media);
@@ -52,7 +56,7 @@ function favoritesAllQueryOptions(type: MediaType) {
 					break;
 				}
 				offset += fetched;
-			} while (offset < total);
+			} while (offset < (firstTotal ?? 0));
 			return media;
 		},
 		retry: false,
@@ -114,13 +118,17 @@ function artistFavoritesQueryOptions() {
 		queryFn: async () => {
 			const ids = new Set<number>();
 			let offset = 0;
-			let total = 0;
+			// total фиксируем с первой страницы: счётчик на сервере может
+			// расти между запросами — иначе догоняли бы его вечно.
+			let firstTotal: number | null = null;
 			do {
 				const body = await apiFetch<unknown>(
 					`/favorites?limit=${FAVORITES_LIMIT}&offset=${offset}`,
 				);
 				const page = favoritesListSchema.parse(body);
-				total = page.total;
+				if (firstTotal === null) {
+					firstTotal = page.total;
+				}
 				for (const entry of page.items) {
 					if (entry.artist_id !== null && entry.artist_id !== undefined) {
 						ids.add(entry.artist_id);
@@ -131,7 +139,7 @@ function artistFavoritesQueryOptions() {
 					break;
 				}
 				offset += fetched;
-			} while (offset < total);
+			} while (offset < (firstTotal ?? 0));
 			return ids;
 		},
 		retry: false,

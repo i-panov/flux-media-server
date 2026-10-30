@@ -59,7 +59,7 @@ export function AudioCard({ media }: { media: Media }) {
 						{media.title}
 					</Text>
 					<Text size="xs" c="dimmed" lineClamp={1}>
-						{artists === "" ? "—" : artists}
+						{artists === "" ? t("common.emptyFallback") : artists}
 					</Text>
 				</Card>
 			</Link>

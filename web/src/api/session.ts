@@ -47,6 +47,8 @@ export function useSession() {
 // Сброс локальной сессии без запроса: серверной сессии уже нет
 // (401 после неудачного refresh) — держать UI «вошедшим» нельзя.
 export function clearSessionData() {
+	// Затираем кэши прошлого пользователя, затем фиксируем пустую сессию.
+	queryClient.removeQueries();
 	queryClient.setQueryData(sessionQueryKey, null);
 }
 
@@ -62,9 +64,11 @@ export function useVerifyCodeMutation() {
 		mutationFn: ({ email, code }: { email: string; code: string }) =>
 			verifyCode(email, code),
 		onSuccess: (data) => {
-			// Ответ уже содержит пользователя — класть в кэш напрямую,
-			// а не инвалидировать: иначе навигация следом застанет
-			// в guard ещё свежий null и отскочит обратно на логин.
+			// Затираем кэши прошлого пользователя. Ответ уже содержит
+			// пользователя — класть в кэш напрямую, а не инвалидировать:
+			// иначе навигация следом застанет в guard ещё свежий null
+			// и отскочит обратно на логин.
+			queryClient.removeQueries();
 			queryClient.setQueryData(sessionQueryKey, data.user);
 		},
 	});
@@ -75,6 +79,8 @@ export function useLogoutMutation() {
 	return useMutation({
 		mutationFn: () => logout(),
 		onSuccess: () => {
+			// Затираем кэши вышедшего пользователя (симметрия с логином).
+			queryClient.removeQueries();
 			queryClient.setQueryData(sessionQueryKey, null);
 		},
 	});

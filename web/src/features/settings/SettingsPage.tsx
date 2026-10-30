@@ -101,7 +101,7 @@ export function SettingsPage() {
 					<Stack gap="sm">
 						<Group justify="space-between" wrap="nowrap">
 							<Text size="sm" truncate>
-								{session?.email ?? "—"}
+								{session?.email ?? t("common.emptyFallback")}
 							</Text>
 							{session?.is_admin === true && (
 								<Badge variant="light" color="violet">
@@ -146,7 +146,7 @@ export function SettingsPage() {
 								{t("settings.about.backendVersion")}
 							</Text>
 							<Text size="sm" fw={600}>
-								{data?.version ?? "—"}
+								{data?.version ?? t("common.emptyFallback")}
 							</Text>
 						</Group>
 						{isError && (

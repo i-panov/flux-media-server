@@ -13,8 +13,12 @@ export function CoverImage({
 }) {
 	// Ошибка запоминается вместе с адресом: при смене трека (компонент
 	// переиспользуется) сломанная обложка прошлого трека не должна
-	// скрывать новую.
+	// скрывать новую. Один повтор на адрес: разовый сбой сети
+	// перезагружается перемонтированием, стойкий — даёт заглушку.
+	// useMediaReload здесь не подходит: он не сбрасывает tried/failed
+	// при смене mediaId и тянет лишний зонд — бюджет проще держать по src.
 	const [failedSrc, setFailedSrc] = useState<string | null>(null);
+	const [retriedSrc, setRetriedSrc] = useState<string | null>(null);
 	if (src === "" || failedSrc === src) {
 		return (
 			<Music size={iconSize} className="text-[var(--mantine-color-dimmed)]" />
@@ -23,10 +27,17 @@ export function CoverImage({
 	return (
 		// biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError — ошибка загрузки, а не интеракция.
 		<img
+			key={retriedSrc === src ? "retry" : "first"}
 			src={src}
 			alt=""
 			className="h-full w-full object-cover"
-			onError={() => setFailedSrc(src)}
+			onError={() => {
+				if (retriedSrc === src) {
+					setFailedSrc(src);
+				} else {
+					setRetriedSrc(src);
+				}
+			}}
 		/>
 	);
 }

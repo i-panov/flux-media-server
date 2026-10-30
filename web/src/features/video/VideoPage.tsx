@@ -3,63 +3,31 @@ import {
 	Button,
 	Group,
 	SimpleGrid,
-	Skeleton,
 	Stack,
 	Text,
 	TextInput,
 	Title,
 } from "@mantine/core";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFavoriteMedia } from "../../api/favorites";
 import { useVideoList } from "../../api/media";
+import { CardGridSkeletons } from "../../components/CardGridSkeletons";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
 import { UploadButton } from "../upload/UploadButton";
 import { VideoCard } from "./VideoCard";
 
-const SKELETON_COUNT = 12;
-const SEARCH_DEBOUNCE_MS = 300;
-
-function VideoSkeletons() {
-	return (
-		<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing="md">
-			{Array.from({ length: SKELETON_COUNT }, (_, index) => (
-				// Скелетоны без данных: индекс здесь — стабильный
-				// идентификатор позиции, а не сущности.
-				// biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholder
-				<Stack key={index} gap="xs">
-					<Skeleton height={140} radius="md" />
-					<Skeleton height={14} width="80%" radius="sm" />
-				</Stack>
-			))}
-		</SimpleGrid>
-	);
-}
-
 export function VideoPage() {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
-	const [debounced, setDebounced] = useState("");
-
-	useEffect(() => {
-		const timer = setTimeout(() => {
-			setDebounced(query.trim());
-		}, SEARCH_DEBOUNCE_MS);
-		return () => {
-			clearTimeout(timer);
-		};
-	}, [query]);
+	const debounced = useDebouncedValue(query);
 
 	const list = useVideoList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
-	const favoriteMedia = useFavoriteMedia("video");
-	const favoriteSectionIds = new Set(favoriteMedia.map((media) => media.id));
-	const visibleItems =
-		debounced === ""
-			? items.filter((media) => !favoriteSectionIds.has(media.id))
-			: items;
+	const visibleItems = useVisibleMedia("video", items, debounced !== "");
 
 	return (
 		<Stack gap="lg">
@@ -79,11 +47,11 @@ export function VideoPage() {
 				w={{ base: "100%", sm: 320 }}
 			/>
 			{/* При поиске ряды продолжения не нужны: они не фильтруются. */}
-			{debounced === "" && <ContinueWatching kind="video" limit={1} />}
+			{debounced === "" && <ContinueWatching limit={1} />}
 			{debounced === "" && <FavoriteSection type="video" />}
 			{debounced === "" && <CollectionsSection type="video" />}
 			{list.isPending ? (
-				<VideoSkeletons />
+				<CardGridSkeletons />
 			) : list.isError && items.length === 0 ? (
 				<Alert color="red" variant="light" title={t("video.error")}>
 					<Button

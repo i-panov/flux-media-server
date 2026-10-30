@@ -14,7 +14,6 @@ import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { type ContinueEntry, useContinueWatching } from "../../api/progress";
 import { formatDuration } from "../../core/format";
-import type { MediaKind } from "../../core/media";
 
 function ContinueCard({ entry }: { entry: ContinueEntry }) {
 	const { t } = useTranslation();
@@ -99,18 +98,14 @@ function ContinueCard({ entry }: { entry: ContinueEntry }) {
 }
 
 // Блок «Продолжить просмотр»: последние начатые и недосмотренные
-// видео. Аудио здесь нет: недослушанный трек поднимается мини-плеером.
+// видео. Только видео: недослушанный трек поднимается мини-плеером,
+// ссылка карточки всегда ведёт на /video/$id. API умеет и type=audio
+// (useContinueWatching покрыт тестами), но в UI эта ветка не используется.
 // Ошибку запроса не показываем — это вспомогательная секция, основной
 // список должен работать и без неё.
-export function ContinueWatching({
-	kind,
-	limit,
-}: {
-	kind: MediaKind;
-	limit?: number;
-}) {
+export function ContinueWatching({ limit }: { limit?: number }) {
 	const { t } = useTranslation();
-	const list = useContinueWatching(kind);
+	const list = useContinueWatching("video");
 	const items = (list.data ?? []).slice(0, limit);
 	if (items.length === 0) {
 		return null;

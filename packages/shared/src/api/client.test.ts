@@ -120,4 +120,30 @@ describe("apiFetch", () => {
 		).rejects.toMatchObject({ status: 401 });
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
+
+	it("один refresh на пачку параллельных 401", async () => {
+		let dataCalls = 0;
+		const fetchMock = vi.fn((input: unknown) => {
+			const url = String(input);
+			if (url.endsWith("/auth/refresh")) {
+				return Promise.resolve(jsonResponse({ ok: true }));
+			}
+			dataCalls += 1;
+			return Promise.resolve(
+				dataCalls <= 2
+					? jsonResponse({ error: "expired" }, 401)
+					: jsonResponse({ ok: true }),
+			);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const [first, second] = await Promise.all([apiFetch("/x"), apiFetch("/y")]);
+
+		expect(first).toEqual({ ok: true });
+		expect(second).toEqual({ ok: true });
+		const refreshCalls = fetchMock.mock.calls.filter((args) =>
+			String(args[0]).endsWith("/auth/refresh"),
+		);
+		expect(refreshCalls).toHaveLength(1);
+	});
 });

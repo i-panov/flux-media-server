@@ -1,4 +1,12 @@
-import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
+import {
+	Alert,
+	Button,
+	Group,
+	Loader,
+	Modal,
+	Stack,
+	Text,
+} from "@mantine/core";
 import { FolderPlus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,7 +45,11 @@ export function AddToCollectionModal({
 				centered
 			>
 				<Stack gap="sm">
-					{collections.isError ? (
+					{collections.isPending ? (
+						<Group justify="center" py="md">
+							<Loader size="sm" aria-label={t("common.loading")} />
+						</Group>
+					) : collections.isError ? (
 						<Alert
 							color="red"
 							variant="light"

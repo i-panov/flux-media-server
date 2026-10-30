@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ApiError, apiFetch } from "../../api/client";
 import {
 	cancelUploadJob,
@@ -47,6 +48,7 @@ export function useUploadQueue(
 	targetCollectionId: number | null,
 ) {
 	const queryClient = useQueryClient();
+	const { t } = useTranslation();
 	const [items, setItems] = useState<QueueItem[]>([]);
 	const counter = useRef(0);
 	const tokens = useRef(new Map<string, number>());
@@ -122,7 +124,7 @@ export function useUploadQueue(
 								collectionFailure instanceof ApiError &&
 								collectionFailure.message !== ""
 									? collectionFailure.message
-									: "Collection error";
+									: t("upload.collectionErrorFallback");
 						}
 					}
 					updateItem(item.key, {
@@ -198,6 +200,10 @@ export function useUploadQueue(
 
 	const removeItem = (item: QueueItem) => {
 		bumpToken(item.key);
+		// Убранная строка не должна оставлять висящий серверный джоб.
+		if (item.job !== null) {
+			void cancelUploadJob(item.job.kind, item.job.id).catch(() => undefined);
+		}
 		setItems((prev) => prev.filter((row) => row.key !== item.key));
 	};
 

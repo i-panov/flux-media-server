@@ -21,19 +21,8 @@ import { ApiError } from "../../api/client";
 import type { Collection } from "../../api/collections";
 import { useSession } from "../../api/session";
 import { useTrash, useTrashActions } from "../../api/trash";
-import type { Media, MediaType } from "../../core/media";
-
-const TYPE_LABEL_KEYS: Record<MediaType, string> = {
-	video: "media.video",
-	audio: "media.audio",
-	image: "media.memes",
-};
-
-function isMediaType(value: string): value is MediaType {
-	return value === "video" || value === "audio" || value === "image";
-}
-
-type TrashActions = ReturnType<typeof useTrashActions>;
+import { isMediaType, MEDIA_TYPE_LABEL_KEYS } from "../../components/mediaType";
+import type { Media } from "../../core/media";
 
 function TrashActionsBar({
 	onRestore,
@@ -78,12 +67,16 @@ function TrashActionsBar({
 
 function TrashCollectionCard({
 	collection,
-	actions,
-	onError,
+	restorePending,
+	purgePending,
+	onRestore,
+	onPurge,
 }: {
 	collection: Collection;
-	actions: TrashActions;
-	onError: (error: unknown) => void;
+	restorePending: boolean;
+	purgePending: boolean;
+	onRestore: () => void;
+	onPurge: () => void;
 }) {
 	const { t } = useTranslation();
 	return (
@@ -93,19 +86,15 @@ function TrashCollectionCard({
 					<Text fw={600}>{collection.name}</Text>
 					{isMediaType(collection.type) && (
 						<Badge variant="light" color="violet">
-							{t(TYPE_LABEL_KEYS[collection.type])}
+							{t(MEDIA_TYPE_LABEL_KEYS[collection.type])}
 						</Badge>
 					)}
 				</Group>
 				<TrashActionsBar
-					restorePending={actions.restoreCollection.isPending}
-					purgePending={actions.purgeCollection.isPending}
-					onRestore={() => {
-						actions.restoreCollection.mutate(collection.id, { onError });
-					}}
-					onPurge={() => {
-						actions.purgeCollection.mutate(collection.id, { onError });
-					}}
+					restorePending={restorePending}
+					purgePending={purgePending}
+					onRestore={onRestore}
+					onPurge={onPurge}
 				/>
 			</Group>
 		</Card>
@@ -115,13 +104,17 @@ function TrashCollectionCard({
 function TrashMediaCard({
 	media,
 	isAdmin,
-	actions,
-	onError,
+	restorePending,
+	purgePending,
+	onRestore,
+	onPurge,
 }: {
 	media: Media;
 	isAdmin: boolean;
-	actions: TrashActions;
-	onError: (error: unknown) => void;
+	restorePending: boolean;
+	purgePending: boolean;
+	onRestore: () => void;
+	onPurge: () => void;
 }) {
 	const { t } = useTranslation();
 	return (
@@ -133,20 +126,16 @@ function TrashMediaCard({
 					</Text>
 					{isMediaType(media.type) && (
 						<Badge variant="light" color="gray">
-							{t(TYPE_LABEL_KEYS[media.type])}
+							{t(MEDIA_TYPE_LABEL_KEYS[media.type])}
 						</Badge>
 					)}
 				</Group>
 				{isAdmin && (
 					<TrashActionsBar
-						restorePending={actions.restoreMedia.isPending}
-						purgePending={actions.purgeMedia.isPending}
-						onRestore={() => {
-							actions.restoreMedia.mutate(media.id, { onError });
-						}}
-						onPurge={() => {
-							actions.purgeMedia.mutate(media.id, { onError });
-						}}
+						restorePending={restorePending}
+						purgePending={purgePending}
+						onRestore={onRestore}
+						onPurge={onPurge}
 					/>
 				)}
 			</Group>
@@ -253,8 +242,18 @@ export function TrashPage() {
 								<TrashCollectionCard
 									key={collection.id}
 									collection={collection}
-									actions={actions}
-									onError={notifyError}
+									restorePending={actions.restoreCollection.isPending}
+									purgePending={actions.purgeCollection.isPending}
+									onRestore={() => {
+										actions.restoreCollection.mutate(collection.id, {
+											onError: notifyError,
+										});
+									}}
+									onPurge={() => {
+										actions.purgeCollection.mutate(collection.id, {
+											onError: notifyError,
+										});
+									}}
 								/>
 							))}
 						</Stack>
@@ -274,8 +273,18 @@ export function TrashPage() {
 									key={media.id}
 									media={media}
 									isAdmin={isAdmin}
-									actions={actions}
-									onError={notifyError}
+									restorePending={actions.restoreMedia.isPending}
+									purgePending={actions.purgeMedia.isPending}
+									onRestore={() => {
+										actions.restoreMedia.mutate(media.id, {
+											onError: notifyError,
+										});
+									}}
+									onPurge={() => {
+										actions.purgeMedia.mutate(media.id, {
+											onError: notifyError,
+										});
+									}}
 								/>
 							))}
 						</Stack>

@@ -11,7 +11,7 @@ import {
 } from "@mantine/core";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useAudioList } from "../../api/media";
@@ -73,10 +73,16 @@ function RenameArtistModal({
 }) {
 	const { t } = useTranslation();
 	const { artist } = useArtist(artistId);
+	// Начальное имя берётся при монтировании: родитель монтирует модалку
+	// только на время открытия и пересоздаёт её через key, когда имя
+	// подгружается позже, — ввод при фоновых рефетчах не затирается.
 	const [name, setName] = useState(artist?.name ?? "");
 	const rename = useRenameArtist();
 
 	const submit = () => {
+		if (rename.isPending) {
+			return;
+		}
 		const trimmed = name.trim();
 		if (trimmed === "") {
 			return;
@@ -116,7 +122,7 @@ function RenameArtistModal({
 					</Button>
 					<Button
 						loading={rename.isPending}
-						disabled={name.trim() === ""}
+						disabled={name.trim() === "" || rename.isPending}
 						onClick={submit}
 					>
 						{t("collections.save")}
@@ -149,6 +155,34 @@ export function ArtistPage() {
 	const list = useAudioList("");
 	const [renameOpened, setRenameOpened] = useState(false);
 	const [editMedia, setEditMedia] = useState<Media | null>(null);
+	const retryLabel = t("common.retry");
+
+	// Серверного фильтра треков по артисту нет — подтягиваем все страницы
+	// при монтировании и фильтруем на клиенте. Каждая новая страница
+	// меняет флаги и перезапускает эффект до полного списка.
+	const {
+		isPending: listPending,
+		hasNextPage,
+		isFetchingNextPage,
+		isFetchNextPageError,
+		fetchNextPage,
+	} = list;
+	useEffect(() => {
+		if (
+			!listPending &&
+			hasNextPage &&
+			!isFetchingNextPage &&
+			!isFetchNextPageError
+		) {
+			void fetchNextPage();
+		}
+	}, [
+		listPending,
+		hasNextPage,
+		isFetchingNextPage,
+		isFetchNextPageError,
+		fetchNextPage,
+	]);
 
 	const tracks =
 		list.data?.pages
@@ -194,7 +228,7 @@ export function ArtistPage() {
 							mt="xs"
 							onClick={() => void refetchArtists()}
 						>
-							{t("common.retry")}
+							{retryLabel}
 						</Button>
 					)}
 				</Alert>
@@ -237,7 +271,7 @@ export function ArtistPage() {
 						mt="xs"
 						onClick={() => void list.refetch()}
 					>
-						{t("common.retry")}
+						{retryLabel}
 					</Button>
 				</Alert>
 			) : tracks.length === 0 ? (
@@ -253,22 +287,31 @@ export function ArtistPage() {
 					))}
 				</Stack>
 			)}
-			{list.hasNextPage && (
-				<Button
-					variant="light"
-					w="fit-content"
-					loading={list.isFetchingNextPage}
-					onClick={() => {
-						void list.fetchNextPage();
-					}}
-				>
-					{t("audio.loadMore")}
-				</Button>
+			{isFetchNextPageError ? (
+				<Alert color="red" variant="light" title={t("artists.tracksError")}>
+					<Button
+						variant="light"
+						size="xs"
+						mt="xs"
+						onClick={() => void fetchNextPage()}
+					>
+						{retryLabel}
+					</Button>
+				</Alert>
+			) : (
+				(hasNextPage || isFetchingNextPage) && (
+					<Stack gap="xs">
+						<Skeleton height={64} radius="md" />
+						<Skeleton height={64} radius="md" />
+					</Stack>
+				)
 			)}
-			{/* Модалка монтируется только на время открытия: имя
-			подхватывается из загруженного артиста, а не из пустого маунта. */}
+			{/* Модалка монтируется только на время открытия, а key по имени
+			пересоздаёт её, когда артист подгружается позже: поле стартует
+			с загруженным именем, а не с пустого маунта. */}
 			{renameOpened && (
 				<RenameArtistModal
+					key={`${artistId}:${artist?.name ?? ""}`}
 					opened
 					artistId={artistId}
 					onClose={() => setRenameOpened(false)}

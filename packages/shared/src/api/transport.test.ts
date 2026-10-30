@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { KeyValueStore } from "../storage";
 import {
 	ACCESS_TOKEN_KEY,
 	createTokenTransport,
 	createWebTransport,
 	getApiConfig,
-	type KeyValueStore,
 	REFRESH_TOKEN_KEY,
 	resetApiConfig,
 } from "./transport";

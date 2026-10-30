@@ -214,13 +214,14 @@ export function usePlaybackControls({
 				clear();
 				return;
 			}
-			shouldPlayRef.current = true;
+			// Удаление сохраняет состояние паузы: играло — продолжает
+			// следующим, стояло — следующий тоже молчит.
 			// Индексы сыгранных съезжают вместе с очередью, иначе shuffle
 			// пропускал бы не те треки.
 			setPlayed((prev) => shiftPlayedIndices(prev, removeIndex));
 			setQueueState((prev) => removeTrack(prev, removeIndex));
 		},
-		[clear, queue.length, setQueueState, shouldPlayRef],
+		[clear, queue.length, setQueueState],
 	);
 
 	return {

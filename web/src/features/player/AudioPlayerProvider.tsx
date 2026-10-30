@@ -7,7 +7,9 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { fetchLatestUnfinishedAudio } from "../../api/progress";
+import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
 import { useMediaProgress } from "../media/useMediaProgress";
 import { PLAYBACK_ERROR } from "./audioPlayback";
@@ -63,6 +65,9 @@ export function useAudioPlayer(): AudioPlayerContextValue {
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
+	const { t } = useTranslation();
+	// Внутренний сентинел audioPlayback: пользователь видит перевод.
+	const playbackFailed = t("player.errorBody");
 	// Начальное состояние — из localStorage (очередь переживает
 	// перезагрузку). Очередь и настройки грузятся независимо: громкость
 	// и режимы — предпочтения, они действуют и без очереди.
@@ -87,10 +92,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 	const timings = useAudioTimings(currentId);
 	// Допуск дрейфа автоплея: трек уже играет, пока позиция едет с сервера.
 	const progress = useMediaProgress(currentId, audioRef, current !== null, 2);
-	const handlePlayError = useCallback((message: string) => {
-		setError(message);
-		setPlaying(false);
-	}, []);
+	const handlePlayError = useCallback(
+		(message: string) => {
+			setError(message === PLAYBACK_ERROR ? playbackFailed : message);
+			setPlaying(false);
+		},
+		[playbackFailed],
+	);
 
 	// Сид мини-плеера: без очереди (и без сохранённой) подтягиваем
 	// последний недослушанный трек с сервера — на паузе, позиция
@@ -165,6 +173,21 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 		repeat,
 	});
 
+	// Приватность очереди: провайдер смонтирован выше Outlet и переживает
+	// logout, поэтому при пустой сессии сносим очередь прошлого
+	// пользователя полным clear (стоп + чистка персиста). undefined —
+	// загрузка: ошибки сессия бросает, а не кэширует null. clear сессию
+	// не трогает, эффект зависит только от фронта в null — зацикливания
+	// нет. Эффект после персиста: при старте без сессии восстановленная
+	// из storage очередь сначала пересохраняется, затем сносится.
+	const { data: session } = useSession();
+	const { clear } = controls;
+	useEffect(() => {
+		if (session === null) {
+			clear();
+		}
+	}, [session, clear]);
+
 	useAudioMediaSession({
 		current,
 		currentTime: timings.currentTime,
@@ -212,8 +235,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 				onPause={() => setPlaying(false)}
 				onEnded={handleTrackEnded}
 				onError={() => {
-					setError(PLAYBACK_ERROR);
-					setPlaying(false);
+					handlePlayError(PLAYBACK_ERROR);
 				}}
 			/>
 		</AudioPlayerContext.Provider>

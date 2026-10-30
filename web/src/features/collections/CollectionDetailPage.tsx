@@ -1,322 +1,35 @@
 import {
-	ActionIcon,
 	Alert,
-	Badge,
 	Button,
 	Group,
-	Menu,
 	Modal,
 	SimpleGrid,
 	Skeleton,
 	Stack,
 	Text,
-	TextInput,
 	Title,
-	Tooltip,
 } from "@mantine/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import {
-	ArrowLeft,
-	FolderInput,
-	MoreVertical,
-	Pencil,
-	Plus,
-	Trash2,
-	X,
-} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	type Collection,
 	useCollectionItems,
 	useCollections,
 	useDeleteCollection,
 	useRemoveFromCollection,
-	useRenameCollection,
 } from "../../api/collections";
-import type { Media, MediaType } from "../../core/media";
-import { AudioCard } from "../audio/AudioCard";
-import { MemeCard } from "../memes/MemeCard";
-import { VideoCard } from "../video/VideoCard";
+import { isMediaType } from "../../components/mediaType";
+import type { MediaType } from "../../core/media";
 import { AddMediaToCollectionModal } from "./AddMediaToCollectionModal";
+import { CollectionCard } from "./CollectionCard";
+import { CollectionFallback } from "./CollectionFallback";
+import { CollectionHeader } from "./CollectionHeader";
 import { CollectionTile } from "./CollectionTile";
+import { descendantIds, TYPE_PATH } from "./collectionUtils";
 import { MoveCollectionModal } from "./MoveCollectionModal";
 import { MoveToCollectionModal } from "./MoveToCollectionModal";
+import { RenameCollectionModal } from "./RenameCollectionModal";
 import { useCollectionError } from "./useCollectionError";
-
-const TYPE_LABEL_KEYS: Record<MediaType, string> = {
-	video: "media.video",
-	audio: "media.audio",
-	image: "media.memes",
-};
-
-const TYPE_PATH: Record<MediaType, "/video" | "/audio" | "/memes"> = {
-	video: "/video",
-	audio: "/audio",
-	image: "/memes",
-};
-
-const BACK_LABEL_KEY = "collections.back";
-
-function CollectionHeader({
-	collection,
-	type,
-	count,
-	backPath,
-	parent,
-	onAdd,
-	onRename,
-	onMove,
-	onDelete,
-}: {
-	collection: Collection;
-	type: MediaType;
-	count: number;
-	backPath: "/video" | "/audio" | "/memes";
-	parent?: Collection;
-	onAdd: () => void;
-	onRename: () => void;
-	onMove: () => void;
-	onDelete: () => void;
-}) {
-	const { t } = useTranslation();
-	const navigate = useNavigate();
-	const backLabel =
-		parent === undefined
-			? t(BACK_LABEL_KEY)
-			: t("collections.backToParent", { name: parent.name });
-	return (
-		<Stack gap="xs">
-			<Group justify="space-between" align="center" wrap="wrap">
-				<Button
-					variant="subtle"
-					leftSection={<ArrowLeft size={16} />}
-					onClick={() => {
-						if (parent === undefined) {
-							void navigate({ to: backPath });
-						} else {
-							void navigate({
-								to: "/collections/$id",
-								params: { id: String(parent.id) },
-							});
-						}
-					}}
-				>
-					{backLabel}
-				</Button>
-				<Group gap="xs">
-					<Button
-						variant="light"
-						leftSection={<Plus size={16} />}
-						onClick={onAdd}
-					>
-						{t("collections.addMedia")}
-					</Button>
-					<Menu position="bottom-end" withinPortal>
-						<Menu.Target>
-							<ActionIcon
-								variant="default"
-								size="lg"
-								aria-label={t("collections.actions")}
-							>
-								<MoreVertical size={18} />
-							</ActionIcon>
-						</Menu.Target>
-						<Menu.Dropdown>
-							<Menu.Item leftSection={<Pencil size={14} />} onClick={onRename}>
-								{t("collections.rename")}
-							</Menu.Item>
-							<Menu.Item
-								leftSection={<FolderInput size={14} />}
-								onClick={onMove}
-							>
-								{t("collections.moveCollection")}
-							</Menu.Item>
-							<Menu.Item
-								color="red"
-								leftSection={<Trash2 size={14} />}
-								onClick={onDelete}
-							>
-								{t("collections.delete")}
-							</Menu.Item>
-						</Menu.Dropdown>
-					</Menu>
-				</Group>
-			</Group>
-			<Group gap="sm" wrap="wrap">
-				<Title order={1} size="h2">
-					{collection.name}
-				</Title>
-				<Badge variant="light" color="violet">
-					{t(TYPE_LABEL_KEYS[type])}
-				</Badge>
-			</Group>
-			<Text size="sm" c="dimmed">
-				{t("collections.itemsCount", { count })}
-			</Text>
-		</Stack>
-	);
-}
-
-function isMediaType(value: string): value is MediaType {
-	return value === "video" || value === "audio" || value === "image";
-}
-
-// Id себя и всех потомков: переезд коллекции под них замкнул бы цикл
-// (сервер тоже проверяет, но молчание кнопки понятнее ошибки).
-function descendantIds(all: Collection[], rootId: number): Set<number> {
-	const excluded = new Set<number>([rootId]);
-	const childrenByParent = new Map<number, number[]>();
-	for (const collection of all) {
-		if (collection.parent_id !== null && collection.parent_id !== undefined) {
-			const list = childrenByParent.get(collection.parent_id) ?? [];
-			list.push(collection.id);
-			childrenByParent.set(collection.parent_id, list);
-		}
-	}
-	const stack = [rootId];
-	while (stack.length > 0) {
-		const current = stack.pop();
-		if (current === undefined) {
-			continue;
-		}
-		for (const child of childrenByParent.get(current) ?? []) {
-			if (!excluded.has(child)) {
-				excluded.add(child);
-				stack.push(child);
-			}
-		}
-	}
-	return excluded;
-}
-
-function CollectionCard({
-	media,
-	type,
-	onRemove,
-	onMove,
-}: {
-	media: Media;
-	type: MediaType;
-	onRemove: () => void;
-	onMove: () => void;
-}) {
-	const { t } = useTranslation();
-	return (
-		<div className="relative">
-			{type === "video" ? (
-				<VideoCard media={media} />
-			) : type === "audio" ? (
-				<AudioCard media={media} />
-			) : (
-				<MemeCard media={media} />
-			)}
-			<Tooltip label={t("collections.removeItem")} withArrow>
-				<ActionIcon
-					variant="filled"
-					color="red"
-					size="lg"
-					radius="xl"
-					aria-label={t("collections.removeItem")}
-					className="absolute bottom-2 left-2 z-10"
-					onClick={onRemove}
-				>
-					<X size={18} />
-				</ActionIcon>
-			</Tooltip>
-			<Tooltip label={t("collections.moveItem")} withArrow>
-				<ActionIcon
-					variant="filled"
-					size="lg"
-					radius="xl"
-					aria-label={t("collections.moveItem")}
-					className="absolute bottom-2 right-2 z-10"
-					onClick={onMove}
-				>
-					<FolderInput size={18} />
-				</ActionIcon>
-			</Tooltip>
-		</div>
-	);
-}
-
-function RenameCollectionModal({
-	collection,
-	opened,
-	onClose,
-}: {
-	collection: Collection;
-	opened: boolean;
-	onClose: () => void;
-}) {
-	const { t } = useTranslation();
-	const [name, setName] = useState(collection.name);
-	const rename = useRenameCollection();
-	const notifyError = useCollectionError();
-	return (
-		<Modal
-			opened={opened}
-			onClose={onClose}
-			title={t("collections.renameTitle")}
-			centered
-		>
-			<Stack gap="md">
-				<TextInput
-					label={t("collections.name")}
-					value={name}
-					data-autofocus
-					onChange={(event) => setName(event.currentTarget.value)}
-				/>
-				<Group justify="flex-end">
-					<Button variant="default" onClick={onClose}>
-						{t("collections.cancel")}
-					</Button>
-					<Button
-						loading={rename.isPending}
-						disabled={name.trim() === ""}
-						onClick={() => {
-							rename.mutate(
-								{ id: collection.id, name: name.trim() },
-								{ onSuccess: onClose, onError: notifyError },
-							);
-						}}
-					>
-						{t("collections.save")}
-					</Button>
-				</Group>
-			</Stack>
-		</Modal>
-	);
-}
-
-function CollectionFallback({
-	title,
-	onRetry,
-}: {
-	title: string;
-	onRetry?: () => void;
-}) {
-	const { t } = useTranslation();
-	const navigate = useNavigate();
-	return (
-		<Stack gap="md">
-			<Alert color="red" variant="light" title={title}>
-				{onRetry !== undefined && (
-					<Button variant="light" size="xs" mt="xs" onClick={onRetry}>
-						{t("common.retry")}
-					</Button>
-				)}
-			</Alert>
-			<Button
-				variant="light"
-				w="fit-content"
-				onClick={() => void navigate({ to: "/video" })}
-			>
-				{t(BACK_LABEL_KEY)}
-			</Button>
-		</Stack>
-	);
-}
 
 export function CollectionDetailPage() {
 	const { t } = useTranslation();
@@ -345,13 +58,19 @@ export function CollectionDetailPage() {
 	const backPath = type === null ? "/video" : TYPE_PATH[type];
 
 	if (!valid) {
-		return <CollectionFallback title={t("collections.notFound")} />;
+		return (
+			<CollectionFallback
+				title={t("collections.notFound")}
+				backPath={backPath}
+			/>
+		);
 	}
 
 	if (collections.isError) {
 		return (
 			<CollectionFallback
 				title={t("collections.loadError")}
+				backPath={backPath}
 				onRetry={() => void collections.refetch()}
 			/>
 		);
@@ -367,7 +86,12 @@ export function CollectionDetailPage() {
 	}
 
 	if (collection === undefined || type === null) {
-		return <CollectionFallback title={t("collections.notFound")} />;
+		return (
+			<CollectionFallback
+				title={t("collections.notFound")}
+				backPath={backPath}
+			/>
+		);
 	}
 
 	const mediaItems = items.data ?? [];

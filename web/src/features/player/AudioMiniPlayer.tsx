@@ -58,7 +58,7 @@ export function AudioMiniPlayer() {
 							)}
 						</Group>
 						<Text size="xs" c="dimmed" truncate>
-							{artists === "" ? "—" : artists}
+							{artists === "" ? t("common.emptyFallback") : artists}
 						</Text>
 					</Stack>
 				</Link>
@@ -71,6 +71,7 @@ export function AudioMiniPlayer() {
 						<ActionIcon
 							variant="subtle"
 							aria-label={t("player.previous")}
+							data-testid="player-prev"
 							onClick={player.previous}
 						>
 							<SkipBack size={18} />
@@ -85,6 +86,7 @@ export function AudioMiniPlayer() {
 							radius="xl"
 							size="lg"
 							aria-label={player.playing ? t("player.pause") : t("player.play")}
+							data-testid={player.playing ? "player-pause" : "player-play"}
 							onClick={player.toggle}
 						>
 							{player.playing ? (
@@ -98,6 +100,7 @@ export function AudioMiniPlayer() {
 						<ActionIcon
 							variant="subtle"
 							aria-label={t("player.next")}
+							data-testid="player-next"
 							onClick={player.next}
 						>
 							<SkipForward size={18} />

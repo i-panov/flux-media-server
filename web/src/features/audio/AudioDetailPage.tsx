@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useMedia } from "../../api/media";
 import { formatDuration } from "../../core/format";
+import { isSafeImageUrl } from "../../core/media";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { ArtistFavoriteButton } from "../favorites/ArtistFavoriteButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
@@ -94,11 +95,12 @@ export function AudioDetailPage() {
 
 	const item = media.data;
 	const isCurrent = player.current?.id === item.id;
-	// Обложка — декоративный фон: битая картинка не должна оставлять иконку.
-	const coverStyle =
-		item.cover_url === ""
-			? undefined
-			: { backgroundImage: `url("${item.cover_url}")` };
+	// Обложка — декоративный фон: пустая или чужая схема не должна
+	// уходить в backgroundImage, тогда видна заглушка с иконкой.
+	const hasCover = isSafeImageUrl(item.cover_url);
+	const coverStyle = hasCover
+		? { backgroundImage: `url("${item.cover_url}")` }
+		: undefined;
 
 	return (
 		<Stack gap="lg">
@@ -111,7 +113,7 @@ export function AudioDetailPage() {
 					style={coverStyle}
 					className="grid h-60 w-60 shrink-0 place-items-center rounded-md bg-[var(--mantine-color-default-hover)] bg-cover bg-center"
 				>
-					{item.cover_url === "" && (
+					{!hasCover && (
 						<Music size={48} className="text-[var(--mantine-color-dimmed)]" />
 					)}
 				</div>

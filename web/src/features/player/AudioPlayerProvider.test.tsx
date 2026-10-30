@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import {
 	afterEach,
@@ -10,6 +10,7 @@ import {
 	it,
 	vi,
 } from "vitest";
+import type { AuthUser } from "../../api/auth";
 import type { Media } from "../../core/media";
 import { AudioPlayerProvider, useAudioPlayer } from "./AudioPlayerProvider";
 import { QUEUE_STORAGE_KEY } from "./playerPersistence";
@@ -64,19 +65,31 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-function setup() {
+// Ключ зеркалит sessionQueryKey из api/session (не экспортируется):
+// предзаполняем кэш сессии до монтирования, чтобы useSession внутри
+// провайдера не уходил в сеть, а сразу видел нужное состояние.
+const SESSION_KEY = ["session"];
+
+function user(): AuthUser {
+	return { id: 1, email: "user@example.com", is_admin: false };
+}
+
+function setup(initialSession?: AuthUser | null) {
 	const client = new QueryClient({
 		defaultOptions: {
 			queries: { retry: false },
 			mutations: { retry: false },
 		},
 	});
+	if (initialSession !== undefined) {
+		client.setQueryData(SESSION_KEY, initialSession);
+	}
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={client}>
 			<AudioPlayerProvider>{children}</AudioPlayerProvider>
 		</QueryClientProvider>
 	);
-	return renderHook(() => useAudioPlayer(), { wrapper });
+	return { ...renderHook(() => useAudioPlayer(), { wrapper }), client };
 }
 
 describe("AudioPlayerProvider", () => {
@@ -296,5 +309,51 @@ describe("AudioPlayerProvider", () => {
 		const { result } = setup();
 		expect(result.current.queue).toEqual([]);
 		expect(result.current.current).toBeNull();
+	});
+
+	it("сбрасывает очередь при выходе из сессии", async () => {
+		const { result, client } = setup(user());
+		act(() => result.current.playMedia(media(1, "Первый")));
+		expect(result.current.current?.id).toBe(1);
+		expect(localStorage.getItem(QUEUE_STORAGE_KEY)).not.toBeNull();
+
+		// Нотификации подписчикам query-кэша идут через setTimeout(0),
+		// поэтому сброс наблюдаем через waitFor, а не синхронно.
+		act(() => {
+			client.setQueryData(SESSION_KEY, null);
+		});
+		await waitFor(() => expect(result.current.queue).toEqual([]));
+		expect(result.current.current).toBeNull();
+		expect(result.current.playing).toBe(false);
+		expect(localStorage.getItem(QUEUE_STORAGE_KEY)).toBeNull();
+	});
+
+	it("сносит восстановленную очередь при старте без сессии", () => {
+		localStorage.setItem(
+			QUEUE_STORAGE_KEY,
+			JSON.stringify({
+				items: [media(1, "Первый")],
+				index: 0,
+				played: [0],
+			}),
+		);
+		const { result } = setup(null);
+		expect(result.current.queue).toEqual([]);
+		expect(result.current.current).toBeNull();
+		expect(localStorage.getItem(QUEUE_STORAGE_KEY)).toBeNull();
+	});
+
+	it("не трогает очередь при активной сессии", () => {
+		localStorage.setItem(
+			QUEUE_STORAGE_KEY,
+			JSON.stringify({
+				items: [media(1, "Первый")],
+				index: 0,
+				played: [0],
+			}),
+		);
+		const { result } = setup(user());
+		expect(result.current.queue.map((item) => item.id)).toEqual([1]);
+		expect(result.current.current?.id).toBe(1);
 	});
 });

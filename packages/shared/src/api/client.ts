@@ -39,22 +39,23 @@ async function toApiError(response: Response): Promise<ApiError> {
 	);
 }
 
-// Публичные auth-эндпоинты: обновлять по ним нечего, повтор бессмысленен.
+// Публичные auth-эндпоинты и health: обновлять по ним нечего, повтор бессмысленен.
 const AUTH_PUBLIC_PATHS = [
 	"/auth/request-code",
 	"/auth/verify-code",
 	"/auth/refresh",
+	"/health",
 ];
 
 // Общий промис обновления, чтобы пачка параллельных 401 не плодила
 // гонку refresh-запросов.
 let refreshInflight: Promise<void> | null = null;
 
-function scheduleRefresh(): Promise<void> {
+function scheduleRefresh(signal?: AbortSignal): Promise<void> {
 	if (refreshInflight === null) {
 		// Сырой вызов транспорта без рекурсии в apiFetch: refresh сам себя обновлять не должен.
 		refreshInflight = getApiConfig()
-			.transport.refresh(getApiConfig().baseUrl)
+			.transport.refresh(getApiConfig().baseUrl, signal)
 			.finally(() => {
 				refreshInflight = null;
 			});
@@ -62,6 +63,9 @@ function scheduleRefresh(): Promise<void> {
 	return refreshInflight;
 }
 
+// Вызывать только как apiFetch<unknown> с последующим zod-парсингом.
+// Каст результата через `as T` без валидации новому коду запрещён:
+// контракт ответа фиксирует схема, а не утверждение типа.
 export function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 	return requestWithRefresh<T>(path, init, true);
 }
@@ -98,10 +102,13 @@ async function requestWithRefresh<T>(
 			!AUTH_PUBLIC_PATHS.includes(path)
 		) {
 			try {
-				await scheduleRefresh();
+				await scheduleRefresh(init?.signal ?? undefined);
 			} catch {
 				throw error;
 			}
+			// Ушёл со страницы во время refresh — молча отменяемся,
+			// TanStack такое глотает.
+			init?.signal?.throwIfAborted();
 			return requestWithRefresh<T>(path, init, false);
 		}
 		throw error;
@@ -112,7 +119,20 @@ async function requestWithRefresh<T>(
 		return undefined as T;
 	}
 
-	return (await response.json()) as T;
+	// 200 с пустым телом — тоже пустой результат, а не JSON-ошибка.
+	const text = await response.text();
+	if (text.length === 0) {
+		return undefined as T;
+	}
+	try {
+		return JSON.parse(text) as T;
+	} catch {
+		throw new ApiError(
+			response.status,
+			"Invalid JSON response",
+			text.slice(0, 200),
+		);
+	}
 }
 
 const healthSchema = z.object({

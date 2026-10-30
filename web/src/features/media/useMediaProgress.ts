@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useProgress, useSaveProgress } from "../../api/progress";
+import {
+	useDeleteProgress,
+	useProgress,
+	useSaveProgress,
+} from "../../api/progress";
 
 // Позиция уходит на сервер не чаще раза в столько секунд воспроизведения.
 const SAVE_EVERY_SECONDS = 10;
@@ -23,6 +27,7 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 	// Состояние живёт в refs: объект результата useMutation — новый на каждом
 	const progressQuery = useProgress(enabled ? mediaId : 0, enabled);
 	const { mutate } = useSaveProgress();
+	const { mutate: remove } = useDeleteProgress();
 	// Готовность метаданных привязана к mediaId: при смене id она сама
 	// становится ложной, без setState в эффекте.
 	const [metadataFor, setMetadataFor] = useState<number | null>(null);
@@ -32,6 +37,11 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 	// размонтировании: cleanup эффекта не может прочитать DOM.
 	const lastPosition = useRef(0);
 	const lastDuration = useRef(0);
+	// Флаг «реально измерялась ненулевая позиция»: отличает сброс
+	// пользователем (отмотка в начало после просмотра) от нуля
+	// неизмеренного элемента (ошибка потока, уход до старта) — во втором
+	// случае DELETE стёр бы восстановленную серверную запись.
+	const playedOnce = useRef(false);
 	// -1: ещё ничего не отправляли, первая позиция уйдёт всегда.
 	const savedPosition = useRef(-1);
 	const restored = useRef(false);
@@ -39,19 +49,38 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 	// mutate из useMutation стабилен, но храним его в ref, чтобы ни один
 	// обработчик не зависел от объекта мутации.
 	const send = useRef(mutate);
+	const drop = useRef(remove);
 	useEffect(() => {
 		send.current = mutate;
 	}, [mutate]);
+	useEffect(() => {
+		drop.current = remove;
+	}, [remove]);
 
 	const flush = useCallback(
 		(id: number, position: number, duration: number) => {
 			const pos = Math.max(Math.floor(position), 0);
 			const dur = Math.max(Math.floor(duration), 0);
-			if (pos === 0 || pos === savedPosition.current) {
-				return;
-			}
 			// Позиция за пределами длительности — испорченный элемент.
 			if (dur > 0 && pos > dur) {
+				return;
+			}
+			// Ноль — не «нечего сохранять», а сброс в начало: серверная
+			// запись удаляется, переоткрытие стартует с 0. Но только если
+			// в этой сессии реально играло (см. playedOnce): иначе ошибка
+			// потока или уход до старта стёрли бы восстановленную позицию.
+			if (pos === 0) {
+				if (!playedOnce.current) {
+					return;
+				}
+				if (savedPosition.current === 0) {
+					return;
+				}
+				savedPosition.current = 0;
+				drop.current(id);
+				return;
+			}
+			if (pos === savedPosition.current) {
 				return;
 			}
 			savedPosition.current = pos;
@@ -72,6 +101,7 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 		restored.current = false;
 		lastPosition.current = 0;
 		lastDuration.current = 0;
+		playedOnce.current = false;
 		savedPosition.current = -1;
 	}, [mediaId]);
 
@@ -79,6 +109,9 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 		const current = Math.floor(el.currentTime);
 		if (current >= 0) {
 			lastPosition.current = current;
+		}
+		if (current > 0) {
+			playedOnce.current = true;
 		}
 		if (Number.isFinite(el.duration) && el.duration > 0) {
 			lastDuration.current = Math.floor(el.duration);

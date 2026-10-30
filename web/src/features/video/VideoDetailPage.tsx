@@ -9,7 +9,7 @@ import {
 } from "@mantine/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { ListPlus } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import {
@@ -72,6 +72,13 @@ export function VideoDetailPage() {
 	const played = useRef(false);
 	const videoProgress = useMediaProgress(mediaId, videoRef, valid);
 
+	// Переход между видео без размонтирования: счётчик нового видео
+	// тоже должен сработать один раз.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: mediaId — триггер сброса, в теле эффекта не читается.
+	useEffect(() => {
+		played.current = false;
+	}, [mediaId]);
+
 	const goBack = () => {
 		void navigate({ to: "/video" });
 	};
@@ -79,10 +86,17 @@ export function VideoDetailPage() {
 
 	// Позиция сохраняется перед ЛЮБЫМ изменением nonce (ошибка video,
 	// ошибка track, кнопка retry) — иначе remount сбрасывает её в 0.
-	const handleMediaError = () => {
-		position.save();
-		reload.handleError();
-	};
+	// useCallback со стабильными зависимостями: SubTrack подписывается
+	// нативным слушателем в эффекте от onError, и новая ссылка на каждой
+	// отрисовке давала бы переподписку на каждый рендер. Оба колбэка
+	// стабильны сами по себе, поэтому деструктурируем их из объектов,
+	// которые пересоздаются на каждый рендер.
+	const { save: savePosition } = position;
+	const { handleError: handleReloadError } = reload;
+	const handleMediaError = useCallback(() => {
+		savePosition();
+		handleReloadError();
+	}, [savePosition, handleReloadError]);
 	const handleRetry = () => {
 		position.save();
 		reload.retry();
@@ -144,7 +158,9 @@ export function VideoDetailPage() {
 
 	const item = media.data;
 	const resolution =
-		item.width > 0 && item.height > 0 ? `${item.width}×${item.height}` : "—";
+		item.width > 0 && item.height > 0
+			? `${item.width}×${item.height}`
+			: t("common.emptyFallback");
 
 	return (
 		<Stack gap="lg">
@@ -225,7 +241,9 @@ export function VideoDetailPage() {
 				<Group gap="xl">
 					<MetaItem
 						label={t("video.meta.year")}
-						value={item.year > 0 ? String(item.year) : "—"}
+						value={
+							item.year > 0 ? String(item.year) : t("common.emptyFallback")
+						}
 					/>
 					<MetaItem
 						label={t("video.meta.duration")}

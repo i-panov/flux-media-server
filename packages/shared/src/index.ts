@@ -4,11 +4,7 @@ export {
 	getHealth,
 	type HealthResponse,
 } from "./api/client";
-export {
-	type HealthResponse as HealthApiResponse,
-	type HealthSnapshot,
-	useHealthQuery,
-} from "./api/health";
+export { type HealthSnapshot, useHealthQuery } from "./api/health";
 export type { CredentialsMode } from "./api/transport";
 export {
 	ACCESS_TOKEN_KEY,

@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { clearSessionData, useLogoutMutation } from "../../api/session";
+import { clearPersistedQueue } from "../player/playerPersistence";
 
 // Общий выход для шапки и настроек: одна обработка 401 и одно
 // уведомление об ошибке.
@@ -14,12 +15,14 @@ export function useLogout() {
 	const logout = () => {
 		mutation.mutate(undefined, {
 			onSuccess: () => {
+				clearPersistedQueue();
 				void navigate({ to: "/login" });
 			},
 			onError: (error) => {
 				if (error instanceof ApiError && error.status === 401) {
 					// Серверная сессия уже недействительна — выходим локально.
 					clearSessionData();
+					clearPersistedQueue();
 					void navigate({ to: "/login" });
 					return;
 				}

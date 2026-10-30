@@ -60,6 +60,7 @@ export function MoveToCollectionModal({
 							excludeIds={new Set([sourceId])}
 							allowRoot={false}
 							pending={move.isPending}
+							loading={collections.isPending}
 							onPick={(toCollectionId) => {
 								if (toCollectionId === null) {
 									return;

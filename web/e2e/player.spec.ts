@@ -178,8 +178,14 @@ test("аудиоплеер: очередь, мини-плеер и текст", 
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),
 	).toBeVisible();
 	await expect(page.getByText("Строка текста")).toBeVisible();
+	await expect(
+		page.getByRole("slider", { name: "Позиция воспроизведения" }),
+	).toBeVisible();
+	await expect(page.getByRole("slider", { name: "Громкость" })).toBeVisible();
+	await expect(page.getByTestId("player-prev")).toBeVisible();
+	await expect(page.getByTestId("player-next")).toBeVisible();
 
-	await page.getByRole("tab", { name: "Очередь" }).click();
+	await page.getByTestId("player-queue-tab").click();
 	await expect(page.getByText("Второй трек")).toBeVisible();
 
 	await page.getByRole("button", { name: "К аудио" }).click();
@@ -228,7 +234,7 @@ test("текст: пустое значение сохраняется как о
 	// должен закрыться, а не сохранить черновик второму треку.
 	await page.getByRole("button", { name: "Редактировать" }).click();
 	await page.getByRole("textbox").fill("Черновик");
-	await page.getByRole("button", { name: "Следующий" }).click();
+	await page.getByTestId("player-next").click();
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Второй трек" }),
 	).toBeVisible();

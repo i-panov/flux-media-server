@@ -1,3 +1,5 @@
+// Внутренний сентинел element-ошибок: провайдер подменяет его
+// переводом t("player.errorBody"), сырые message из play() — как есть.
 export const PLAYBACK_ERROR = "Playback failed";
 
 export function playAudio(

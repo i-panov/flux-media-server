@@ -35,6 +35,9 @@ export function parseSyncedLyrics(syncData: string): SyncedLyricLine[] {
 			result.push({ time: minutes * 60 + seconds, text });
 		}
 	}
+	// Теги в строке могут идти не по порядку — подсветка ищет последнюю
+	// прошедшую, поэтому результат всегда отсортирован по времени.
+	result.sort((a, b) => a.time - b.time);
 	return result;
 }
 

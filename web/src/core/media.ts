@@ -67,6 +67,24 @@ export type MediaType = "video" | "audio" | "image";
 // «Продолжить просмотр/прослушивание» — только медиа с прогрессом.
 export type MediaKind = Exclude<MediaType, "image">;
 
+const URL_SCHEME_PATTERN = /^([a-zA-Z][a-zA-Z0-9+.-]*):/;
+
+// Обложка уходит в CSS backgroundImage: чужая схема (javascript:, data:,
+// blob: и т.п.) вместо картинки дала бы пустой или мусорный фон.
+// Разрешаем http(s) и относительные пути (без схемы), остальное —
+// сигнал показать заглушку вместо фона.
+export function isSafeImageUrl(url: string): boolean {
+	if (url === "") {
+		return false;
+	}
+	const scheme = URL_SCHEME_PATTERN.exec(url);
+	if (scheme?.[1] === undefined) {
+		return true;
+	}
+	const name = scheme[1].toLowerCase();
+	return name === "http" || name === "https";
+}
+
 interface MediaListRequest {
 	type: MediaType;
 	q: string;

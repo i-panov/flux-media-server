@@ -61,7 +61,7 @@ export function AudioTrackRow({
 					</Text>
 				</Link>
 				<Text size="xs" c="dimmed" truncate>
-					{artists === "" ? "—" : artists}
+					{artists === "" ? t("common.emptyFallback") : artists}
 				</Text>
 			</Stack>
 			{media.duration > 0 && (

@@ -1,7 +1,5 @@
 import type { KeyValueStore } from "../storage";
 
-export type { KeyValueStore } from "../storage";
-
 // AuthTransport закрывает единственное платформенное различие API-слоя:
 // web аутентифицируется httpOnly-куками, мобильный клиент — Bearer-токенами
 // из защищённого хранилища. HTTP-вызовы (client.ts) платформенно нейтральны.
@@ -11,21 +9,25 @@ export type CredentialsMode = "omit" | "same-origin" | "include";
 export interface AuthTransport {
 	authHeaders(): Promise<Record<string, string>>;
 	credentials(): CredentialsMode | undefined;
-	refresh(baseUrl: string): Promise<void>;
+	refresh(baseUrl: string, signal?: AbortSignal): Promise<void>;
 }
 
-export function createWebTransport(): AuthTransport {
+export function createWebTransport(opts?: {
+	credentials?: CredentialsMode;
+}): AuthTransport {
+	const credentials: CredentialsMode = opts?.credentials ?? "same-origin";
 	return {
 		authHeaders: (): Promise<Record<string, string>> => Promise.resolve({}),
-		credentials: () => "same-origin",
-		refresh: async (baseUrl: string) => {
+		credentials: () => credentials,
+		refresh: async (baseUrl: string, signal?: AbortSignal) => {
 			// Сырой fetch: refresh сам себя обновлять не должен, сервер
 			// читает refresh-токен из куки при пустом теле.
 			const response = await fetch(`${baseUrl}/auth/refresh`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: "{}",
-				credentials: "same-origin",
+				credentials,
+				signal,
 			});
 			if (!response.ok) {
 				throw new Error(`Token refresh failed: ${response.status}`);
@@ -46,7 +48,7 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 			return access === null ? {} : { Authorization: `Bearer ${access}` };
 		},
 		credentials: () => undefined,
-		refresh: async (baseUrl: string) => {
+		refresh: async (baseUrl: string, signal?: AbortSignal) => {
 			const refreshToken = await store.get(REFRESH_TOKEN_KEY);
 			if (refreshToken === null) {
 				throw new Error("No refresh token stored");
@@ -55,6 +57,7 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ refresh_token: refreshToken }),
+				signal,
 			});
 			if (!response.ok) {
 				throw new Error(`Token refresh failed: ${response.status}`);

@@ -78,7 +78,7 @@ export function VideoCard({ media }: { media: Media }) {
 						{media.title}
 					</Text>
 					<Text size="xs" c="dimmed">
-						{media.year > 0 ? media.year : "—"}
+						{media.year > 0 ? media.year : t("common.emptyFallback")}
 					</Text>
 				</Card>
 			</Link>

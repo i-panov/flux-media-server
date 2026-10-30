@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { type Media, type MediaKind, mediaSchema } from "../core/media";
+import { queryClient } from "../queryClient";
+import type { AuthUser } from "./auth";
 import { ApiError, apiFetch } from "./client";
 
 const progressSchema = z.object({
@@ -88,6 +90,30 @@ export function useSaveProgress() {
 	});
 }
 
+// Сброс позиции в начало (0) — это удаление серверной записи, иначе
+// переоткрытие вернётся на старое место. Отсутствующую запись (404)
+// считаем успехом: конечное состояние то же — прогресса нет.
+async function deleteProgress(mediaId: number): Promise<void> {
+	try {
+		await apiFetch<unknown>(`/progress/${mediaId}`, { method: "DELETE" });
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) {
+			return;
+		}
+		throw error;
+	}
+}
+
+export function useDeleteProgress() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: deleteProgress,
+		onSuccess: (_data, mediaId) => {
+			queryClient.setQueryData(["progress", mediaId], null);
+		},
+	});
+}
+
 // Незавершённый просмотр: явный флаг снят, до 90% длительности, но что-то
 // уже отсмотрено или известна длительность.
 function isUnfinished(entry: ProgressEntry): boolean {
@@ -137,8 +163,15 @@ export function useContinueWatching(kind: MediaKind) {
 // Последний недослушанный трек для seeded-мини-плеера: свежих записей
 // может быть несколько, а завершённая (дослушанная до конца) — самой
 // новой, поэтому берём страницу и выбираем первую незавершённую.
+// Сид фоновый и необязательный: без сессии в сеть не ходим, иначе
+// apiFetch дёрнул бы refresh ради трека, который некому слушать.
+// Ключ зеркалит sessionQueryKey из api/session (не экспортируется).
 // Ошибки гасятся — плеер без сида просто стартует пустым.
 export async function fetchLatestUnfinishedAudio(): Promise<Media | null> {
+	const session = queryClient.getQueryData<AuthUser | null>(["session"]);
+	if (session === null || session === undefined) {
+		return null;
+	}
 	try {
 		const params = new URLSearchParams({
 			type: "audio",
@@ -158,7 +191,12 @@ export async function fetchLatestUnfinishedAudio(): Promise<Media | null> {
 			}
 		}
 		return null;
-	} catch {
+	} catch (error) {
+		// 401 после неудачного refresh — разлогинен, молча без сида.
+		if (error instanceof ApiError && error.status === 401) {
+			return null;
+		}
+		console.warn("Failed to fetch latest unfinished audio", error);
 		return null;
 	}
 }
