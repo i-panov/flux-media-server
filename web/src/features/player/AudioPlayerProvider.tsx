@@ -8,18 +8,21 @@ import {
 } from "react";
 import type { Media } from "../../core/media";
 import { useMediaProgress } from "../media/useMediaProgress";
-import { PLAYBACK_ERROR, playAudio } from "./audioPlayback";
+import { PLAYBACK_ERROR } from "./audioPlayback";
 import {
 	type AudioQueueState,
 	currentMedia,
 	emptyQueue,
-	removeTrack,
-	selectIndex,
-	startQueue,
+	type RepeatMode,
 } from "./audioQueue";
 import { HiddenAudio } from "./HiddenAudio";
+import { loadPersistedQueue, loadPersistedSettings } from "./playerPersistence";
 import { useAudioElementSync } from "./useAudioElementSync";
 import { useAudioMediaSession } from "./useAudioMediaSession";
+import { useAudioTimings } from "./useAudioTimings";
+import { usePlaybackControls } from "./usePlaybackControls";
+import { usePlayerPersistence } from "./usePlayerPersistence";
+import { useTrackEnded } from "./useTrackEnded";
 
 interface AudioPlayerContextValue {
 	queue: Media[];
@@ -29,6 +32,8 @@ interface AudioPlayerContextValue {
 	currentTime: number;
 	duration: number;
 	volume: number;
+	shuffle: boolean;
+	repeat: RepeatMode;
 	error: string | null;
 	playQueue: (items: Media[], startIndex?: number) => void;
 	playMedia: (media: Media) => void;
@@ -38,6 +43,8 @@ interface AudioPlayerContextValue {
 	select: (index: number) => void;
 	seek: (time: number) => void;
 	setVolume: (volume: number) => void;
+	toggleShuffle: () => void;
+	cycleRepeat: () => void;
 	removeAt: (index: number) => void;
 	clear: () => void;
 }
@@ -53,150 +60,71 @@ export function useAudioPlayer(): AudioPlayerContextValue {
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
-	const [queueState, setQueueState] = useState<AudioQueueState>(emptyQueue);
+	// Начальное состояние — из localStorage (очередь переживает
+	// перезагрузку). Очередь и настройки грузятся независимо: громкость
+	// и режимы — предпочтения, они действуют и без очереди.
+	// Автоплей не восстанавливаем: браузеры его всё равно
+	// режут, а сохранённая серверная позиция подтянется при старте.
+	const [restoredQueue] = useState(loadPersistedQueue);
+	const [restoredSettings] = useState(loadPersistedSettings);
+	const [queueState, setQueueState] = useState<AudioQueueState>(
+		restoredQueue?.queue ?? emptyQueue,
+	);
 	const queue = queueState.items;
 	const index = queueState.index;
 	const [playing, setPlaying] = useState(false);
-	// Позиция и длительность привязаны к id трека: после переключения
-	// старые значения к новому файлу не относятся, а сбрасывать их
-	// эффектом не нужно — сравнение с currentId даёт ноль само.
-	const [time, setTime] = useState({ mediaId: 0, seconds: 0 });
-	const [loaded, setLoaded] = useState({ mediaId: 0, seconds: 0 });
-	const [volume, setVolumeState] = useState(1);
+	const [volume, setVolumeState] = useState(restoredSettings.volume);
+	const [shuffle, setShuffle] = useState(restoredSettings.shuffle);
+	const [repeat, setRepeat] = useState<RepeatMode>(restoredSettings.repeat);
 	const [error, setError] = useState<string | null>(null);
 	const audioRef = useRef<HTMLAudioElement | null>(null);
 	const shouldPlay = useRef(false);
 	const current = currentMedia(queueState);
 	const currentId = current?.id ?? 0;
-	const currentTime = time.mediaId === currentId ? time.seconds : 0;
-	const duration = loaded.mediaId === currentId ? loaded.seconds : 0;
-	const progress = useMediaProgress(currentId, audioRef, current !== null);
+	const timings = useAudioTimings(currentId);
+	// Допуск дрейфа автоплея: трек уже играет, пока позиция едет с сервера.
+	const progress = useMediaProgress(currentId, audioRef, current !== null, 2);
 	const handlePlayError = useCallback((message: string) => {
 		setError(message);
 		setPlaying(false);
 	}, []);
 
-	const playQueue = useCallback(
-		(items: Media[], startIndex = 0) => {
-			if (items.length === 0) {
-				return;
-			}
-			const nextState = startQueue(items, startIndex);
-			shouldPlay.current = true;
-			setError(null);
-			setQueueState(nextState);
-			const element = audioRef.current;
-			if (element !== null && currentMedia(nextState)?.id === currentId) {
-				playAudio(element, handlePlayError);
-			}
-		},
-		[currentId, handlePlayError],
-	);
-
-	const playMedia = useCallback(
-		(media: Media) => playQueue([media], 0),
-		[playQueue],
-	);
-
-	const toggle = useCallback(() => {
-		const element = audioRef.current;
-		if (element === null || current === null) {
-			return;
-		}
-		if (element.paused) {
-			shouldPlay.current = true;
-			// Повтор после сбоя: старая ошибка не должна висеть, если
-			// воспроизведение на этот раз пошло.
-			setError(null);
-			playAudio(element, handlePlayError);
-		} else {
-			progress.handlePause();
-			shouldPlay.current = false;
-			element.pause();
-		}
-	}, [current, handlePlayError, progress]);
-
-	const select = useCallback(
-		(nextIndex: number) => {
-			if (nextIndex < 0 || nextIndex >= queue.length) {
-				return;
-			}
-			shouldPlay.current = true;
-			setError(null);
-			setQueueState((prev) => selectIndex(prev, nextIndex));
-		},
-		[queue.length],
-	);
-
-	const next = useCallback(() => {
-		if (index < queue.length - 1) {
-			select(index + 1);
-			return;
-		}
-		shouldPlay.current = false;
-		progress.handlePause();
-		audioRef.current?.pause();
-	}, [index, progress, queue.length, select]);
-
-	const previous = useCallback(() => {
-		const element = audioRef.current;
-		if (element !== null && element.currentTime > 3) {
-			element.currentTime = 0;
-			setTime({ mediaId: currentId, seconds: 0 });
-			return;
-		}
-		if (index > 0) {
-			select(index - 1);
-		}
-	}, [currentId, index, select]);
-
-	const seek = useCallback(
-		(seconds: number) => {
-			const element = audioRef.current;
-			if (element === null) {
-				return;
-			}
-			element.currentTime = seconds;
-			setTime({ mediaId: currentId, seconds });
-		},
-		[currentId],
-	);
-
-	const setVolume = useCallback((value: number) => {
-		const normalized = Math.min(Math.max(value, 0), 1);
-		setVolumeState(normalized);
-		if (audioRef.current !== null) {
-			audioRef.current.volume = normalized;
-		}
+	const toggleShuffle = useCallback(() => {
+		setShuffle((prev) => !prev);
 	}, []);
 
-	const clear = useCallback(() => {
-		shouldPlay.current = false;
-		const element = audioRef.current;
-		if (element !== null) {
-			element.pause();
-			element.removeAttribute("src");
-			element.load();
-		}
-		setQueueState(emptyQueue);
-		setPlaying(false);
-		setError(null);
+	const cycleRepeat = useCallback(() => {
+		setRepeat((prev) =>
+			prev === "off" ? "all" : prev === "all" ? "one" : "off",
+		);
 	}, []);
 
-	const removeAt = useCallback(
-		(removeIndex: number) => {
-			if (removeIndex < 0 || removeIndex >= queue.length) {
-				return;
-			}
-			if (queue.length === 1) {
-				clear();
-				return;
-			}
-			shouldPlay.current = true;
-			setQueueState((prev) => removeTrack(prev, removeIndex));
-		},
-		[clear, queue.length],
-	);
+	const controls = usePlaybackControls({
+		queueState,
+		setQueueState,
+		current,
+		currentId,
+		audioRef,
+		shouldPlayRef: shouldPlay,
+		shuffle,
+		repeat,
+		progress,
+		markTime: timings.markTime,
+		setError,
+		setPlaying,
+		setVolumeState,
+		onPlayError: handlePlayError,
+		initialPlayed: restoredQueue?.played,
+	});
+
+	const handleTrackEnded = useTrackEnded({
+		repeat,
+		audioRef,
+		markTime: timings.markTime,
+		next: controls.next,
+		onProgressEnded: progress.handleEnded,
+		onError: handlePlayError,
+	});
 
 	useAudioElementSync({
 		current,
@@ -206,13 +134,21 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 		onError: handlePlayError,
 	});
 
+	usePlayerPersistence({
+		queueState,
+		played: controls.played,
+		volume,
+		shuffle,
+		repeat,
+	});
+
 	useAudioMediaSession({
 		current,
-		currentTime,
-		duration,
-		onToggle: toggle,
-		next,
-		previous,
+		currentTime: timings.currentTime,
+		duration: timings.duration,
+		onToggle: controls.toggle,
+		next: controls.next,
+		previous: controls.previous,
 	});
 
 	return (
@@ -222,20 +158,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 				index,
 				current,
 				playing,
-				currentTime,
-				duration,
+				currentTime: timings.currentTime,
+				duration: timings.duration,
 				volume,
+				shuffle,
+				repeat,
 				error,
-				playQueue,
-				playMedia,
-				toggle,
-				next,
-				previous,
-				select,
-				seek,
-				setVolume,
-				removeAt,
-				clear,
+				...controls,
+				toggleShuffle,
+				cycleRepeat,
 			}}
 		>
 			{children}
@@ -243,25 +174,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 				audioRef={audioRef}
 				src={current === null ? undefined : `/api/media/${current.id}/stream`}
 				onLoadedMetadata={(event) => {
-					setLoaded({
-						mediaId: currentId,
-						seconds: event.currentTarget.duration || 0,
-					});
+					timings.markLoaded(event.currentTarget.duration || 0);
 					progress.handleLoadedMetadata();
 				}}
 				onTimeUpdate={(event) => {
-					setTime({
-						mediaId: currentId,
-						seconds: event.currentTarget.currentTime,
-					});
+					timings.markTime(event.currentTarget.currentTime);
 					progress.handleTimeUpdate();
 				}}
 				onPlay={() => setPlaying(true)}
 				onPause={() => setPlaying(false)}
-				onEnded={() => {
-					progress.handleEnded();
-					next();
-				}}
+				onEnded={handleTrackEnded}
 				onError={() => {
 					setError(PLAYBACK_ERROR);
 					setPlaying(false);

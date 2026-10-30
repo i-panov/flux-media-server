@@ -55,3 +55,104 @@ export function removeTrack(
 	}
 	return { items, index: state.index };
 }
+
+export type RepeatMode = "off" | "all" | "one";
+
+// Куда идти по next (кнопка и конец трека): индекс или null — стоп.
+// Повтор одного обрабатывается перезапуском, а не переходом, поэтому
+// здесь "one" останавливает очередь как "off": вызывающий смотрит
+// на repeat отдельно.
+//
+// При shuffle уже сыгранные треки (played) пропускаются, а текущий
+// никогда не выбирается сразу повторно: иначе при repeat "off" очередь
+// играла бы бесконечно по кругу вместо остановки в конце.
+export function pickNextIndex(
+	state: AudioQueueState,
+	options: {
+		shuffle: boolean;
+		repeat: RepeatMode;
+		played?: ReadonlySet<number>;
+		random?: () => number;
+	},
+): number | null {
+	const { shuffle, repeat } = options;
+	const last = state.items.length - 1;
+	if (last < 0) {
+		return null;
+	}
+	if (shuffle && state.items.length > 1) {
+		const random = options.random ?? Math.random;
+		const pool: number[] = [];
+		for (let index = 0; index < state.items.length; index += 1) {
+			if (index !== state.index && !(options.played?.has(index) ?? false)) {
+				pool.push(index);
+			}
+		}
+		if (pool.length === 0) {
+			// Всё сыграно: без повтора — стоп, с повтором — свежий круг
+			// (вызывающий при этом сбрасывает played).
+			if (repeat !== "all") {
+				return null;
+			}
+			for (let index = 0; index < state.items.length; index += 1) {
+				if (index !== state.index) {
+					pool.push(index);
+				}
+			}
+		}
+		return pool[Math.floor(random() * pool.length) % pool.length];
+	}
+	if (state.index < last) {
+		return state.index + 1;
+	}
+	return repeat === "all" ? 0 : null;
+}
+
+// Куда идти по «Предыдущий»: индекс или null — стоим на месте.
+// Симметрично next: при repeat "all" с первого трека уходим на последний,
+// при shuffle — на случайный другой.
+export function pickPreviousIndex(
+	state: AudioQueueState,
+	options: {
+		shuffle: boolean;
+		repeat: RepeatMode;
+		random?: () => number;
+	},
+): number | null {
+	if (state.items.length === 0) {
+		return null;
+	}
+	if (options.shuffle && state.items.length > 1) {
+		const random = options.random ?? Math.random;
+		const pool: number[] = [];
+		for (let index = 0; index < state.items.length; index += 1) {
+			if (index !== state.index) {
+				pool.push(index);
+			}
+		}
+		return pool[Math.floor(random() * pool.length) % pool.length];
+	}
+	if (state.index > 0) {
+		return state.index - 1;
+	}
+	if (options.repeat === "all" && state.items.length > 1) {
+		return state.items.length - 1;
+	}
+	return null;
+}
+
+// После удаления трека индексы сыгранных сдвигаются: удалённый выпадает,
+// стоящие выше съезжают на один. Без этого shuffle пропускал бы не те треки.
+export function shiftPlayedIndices(
+	played: ReadonlySet<number>,
+	removed: number,
+): Set<number> {
+	const next = new Set<number>();
+	for (const index of played) {
+		if (index === removed) {
+			continue;
+		}
+		next.add(index > removed ? index - 1 : index);
+	}
+	return next;
+}

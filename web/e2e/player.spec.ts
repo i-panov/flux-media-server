@@ -2,6 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 const PROGRESS_ID_PATTERN = /^\/api\/progress\/\d+$/;
 const STREAM_PATTERN = /^\/api\/media\/\d+\/stream$/;
+const RANGE_PATTERN = /^bytes=(\d+)-(\d*)$/;
 const PLAYER_PATTERN = /\/player$/;
 const AUDIO_LIST_PATTERN = /\/audio$/;
 
@@ -38,9 +39,8 @@ function audioItem(id: number, title: string) {
 	};
 }
 
-function silentWav(): Buffer {
+function silentWav(seconds = 1): Buffer {
 	const sampleRate = 8000;
-	const seconds = 1;
 	const dataSize = sampleRate * seconds * 2;
 	const buffer = Buffer.alloc(44 + dataSize);
 	buffer.write("RIFF", 0);
@@ -256,4 +256,142 @@ test("текст: пока текст не загружен, редактор н
 	await expect(
 		page.getByRole("button", { name: "Добавить текст" }),
 	).toHaveCount(0);
+});
+
+test("аудио продолжает с сохранённой позиции", async ({ page }) => {
+	await page.route("**/api/auth/me", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				id: 1,
+				email: "user@example.com",
+				is_admin: false,
+			}),
+		}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/media",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					items: [audioItem(1, "Первый трек")],
+					total: 1,
+					limit: 24,
+					offset: 0,
+				}),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: [], total: 0, limit: 20, offset: 0 }),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/progress/1",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					id: 1,
+					user_id: 1,
+					media_id: 1,
+					position: 30,
+					duration: 120,
+					completed: false,
+					updated_at: "2026-01-01T00:00:00Z",
+				}),
+			}),
+	);
+	await page.route("**/api/collections", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: "[]",
+		}),
+	);
+	await page.route("**/api/favorites", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({ items: [], total: 0, limit: 200, offset: 0 }),
+		}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/media/1/lyrics",
+		(route) =>
+			route.fulfill({
+				status: 404,
+				contentType: "application/json",
+				body: JSON.stringify({ error: "not found" }),
+			}),
+	);
+	// Минута тишины: сохранённые 0:30 обязаны попасть внутрь файла.
+	// Отдаём с поддержкой Range: без неё Chromium считает поток
+	// неseekable и молча игнорирует восстановление позиции — как и
+	// положено, а тест проверяет именно восстановление.
+	await page.route(
+		(url) => url.pathname === "/api/media/1/stream",
+		(route) => {
+			const stream = silentWav(60);
+			const range = route.request().headers().range;
+			if (range === undefined) {
+				return route.fulfill({
+					status: 200,
+					contentType: "audio/wav",
+					headers: { "Accept-Ranges": "bytes" },
+					body: stream,
+				});
+			}
+			const match = RANGE_PATTERN.exec(range);
+			if (match === null) {
+				return route.fulfill({ status: 416, body: "bad range" });
+			}
+			const start = Number(match[1]);
+			const end =
+				match[2] === ""
+					? stream.length - 1
+					: Math.min(Number(match[2]), stream.length - 1);
+			return route.fulfill({
+				status: 206,
+				contentType: "audio/wav",
+				headers: {
+					"Accept-Ranges": "bytes",
+					"Content-Range": `bytes ${start}-${end}/${stream.length}`,
+					"Content-Length": String(end - start + 1),
+				},
+				body: stream.subarray(start, end + 1),
+			});
+		},
+	);
+	await page.route(
+		(url) => url.pathname.endsWith("/cover"),
+		(route) =>
+			route.fulfill({
+				status: 404,
+				contentType: "application/json",
+				body: JSON.stringify({ error: "no cover" }),
+			}),
+	);
+
+	await page.goto("/audio");
+	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await expect(page).toHaveURL(PLAYER_PATTERN);
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Первый трек" }),
+	).toBeVisible();
+	await expect
+		.poll(
+			async () =>
+				page.evaluate(() => document.querySelector("audio")?.currentTime ?? -1),
+			{ timeout: 15000 },
+		)
+		.toBeGreaterThanOrEqual(29);
 });

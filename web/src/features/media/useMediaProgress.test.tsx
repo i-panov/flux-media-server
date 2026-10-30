@@ -142,6 +142,47 @@ describe("useMediaProgress", () => {
 		expect(video.currentTime).toBe(42);
 	});
 
+	it("восстанавливает позицию поверх дрейфа автоплея", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse(progressBody(7, 120)));
+		vi.stubGlobal("fetch", fetchMock);
+
+		// Автоплей успел уйти на доли секунды раньше данных прогресса.
+		const video = fakeVideo(0.5, 3600);
+		const ref = { current: video };
+		const { result } = renderHook(() => useMediaProgress(7, ref, true, 2), {
+			wrapper: TestWrapper,
+		});
+
+		result.current.handleLoadedMetadata();
+		await waitFor(() => {
+			expect(video.currentTime).toBe(120);
+		});
+	});
+
+	it("без допуска ручной старт не перекрывается позицией", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse(progressBody(7, 300)));
+		vi.stubGlobal("fetch", fetchMock);
+
+		// Видео без автоплея: пользователь сам нажал play до прихода
+		// данных — прыгать на сохранённую минуту нельзя.
+		const video = fakeVideo(1.5, 3600);
+		const ref = { current: video };
+		const { result } = renderHook(() => useMediaProgress(7, ref), {
+			wrapper: TestWrapper,
+		});
+
+		result.current.handleLoadedMetadata();
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalled();
+		});
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(video.currentTime).toBe(1.5);
+	});
+
 	it("не ходит за прогрессом при невалидном mediaId", async () => {
 		const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}));
 		vi.stubGlobal("fetch", fetchMock);
@@ -276,5 +317,66 @@ describe("useMediaProgress", () => {
 		expect(String(first[0])).toContain("/progress/7");
 		expect((first[1] as RequestInit).body).toBeTypeOf("string");
 		expect(lastPutBody(fetchMock).position).toBe(55);
+	});
+
+	it("восстанавливает позицию нового трека после смены mediaId", async () => {
+		const fetchMock = vi.fn().mockImplementation((url: string) => {
+			const body = String(url).includes("/progress/8")
+				? progressBody(8, 40)
+				: progressBody(7, 0);
+			return Promise.resolve(jsonResponse(body));
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const first = fakeVideo(0, 3600);
+		const ref = { current: first as HTMLVideoElement | null };
+		const { result, rerender } = renderHook(
+			({ mediaId }) => useMediaProgress(mediaId, ref),
+			{ wrapper: TestWrapper, initialProps: { mediaId: 7 } },
+		);
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalled();
+		});
+
+		// Новый элемент нового трека: позиция прошлого сюда не переезжает.
+		const second = fakeVideo(0, 3600);
+		ref.current = second;
+		rerender({ mediaId: 8 });
+		result.current.handleLoadedMetadata();
+
+		await waitFor(() => {
+			expect(second.currentTime).toBe(40);
+		});
+		expect(first.currentTime).toBe(0);
+	});
+
+	it("не ставит новому треку позицию прошлого при пустом прогрессе", async () => {
+		const fetchMock = vi.fn().mockImplementation((url: string) => {
+			if (String(url).includes("/progress/8")) {
+				return Promise.resolve(
+					jsonResponse({ error: "Progress not found" }, 404),
+				);
+			}
+			return Promise.resolve(jsonResponse(progressBody(7, 120)));
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const first = fakeVideo(0, 3600);
+		const ref = { current: first as HTMLVideoElement | null };
+		const { result, rerender } = renderHook(
+			({ mediaId }) => useMediaProgress(mediaId, ref),
+			{ wrapper: TestWrapper, initialProps: { mediaId: 7 } },
+		);
+		result.current.handleLoadedMetadata();
+		await waitFor(() => {
+			expect(first.currentTime).toBe(120);
+		});
+
+		const second = fakeVideo(0, 3600);
+		ref.current = second;
+		rerender({ mediaId: 8 });
+		result.current.handleLoadedMetadata();
+		await new Promise((resolve) => setTimeout(resolve, 30));
+		expect(second.currentTime).toBe(0);
 	});
 });

@@ -120,6 +120,7 @@
 	"settings.account.logout": "Sign out",
 	"settings.server.title": "Server",
 	"settings.server.origin": "Address",
+	"settings.server.unreachable": "Server is unreachable",
 	"settings.about.title": "About",
 	"settings.about.webVersion": "Web version",
 	"settings.about.backendVersion": "Backend version",
@@ -197,5 +198,9 @@
 	"player.lyricsError": "Failed to load the text",
 	"player.addText": "Add text",
 	"player.edit": "Edit",
-	"player.noText": "No text yet"
+	"player.noText": "No text yet",
+	"player.shuffle": "Shuffle",
+	"player.repeatOff": "Repeat off",
+	"player.repeatAll": "Repeat queue",
+	"player.repeatOne": "Repeat track"
 }

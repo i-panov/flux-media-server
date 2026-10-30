@@ -12,6 +12,7 @@ import {
 } from "vitest";
 import type { Media } from "../../core/media";
 import { AudioPlayerProvider, useAudioPlayer } from "./AudioPlayerProvider";
+import { QUEUE_STORAGE_KEY } from "./playerPersistence";
 
 function media(id: number, title: string): Media {
 	return {
@@ -44,6 +45,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+	localStorage.clear();
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(() =>
@@ -153,5 +155,135 @@ describe("AudioPlayerProvider", () => {
 		expect(result.current.volume).toBe(1);
 		act(() => result.current.setVolume(-0.5));
 		expect(result.current.volume).toBe(0);
+	});
+
+	it("переключает перемешивание и циклит режим повтора", () => {
+		const { result } = setup();
+		expect(result.current.shuffle).toBe(false);
+		expect(result.current.repeat).toBe("off");
+		act(() => result.current.toggleShuffle());
+		expect(result.current.shuffle).toBe(true);
+		act(() => result.current.cycleRepeat());
+		expect(result.current.repeat).toBe("all");
+		act(() => result.current.cycleRepeat());
+		expect(result.current.repeat).toBe("one");
+		act(() => result.current.cycleRepeat());
+		expect(result.current.repeat).toBe("off");
+	});
+
+	it("повтор очереди зацикливает next на первом треке", () => {
+		const { result } = setup();
+		act(() => {
+			result.current.playQueue([media(1, "Первый"), media(2, "Второй")], 1);
+		});
+		act(() => result.current.cycleRepeat());
+		act(() => result.current.next());
+		expect(result.current.current?.id).toBe(1);
+	});
+
+	it("previous зацикливается на последний трек при повторе очереди", () => {
+		const { result } = setup();
+		act(() => {
+			result.current.playQueue(
+				[media(1, "Первый"), media(2, "Второй"), media(3, "Третий")],
+				0,
+			);
+		});
+		act(() => result.current.previous());
+		expect(result.current.current?.id).toBe(1);
+		act(() => result.current.cycleRepeat());
+		act(() => result.current.previous());
+		expect(result.current.current?.id).toBe(3);
+	});
+
+	it("перемешанная очередь останавливается без повтора", () => {
+		const { result } = setup();
+		act(() => {
+			result.current.playQueue([media(1, "Первый"), media(2, "Второй")], 0);
+		});
+		act(() => result.current.toggleShuffle());
+		act(() => result.current.next());
+		expect(result.current.current?.id).toBe(2);
+		// Всё сыграно: дальше — стоп, а не случайный повтор.
+		act(() => result.current.next());
+		expect(result.current.current?.id).toBe(2);
+	});
+
+	it("сохраняет очередь и поднимает её после перезамонтирования", () => {
+		const first = setup();
+		act(() => {
+			first.result.current.playQueue(
+				[media(1, "Первый"), media(2, "Второй")],
+				1,
+			);
+		});
+		act(() => first.result.current.setVolume(0.5));
+		act(() => first.result.current.toggleShuffle());
+		first.unmount();
+
+		const second = setup();
+		expect(second.result.current.queue.map((item) => item.id)).toEqual([1, 2]);
+		expect(second.result.current.index).toBe(1);
+		expect(second.result.current.current?.id).toBe(2);
+		expect(second.result.current.volume).toBe(0.5);
+		expect(second.result.current.shuffle).toBe(true);
+		// Автоплей не восстанавливаем: браузеры его режут, старт — по кнопке.
+		expect(second.result.current.playing).toBe(false);
+	});
+
+	it("clear стирает сохранённую очередь", () => {
+		const first = setup();
+		act(() => first.result.current.playMedia(media(1, "Первый")));
+		act(() => first.result.current.clear());
+		first.unmount();
+
+		const second = setup();
+		expect(second.result.current.queue).toEqual([]);
+		expect(second.result.current.current).toBeNull();
+	});
+
+	it("clear оставляет громкость и режимы", () => {
+		const first = setup();
+		act(() => first.result.current.playMedia(media(1, "Первый")));
+		act(() => first.result.current.setVolume(0.5));
+		act(() => first.result.current.toggleShuffle());
+		act(() => first.result.current.clear());
+		first.unmount();
+
+		const second = setup();
+		expect(second.result.current.queue).toEqual([]);
+		expect(second.result.current.volume).toBe(0.5);
+		expect(second.result.current.shuffle).toBe(true);
+	});
+
+	it("shuffle не повторяет сыгранное после перезамонтирования", () => {
+		const first = setup();
+		act(() => {
+			first.result.current.playQueue(
+				[media(1, "Первый"), media(2, "Второй"), media(3, "Третий")],
+				0,
+			);
+		});
+		act(() => first.result.current.toggleShuffle());
+		act(() => first.result.current.next());
+		const secondId = first.result.current.current?.id;
+		first.unmount();
+
+		const second = setup();
+		expect(second.result.current.current?.id).toBe(secondId);
+		act(() => second.result.current.next());
+		const thirdId = second.result.current.current?.id;
+		// Все три трека разные: сыгранное до перезагрузки не повторилось.
+		expect(new Set([1, secondId, thirdId]).size).toBe(3);
+		// Всё сыграно: дальше — стоп.
+		act(() => second.result.current.next());
+		expect(second.result.current.current?.id).toBe(thirdId);
+	});
+
+	it("битое хранилище не ломает плеер", () => {
+		localStorage.setItem(QUEUE_STORAGE_KEY, "not json");
+		const { result } = setup();
+		expect(result.current.queue).toEqual([]);
+		expect(result.current.current).toBeNull();
 	});
 });

@@ -1,4 +1,5 @@
 import {
+	Alert,
 	Badge,
 	Button,
 	Card,
@@ -47,7 +48,7 @@ function SettingsCard({
 export function SettingsPage() {
 	const { t, i18n } = useTranslation();
 	const { colorScheme, setColorScheme } = useMantineColorScheme();
-	const { data } = useHealthQuery();
+	const { data, isError, isFetching, refetch } = useHealthQuery();
 	const { data: session } = useSession();
 	const { logout, isPending: logoutPending } = useLogout();
 	const currentLang = pickLang(i18n.language);
@@ -148,6 +149,24 @@ export function SettingsPage() {
 								{data?.version ?? "—"}
 							</Text>
 						</Group>
+						{isError && (
+							<Alert
+								color="red"
+								variant="light"
+								title={t("settings.server.unreachable")}
+							>
+								{t("home.server.error")}
+								<Button
+									variant="light"
+									size="xs"
+									mt="xs"
+									loading={isFetching}
+									onClick={() => void refetch()}
+								>
+									{t("common.retry")}
+								</Button>
+							</Alert>
+						)}
 					</Stack>
 				</SettingsCard>
 			</SimpleGrid>

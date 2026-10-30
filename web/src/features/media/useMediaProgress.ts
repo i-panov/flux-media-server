@@ -9,14 +9,18 @@ const COMPLETED_TAIL_SECONDS = 5;
 // Общий прогресс для видео и аудио: HTMLMediaElement, поэтому тип элемента
 // задаёт вызывающий (HTMLVideoElement / HTMLAudioElement).
 //
-// Состояние живёт в refs: объект результата useMutation — новый на каждом
-// рендере, и попадание его в зависимости эффекта запускает бесконечный
-// цикл «cleanup → mutate → рендер → cleanup».
+// restoreDriftSeconds — допуск дрейфа автоплея при восстановлении: аудио
+// стартует раньше, чем приходит сохранённая позиция, и набежавшие доли
+// секунды — не «пользователь уже смотрит». У видео автоплея нет, поэтому
+// там допуск нулевой: ручной старт в первые секунды позиция не перекрывает.
+//
 export function useMediaProgress<E extends HTMLMediaElement>(
 	mediaId: number,
 	mediaRef: React.RefObject<E | null>,
 	enabled = true,
+	restoreDriftSeconds = 0,
 ) {
+	// Состояние живёт в refs: объект результата useMutation — новый на каждом
 	const progressQuery = useProgress(enabled ? mediaId : 0, enabled);
 	const { mutate } = useSaveProgress();
 	// Готовность метаданных привязана к mediaId: при смене id она сама
@@ -135,12 +139,15 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 		}
 		restored.current = true;
 		const el = mediaRef.current;
-		if (el === null || el.currentTime !== 0) {
+		if (el === null) {
 			return;
 		}
 		const position = data?.position ?? 0;
 		const duration = Number.isFinite(el.duration) ? el.duration : 0;
 		if (position <= 0 || (duration > 0 && position > duration)) {
+			return;
+		}
+		if (el.currentTime > restoreDriftSeconds) {
 			return;
 		}
 		el.currentTime = position;
@@ -149,7 +156,13 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 			lastDuration.current = Math.floor(duration);
 		}
 		savedPosition.current = position;
-	}, [enabled, metadataReady, progressQuery.data, mediaRef]);
+	}, [
+		enabled,
+		metadataReady,
+		progressQuery.data,
+		mediaRef,
+		restoreDriftSeconds,
+	]);
 
 	// Сохранение при уходе со страницы и при смене mediaId. Слушатели
 	// пересоздаются вместе с id, а cleanup попадает в замыкание со старым

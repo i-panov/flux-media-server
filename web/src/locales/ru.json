@@ -120,6 +120,7 @@
 	"settings.account.logout": "Выйти из аккаунта",
 	"settings.server.title": "Сервер",
 	"settings.server.origin": "Адрес",
+	"settings.server.unreachable": "Сервер недоступен",
 	"settings.about.title": "О приложении",
 	"settings.about.webVersion": "Версия веба",
 	"settings.about.backendVersion": "Версия бэкенда",
@@ -197,5 +198,9 @@
 	"player.lyricsError": "Не удалось загрузить текст",
 	"player.addText": "Добавить текст",
 	"player.edit": "Редактировать",
-	"player.noText": "Текст не добавлен"
+	"player.noText": "Текст не добавлен",
+	"player.shuffle": "Перемешать",
+	"player.repeatOff": "Повтор выключен",
+	"player.repeatAll": "Повторять очередь",
+	"player.repeatOne": "Повторять трек"
 }

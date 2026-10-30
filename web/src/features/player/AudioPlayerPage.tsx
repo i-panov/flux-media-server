@@ -19,6 +19,9 @@ import {
 	Music,
 	Pause,
 	Play,
+	Repeat,
+	Repeat1,
+	Shuffle,
 	SkipBack,
 	SkipForward,
 	Trash2,
@@ -268,6 +271,18 @@ export function AudioPlayerPage() {
 					</Group>
 
 					<Group justify="center" gap="md">
+						<Tooltip label={t("player.shuffle")} withArrow>
+							<ActionIcon
+								variant={player.shuffle ? "filled" : "subtle"}
+								size="lg"
+								radius="xl"
+								aria-label={t("player.shuffle")}
+								aria-pressed={player.shuffle}
+								onClick={player.toggleShuffle}
+							>
+								<Shuffle size={20} />
+							</ActionIcon>
+						</Tooltip>
 						<Tooltip label={t("player.previous")} withArrow>
 							<ActionIcon
 								variant="subtle"
@@ -299,6 +314,36 @@ export function AudioPlayerPage() {
 								onClick={player.next}
 							>
 								<SkipForward size={22} />
+							</ActionIcon>
+						</Tooltip>
+						<Tooltip
+							label={
+								player.repeat === "all"
+									? t("player.repeatAll")
+									: player.repeat === "one"
+										? t("player.repeatOne")
+										: t("player.repeatOff")
+							}
+							withArrow
+						>
+							<ActionIcon
+								variant={player.repeat === "off" ? "subtle" : "filled"}
+								size="lg"
+								radius="xl"
+								aria-label={
+									player.repeat === "all"
+										? t("player.repeatAll")
+										: player.repeat === "one"
+											? t("player.repeatOne")
+											: t("player.repeatOff")
+								}
+								onClick={player.cycleRepeat}
+							>
+								{player.repeat === "one" ? (
+									<Repeat1 size={20} />
+								) : (
+									<Repeat size={20} />
+								)}
 							</ActionIcon>
 						</Tooltip>
 					</Group>
