@@ -115,6 +115,45 @@ export function useAddToCollection() {
 	});
 }
 
+export function moveCollectionItem(
+	sourceId: number,
+	toCollectionId: number,
+	mediaId: number,
+): Promise<unknown> {
+	return apiFetch<unknown>(`/collections/${sourceId}/items/move`, {
+		method: "POST",
+		body: JSON.stringify({
+			media_id: mediaId,
+			to_collection_id: toCollectionId,
+		}),
+	});
+}
+
+export function useMoveCollectionItem() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			sourceId,
+			toCollectionId,
+			mediaId,
+		}: {
+			sourceId: number;
+			toCollectionId: number;
+			mediaId: number;
+		}) => moveCollectionItem(sourceId, toCollectionId, mediaId),
+		onSuccess: (_data, variables) => {
+			// Элемент уехал из исходной коллекции в целевую.
+			void queryClient.invalidateQueries({
+				queryKey: ["collections", variables.sourceId, "items"],
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ["collections", variables.toCollectionId, "items"],
+			});
+			void queryClient.invalidateQueries({ queryKey: ["collections"] });
+		},
+	});
+}
+
 export function useRemoveFromCollection() {
 	const queryClient = useQueryClient();
 	return useMutation({

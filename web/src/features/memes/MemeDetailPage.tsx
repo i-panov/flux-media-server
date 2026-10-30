@@ -14,6 +14,7 @@ import { useMedia, useMediaReload } from "../../api/media";
 import type { Media } from "../../core/media";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { MediaAdminActions } from "../media/MediaAdminActions";
 
 // Просмотрщик мема: оригинал отдаётся стримом (превью — только для
 // сетки), поэтому картинка грузится в исходном качестве.
@@ -140,6 +141,7 @@ export function MemeDetailPage() {
 						{item.description}
 					</Text>
 				)}
+				<MediaAdminActions media={item} backPath="/memes" />
 			</Stack>
 		</Stack>
 	);

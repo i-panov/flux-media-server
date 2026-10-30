@@ -1,6 +1,7 @@
 import { Button, Group, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { z } from "zod";
 import { useCreateCollection } from "../../api/collections";
 import type { MediaType } from "../../core/media";
 
@@ -8,10 +9,12 @@ export function CreateCollectionModal({
 	opened,
 	type,
 	onClose,
+	onCreated,
 }: {
 	opened: boolean;
 	type: MediaType;
 	onClose: () => void;
+	onCreated?: (id: number) => void;
 }) {
 	const { t } = useTranslation();
 	const [name, setName] = useState("");
@@ -30,7 +33,13 @@ export function CreateCollectionModal({
 		create.mutate(
 			{ name: trimmed, type },
 			{
-				onSuccess: () => {
+				onSuccess: (body) => {
+					// Сразу выбираем созданную (нужно экрану загрузки):
+					// остальные вызовы onCreated не передают.
+					const id = z.object({ id: z.number() }).safeParse(body);
+					if (id.success) {
+						onCreated?.(id.data.id);
+					}
 					close();
 				},
 			},

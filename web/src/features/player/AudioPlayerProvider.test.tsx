@@ -33,6 +33,7 @@ function media(id: number, title: string): Media {
 		cover_url: "",
 		view_count: 0,
 		created_at: "2026-01-01T00:00:00Z",
+		source_url: "",
 	};
 }
 
@@ -207,6 +208,16 @@ describe("AudioPlayerProvider", () => {
 		// Всё сыграно: дальше — стоп, а не случайный повтор.
 		act(() => result.current.next());
 		expect(result.current.current?.id).toBe(2);
+	});
+
+	it("enqueue дописывает не прерывая текущий", () => {
+		const { result } = setup();
+		act(() => {
+			result.current.playQueue([media(1, "Первый"), media(2, "Второй")], 0);
+		});
+		act(() => result.current.enqueue(media(3, "Третий")));
+		expect(result.current.queue.map((item) => item.id)).toEqual([1, 2, 3]);
+		expect(result.current.current?.id).toBe(1);
 	});
 
 	it("сохраняет очередь и поднимает её после перезамонтирования", () => {

@@ -6,15 +6,19 @@ import {
 	Group,
 	Loader,
 	SegmentedControl,
+	Select,
 	Stack,
 	Text,
 	Title,
 } from "@mantine/core";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { ArrowLeft, Upload } from "lucide-react";
+import { ArrowLeft, FolderPlus, Upload, X } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useCollections } from "../../api/collections";
 import { useSession } from "../../api/session";
 import type { UploadType } from "../../api/upload";
+import { CreateCollectionModal } from "../collections/CreateCollectionModal";
 import { UploadItemCard } from "./UploadItemCard";
 import { useUploadQueue } from "./useUploadQueue";
 
@@ -38,6 +42,11 @@ export function UploadPage() {
 	const search = useSearch({ from: "/upload" });
 	const session = useSession();
 	const type = search.type;
+	// Коллекция для всей пачки (как во Flutter): смена типа сбрасывает
+	// выбор, коллекция чужого типа файлам не достанется.
+	const [collectionId, setCollectionId] = useState<number | null>(null);
+	const [createOpened, setCreateOpened] = useState(false);
+	const collections = useCollections();
 	const {
 		items,
 		addFiles,
@@ -46,12 +55,21 @@ export function UploadPage() {
 		retryItem,
 		forceItem,
 		busy,
-	} = useUploadQueue(type);
+	} = useUploadQueue(type, collectionId);
 
 	const changeType = (value: string) => {
 		const next = value as UploadType;
+		setCollectionId(null);
 		void navigate({ to: "/upload", search: { type: next }, replace: true });
 	};
+
+	const matchingCollections = (collections.data ?? []).filter(
+		(collection) => collection.type === type,
+	);
+	const selectedCollection =
+		collectionId === null
+			? null
+			: (matchingCollections.find((item) => item.id === collectionId) ?? null);
 
 	const goBack = () => {
 		if (type === "video") {
@@ -112,6 +130,52 @@ export function UploadPage() {
 					label: t(TYPE_LABEL_KEYS[value]),
 				}))}
 				w="fit-content"
+			/>
+
+			<Group gap="xs" wrap="wrap">
+				<Select
+					label={t("upload.collection")}
+					placeholder={t("upload.collectionPlaceholder")}
+					value={selectedCollection === null ? null : String(collectionId)}
+					data={matchingCollections.map((collection) => ({
+						value: String(collection.id),
+						label: collection.name,
+					}))}
+					allowDeselect={false}
+					disabled={collections.isPending}
+					w={{ base: "100%", sm: 280 }}
+					onChange={(value) => {
+						setCollectionId(value === null ? null : Number(value));
+					}}
+				/>
+				{selectedCollection !== null && (
+					<Button
+						variant="subtle"
+						color="red"
+						leftSection={<X size={16} />}
+						onClick={() => setCollectionId(null)}
+					>
+						{t("upload.collectionClear")}
+					</Button>
+				)}
+				<Button
+					variant="light"
+					leftSection={<FolderPlus size={16} />}
+					onClick={() => setCreateOpened(true)}
+				>
+					{t("collections.create")}
+				</Button>
+			</Group>
+			{selectedCollection !== null && (
+				<Text size="sm" c="dimmed">
+					{t("upload.collectionHint", { name: selectedCollection.name })}
+				</Text>
+			)}
+			<CreateCollectionModal
+				opened={createOpened}
+				type={type}
+				onClose={() => setCreateOpened(false)}
+				onCreated={(id) => setCollectionId(id)}
 			/>
 
 			<FileButton onChange={addFiles} accept={ACCEPT[type]} multiple>

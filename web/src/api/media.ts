@@ -1,4 +1,9 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+	useInfiniteQuery,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import type { RefObject } from "react";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -9,7 +14,6 @@ import {
 	videoListOptions,
 } from "../core/media";
 import { apiFetch } from "./client";
-
 export function useVideoList(q: string) {
 	return useInfiniteQuery(videoListOptions(apiFetch, q));
 }
@@ -28,6 +32,22 @@ export function useMedia(id: number, enabled = true) {
 
 export function useMediaSubs(mediaId: number, enabled = true) {
 	return useQuery({ ...mediaSubsOptions(apiFetch, mediaId), enabled });
+}
+
+// Удаление медиа в корзину (только админ, как во Flutter — с
+// подтверждением на экране). Инвалидация тройная, как у действий
+// корзины: списки, сама корзина и коллекции.
+export function useDeleteMedia() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (mediaId: number) =>
+			apiFetch<unknown>(`/media/${mediaId}`, { method: "DELETE" }),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["trash"] });
+			void queryClient.invalidateQueries({ queryKey: ["collections"] });
+		},
+	});
 }
 
 // Повтор прямого медиа-запроса (<video>, <img>, <track>) после сбоя.

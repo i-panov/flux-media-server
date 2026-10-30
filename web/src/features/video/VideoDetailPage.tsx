@@ -8,6 +8,7 @@ import {
 	Title,
 } from "@mantine/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
+import { ListPlus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
@@ -20,8 +21,10 @@ import {
 import { formatDuration, splitSubLang } from "../../core/format";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
 import { useMediaProgress } from "../media/useMediaProgress";
+import { useAudioPlayer } from "../player/AudioPlayerProvider";
 
 // React не поддерживает onError на <track> (только audio/video/img/...),
 // поэтому ошибку загрузки дорожки ловим нативным слушателем: при истёкшей
@@ -63,6 +66,7 @@ export function VideoDetailPage() {
 	const media = useMedia(valid ? mediaId : 0, valid);
 	const subs = useMediaSubs(valid ? mediaId : 0, valid);
 	const reload = useMediaReload(valid ? mediaId : 0);
+	const player = useAudioPlayer();
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const position = useSavedTime(videoRef);
 	const played = useRef(false);
@@ -209,6 +213,13 @@ export function VideoDetailPage() {
 					<Group gap="xs">
 						<FavoriteButton mediaId={item.id} type="video" />
 						<AddToCollectionButton mediaId={item.id} type="video" />
+						<Button
+							variant="light"
+							leftSection={<ListPlus size={16} />}
+							onClick={() => player.enqueue(item)}
+						>
+							{t("player.enqueue")}
+						</Button>
 					</Group>
 				</Group>
 				<Group gap="xl">
@@ -227,6 +238,7 @@ export function VideoDetailPage() {
 					/>
 				</Group>
 				{item.description !== "" && <Text>{item.description}</Text>}
+				<MediaAdminActions media={item} extractAudio backPath="/video" />
 			</Stack>
 		</Stack>
 	);

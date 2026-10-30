@@ -107,6 +107,11 @@ export function UploadItemCard({
 							</Stack>
 						</Alert>
 					)}
+					{item.status === "done" && item.collectionError !== "" && (
+						<Text size="xs" c="orange">
+							{t("upload.collectionError", { error: item.collectionError })}
+						</Text>
+					)}
 					{item.status === "error" && (
 						<Stack gap="xs">
 							<Text size="xs" c="red">

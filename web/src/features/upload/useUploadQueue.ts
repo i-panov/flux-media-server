@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ApiError } from "../../api/client";
+import { ApiError, apiFetch } from "../../api/client";
 import {
 	cancelUploadJob,
 	enqueueUpload,
@@ -27,6 +27,9 @@ export interface QueueItem {
 	error: string;
 	duplicate: { id: number; title: string } | null;
 	job: { id: number; kind: "upload" | "transcode" } | null;
+	// Не удалось положить готовый файл в выбранную коллекцию
+	// (сам файл загружен): текст ошибки для строки элемента.
+	collectionError: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -37,7 +40,12 @@ function sleep(ms: number): Promise<void> {
 
 // Очередь загрузок: каждый файл обрабатывается независимо, ответы
 // устаревших попыток отсекаются тикетом (отмена/повтор/force).
-export function useUploadQueue(type: UploadType) {
+// targetCollectionId — коллекция экрана: готовый файл кладётся в неё
+// сразу (как во Flutter), выбор читается на старте обработки.
+export function useUploadQueue(
+	type: UploadType,
+	targetCollectionId: number | null,
+) {
 	const queryClient = useQueryClient();
 	const [items, setItems] = useState<QueueItem[]>([]);
 	const counter = useRef(0);
@@ -64,12 +72,16 @@ export function useUploadQueue(type: UploadType) {
 
 	const processItem = async (item: QueueItem, force: boolean) => {
 		const token = bumpToken(item.key);
+		// Коллекция фиксируется на старте обработки (как во Flutter):
+		// смена выбора посреди загрузки на летящий файл не влияет.
+		const targetCollection = targetCollectionId;
 		updateItem(item.key, {
 			status: "uploading",
 			progress: null,
 			error: "",
 			duplicate: null,
 			job: null,
+			collectionError: "",
 		});
 		try {
 			const enqueued = await enqueueUpload(item.file, item.type, force);
@@ -91,7 +103,33 @@ export function useUploadQueue(type: UploadType) {
 				const progress =
 					typeof status.progress === "number" ? status.progress : null;
 				if (status.status === "done") {
-					updateItem(item.key, { status: "done", progress: 100 });
+					let collectionError = "";
+					const mediaId = status.media?.id ?? null;
+					if (targetCollection !== null && mediaId !== null) {
+						try {
+							await apiFetch<unknown>(
+								`/collections/${targetCollection}/items`,
+								{
+									method: "POST",
+									body: JSON.stringify({ media_id: mediaId }),
+								},
+							);
+							void queryClient.invalidateQueries({
+								queryKey: ["collections", targetCollection, "items"],
+							});
+						} catch (collectionFailure) {
+							collectionError =
+								collectionFailure instanceof ApiError &&
+								collectionFailure.message !== ""
+									? collectionFailure.message
+									: "Collection error";
+						}
+					}
+					updateItem(item.key, {
+						status: "done",
+						progress: 100,
+						collectionError,
+					});
 					invalidateList(item.type);
 					return;
 				}
@@ -141,6 +179,7 @@ export function useUploadQueue(type: UploadType) {
 				error: "",
 				duplicate: null,
 				job: null,
+				collectionError: "",
 			};
 		});
 		setItems((prev) => [...created, ...prev]);

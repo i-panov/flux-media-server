@@ -15,7 +15,15 @@ import {
 	Tooltip,
 } from "@mantine/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowLeft, MoreVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+	ArrowLeft,
+	FolderInput,
+	MoreVertical,
+	Pencil,
+	Plus,
+	Trash2,
+	X,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -32,6 +40,7 @@ import { MemeCard } from "../memes/MemeCard";
 import { VideoCard } from "../video/VideoCard";
 import { AddMediaToCollectionModal } from "./AddMediaToCollectionModal";
 import { CollectionTile } from "./CollectionTile";
+import { MoveToCollectionModal } from "./MoveToCollectionModal";
 import { useCollectionError } from "./useCollectionError";
 
 const TYPE_LABEL_KEYS: Record<MediaType, string> = {
@@ -148,10 +157,12 @@ function CollectionCard({
 	media,
 	type,
 	onRemove,
+	onMove,
 }: {
 	media: Media;
 	type: MediaType;
 	onRemove: () => void;
+	onMove: () => void;
 }) {
 	const { t } = useTranslation();
 	return (
@@ -174,6 +185,18 @@ function CollectionCard({
 					onClick={onRemove}
 				>
 					<X size={18} />
+				</ActionIcon>
+			</Tooltip>
+			<Tooltip label={t("collections.moveItem")} withArrow>
+				<ActionIcon
+					variant="filled"
+					size="lg"
+					radius="xl"
+					aria-label={t("collections.moveItem")}
+					className="absolute bottom-2 right-2 z-10"
+					onClick={onMove}
+				>
+					<FolderInput size={18} />
 				</ActionIcon>
 			</Tooltip>
 		</div>
@@ -272,6 +295,7 @@ export function CollectionDetailPage() {
 	const [renameOpened, setRenameOpened] = useState(false);
 	const [deleteOpened, setDeleteOpened] = useState(false);
 	const [addOpened, setAddOpened] = useState(false);
+	const [moveMediaId, setMoveMediaId] = useState<number | null>(null);
 
 	const collection = (collections.data ?? []).find(
 		(item) => item.id === collectionId,
@@ -378,6 +402,7 @@ export function CollectionDetailPage() {
 									{ onError: notifyError },
 								);
 							}}
+							onMove={() => setMoveMediaId(media.id)}
 						/>
 					))}
 				</SimpleGrid>
@@ -396,6 +421,15 @@ export function CollectionDetailPage() {
 				existingIds={new Set(mediaItems.map((media) => media.id))}
 				onClose={() => setAddOpened(false)}
 			/>
+			{moveMediaId !== null && (
+				<MoveToCollectionModal
+					opened
+					sourceId={collectionId}
+					mediaId={moveMediaId}
+					type={type}
+					onClose={() => setMoveMediaId(null)}
+				/>
+			)}
 			<Modal
 				opened={deleteOpened}
 				onClose={() => setDeleteOpened(false)}

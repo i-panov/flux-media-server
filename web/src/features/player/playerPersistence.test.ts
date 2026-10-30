@@ -29,6 +29,7 @@ function media(id: number): Media {
 		cover_url: "",
 		view_count: 0,
 		created_at: "2026-01-01T00:00:00Z",
+		source_url: "",
 	};
 }
 

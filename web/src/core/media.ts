@@ -42,6 +42,9 @@ export const mediaSchema = z.object({
 	cover_url: z.string(),
 	view_count: z.number(),
 	created_at: z.string(),
+	// Ссылка на источник: старые ответы и вложенные медиа (очередь,
+	// избранное) её не содержат — default вместо optional.
+	source_url: z.string().default(""),
 });
 
 export type Media = z.infer<typeof mediaSchema>;

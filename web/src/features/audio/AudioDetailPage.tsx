@@ -15,6 +15,7 @@ import { useMedia } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
 
@@ -184,6 +185,7 @@ export function AudioDetailPage() {
 						/>
 					</Group>
 					{item.description !== "" && <Text>{item.description}</Text>}
+					<MediaAdminActions media={item} backPath="/audio" />
 				</Stack>
 			</Group>
 		</Stack>

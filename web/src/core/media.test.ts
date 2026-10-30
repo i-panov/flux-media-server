@@ -31,6 +31,7 @@ function videoItem(id: number) {
 		cover_url: "",
 		view_count: 3,
 		created_at: "2026-01-01T00:00:00Z",
+		source_url: "",
 		unknown_future_field: "must-be-stripped",
 	};
 }

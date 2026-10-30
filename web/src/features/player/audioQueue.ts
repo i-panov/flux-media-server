@@ -34,6 +34,21 @@ export function selectIndex(
 	return { ...state, index };
 }
 
+// Добавление в конец без прерывания текущего (как enqueue во Flutter):
+// пустая очередь принимает индекс 0, но воспроизведение не стартует.
+export function enqueueItems(
+	state: AudioQueueState,
+	items: Media[],
+): AudioQueueState {
+	if (items.length === 0) {
+		return state;
+	}
+	return {
+		items: [...state.items, ...items],
+		index: state.items.length === 0 ? 0 : state.index,
+	};
+}
+
 export function removeTrack(
 	state: AudioQueueState,
 	index: number,

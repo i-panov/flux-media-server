@@ -6,6 +6,7 @@ import {
 	type AudioQueueState,
 	currentMedia,
 	emptyQueue,
+	enqueueItems,
 	pickNextIndex,
 	pickPreviousIndex,
 	type RepeatMode,
@@ -82,6 +83,13 @@ export function usePlaybackControls({
 	const playMedia = useCallback(
 		(media: Media) => playQueue([media], 0),
 		[playQueue],
+	);
+
+	const enqueue = useCallback(
+		(media: Media) => {
+			setQueueState((prev) => enqueueItems(prev, [media]));
+		},
+		[setQueueState],
 	);
 
 	const toggle = useCallback(() => {
@@ -219,6 +227,7 @@ export function usePlaybackControls({
 		played,
 		playQueue,
 		playMedia,
+		enqueue,
 		toggle,
 		next,
 		previous,

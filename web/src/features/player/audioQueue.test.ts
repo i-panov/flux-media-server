@@ -3,6 +3,7 @@ import type { Media } from "../../core/media";
 import {
 	type AudioQueueState,
 	emptyQueue,
+	enqueueItems,
 	pickNextIndex,
 	pickPreviousIndex,
 	removeTrack,
@@ -30,6 +31,7 @@ function media(id: number): Media {
 		cover_url: "",
 		view_count: 0,
 		created_at: "2026-01-01T00:00:00Z",
+		source_url: "",
 	};
 }
 
@@ -191,5 +193,22 @@ describe("audioQueue", () => {
 	it("shiftPlayedIndices сдвигает индексы после удаления", () => {
 		expect(shiftPlayedIndices(new Set([0, 1, 2]), 1)).toEqual(new Set([0, 1]));
 		expect(shiftPlayedIndices(new Set([0, 2]), 0)).toEqual(new Set([1]));
+	});
+
+	it("enqueueItems дописывает в конец не трогая текущий", () => {
+		const state = enqueueItems(queue([1, 2], 0), [media(3)]);
+		expect(state.items.map((item) => item.id)).toEqual([1, 2, 3]);
+		expect(state.index).toBe(0);
+	});
+
+	it("enqueueItems в пустую очередь ставит индекс 0", () => {
+		const state = enqueueItems(emptyQueue, [media(1)]);
+		expect(state.items.map((item) => item.id)).toEqual([1]);
+		expect(state.index).toBe(0);
+	});
+
+	it("enqueueItems с пустым списком ничего не меняет", () => {
+		const state = queue([1], 0);
+		expect(enqueueItems(state, [])).toBe(state);
 	});
 });

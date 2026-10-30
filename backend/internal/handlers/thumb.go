@@ -98,7 +98,12 @@ func (h *ThumbHandler) GetCover(c *fiber.Ctx) error {
 	}
 
 	c.Set("Content-Type", contentType)
-	c.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", coverCacheMaxAge))
+	// Обложка перезаписывается на месте тем же URL после PUT: дневной
+	// max-age показывал бы старую картинку до суток. no-cache заставляет
+	// проверять свежесть каждый раз (условные запросы thumbnails-сервис
+	// не поддерживает, но файл маленький). Flutter дополнительно
+	// добавляет ?v=updated_at — ему это не мешает.
+	c.Set("Cache-Control", "no-cache")
 
 	return c.SendFile(coverPath)
 }

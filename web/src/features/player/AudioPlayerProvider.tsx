@@ -37,6 +37,7 @@ interface AudioPlayerContextValue {
 	error: string | null;
 	playQueue: (items: Media[], startIndex?: number) => void;
 	playMedia: (media: Media) => void;
+	enqueue: (media: Media) => void;
 	toggle: () => void;
 	next: () => void;
 	previous: () => void;

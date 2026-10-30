@@ -74,6 +74,27 @@ func TestThumbHandler_UploadCoverValidJPEG(t *testing.T) {
 	assert.Equal(t, "/api/media/1/cover", parsed["cover_url"])
 }
 
+// TestThumbHandler_GetCoverNoCache: обложка перезаписывается тем же URL,
+// поэтому отдаём no-cache — иначе браузер показывал бы старую до суток.
+func TestThumbHandler_GetCoverNoCache(t *testing.T) {
+	app := setupThumbTestApp(t)
+
+	content := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01}
+	body, contentType := coverMultipartForm(t, "cover.jpg", content)
+
+	req := httptest.NewRequest("PUT", "/api/media/1/cover", body)
+	req.Header.Set("Content-Type", contentType)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	req = httptest.NewRequest("GET", "/api/media/1/cover", nil)
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.Equal(t, "no-cache", resp.Header.Get("Cache-Control"))
+}
+
 func TestThumbHandler_UploadCoverTooSmall(t *testing.T) {
 	app := setupThumbTestApp(t)
 
