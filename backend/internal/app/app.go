@@ -264,10 +264,12 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	subsHandler := handlers.NewSubsHandler(mediaRepo, subRepo, cfg.Media)
 	adminHandler := handlers.NewAdminHandler(mediaRepo, taskRepo, transcodeQueue, cfg.Storage, cfg.Media)
 	// Очередь извлечения аудио из видео: отдельный воркер (ffmpeg тяжёлый),
-	// механика статусов — как у загрузок.
+	// механика статусов — как у загрузок. Строки заданий персистентны:
+	// рестарт поднимает незавершённые обратно в очередь.
 	extractQueue := services.NewExtractService(
 		context.Background(),
 		mediaRepo,
+		repository.NewExtractTaskRepository(db),
 		thumbSvc,
 		cfg.Media.AudioPath,
 		services.DefaultExtractQueueWorkers,

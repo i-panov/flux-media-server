@@ -119,6 +119,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.RefreshToken{},
 		&models.Artist{},
 		&models.TranscodeTask{},
+		&models.ExtractTask{},
 		&models.Subtitle{},
 	)
 }
@@ -308,8 +309,119 @@ func RunMigrations(db *gorm.DB) error {
 			}
 		}
 
+		// --- Phase 4: case-insensitive artist dedup (artists.name_norm) ---
+		//
+		// Сравнение имён в SQLite бинарное, и «Кино»/«кино» жили дублями.
+		// Канон — name_norm (trim + lower, считает Go: SQLite LOWER
+		// сворачивает только ASCII). Старые дубли сливаются в минимальный
+		// id, связи перевешиваются, UNIQUE-индекс создаст AutoMigrate после.
+		if ok, err := tableExists(tx, "artists"); err != nil {
+			return fmt.Errorf("check artists: %w", err)
+		} else if ok {
+			if err := normalizeArtistNames(tx); err != nil {
+				return fmt.Errorf("normalize artists: %w", err)
+			}
+			// Старый бинарный unique на name больше не нужен: norm строже.
+			// AutoMigrate его не дропает, чистим здесь (как file_path).
+			if err := dropUniqueIndexesOnColumn(tx, "artists", "name"); err != nil {
+				return fmt.Errorf("migrate artists indexes: %w", err)
+			}
+		}
+
 		return nil
 	})
+}
+
+// normalizeArtistNames backfills artists.name_norm (Go lower — юникодный,
+// в отличие от SQLite LOWER) and merges case-duplicates into the minimal
+// id, repointing media_artists and favorites. Idempotent: re-runs change
+// nothing once norms are filled and unique.
+func normalizeArtistNames(tx *gorm.DB) error {
+	if has, err := tableHasColumn(tx, "artists", "name_norm"); err != nil {
+		return fmt.Errorf("check artists.name_norm: %w", err)
+	} else if !has {
+		if err := tx.Exec("ALTER TABLE artists ADD COLUMN name_norm TEXT").Error; err != nil {
+			return fmt.Errorf("add artists.name_norm: %w", err)
+		}
+	}
+
+	var artists []models.Artist
+	if err := tx.Find(&artists).Error; err != nil {
+		return fmt.Errorf("list artists: %w", err)
+	}
+	for i := range artists {
+		norm := normArtistName(artists[i].Name)
+		if artists[i].NameNorm == norm {
+			continue
+		}
+		if err := tx.Model(&models.Artist{}).
+			Where("id = ?", artists[i].ID).
+			Update("name_norm", norm).Error; err != nil {
+			return fmt.Errorf("backfill artists.name_norm: %w", err)
+		}
+	}
+
+	var groups []struct {
+		Norm   string
+		Keeper uint
+		IDs    string
+	}
+	if err := tx.Raw(`SELECT name_norm AS norm, MIN(id) AS keeper,
+		GROUP_CONCAT(id) AS ids FROM artists
+		GROUP BY name_norm HAVING COUNT(*) > 1`).Scan(&groups).Error; err != nil {
+		return fmt.Errorf("find duplicate artists: %w", err)
+	}
+	hasMediaArtists, err := tableExists(tx, "media_artists")
+	if err != nil {
+		return fmt.Errorf("check media_artists: %w", err)
+	}
+	hasFavArtistID, err := tableHasColumn(tx, "favorites", "artist_id")
+	if err != nil {
+		return fmt.Errorf("check favorites.artist_id: %w", err)
+	}
+	for _, group := range groups {
+		var dupes []uint
+		for _, part := range strings.Split(group.IDs, ",") {
+			var id uint64
+			if _, err := fmt.Sscanf(part, "%d", &id); err != nil {
+				return fmt.Errorf("parse duplicate artist id: %w", err)
+			}
+			if uint(id) != group.Keeper {
+				dupes = append(dupes, uint(id))
+			}
+		}
+		if len(dupes) == 0 {
+			continue
+		}
+		if hasMediaArtists {
+			// UPDATE OR IGNORE: строка stays on the dupe only when the
+			// keeper link already exists; leftovers are deleted below.
+			if err := tx.Exec(`UPDATE OR IGNORE media_artists SET artist_id = ?
+				WHERE artist_id IN ?`, group.Keeper, dupes).Error; err != nil {
+				return fmt.Errorf("repoint media_artists: %w", err)
+			}
+			if err := tx.Exec(`DELETE FROM media_artists
+				WHERE artist_id IN ?`, dupes).Error; err != nil {
+				return fmt.Errorf("delete duplicate media_artists: %w", err)
+			}
+		}
+		if hasFavArtistID {
+			if err := tx.Exec(`UPDATE OR IGNORE favorites SET artist_id = ?
+				WHERE artist_id IN ?`, group.Keeper, dupes).Error; err != nil {
+				return fmt.Errorf("repoint favorite artists: %w", err)
+			}
+			if err := tx.Exec(`DELETE FROM favorites
+				WHERE artist_id IN ?`, dupes).Error; err != nil {
+				return fmt.Errorf("delete duplicate favorite artists: %w", err)
+			}
+		}
+		if err := tx.Exec(`DELETE FROM artists WHERE id IN ?`, dupes).Error; err != nil {
+			return fmt.Errorf("delete duplicate artists: %w", err)
+		}
+		log.Printf("migration: merged %d duplicate artist(s) into id=%d (%s)",
+			len(dupes), group.Keeper, group.Norm)
+	}
+	return nil
 }
 
 // tableExists reports whether a table exists in the SQLite database.

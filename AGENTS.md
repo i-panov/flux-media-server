@@ -104,9 +104,10 @@ Key settings:
 ## Docker
 
 ```bash
-cd backend && docker-compose up -d
+cd backend && docker-compose up -d  # контекст — корень репо: образ печёт и API, и web/dist
 ```
 
 - Exposes port 8080
 - Volumes: `/app/data` (DB), `/media` (media files, read-only)
 - Runtime image includes `ffmpeg`
+- Веб-бандл запечён в образ (`/app/web`, Node-стадия в `backend/Dockerfile`); включается через `web_dist: "/app/web"` в конфиге. Локальный `web/dist` перекрывает запечённый маунтом `../web/dist:/app/web:ro`.

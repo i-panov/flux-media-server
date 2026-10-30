@@ -22,7 +22,7 @@ import (
 // stubExtractQueue — очередь без ffmpeg: хендлер тестируется отдельно
 // от сервиса (сервис покрыт extract_test.go, ffmpeg-пути — со скипом).
 type stubExtractQueue struct {
-	enqueueID  uint64
+	enqueueID  uint
 	enqueueErr error
 	status     string
 	errMsg     string
@@ -34,7 +34,7 @@ type stubExtractQueue struct {
 	forceUnavailable bool
 }
 
-func (s *stubExtractQueue) Enqueue(sourceID uint) (uint64, error) {
+func (s *stubExtractQueue) Enqueue(sourceID uint) (uint, error) {
 	s.enqueued = append(s.enqueued, sourceID)
 	if s.enqueueErr != nil {
 		return 0, s.enqueueErr
@@ -42,11 +42,11 @@ func (s *stubExtractQueue) Enqueue(sourceID uint) (uint64, error) {
 	return s.enqueueID, nil
 }
 
-func (s *stubExtractQueue) Get(id uint64) (string, string, uint, bool) {
+func (s *stubExtractQueue) Get(id uint) (string, string, uint, bool) {
 	return s.status, s.errMsg, s.mediaID, s.ok
 }
 
-func (s *stubExtractQueue) Cancel(id uint64) error {
+func (s *stubExtractQueue) Cancel(id uint) error {
 	return s.cancelErr
 }
 
@@ -207,6 +207,7 @@ func TestExtractHandler_ConcurrentPostsShareOneJob(t *testing.T) {
 	svc := services.NewExtractService(
 		context.Background(),
 		mediaRepo,
+		repository.NewExtractTaskRepository(db),
 		services.NewThumbnailService(t.TempDir()),
 		t.TempDir(),
 		0,
@@ -260,6 +261,7 @@ func TestExtractHandler_ConcurrentPostsShareOneJobParallel(t *testing.T) {
 	svc := services.NewExtractService(
 		context.Background(),
 		mediaRepo,
+		repository.NewExtractTaskRepository(db),
 		services.NewThumbnailService(t.TempDir()),
 		t.TempDir(),
 		0,
@@ -318,6 +320,7 @@ func TestExtractHandler_CancelledJobStatusIs404(t *testing.T) {
 	svc := services.NewExtractService(
 		context.Background(),
 		mediaRepo,
+		repository.NewExtractTaskRepository(db),
 		services.NewThumbnailService(t.TempDir()),
 		t.TempDir(),
 		0,

@@ -17,9 +17,9 @@ import (
 // постановка, статус, отмена и доступность ffmpeg (тесты подменяют
 // стабом без ffmpeg).
 type ExtractQueue interface {
-	Enqueue(sourceID uint) (uint64, error)
-	Get(id uint64) (status, errMsg string, mediaID uint, ok bool)
-	Cancel(id uint64) error
+	Enqueue(sourceID uint) (uint, error)
+	Get(id uint) (status, errMsg string, mediaID uint, ok bool)
+	Cancel(id uint) error
 	Available() bool
 }
 
@@ -87,7 +87,7 @@ func (h *ExtractHandler) ExtractStatus(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 
-	status, errMsg, mediaID, ok := h.queue.Get(uint64(id))
+	status, errMsg, mediaID, ok := h.queue.Get(uint(id))
 	if !ok {
 		return response.Error(c, fiber.StatusNotFound, "Extract job not found")
 	}
@@ -143,7 +143,7 @@ func (h *ExtractHandler) CancelExtract(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid job ID")
 	}
 
-	switch err := h.queue.Cancel(uint64(id)); {
+	switch err := h.queue.Cancel(uint(id)); {
 	case errors.Is(err, services.ErrExtractJobNotFound):
 		return response.Error(c, fiber.StatusNotFound, "Extract job not found")
 	case errors.Is(err, services.ErrExtractJobDone):

@@ -190,6 +190,17 @@ type LyricsRepository interface {
 	Delete(ctx context.Context, mediaID uint) error
 }
 
+// ExtractTaskRepository defines data access methods for
+// ExtractTask entities (извлечение аудио из видео, переживает рестарт).
+type ExtractTaskRepository interface {
+	Create(ctx context.Context, task *models.ExtractTask) error
+	Get(ctx context.Context, id uint) (*models.ExtractTask, error)
+	SetStatus(ctx context.Context, id uint, status, errMsg string, mediaID uint) error
+	Delete(ctx context.Context, id uint) error
+	FindUnfinished(ctx context.Context, active ...string) ([]models.ExtractTask, error)
+	FindActiveBySource(ctx context.Context, sourceID uint, active ...string) (*models.ExtractTask, error)
+}
+
 // TranscodeTaskRepository defines data access methods for
 // TranscodeTask entities (нормализация видео из карантина).
 type TranscodeTaskRepository interface {

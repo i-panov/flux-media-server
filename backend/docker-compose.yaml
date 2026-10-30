@@ -1,6 +1,12 @@
 services:
   flux-server:
-    build: .
+    # Контекст — корень репозитория: образ собирает и Go-бинарник,
+    # и веб-бандл (Node-стадия в Dockerfile), dist отдельно доставлять
+    # не нужно. Локальная пересборка веба перекрывает запечённый бандл
+    # маунтом: - ../web/dist:/app/web:ro
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
     container_name: flux-media-server
     restart: unless-stopped
     ports:

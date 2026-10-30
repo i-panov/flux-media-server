@@ -59,7 +59,7 @@ func setupExtractTestService(t *testing.T, workers int) (*ExtractService, reposi
 	mediaRepo := repository.NewMediaRepository(db)
 	thumbSvc := NewThumbnailService(t.TempDir())
 	audioDir := t.TempDir()
-	q := NewExtractService(context.Background(), mediaRepo, thumbSvc, audioDir, workers, 10)
+	q := NewExtractService(context.Background(), mediaRepo, repository.NewExtractTaskRepository(db), thumbSvc, audioDir, workers, 10)
 	t.Cleanup(q.Stop)
 	return q, mediaRepo, audioDir
 }
@@ -91,6 +91,133 @@ func TestExtractServiceAvailableReflectsBinaries(t *testing.T) {
 	assert.Equal(t, ffmpegErr == nil && ffprobeErr == nil, q.Available())
 }
 
+// Крах в окне между Create и Done: трек со связкой уже записан, повтор
+// обязан закрыться done сразу, а не гонять ffmpeg и падать в ложный
+// «File already exists» по собственному сироте. Без ffmpeg: проверка
+// стоит до probe, бинарники не нужны.
+func TestExtractProcess_CompletesWhenTrackAlreadyLinked(t *testing.T) {
+	q, mediaRepo, _ := setupExtractTestService(t, 0)
+	ctx := context.Background()
+
+	source := &models.Media{Title: "Clip", Type: models.MediaTypeVideo, FilePath: "/v/clip.mp4"}
+	require.NoError(t, mediaRepo.Create(ctx, source))
+	track := &models.Media{
+		Title:         "Clip",
+		Type:          models.MediaTypeAudio,
+		FilePath:      "/a/clip.m4a",
+		FileHash:      "orphan",
+		SourceMediaID: &source.ID,
+	}
+	require.NoError(t, mediaRepo.Create(ctx, track))
+
+	id, err := q.Enqueue(source.ID)
+	require.NoError(t, err)
+	q.mu.Lock()
+	job := q.jobs[id]
+	q.mu.Unlock()
+
+	q.process(job)
+
+	status, _, mediaID, ok := q.Get(id)
+	require.True(t, ok)
+	assert.Equal(t, ExtractJobDone, status)
+	assert.Equal(t, track.ID, mediaID)
+}
+
+// Управляемый рестарт (SIGTERM → Stop) не должен хоронить летящее
+// задание в error: fail при мёртвом q.ctx возвращает строку в queued,
+// следующий старт подхватывает её через recovery. Живой контекст
+// по-прежнему пишет терминальный error.
+func TestExtractFail_RequeuesOnShutdown(t *testing.T) {
+	q, _, _ := setupExtractTestService(t, 0)
+
+	id, err := q.Enqueue(11)
+	require.NoError(t, err)
+	q.mu.Lock()
+	job := q.jobs[id]
+	q.mu.Unlock()
+
+	q.cancel()
+	q.fail(job, context.Canceled, "boom")
+
+	status, errMsg, _, ok := q.Get(id)
+	require.True(t, ok)
+	assert.Equal(t, ExtractJobQueued, status)
+	assert.Empty(t, errMsg)
+
+	// Контроль: живой контекст по-прежнему пишет терминальный error.
+	q2, _, _ := setupExtractTestService(t, 0)
+	other, err := q2.Enqueue(12)
+	require.NoError(t, err)
+	q2.mu.Lock()
+	otherJob := q2.jobs[other]
+	q2.mu.Unlock()
+	q2.fail(otherJob, assert.AnError, "boom")
+
+	status, errMsg, _, ok = q2.Get(other)
+	require.True(t, ok)
+	assert.Equal(t, ExtractJobError, status)
+	assert.Equal(t, "boom", errMsg)
+}
+
+// Перезапуск сервера поднимает незавершённые задания из БД: processing
+// сбрасывается в queued, ID не переиспользуются, дедуп по источнику
+// работает и для поднятых заданий.
+func TestExtractService_RestartRecovery(t *testing.T) {
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+	ctx := context.Background()
+	newService := func() *ExtractService {
+		return NewExtractService(
+			context.Background(),
+			repository.NewMediaRepository(db),
+			repository.NewExtractTaskRepository(db),
+			NewThumbnailService(t.TempDir()),
+			t.TempDir(),
+			0,
+			10,
+		)
+	}
+
+	q1 := newService()
+	id1, err := q1.Enqueue(7)
+	require.NoError(t, err)
+	require.NotZero(t, id1)
+	// Имитация краха посреди обработки: строка осталась processing.
+	store := repository.NewExtractTaskRepository(db)
+	require.NoError(t, store.SetStatus(ctx, id1, ExtractJobProcessing, "", 0))
+	q1.Stop()
+
+	q2 := newService()
+	t.Cleanup(q2.Stop)
+
+	status, _, _, ok := q2.Get(id1)
+	require.True(t, ok, "recovered job must be visible")
+	assert.Equal(t, ExtractJobQueued, status)
+
+	row, err := store.Get(ctx, id1)
+	require.NoError(t, err)
+	assert.Equal(t, ExtractJobQueued, row.Status)
+
+	// Дедуп видит поднятое задание: повторный POST отдаёт тот же ID.
+	dup, err := q2.Enqueue(7)
+	require.NoError(t, err)
+	assert.Equal(t, id1, dup)
+
+	// Новые задания продолжают счётчик, а не занимают старые ID.
+	id2, err := q2.Enqueue(8)
+	require.NoError(t, err)
+	assert.Greater(t, id2, id1)
+
+	// Отмена удаляет и строку.
+	require.NoError(t, q2.Cancel(id1))
+	_, _, _, ok = q2.Get(id1)
+	assert.False(t, ok)
+	_, err = store.Get(ctx, id1)
+	require.Error(t, err)
+}
+
 func TestExtractQueueDedupsInflightBySource(t *testing.T) {
 	// Два параллельных POST одного видео — один джоб: повтор возвращает
 	// ID летящего задания вместо нового (иначе два ffmpeg на источник).
@@ -119,7 +246,7 @@ func TestExtractQueueConcurrentEnqueueSameSource(t *testing.T) {
 	q, _, _ := setupExtractTestService(t, 0)
 
 	const n = 8
-	ids := make([]uint64, n)
+	ids := make([]uint, n)
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
 		wg.Add(1)
@@ -149,6 +276,7 @@ func TestExtractQueueFull(t *testing.T) {
 	q := NewExtractService(
 		context.Background(),
 		repository.NewMediaRepository(db),
+		repository.NewExtractTaskRepository(db),
 		NewThumbnailService(t.TempDir()),
 		t.TempDir(),
 		0,
@@ -353,19 +481,26 @@ func TestExtractRejectsTraversalTitleWithoutFFmpeg(t *testing.T) {
 }
 
 func TestExtractMaxKeptOverflow(t *testing.T) {
-	q, _, _ := setupExtractTestService(t, 0)
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+	store := repository.NewExtractTaskRepository(db)
+	q := NewExtractService(context.Background(), repository.NewMediaRepository(db), store, NewThumbnailService(t.TempDir()), t.TempDir(), 0, 1000)
+	t.Cleanup(q.Stop)
 
 	// Набиваем терминальных заданий сверх потолка напрямую.
-	q.mu.Lock()
+	ctx := context.Background()
 	for i := 0; i < maxKeptExtractJobs+10; i++ {
-		q.nextID++
-		q.jobs[q.nextID] = &ExtractJob{
-			ID:        q.nextID,
+		row := &models.ExtractTask{SourceMediaID: uint(i + 1), Status: ExtractJobError}
+		require.NoError(t, store.Create(ctx, row))
+		q.mu.Lock()
+		q.jobs[row.ID] = &ExtractJob{
+			ID:        row.ID,
 			Status:    ExtractJobError,
 			createdAt: time.Now(),
 		}
+		q.mu.Unlock()
 	}
-	q.mu.Unlock()
 
 	q.sweep()
 
@@ -373,6 +508,10 @@ func TestExtractMaxKeptOverflow(t *testing.T) {
 	count := len(q.jobs)
 	q.mu.Unlock()
 	assert.Equal(t, maxKeptExtractJobs, count)
+
+	var rows int64
+	require.NoError(t, db.Model(&models.ExtractTask{}).Count(&rows).Error)
+	assert.Equal(t, int64(maxKeptExtractJobs), rows)
 }
 
 func TestTruncateFilename(t *testing.T) {

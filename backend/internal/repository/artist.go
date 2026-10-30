@@ -48,7 +48,7 @@ func (r *ArtistStore) Update(ctx context.Context, id uint, name string) (*models
 	result := r.db.WithContext(ctx).
 		Model(&models.Artist{}).
 		Where("id = ?", id).
-		Update("name", name)
+		Updates(map[string]any{"name": name, "name_norm": normArtistName(name)})
 	if result.Error != nil {
 		if isUniqueViolation(result.Error) {
 			return nil, ErrArtistNameTaken
@@ -78,16 +78,24 @@ func (r *ArtistStore) Touch(ctx context.Context, id uint) error {
 	return nil
 }
 
+// normArtistName приводит имя к каноническому виду для дедупа:
+// пробелы по краям и регистр значения не имеют. Lower — юникодный
+// (кириллица тоже), поэтому нормализация только в Go, не в SQL.
+func normArtistName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
 // FindOrCreateByName finds an artist by name or creates a new one.
-// Name is trimmed; empty names are rejected.
+// Name is trimmed; empty names are rejected. Match is case-insensitive.
 func (r *ArtistStore) FindOrCreateByName(ctx context.Context, name string) (*models.Artist, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("artist name is empty")
 	}
+	norm := normArtistName(name)
 
 	var artist models.Artist
-	err := r.db.WithContext(ctx).Where("name = ?", name).First(&artist).Error
+	err := r.db.WithContext(ctx).Where("name_norm = ?", norm).First(&artist).Error
 	if err == nil {
 		return &artist, nil
 	}
@@ -95,7 +103,7 @@ func (r *ArtistStore) FindOrCreateByName(ctx context.Context, name string) (*mod
 		return nil, err
 	}
 
-	artist = models.Artist{Name: name}
+	artist = models.Artist{Name: name, NameNorm: norm}
 	if err := r.db.WithContext(ctx).Create(&artist).Error; err != nil {
 		// Гонка: такой артист уже создан конкурентным запросом. Маскируем
 		// ошибку только если это UNIQUE-нарушение и запись теперь существует;
@@ -103,7 +111,7 @@ func (r *ArtistStore) FindOrCreateByName(ctx context.Context, name string) (*mod
 		if !isUniqueViolation(err) {
 			return nil, err
 		}
-		if err2 := r.db.WithContext(ctx).Where("name = ?", name).First(&artist).Error; err2 != nil {
+		if err2 := r.db.WithContext(ctx).Where("name_norm = ?", norm).First(&artist).Error; err2 != nil {
 			return nil, err
 		}
 	}

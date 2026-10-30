@@ -102,8 +102,9 @@ func extractTargetFor(codec string) extractTarget {
 
 // ExtractJob — задание извлечения аудиодорожки из видео. Все поля доступны
 // только под mutex'ом сервиса (воркер и хендлеры разделяют объект).
+// ID — из БД (extract_tasks.id, стабилен между рестартами).
 type ExtractJob struct {
-	ID        uint64
+	ID        uint
 	Status    string
 	Error     string
 	MediaID   uint
@@ -117,19 +118,24 @@ type ExtractJob struct {
 	jobCancel context.CancelFunc
 }
 
-// ExtractService — in-memory очередь извлечения аудио. Механика зервалит
-// UploadQueue (канал + карта + sweep + отмена): семантика другая (вход —
-// mediaId, а не файл), поэтому общая абстракция дала бы ложную общность.
+// ExtractService — очередь извлечения аудио с персистентными строками
+// (extract_tasks). Механика зеркалит UploadQueue (канал + карта + sweep
+// + отмена): семантика другая (вход — mediaId, а не файл), поэтому общая
+// абстракция дала бы ложную общность.
 type ExtractService struct {
-	mu        sync.Mutex
-	jobs      map[uint64]*ExtractJob
-	queue     chan *ExtractJob
-	nextID    uint64
-	limit     int
+	mu    sync.Mutex
+	jobs  map[uint]*ExtractJob
+	queue chan *ExtractJob
+	limit int
+	// enqueueMu сериализует постановки: без него параллельные Enqueue
+	// одного источника одновременно проходят проверку дедупа и плодят
+	// дубли (check-then-act на карте + БД).
+	enqueueMu sync.Mutex
 	ctx       context.Context
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
 	media     repository.MediaRepository
+	tasks     repository.ExtractTaskRepository
 	thumbSvc  *ThumbnailService
 	extract   *MetadataExtractor
 	audioPath string
@@ -141,11 +147,12 @@ type ExtractService struct {
 func NewExtractService(
 	ctx context.Context,
 	mediaRepo repository.MediaRepository,
+	tasks repository.ExtractTaskRepository,
 	thumbSvc *ThumbnailService,
 	audioPath string,
 	workers, limit int,
 ) *ExtractService {
-	if workers <= 0 {
+	if workers < 0 {
 		workers = DefaultExtractQueueWorkers
 	}
 	if limit <= 0 {
@@ -167,12 +174,13 @@ func NewExtractService(
 		log.Printf("extract queue: ffmpeg/ffprobe not in PATH, extraction jobs will fail")
 	}
 	q := &ExtractService{
-		jobs:      make(map[uint64]*ExtractJob),
+		jobs:      make(map[uint]*ExtractJob),
 		queue:     make(chan *ExtractJob, limit),
 		limit:     limit,
 		ctx:       qctx,
 		cancel:    cancel,
 		media:     mediaRepo,
+		tasks:     tasks,
 		thumbSvc:  thumbSvc,
 		extract:   NewMetadataExtractor(),
 		audioPath: absAudioPath,
@@ -184,7 +192,62 @@ func NewExtractService(
 	}
 	q.wg.Add(1)
 	go q.sweepLoop()
+	q.recoverInterrupted()
 	return q
+}
+
+// recoverInterrupted поднимает незавершённые строки из БД (следствие
+// рестарта посреди обработки): сбрасывает processing в queued,
+// пересоздаёт in-memory записи. ID раздаёт БД, переиспользования нет.
+// Отправка в канал — отдельной горутиной с блокировкой: unfinished
+// может быть больше буфера, а конструктор блокироваться не должен.
+func (q *ExtractService) recoverInterrupted() {
+	unfinished, err := q.tasks.FindUnfinished(context.Background(), ExtractJobQueued, ExtractJobProcessing)
+	if err != nil {
+		log.Printf("extract queue: load unfinished jobs: %v", err)
+		return
+	}
+	var ids []uint
+	for _, row := range unfinished {
+		if row.Status == ExtractJobProcessing {
+			if err := q.tasks.SetStatus(context.Background(), row.ID, ExtractJobQueued, "", 0); err != nil {
+				log.Printf("extract queue: reset job %d: %v", row.ID, err)
+				continue
+			}
+		}
+		q.mu.Lock()
+		q.jobs[row.ID] = &ExtractJob{
+			ID:        row.ID,
+			Status:    ExtractJobQueued,
+			sourceID:  row.SourceMediaID,
+			createdAt: row.CreatedAt,
+		}
+		q.mu.Unlock()
+		ids = append(ids, row.ID)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	log.Printf("extract queue: recovered %d interrupted job(s)", len(ids))
+	q.wg.Add(1)
+	go q.recoverQueue(ids)
+}
+
+func (q *ExtractService) recoverQueue(ids []uint) {
+	defer q.wg.Done()
+	for _, id := range ids {
+		q.mu.Lock()
+		job, ok := q.jobs[id]
+		q.mu.Unlock()
+		if !ok {
+			continue
+		}
+		select {
+		case q.queue <- job:
+		case <-q.ctx.Done():
+			return
+		}
+	}
 }
 
 // Available сообщает, есть ли ffmpeg+ffprobe: без них извлечение
@@ -194,11 +257,26 @@ func (q *ExtractService) Available() bool {
 	return q.available
 }
 
+// saveStatus пишет переход в БД best-effort: недоступная БД ломает
+// и остальной сервер, поэтому воркер продолжает in-memory.
+func (q *ExtractService) saveStatus(job *ExtractJob) {
+	q.mu.Lock()
+	id, status, errMsg, mediaID := job.ID, job.Status, job.Error, job.MediaID
+	q.mu.Unlock()
+	if err := q.tasks.SetStatus(context.Background(), id, status, errMsg, mediaID); err != nil {
+		log.Printf("extract queue: save task %d: %v", id, err)
+	}
+}
+
 // Enqueue ставит задание в очередь и возвращает его ID. Повторный POST
 // того же видео, пока прошлый джоб летит (queued/processing), отдаёт ID
-// существующего задания вместо нового: без дедупа check-then-act
-// плодил бы параллельные ffmpeg на один источник.
-func (q *ExtractService) Enqueue(sourceID uint) (uint64, error) {
+// существующего задания вместо нового: без дедупа параллельные запросы
+// плодили бы по ffmpeg на один источник.
+func (q *ExtractService) Enqueue(sourceID uint) (uint, error) {
+	// Сериализация всего check-then-act: карта + БД + вставка.
+	q.enqueueMu.Lock()
+	defer q.enqueueMu.Unlock()
+
 	q.mu.Lock()
 	for id, job := range q.jobs {
 		if job.sourceID == sourceID &&
@@ -207,13 +285,25 @@ func (q *ExtractService) Enqueue(sourceID uint) (uint64, error) {
 			return id, nil
 		}
 	}
-	q.nextID++
+	q.mu.Unlock()
+	// Дыра после рестарта: поднятые задания уже в карте выше, но на
+	// всякий случай проверяем и БД (один дешёвый запрос на постановку).
+	if active, err := q.tasks.FindActiveBySource(context.Background(), sourceID, ExtractJobQueued, ExtractJobProcessing); err == nil {
+		return active.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Printf("extract queue: find active job: %v", err)
+	}
+	row := &models.ExtractTask{SourceMediaID: sourceID, Status: ExtractJobQueued}
+	if err := q.tasks.Create(context.Background(), row); err != nil {
+		return 0, err
+	}
 	job := &ExtractJob{
-		ID:        q.nextID,
+		ID:        row.ID,
 		Status:    ExtractJobQueued,
 		sourceID:  sourceID,
-		createdAt: time.Now(),
+		createdAt: row.CreatedAt,
 	}
+	q.mu.Lock()
 	q.jobs[job.ID] = job
 	q.mu.Unlock()
 
@@ -224,28 +314,42 @@ func (q *ExtractService) Enqueue(sourceID uint) (uint64, error) {
 		q.mu.Lock()
 		delete(q.jobs, job.ID)
 		q.mu.Unlock()
+		if err := q.tasks.Delete(context.Background(), job.ID); err != nil {
+			log.Printf("extract queue: delete overflowed job %d: %v", job.ID, err)
+		}
 		return 0, ErrExtractQueueFull
 	}
 }
 
 // Get возвращает копию статуса задания. ok=false — задания нет.
-func (q *ExtractService) Get(id uint64) (status, errMsg string, mediaID uint, ok bool) {
+// Сначала карта, затем БД: завершённые (но ещё не выметенные) строки
+// переживают даже вытеснение из памяти.
+func (q *ExtractService) Get(id uint) (status, errMsg string, mediaID uint, ok bool) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	job, found := q.jobs[id]
-	if !found {
+	var st, em string
+	var mid uint
+	if found {
+		st, em, mid = job.Status, job.Error, job.MediaID
+	}
+	q.mu.Unlock()
+	if found {
+		return st, em, mid, true
+	}
+	row, err := q.tasks.Get(context.Background(), id)
+	if err != nil {
 		return "", "", 0, false
 	}
-	return job.Status, job.Error, job.MediaID, true
+	return row.Status, row.Error, row.MediaID, true
 }
 
 // Cancel отменяет задание, если оно ещё не завершено: убивает запущенный
-// ffmpeg через per-job контекст, удаляет задание из карты; файл и запись
-// Media (если созданы) подчищает воркер на ближайшей проверке отмены.
-// Done-задание отменить нельзя — ErrExtractJobDone. После отмены клиент
-// увидит 404 на статусе (запись удалена) — отмену он отличает по своему
+// ffmpeg через per-job контекст, удаляет задание из карты и строку из БД;
+// файл и запись Media (если созданы) подчищает воркер на ближайшей проверке
+// отмены. Done-задание отменить нельзя — ErrExtractJobDone. После отмены
+// клиент увидит 404 на статусе (запись удалена) — отмену он отличает по своему
 // локальному флагу, а не по коду.
-func (q *ExtractService) Cancel(id uint64) error {
+func (q *ExtractService) Cancel(id uint) error {
 	q.mu.Lock()
 	job, found := q.jobs[id]
 	if !found {
@@ -264,6 +368,9 @@ func (q *ExtractService) Cancel(id uint64) error {
 	}
 	delete(q.jobs, id)
 	q.mu.Unlock()
+	if err := q.tasks.Delete(context.Background(), id); err != nil {
+		log.Printf("extract queue: delete cancelled job %d: %v", id, err)
+	}
 
 	// Файла на этом этапе может ещё не быть (задание в queued), поэтому
 	// чистить здесь нечего — пути знает только воркер.
@@ -313,7 +420,9 @@ func (q *ExtractService) process(job *ExtractJob) {
 	job.jobCancel = jobCancel
 	q.mu.Unlock()
 	defer jobCancel()
-	if earlyCancelled {
+	if !earlyCancelled {
+		q.saveStatus(job)
+	} else {
 		// Отмена пришла, пока задание ждало воркера: файл ещё не создан,
 		// чистить нечего.
 		return
@@ -326,6 +435,24 @@ func (q *ExtractService) process(job *ExtractJob) {
 	}
 	if !source.Type.IsVideo() {
 		q.fail(job, fmt.Errorf("media %d is not a video", sourceID), "Source must be a video")
+		return
+	}
+
+	// Повтор после краха в окне между Create и Done: трек со связкой уже
+	// записан, извлекать заново нечего — иначе ffmpeg гонялся бы впустую,
+	// а FindByHash нашёл бы собственный сироту прошлого прогона и задание
+	// завершилось бы ложным «File already exists» при успехе.
+	// Зеркалит проверку хендлера: повторный POST отдаёт 200 с треком.
+	if existing, err := q.media.FindBySourceMediaID(jobCtx, sourceID); err == nil && existing != nil && existing.ID != 0 {
+		q.mu.Lock()
+		job.MediaID = existing.ID
+		job.Status = ExtractJobDone
+		job.Error = ""
+		q.mu.Unlock()
+		q.saveStatus(job)
+		return
+	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		q.fail(job, err, "Failed to check existing track")
 		return
 	}
 
@@ -380,6 +507,10 @@ func (q *ExtractService) process(job *ExtractJob) {
 		return
 	}
 
+	// Остаток прошлого прогона после краха: ffmpeg с флагом -n отказался
+	// бы перезаписывать, и поднятое задание упало бы сразу. Имя уникально
+	// на джоб (.part-<id>), чужое не сносим.
+	os.Remove(tmpPath)
 	if err := q.runFFmpeg(jobCtx, source.FilePath, tmpPath, target, duration); err != nil {
 		os.Remove(tmpPath)
 		if cancelled := q.markCancelled(job); cancelled {
@@ -502,15 +633,15 @@ func (q *ExtractService) process(job *ExtractJob) {
 	}
 
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	if job.Status == extractJobCancelled {
 		q.mu.Unlock()
 		q.cleanupJob(finalPath, media.ID)
-		q.mu.Lock()
 		return
 	}
 	job.Status = ExtractJobDone
 	job.Error = ""
+	q.mu.Unlock()
+	q.saveStatus(job)
 }
 
 // markCancelled проверяет отмену под локом (для проверок между этапами).
@@ -658,6 +789,18 @@ func (q *ExtractService) fail(job *ExtractJob, err error, errMsg string) {
 		log.Printf("extract queue: job %d already cancelled, ignoring failure: %v", job.ID, err)
 		return
 	}
+	// Остановка очереди (SIGTERM при рестарте): терминальный error не
+	// пишем, иначе управляемый рестарт терял бы задание вопреки контракту
+	// recovery (поднимаются только queued/processing). Возвращаем в queued —
+	// следующий старт подхватит задание как после краха.
+	if q.ctx.Err() != nil {
+		job.Status = ExtractJobQueued
+		job.Error = ""
+		q.mu.Unlock()
+		q.saveStatus(job)
+		log.Printf("extract queue: job %d requeued on shutdown", job.ID)
+		return
+	}
 	job.Status = ExtractJobError
 	job.Error = errMsg
 	mediaID := job.MediaID
@@ -665,6 +808,7 @@ func (q *ExtractService) fail(job *ExtractJob, err error, errMsg string) {
 	// outPath, а не по пустому пути.
 	outPath := job.outPath
 	q.mu.Unlock()
+	q.saveStatus(job)
 
 	if mediaID != 0 || outPath != "" {
 		q.cleanupJob(outPath, mediaID)
@@ -703,37 +847,47 @@ func (q *ExtractService) sweepLoop() {
 
 func (q *ExtractService) sweep() {
 	type agedJob struct {
-		id        uint64
+		id        uint
 		createdAt time.Time
 	}
 
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	var evicted []uint
+	func() {
+		q.mu.Lock()
+		defer q.mu.Unlock()
 
-	now := time.Now()
-	for id, job := range q.jobs {
-		if job.Status == ExtractJobQueued || job.Status == ExtractJobProcessing {
-			continue
+		now := time.Now()
+		for id, job := range q.jobs {
+			if job.Status == ExtractJobQueued || job.Status == ExtractJobProcessing {
+				continue
+			}
+			if now.Sub(job.createdAt) > extractJobTTL {
+				delete(q.jobs, id)
+				evicted = append(evicted, id)
+			}
 		}
-		if now.Sub(job.createdAt) > extractJobTTL {
-			delete(q.jobs, id)
-		}
-	}
 
-	if len(q.jobs) <= maxKeptExtractJobs {
-		return
-	}
-	var terminal []agedJob
-	for id, job := range q.jobs {
-		if job.Status != ExtractJobQueued && job.Status != ExtractJobProcessing {
-			terminal = append(terminal, agedJob{id: id, createdAt: job.createdAt})
+		if len(q.jobs) <= maxKeptExtractJobs {
+			return
 		}
-	}
-	sort.Slice(terminal, func(i, j int) bool {
-		return terminal[i].createdAt.Before(terminal[j].createdAt)
-	})
-	overflow := len(q.jobs) - maxKeptExtractJobs
-	for i := 0; i < overflow && i < len(terminal); i++ {
-		delete(q.jobs, terminal[i].id)
+		var terminal []agedJob
+		for id, job := range q.jobs {
+			if job.Status != ExtractJobQueued && job.Status != ExtractJobProcessing {
+				terminal = append(terminal, agedJob{id: id, createdAt: job.createdAt})
+			}
+		}
+		sort.Slice(terminal, func(i, j int) bool {
+			return terminal[i].createdAt.Before(terminal[j].createdAt)
+		})
+		overflow := len(q.jobs) - maxKeptExtractJobs
+		for i := 0; i < overflow && i < len(terminal); i++ {
+			delete(q.jobs, terminal[i].id)
+			evicted = append(evicted, terminal[i].id)
+		}
+	}()
+	for _, id := range evicted {
+		if err := q.tasks.Delete(context.Background(), id); err != nil {
+			log.Printf("extract queue: delete swept job %d: %v", id, err)
+		}
 	}
 }

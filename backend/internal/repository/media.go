@@ -422,8 +422,9 @@ func resolveArtists(db *gorm.DB, artists []models.Artist) ([]models.Artist, erro
 		if name == "" {
 			continue
 		}
+		norm := normArtistName(name)
 		var existing models.Artist
-		err := db.Where("name = ?", name).First(&existing).Error
+		err := db.Where("name_norm = ?", norm).First(&existing).Error
 		if err == nil {
 			resolved = append(resolved, existing)
 			continue
@@ -432,13 +433,14 @@ func resolveArtists(db *gorm.DB, artists []models.Artist) ([]models.Artist, erro
 			return nil, err
 		}
 		a.Name = name
+		a.NameNorm = norm
 		if err := db.Create(&a).Error; err != nil {
 			// Маскируем только реальную гонку (UNIQUE-нарушение и запись уже
 			// существует); прочие сбои БД возвращаются как есть.
 			if !isUniqueViolation(err) {
 				return nil, err
 			}
-			if err2 := db.Where("name = ?", name).First(&existing).Error; err2 != nil {
+			if err2 := db.Where("name_norm = ?", norm).First(&existing).Error; err2 != nil {
 				return nil, err
 			}
 			resolved = append(resolved, existing)

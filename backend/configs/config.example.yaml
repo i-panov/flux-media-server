@@ -22,10 +22,12 @@ server:
   # (rate_limiter.max) throttles request frequency. Applies to
   # /api/media/upload and cover endpoints; the rest of the API is capped at 4 MB.
   max_upload_size: 2147483648  # 2GB in bytes
-  # web_dist: каталог собранного веб-клиента (npm run build в web/),
-  # раздаётся с того же origin, что и API (SPA с fallback на index.html).
+  # web_dist: каталог собранного веб-клиента, раздаётся с того же
+  # origin, что и API (SPA с fallback на index.html).
   # Пусто/закомментировано — API-only режим (разработка через Vite).
-  # web_dist: "../web/dist"
+  # В Docker-образе бандл уже запечён в /app/web (Node-стадия
+  # в backend/Dockerfile) — для него достаточно раскомментировать:
+  # web_dist: "/app/web"
 
 database:
   path: "./data/flux.db"

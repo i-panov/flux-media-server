@@ -1,8 +1,17 @@
+# Контекст сборки — корень репозитория (см. backend/docker-compose.yaml):
+# образ печёт и Go-бинарник, и веб-бандл, поэтому исключения — для обоих.
 .git/
 .gitignore
 README.md
 AGENTS.md
-frontend/
-backend/tmp/
-backend/configs/config.yaml
 *.md
+frontend/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+backend/data/
+backend/tmp/
+backend/*.db
+backend/flux-server
+backend/configs/config.yaml
