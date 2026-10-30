@@ -16,3 +16,6 @@ backend/.env
 
 # Internal planning docs (not for repo)
 docs/
+
+# Node dependencies (npm workspaces: root + web + mobile + packages/*)
+node_modules/

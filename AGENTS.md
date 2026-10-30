@@ -54,6 +54,27 @@ npm run size       # size-limit budgets
 - PWA service worker (`src/sw.ts`) must keep the literal `self.__WB_MANIFEST` or the precache inject step fails
 - Node `>=22` required
 
+### Shared (`packages/shared`)
+
+```bash
+npm run typecheck -w @flux/shared
+npm run lint -w @flux/shared
+npm run test -w @flux/shared
+```
+
+- Чистый TypeScript без JSX, DOM и нативного кода — анализаторы (biome + eslint) унаследованы от web.
+- Только рантайм-зависимости: `zod`, `@tanstack/react-query`.
+
+### Mobile (`mobile/`)
+
+```bash
+cd mobile && npx expo start   # LAN для Expo Go / эмуляторы
+npm run typecheck -w mobile && npm run lint -w mobile
+```
+
+- Expo с prebuild; `android/` и `ios/` генерятся и в git не входят.
+- Анализаторы как в вебе: biome (extends) + `eslint-config-expo` + sonarjs.
+
 ## Architecture
 
 ### Backend structure (`backend/internal/`)
@@ -89,6 +110,7 @@ npm run size       # size-limit budgets
 - Каждый коммит, затрагивающий `frontend/`, инкрементирует patch в `frontend/pubspec.yaml` (`1.0.x`) и build-номер после `+`: от него зависит Android versionCode — без этого новый APK не встанет поверх старого.
 - Каждый коммит, затрагивающий `backend/`, инкрементирует patch дефолта `version` в `backend/cmd/server/main.go` (`1.0.x`).
 - Каждый коммит, затрагивающий `web/`, инкрементирует patch в `web/package.json` (`0.x.y`, пока веб в разработке — `0.*`); версия видна в Настройки → О приложении.
+- Каждый коммит, затрагивающий `mobile/`, инкрементирует patch в `mobile/package.json`; `packages/shared` — `0.x.y` (minor на ломающие изменения транспорта/моделей).
 - Версия приложения видна в Настройки → О приложении, версия бэкенда — там же из `GET /api/health` (поле `version`): свежесть обоих концов сверяется по ним.
 - Флаги `-version` (сервер) и ldflags `-X main.version=...` продолжают работать поверх дефолта.
 

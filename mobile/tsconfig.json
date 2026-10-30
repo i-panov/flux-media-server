@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "include": ["app", "src"],
+  "compilerOptions": {
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}

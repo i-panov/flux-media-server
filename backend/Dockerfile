@@ -15,15 +15,19 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /build/flux-server ./cmd/server
 # (route codegen + typecheck + vite). Бандл печётся в образе, поэтому
 # рассинхрон «бинарник одной версии, веб другой» исключён: образ
 # самодостаточен, отдельный деплой dist не нужен.
-FROM node:22-alpine AS web
+# glibc-база осознанно: lock-файл содержит glibc-вариант tailwind-биндинга, на alpine/musl сборка падает
+FROM node:22-slim AS web
 
-WORKDIR /web
+WORKDIR /build
 
-COPY web/package.json web/package-lock.json ./
-RUN npm ci
+COPY package.json package-lock.json ./
+COPY web/package.json ./web/
+COPY packages/shared/package.json ./packages/shared/
+RUN npm ci --workspace=flux-web
 
-COPY web/ ./
-RUN npm run build
+COPY web/ ./web/
+COPY packages/shared/ ./packages/shared/
+RUN npm run build --workspace=flux-web
 
 # Runtime stage
 FROM alpine:3.19
@@ -37,7 +41,7 @@ COPY --from=builder /build/configs/config.example.yaml ./configs/config.example.
 # Содержимое dist — прямо в /app/web: сервер отдаёт его по web_dist
 # (см. configs/config.example.yaml). Путь совпадает с демо-маунтом,
 # который при наличии пересборки локально перекрывает запечённое.
-COPY --from=web /web/dist/ ./web/
+COPY --from=web /build/web/dist/ ./web/
 
 # Run as an unprivileged user: a remote file-write vulnerability must not
 # give root inside the container.

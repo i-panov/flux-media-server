@@ -93,6 +93,12 @@ describe("useMediaProgress", () => {
 		result.current.handleLoadedMetadata();
 		expect(video.currentTime).toBe(0);
 
+		// Клиент резолвит транспорт асинхронно: fetch вызывается не позже,
+		// чем на первом микротаске после подписки.
+		await waitFor(() => {
+			expect(fetchMock).toHaveBeenCalled();
+		});
+
 		(resolveProgress as unknown as (response: Response) => void)(
 			jsonResponse(progressBody(7, 120)),
 		);
