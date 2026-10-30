@@ -59,19 +59,69 @@ export function useUpdateMetadata(mediaId: number) {
 	});
 }
 
+export interface ArtistEntry {
+	id: number;
+	name: string;
+}
+
+const artistEntrySchema = z.object({
+	id: z.number(),
+	name: z.string(),
+});
+
 export function useMediaArtists() {
 	return useQuery({
 		queryKey: ["artists"],
-		queryFn: async (): Promise<string[]> => {
+		queryFn: async (): Promise<ArtistEntry[]> => {
 			const body = await apiFetch<unknown>("/artists");
 			const parsed = (body as { items?: unknown }).items ?? body;
-			const names = z
-				.array(z.object({ name: z.string() }))
+			const entries = z
+				.array(artistEntrySchema)
 				.parse(parsed)
-				.map((artist) => artist.name);
-			return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+				.map((artist) => ({ id: artist.id, name: artist.name }));
+			const seen = new Set<string>();
+			return entries
+				.filter((artist) => {
+					if (seen.has(artist.name)) {
+						return false;
+					}
+					seen.add(artist.name);
+					return true;
+				})
+				.sort((a, b) => a.name.localeCompare(b.name));
 		},
 		retry: false,
 		refetchOnWindowFocus: false,
+	});
+}
+
+export function useArtist(artistId: number) {
+	const artists = useMediaArtists();
+	const artist = (artists.data ?? []).find((item) => item.id === artistId);
+	return {
+		artist,
+		isPending: artists.isPending,
+		isError: artists.isError,
+		refetch: artists.refetch,
+	};
+}
+
+export async function renameArtist(id: number, name: string) {
+	const body = await apiFetch<unknown>(`/artists/${id}`, {
+		method: "PUT",
+		body: JSON.stringify({ name }),
+	});
+	return artistEntrySchema.parse(body);
+}
+
+export function useRenameArtist() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, name }: { id: number; name: string }) =>
+			renameArtist(id, name),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["artists"] });
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+		},
 	});
 }

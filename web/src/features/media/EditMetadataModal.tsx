@@ -12,6 +12,7 @@ import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaArtists, useUpdateMetadata } from "../../api/metadata";
+import { parseFilename } from "../../core/format";
 import type { Media } from "../../core/media";
 import { useCollectionError } from "../collections/useCollectionError";
 
@@ -169,8 +170,8 @@ export function EditMetadataModal({
 						</Group>
 					))}
 					<datalist id="metadata-artists">
-						{(artistNames.data ?? []).map((name) => (
-							<option key={name} value={name} />
+						{(artistNames.data ?? []).map((artist) => (
+							<option key={artist.id} value={artist.name} />
 						))}
 					</datalist>
 				</Stack>
@@ -211,6 +212,28 @@ export function EditMetadataModal({
 					maxRows={8}
 					onChange={(event) => setDescription(event.currentTarget.value)}
 				/>
+				{media.filename !== "" && (
+					<Group gap="xs" wrap="nowrap">
+						<Text size="xs" c="dimmed" truncate className="flex-1">
+							{media.filename}
+						</Text>
+						<Button
+							variant="subtle"
+							size="xs"
+							onClick={() => {
+								const parsed = parseFilename(media.filename);
+								if (parsed.title !== "") {
+									setTitle(parsed.title);
+								}
+								if (parsed.year !== null) {
+									setYear(String(parsed.year));
+								}
+							}}
+						>
+							{t("metadata.useFilename")}
+						</Button>
+					</Group>
+				)}
 				{update.isError && (
 					<Text size="sm" c="red">
 						{t("metadata.saveError")}

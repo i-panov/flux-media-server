@@ -79,7 +79,7 @@ export function VideoPage() {
 				w={{ base: "100%", sm: 320 }}
 			/>
 			{/* При поиске ряды продолжения не нужны: они не фильтруются. */}
-			{debounced === "" && <ContinueWatching kind="video" />}
+			{debounced === "" && <ContinueWatching kind="video" limit={1} />}
 			{debounced === "" && <FavoriteSection type="video" />}
 			{debounced === "" && <CollectionsSection type="video" />}
 			{list.isPending ? (

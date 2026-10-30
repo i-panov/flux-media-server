@@ -3,9 +3,11 @@ import {
 	type ReactNode,
 	useCallback,
 	useContext,
+	useEffect,
 	useRef,
 	useState,
 } from "react";
+import { fetchLatestUnfinishedAudio } from "../../api/progress";
 import type { Media } from "../../core/media";
 import { useMediaProgress } from "../media/useMediaProgress";
 import { PLAYBACK_ERROR } from "./audioPlayback";
@@ -89,6 +91,26 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 		setError(message);
 		setPlaying(false);
 	}, []);
+
+	// Сид мини-плеера: без очереди (и без сохранённой) подтягиваем
+	// последний недослушанный трек с сервера — на паузе, позиция
+	// восстановится прогрессом при загрузке метаданных. Применяем
+	// функцией: пользователь мог начать очередь, пока запрос в воздухе.
+	const seeded = useRef(restoredQueue !== null);
+	useEffect(() => {
+		if (seeded.current || queue.length > 0) {
+			return;
+		}
+		seeded.current = true;
+		void fetchLatestUnfinishedAudio().then((media) => {
+			if (media === null) {
+				return;
+			}
+			setQueueState((prev) =>
+				prev.items.length === 0 ? { items: [media], index: 0 } : prev,
+			);
+		});
+	}, [queue.length]);
 
 	const toggleShuffle = useCallback(() => {
 		setShuffle((prev) => !prev);
@@ -181,6 +203,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 				onTimeUpdate={(event) => {
 					timings.markTime(event.currentTarget.currentTime);
 					progress.handleTimeUpdate();
+				}}
+				onSeeked={(event) => {
+					// Восстановление позиции на паузе: timeupdate не стреляет.
+					timings.markTime(event.currentTarget.currentTime);
 				}}
 				onPlay={() => setPlaying(true)}
 				onPause={() => setPlaying(false)}

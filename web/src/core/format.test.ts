@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, splitSubLang } from "./format";
+import { formatDuration, parseFilename, splitSubLang } from "./format";
 
 describe("formatDuration", () => {
 	it("форматирует секунды и минуты без часов", () => {
@@ -54,6 +54,36 @@ describe("splitSubLang", () => {
 		expect(splitSubLang("es-4192")).toEqual({
 			base: "es-4192",
 			label: "es-4192",
+		});
+	});
+});
+
+describe("parseFilename", () => {
+	it("разбирает Title.Year.ext", () => {
+		expect(parseFilename("Matrix.1999.mkv")).toEqual({
+			title: "Matrix",
+			year: 1999,
+		});
+	});
+
+	it("разбирает Title (Year).ext", () => {
+		expect(parseFilename("Matrix (1999).mp4")).toEqual({
+			title: "Matrix",
+			year: 1999,
+		});
+	});
+
+	it("разбирает Title.S01E05.ext без года", () => {
+		expect(parseFilename("Show.S01E05.mkv")).toEqual({
+			title: "Show",
+			year: null,
+		});
+	});
+
+	it("фолбэк: имя без расширения, точки в пробелы", () => {
+		expect(parseFilename("My.Home.Video.mp4")).toEqual({
+			title: "My Home Video",
+			year: null,
 		});
 	});
 });

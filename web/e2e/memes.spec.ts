@@ -3,6 +3,7 @@ import { stubEmptyLibraryMeta } from "./stubs";
 
 const MEMES_LIST_PATTERN = /\/memes$/;
 const MEME_DETAIL_PATTERN = /\/memes\/1$/;
+const MEME_TITLES_PATTERN = /Портрет|Пейзаж/;
 const UPLOAD_IMAGE_PATTERN = /\/upload\?type=image$/;
 // biome-ignore lint/security/noSecrets: CSS-селектор, не секрет.
 const FILE_INPUT_SELECTOR = 'input[type="file"]';
@@ -150,6 +151,67 @@ test("мемы: сетка, поиск, просмотрщик и скачива
 
 	await page.getByRole("button", { name: "К мемам" }).click();
 	await expect(page).toHaveURL(MEMES_LIST_PATTERN);
+});
+
+function svgThumb(width: number, height: number): Buffer {
+	return Buffer.from(
+		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#888"/></svg>`,
+	);
+}
+
+test("мемы: плитки одинаковой высоты при разных пропорциях", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+	await stubEmptyLibraryMeta(page);
+	await page.route(
+		(url) => url.pathname === "/api/media",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: listBody([imageItem(1, "Портрет"), imageItem(2, "Пейзаж")], 2),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/media/1/thumb",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "image/svg+xml",
+				body: svgThumb(300, 600),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/media/2/thumb",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "image/svg+xml",
+				body: svgThumb(600, 300),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: [], total: 0, limit: 20, offset: 0 }),
+			}),
+	);
+
+	await page.goto("/memes");
+	await expect(page.getByRole("link", { name: "Портрет" })).toBeVisible();
+	await expect(page.getByRole("link", { name: "Пейзаж" })).toBeVisible();
+	// Портрет 300×600 и пейзаж 600×300: плитки обязаны остаться квадратами.
+	const heights = await page
+		.getByRole("link", { name: MEME_TITLES_PATTERN })
+		.evaluateAll((links) =>
+			links.map((link) => Math.round(link.getBoundingClientRect().height)),
+		);
+	expect(heights.length).toBe(2);
+	expect(heights[0]).toBe(heights[1]);
 });
 
 test("мемы открываются из навигации", async ({ page }) => {

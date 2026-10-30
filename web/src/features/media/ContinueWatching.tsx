@@ -9,37 +9,27 @@ import {
 	Title,
 } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
-import { Film, Music, RotateCw } from "lucide-react";
+import { Film, RotateCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { type ContinueEntry, useContinueWatching } from "../../api/progress";
 import { formatDuration } from "../../core/format";
 import type { MediaKind } from "../../core/media";
 
-function ContinueCard({
-	entry,
-	kind,
-}: {
-	entry: ContinueEntry;
-	kind: MediaKind;
-}) {
+function ContinueCard({ entry }: { entry: ContinueEntry }) {
 	const { t } = useTranslation();
 	const media = entry.media;
 	const reload = useMediaReload(media.id);
-	// У видео превью — кадр, у аудио — обложка. Плейсхолдер общий:
-	// пустой URL и окончательно битая картинка выглядят одинаково.
-	const preview = kind === "video" ? media.thumbnail_url : media.cover_url;
-	const hasPreview = preview !== "" && !reload.failed;
-	const FallbackIcon = kind === "video" ? Film : Music;
-	// Кадр видео — широкий, обложка аудио — квадратная.
-	const previewSize = kind === "video" ? "h-16 w-24" : "h-16 w-16";
+	// Превью — кадр видео. Плейсхолдер при пустом URL и окончательно
+	// битой картинке выглядит одинаково.
+	const hasPreview = media.thumbnail_url !== "" && !reload.failed;
 	// Длительность прогресса точнее карточки: она пишется плеером.
 	const total = entry.duration > 0 ? entry.duration : media.duration;
 	const percent = total > 0 ? Math.min(100, (entry.position / total) * 100) : 0;
 	return (
 		<div className="relative">
 			<Link
-				to={kind === "video" ? "/video/$id" : "/audio/$id"}
+				to="/video/$id"
 				params={{ id: String(media.id) }}
 				className="no-underline [color:inherit]"
 			>
@@ -50,18 +40,18 @@ function ContinueCard({
 								// biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError здесь — ошибка загрузки, а не интеракция.
 								<img
 									key={reload.nonce}
-									src={preview}
+									src={media.thumbnail_url}
 									alt=""
 									loading="lazy"
 									onError={reload.handleError}
-									className={`${previewSize} shrink-0 rounded object-cover`}
+									className="h-16 w-24 shrink-0 rounded object-cover"
 								/>
 							) : (
 								<div
 									aria-hidden="true"
-									className={`${previewSize} grid shrink-0 place-items-center rounded bg-[var(--mantine-color-default-hover)]`}
+									className="grid h-16 w-24 shrink-0 place-items-center rounded bg-[var(--mantine-color-default-hover)]"
 								>
-									<FallbackIcon
+									<Film
 										size={20}
 										className="text-[var(--mantine-color-dimmed)]"
 									/>
@@ -108,9 +98,10 @@ function ContinueCard({
 	);
 }
 
-// Блок «Продолжить просмотр/прослушивание»: последние начатые и
-// недосмотренные записи нужного типа. Ошибку запроса не показываем — это
-// вспомогательная секция, основной список должен работать и без неё.
+// Блок «Продолжить просмотр»: последние начатые и недосмотренные
+// видео. Аудио здесь нет: недослушанный трек поднимается мини-плеером.
+// Ошибку запроса не показываем — это вспомогательная секция, основной
+// список должен работать и без неё.
 export function ContinueWatching({
 	kind,
 	limit,
@@ -127,11 +118,11 @@ export function ContinueWatching({
 	return (
 		<Stack gap="sm">
 			<Title order={2} size="h3">
-				{t(kind === "video" ? "continue.watching" : "continue.listening")}
+				{t("continue.watching")}
 			</Title>
 			<SimpleGrid cols={{ base: 1, sm: 2, md: 3, xl: 4 }} spacing="md">
 				{items.map((entry) => (
-					<ContinueCard key={entry.id} entry={entry} kind={kind} />
+					<ContinueCard key={entry.id} entry={entry} />
 				))}
 			</SimpleGrid>
 		</Stack>

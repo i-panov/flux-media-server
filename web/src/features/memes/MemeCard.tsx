@@ -25,7 +25,7 @@ export function MemeCard({ media }: { media: Media }) {
 				className="block"
 			>
 				<Card withBorder padding={0} radius="md" className="overflow-hidden">
-					<div className="aspect-square bg-[var(--mantine-color-default-hover)]">
+					<div className="relative aspect-square bg-[var(--mantine-color-default-hover)]">
 						{reload.failed ? (
 							<div
 								aria-hidden="true"
@@ -37,6 +37,9 @@ export function MemeCard({ media }: { media: Media }) {
 								/>
 							</div>
 						) : (
+							// Картинка в абсолюте: иначе её intrinsic-размер
+							// (портрет/панорама) растягивает aspect-бокс и
+							// скачет вся сетка — проверено на живых мемах.
 							// biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError здесь — ошибка загрузки, а не интеракция.
 							<img
 								key={reload.nonce}
@@ -45,7 +48,7 @@ export function MemeCard({ media }: { media: Media }) {
 								loading="lazy"
 								decoding="async"
 								onError={reload.handleError}
-								className="h-full w-full object-cover"
+								className="absolute inset-0 h-full w-full object-cover"
 							/>
 						)}
 					</div>

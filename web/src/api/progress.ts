@@ -133,3 +133,32 @@ export function useContinueWatching(kind: MediaKind) {
 		refetchOnWindowFocus: false,
 	});
 }
+
+// Последний недослушанный трек для seeded-мини-плеера: свежих записей
+// может быть несколько, а завершённая (дослушанная до конца) — самой
+// новой, поэтому берём страницу и выбираем первую незавершённую.
+// Ошибки гасятся — плеер без сида просто стартует пустым.
+export async function fetchLatestUnfinishedAudio(): Promise<Media | null> {
+	try {
+		const params = new URLSearchParams({
+			type: "audio",
+			limit: String(CONTINUE_LIMIT),
+			offset: "0",
+		});
+		const body = await apiFetch<unknown>(`/progress?${params.toString()}`);
+		const parsed = progressListSchema.parse(body);
+		for (const entry of parsed.items) {
+			if (
+				entry.media !== null &&
+				entry.media !== undefined &&
+				entry.media.type === "audio" &&
+				isUnfinished(entry)
+			) {
+				return entry.media;
+			}
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}

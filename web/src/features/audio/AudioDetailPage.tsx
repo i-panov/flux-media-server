@@ -7,13 +7,14 @@ import {
 	Text,
 	Title,
 } from "@mantine/core";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Music, Pause, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useMedia } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
+import { ArtistFavoriteButton } from "../favorites/ArtistFavoriteButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
@@ -93,7 +94,6 @@ export function AudioDetailPage() {
 
 	const item = media.data;
 	const isCurrent = player.current?.id === item.id;
-	const artists = item.artists.map((artist) => artist.name).join(", ");
 	// Обложка — декоративный фон: битая картинка не должна оставлять иконку.
 	const coverStyle =
 		item.cover_url === ""
@@ -164,8 +164,32 @@ export function AudioDetailPage() {
 						</Alert>
 					)}
 					<Group gap="xl">
-						{artists !== "" && (
-							<MetaItem label={t("audio.meta.artist")} value={artists} />
+						{item.artists.length > 0 && (
+							<Stack gap={4}>
+								<Text size="xs" c="dimmed">
+									{t("audio.meta.artist")}
+								</Text>
+								<Group gap="xs">
+									{item.artists.map((artist) => (
+										<Group key={artist.id} gap={2} wrap="nowrap">
+											<Link
+												to="/artists/$id"
+												params={{ id: String(artist.id) }}
+												className="no-underline [color:inherit]"
+											>
+												<Text size="sm" fw={600}>
+													{artist.name}
+												</Text>
+											</Link>
+											<ArtistFavoriteButton
+												artistId={artist.id}
+												artistName={artist.name}
+												size={15}
+											/>
+										</Group>
+									))}
+								</Group>
+							</Stack>
 						)}
 						{item.album !== "" && (
 							<MetaItem label={t("audio.meta.album")} value={item.album} />

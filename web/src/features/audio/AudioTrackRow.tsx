@@ -1,0 +1,104 @@
+import { ActionIcon, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { Link } from "@tanstack/react-router";
+import { Music, Play, RotateCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useMediaReload } from "../../api/media";
+import { formatDuration } from "../../core/format";
+import type { Media } from "../../core/media";
+import { FavoriteButton } from "../favorites/FavoriteButton";
+import { DeleteMediaButton } from "../media/DeleteMediaButton";
+
+// Плоская строка трека для раздела аудио (как во Flutter): обложка,
+// название, исполнители, длительность и действия в один ряд —
+// никаких карточек с лесенкой кнопок.
+export function AudioTrackRow({
+	media,
+	onPlay,
+	showDelete,
+}: {
+	media: Media;
+	onPlay?: () => void;
+	showDelete?: boolean;
+}) {
+	const { t } = useTranslation();
+	const reload = useMediaReload(media.id);
+	// Обложки может не быть (mp3 без тегов): сразу плейсхолдер, без <img src="">.
+	const hasCover = media.cover_url !== "" && !reload.failed;
+	const artists = media.artists.map((artist) => artist.name).join(", ");
+	return (
+		<Group
+			gap="sm"
+			wrap="nowrap"
+			className="rounded-md border border-[var(--mantine-color-default-border)] px-3 py-2"
+		>
+			<div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded bg-[var(--mantine-color-default-hover)]">
+				{hasCover ? (
+					// biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError здесь — ошибка загрузки, а не интеракция.
+					<img
+						key={reload.nonce}
+						src={media.cover_url}
+						alt=""
+						loading="lazy"
+						onError={reload.handleError}
+						className="h-full w-full object-cover"
+					/>
+				) : (
+					<Music
+						size={20}
+						aria-hidden="true"
+						className="text-[var(--mantine-color-dimmed)]"
+					/>
+				)}
+			</div>
+			<Stack gap={0} className="min-w-0 flex-1">
+				<Link
+					to="/audio/$id"
+					params={{ id: String(media.id) }}
+					className="no-underline [color:inherit]"
+				>
+					<Text fw={600} size="sm" truncate>
+						{media.title}
+					</Text>
+				</Link>
+				<Text size="xs" c="dimmed" truncate>
+					{artists === "" ? "—" : artists}
+				</Text>
+			</Stack>
+			{media.duration > 0 && (
+				<Text size="xs" c="dimmed" className="shrink-0">
+					{formatDuration(media.duration)}
+				</Text>
+			)}
+			<Group gap={4} wrap="nowrap" className="shrink-0">
+				{onPlay !== undefined && (
+					<Tooltip label={t("player.play")} withArrow>
+						<ActionIcon
+							variant="filled"
+							radius="xl"
+							size="lg"
+							aria-label={t("player.play")}
+							onClick={onPlay}
+						>
+							<Play size={18} fill="currentColor" />
+						</ActionIcon>
+					</Tooltip>
+				)}
+				<FavoriteButton mediaId={media.id} type="audio" />
+				{showDelete === true && (
+					<DeleteMediaButton mediaId={media.id} iconOnly />
+				)}
+				{reload.failed && (
+					<Tooltip label={t("common.retry")} withArrow>
+						<ActionIcon
+							variant="subtle"
+							aria-label={t("common.retry")}
+							onClick={reload.retry}
+						>
+							<RotateCw size={18} />
+						</ActionIcon>
+					</Tooltip>
+				)}
+			</Group>
+		</Group>
+	);
+}

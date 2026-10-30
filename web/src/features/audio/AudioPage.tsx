@@ -14,12 +14,13 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFavoriteMedia } from "../../api/favorites";
 import { useAudioList } from "../../api/media";
+import { useSession } from "../../api/session";
 import { CollectionsSection } from "../collections/CollectionsSection";
+import { FavoriteArtistsSection } from "../favorites/FavoriteArtistsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
-import { ContinueWatching } from "../media/ContinueWatching";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
 import { UploadButton } from "../upload/UploadButton";
-import { AudioCard } from "./AudioCard";
+import { AudioTrackRow } from "./AudioTrackRow";
 
 const SKELETON_COUNT = 12;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -59,6 +60,8 @@ export function AudioPage() {
 
 	const list = useAudioList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
+	const { data: session } = useSession();
+	const isAdmin = session?.is_admin === true;
 	const favoriteMedia = useFavoriteMedia("audio");
 	const favoriteSectionIds = new Set(favoriteMedia.map((media) => media.id));
 	const visibleItems =
@@ -83,9 +86,13 @@ export function AudioPage() {
 				}}
 				w={{ base: "100%", sm: 320 }}
 			/>
-			{/* При поиске ряд продолжения не нужен: он не фильтруется. */}
-			{debounced === "" && <ContinueWatching kind="audio" />}
+			{/* При поиске секции не нужны: они не фильтруются.
+			Блока продолжения здесь нет: недослушанный трек поднимается
+			мини-плеером на паузе сразу после загрузки. */}
 			{debounced === "" && <FavoriteSection type="audio" />}
+			{debounced === "" && (
+				<FavoriteArtistsSection onSelect={(name) => setQuery(name)} />
+			)}
 			{debounced === "" && <CollectionsSection type="audio" />}
 			{list.isPending ? (
 				<AudioSkeletons />
@@ -106,21 +113,19 @@ export function AudioPage() {
 				<Text c="dimmed">{t("audio.empty")}</Text>
 			) : (
 				<>
-					<SimpleGrid
-						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
-						spacing="md"
-					>
+					<Stack gap="xs">
 						{visibleItems.map((media) => (
-							<AudioCard
+							<AudioTrackRow
 								key={media.id}
 								media={media}
 								onPlay={() => {
 									player.playQueue(items, items.indexOf(media));
 									void navigate({ to: "/player" });
 								}}
+								showDelete={isAdmin}
 							/>
 						))}
-					</SimpleGrid>
+					</Stack>
 					{list.isFetchNextPageError ? (
 						<Alert color="red" variant="light" title={t("audio.error")}>
 							<Button

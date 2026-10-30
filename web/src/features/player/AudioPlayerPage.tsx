@@ -34,6 +34,8 @@ import { useSession } from "../../api/session";
 import { formatDuration } from "../../core/format";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
+import { parseSyncedLyrics } from "./lyricsSync";
+import { SyncedLyricsView } from "./SyncedLyricsView";
 
 function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 	const { t } = useTranslation();
@@ -52,6 +54,11 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 		kind === "lyrics"
 			? (lyrics.data?.lyrics_text ?? "")
 			: (lyrics.data?.translation ?? "");
+	// LRC-синхронизация — только у лирики, как во Flutter.
+	const syncLines =
+		kind === "lyrics" && !editing
+			? parseSyncedLyrics(lyrics.data?.sync_data ?? "")
+			: [];
 	const isAdmin = session.data?.is_admin === true;
 
 	const startEditing = () => {
@@ -128,6 +135,8 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 					minRows={12}
 					maxRows={28}
 				/>
+			) : syncLines.length > 0 ? (
+				<SyncedLyricsView lines={syncLines} />
 			) : (
 				<Text style={{ whiteSpace: "pre-wrap" }}>
 					{text === "" ? t("player.noText") : text}

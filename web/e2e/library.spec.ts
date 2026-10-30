@@ -2,6 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 const COLLECTION_DETAIL_PATTERN = /\/collections\/1$/;
 const NESTED_COLLECTION_PATTERN = /\/collections\/2$/;
+const VIDEO_LIST_PATTERN = /\/video$/;
 const TRASH_PATTERN = /\/trash$/;
 
 function videoItem(id: number, title: string) {
@@ -79,6 +80,83 @@ async function stubLibrary(page: Page) {
 			}),
 	);
 }
+
+test("коллекция переезжает в корень", async ({ page }) => {
+	await page.route("**/api/auth/me", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				id: 1,
+				email: "user@example.com",
+				is_admin: false,
+			}),
+		}),
+	);
+	const collections = [
+		{
+			id: 1,
+			user_id: 1,
+			name: "Корень",
+			type: "video",
+			parent_id: null,
+			created_at: "2026-01-01T00:00:00Z",
+			updated_at: "2026-01-01T00:00:00Z",
+		},
+		{
+			id: 2,
+			user_id: 1,
+			name: "Вложенная",
+			type: "video",
+			parent_id: 1,
+			created_at: "2026-01-01T00:00:00Z",
+			updated_at: "2026-01-01T00:00:00Z",
+		},
+	];
+	await page.route(
+		(url) => url.pathname === "/api/collections",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify(collections),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/collections/2/items",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: "[]",
+			}),
+	);
+	let moveBody = "";
+	await page.route(
+		(url) => url.pathname === "/api/collections/2",
+		(route) => {
+			moveBody = route.request().postData() ?? "";
+			return route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ ...collections[1], parent_id: null }),
+			});
+		},
+	);
+
+	await page.goto("/collections/2");
+	await expect(page).toHaveURL(NESTED_COLLECTION_PATTERN);
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Вложенная" }),
+	).toBeVisible();
+	await page.getByRole("button", { name: "Действия" }).click();
+	await page.getByRole("menuitem", { name: "Переместить коллекцию" }).click();
+	await page.getByRole("button", { name: "В корень" }).click();
+
+	expect(JSON.parse(moveBody)).toEqual({ parent_id: null });
+	// Шапка устарела после переезда — уходим к списку раздела.
+	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
+});
 
 test("корзина: восстановление и окончательное удаление", async ({ page }) => {
 	await page.route("**/api/auth/me", (route) =>

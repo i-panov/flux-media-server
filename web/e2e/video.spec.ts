@@ -1,113 +1,24 @@
 import { expect, type Page, test } from "@playwright/test";
-import { stubEmptyLibraryMeta } from "./stubs";
+import {
+	CONTINUE_LINK_PATTERN,
+	listBody,
+	PIXEL_PNG,
+	progressItem,
+	stubAuthedSession,
+	stubVideoApi,
+	VIDEO_DETAIL_PATTERN,
+	VIDEO_LIST_PATTERN,
+	videoItem,
+} from "./video-fixtures";
 
-const VIDEO_LIST_PATTERN = /\/video$/;
-const VIDEO_DETAIL_PATTERN = /\/video\/1$/;
-// Ссылка карточки «Продолжить просмотр»: имя собирается из названия,
-// остатка и aria-label полосы прогресса, поэтому ищем по фрагменту.
-const CONTINUE_LINK_PATTERN = /Осталось \d{2}:\d{2}/;
-
-const userBody = JSON.stringify({
-	id: 1,
-	email: "user@example.com",
-	is_admin: false,
-});
-
-function videoItem(id: number, title: string) {
-	return {
-		id,
-		title,
-		year: 2024,
-		description: `Описание ${title}`,
-		type: "video",
-		duration: 3725,
-		width: 1920,
-		height: 1080,
-		file_size: 100,
-		thumbnail_url: `/api/media/${id}/thumb`,
-		cover_url: "",
-		view_count: 3,
-		created_at: "2026-01-01T00:00:00Z",
-	};
-}
-
-function listBody(items: ReturnType<typeof videoItem>[], total: number) {
-	return JSON.stringify({ items, total, limit: 24, offset: 0 });
-}
-
-function progressItem(
-	id: number,
-	media: ReturnType<typeof videoItem>,
-	position: number,
-) {
-	return {
-		id,
-		user_id: 1,
-		media_id: media.id,
-		position,
-		duration: 3725,
-		completed: false,
-		updated_at: "2026-01-01T00:00:00Z",
-		media,
-	};
-}
-
-// 1×1 прозрачный PNG: превью должно декодироваться как настоящая картинка.
-const PIXEL_PNG = Buffer.from(
-	// biome-ignore lint/security/noSecrets: это картинка-фикстура, а не секрет.
-	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-	"base64",
-);
-
-async function stubAuthedSession(page: Page) {
-	await page.route("**/api/auth/me", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: userBody,
-		}),
-	);
-	await stubEmptyLibraryMeta(page);
-}
-async function stubVideoApi(page: Page) {
+async function stubEmptyVideoList(page: Page) {
 	await page.route(
 		(url) => url.pathname === "/api/media",
-		(route) => {
-			const url = new URL(route.request().url());
-			const q = url.searchParams.get("q") ?? "";
-			const items =
-				q === ""
-					? [videoItem(1, "Первый фильм"), videoItem(2, "Второй фильм")]
-					: [];
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: listBody(items, items.length),
-			});
-		},
-	);
-	await page.route("**/api/media/1", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify(videoItem(1, "Первый фильм")),
-		}),
-	);
-	await page.route("**/api/media/1/subs", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify([{ lang: "ru", url: "/api/media/1/subs/ru" }]),
-		}),
-	);
-	// Блок «Продолжить просмотр» не должен зависеть от живого бэкенда.
-	await page.route(
-		(url) => url.pathname === "/api/progress",
 		(route) =>
 			route.fulfill({
 				status: 200,
 				contentType: "application/json",
-				body: JSON.stringify({ items: [], total: 0, limit: 20, offset: 0 }),
+				body: listBody([], 0),
 			}),
 	);
 }
@@ -206,15 +117,7 @@ test("видео: превью «Продолжить просмотр» чин�
 }) => {
 	await stubAuthedSession(page);
 	// Пустой список: единственные картинки на странице — превью блока.
-	await page.route(
-		(url) => url.pathname === "/api/media",
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: listBody([], 0),
-			}),
-	);
+	await stubEmptyVideoList(page);
 	await page.route(
 		(url) => url.pathname === "/api/progress",
 		(route) =>
@@ -222,34 +125,38 @@ test("видео: превью «Продолжить просмотр» чин�
 				status: 200,
 				contentType: "application/json",
 				body: JSON.stringify({
-					items: [
-						progressItem(1, videoItem(3, "Третий фильм"), 120),
-						progressItem(2, videoItem(4, "Четвёртый фильм"), 240),
-					],
-					total: 2,
+					items: [progressItem(1, videoItem(3, "Третий фильм"), 120)],
+					total: 1,
 					limit: 20,
 					offset: 0,
 				}),
 			}),
 	);
 	// Зонд useMediaReload ходит за деталями медиа.
-	for (const id of [3, 4]) {
-		await page.route(
-			(url) => url.pathname === `/api/media/${id}`,
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify(videoItem(id, `Фильм ${id}`)),
-				}),
-		);
-	}
+	await page.route(
+		(url) => url.pathname === "/api/media/3",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify(videoItem(3, "Третий фильм")),
+			}),
+	);
 	// 401 на первом запросе превью: зонд подтверждает сессию, элемент
-	// перемонтируется по nonce и картинка приходит заново.
+	// перемонтируется по nonce и картинка приходит заново. Вторая фаза
+	// (missing) отдаёт 404 — вместо битой картинки плейсхолдер и повтор.
 	let recoveredHits = 0;
+	let thumbMissing = false;
 	await page.route(
 		(url) => url.pathname === "/api/media/3/thumb",
 		(route) => {
+			if (thumbMissing) {
+				return route.fulfill({
+					status: 404,
+					contentType: "application/json",
+					body: JSON.stringify({ error: "no thumbnail" }),
+				});
+			}
 			recoveredHits += 1;
 			if (recoveredHits === 1) {
 				return route.fulfill({
@@ -285,7 +192,12 @@ test("видео: превью «Продолжить просмотр» чин�
 	await expect(recovered).toBeVisible();
 	await expect.poll(() => recoveredHits).toBeGreaterThanOrEqual(2);
 
-	await expect(page.locator('img[src="/api/media/4/thumb"]')).toHaveCount(0);
+	thumbMissing = true;
+	await page.reload();
+	await expect(
+		page.getByRole("heading", { name: "Продолжить просмотр" }),
+	).toBeVisible();
+	await expect(page.locator('img[src="/api/media/3/thumb"]')).toHaveCount(0);
 	await expect(page.getByRole("button", { name: "Повторить" })).toBeVisible();
 });
 

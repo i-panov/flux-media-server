@@ -150,15 +150,31 @@ async function stubVideoDetail(page: Page) {
 test("метаданные: правка названия на детальной видео", async ({ page }) => {
 	await stubAdmin(page);
 	await stubVideoDetail(page);
+	// Заголовок переживает рефетч после успеха: стаб хранит состояние,
+	// как настоящий бэкенд, иначе инвалидация вернёт старое название.
+	let currentTitle = "Первый фильм";
+	await page.route("**/api/media/1", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify(videoItem(1, currentTitle)),
+		}),
+	);
 	const metadataBodies: string[] = [];
 	await page.route(
 		(url) => url.pathname === "/api/metadata/1",
 		(route) => {
-			metadataBodies.push(route.request().postData() ?? "");
+			const raw = route.request().postData() ?? "";
+			metadataBodies.push(raw);
+			try {
+				currentTitle = (JSON.parse(raw) as { title?: unknown }).title as string;
+			} catch {
+				// Тело проверится ниже; здесь не падаем.
+			}
 			return route.fulfill({
 				status: 200,
 				contentType: "application/json",
-				body: JSON.stringify(videoItem(1, "Новое название")),
+				body: JSON.stringify(videoItem(1, currentTitle)),
 			});
 		},
 	);
@@ -173,6 +189,9 @@ test("метаданные: правка названия на детально�
 	await page.getByLabel("Название").fill("Новое название");
 	await page.getByRole("button", { name: "Сохранить" }).click();
 
+	// Ждём успех (закрытие модалки), а не отправку: заголовок
+	// обновляется в onSuccess той же очередью микротасков.
+	await expect(page.getByRole("dialog")).toBeHidden();
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Новое название" }),
 	).toBeVisible();

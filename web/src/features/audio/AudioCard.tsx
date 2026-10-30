@@ -1,19 +1,13 @@
 import { ActionIcon, Card, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
-import { Music, Play, RotateCw } from "lucide-react";
+import { Music, RotateCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 
-export function AudioCard({
-	media,
-	onPlay,
-}: {
-	media: Media;
-	onPlay?: () => void;
-}) {
+export function AudioCard({ media }: { media: Media }) {
 	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
 	// Обложки может не быть (mp3 без тегов): сразу плейсхолдер, без <img src="">.
@@ -29,6 +23,8 @@ export function AudioCard({
 				<Card withBorder padding="sm" radius="md">
 					<Card.Section className="relative">
 						{hasCover ? (
+							// Картинка в абсолюте: иначе её intrinsic-размер
+							// растягивает aspect-бокс (как было в сетке мемов).
 							// biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError здесь — ошибка загрузки, а не интеракция.
 							<img
 								key={reload.nonce}
@@ -36,7 +32,7 @@ export function AudioCard({
 								alt=""
 								loading="lazy"
 								onError={reload.handleError}
-								className="aspect-square w-full object-cover"
+								className="absolute inset-0 h-full w-full object-cover"
 							/>
 						) : (
 							<div
@@ -72,19 +68,6 @@ export function AudioCard({
 				type="audio"
 				className="absolute top-2 left-2 z-10"
 			/>
-			{onPlay !== undefined && (
-				<ActionIcon
-					variant="filled"
-					radius="xl"
-					size="lg"
-					aria-label={t("player.play")}
-					title={t("player.play")}
-					className="absolute bottom-2 left-2 z-10"
-					onClick={onPlay}
-				>
-					<Play size={18} fill="currentColor" />
-				</ActionIcon>
-			)}
 			{/* Retry — сосед ссылки, а не её потомок: кнопка внутри <a>
 			ломает content model и путает скринридеры. */}
 			{reload.failed && (

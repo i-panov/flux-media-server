@@ -17,6 +17,11 @@ const LYRICS_BODY = {
 	updated_at: "2026-01-01T00:00:00Z",
 };
 
+// biome-ignore lint/security/noSecrets: LRC-фикстуры, а не секреты.
+const SYNC_TEXT = "Первая\nВторая";
+// biome-ignore lint/security/noSecrets: LRC-фикстура, а не секрет.
+const SYNC_DATA = "[00:00.10] Первая\n[00:00.50] Вторая";
+
 function audioItem(id: number, title: string) {
 	return {
 		id,
@@ -215,6 +220,9 @@ test("текст: пустое значение сохраняется как о
 	await page.getByRole("button", { name: "Сохранить" }).click();
 	await expect.poll(() => saved.length).toBe(1);
 	expect(saved[0]).toMatchObject({ lyrics_text: "", clear: true });
+	// Ждём именно успех (закрытие редактора), а не отправку: иначе
+	// onSuccess первого сохранения закроет редактор посреди черновика.
+	await expect(page.getByRole("textbox")).toHaveCount(0);
 
 	// Черновик начат на первом треке, но трек переключили: редактор
 	// должен закрыться, а не сохранить черновик второму треку.
@@ -394,4 +402,121 @@ test("аудио продолжает с сохранённой позиции",
 			{ timeout: 15000 },
 		)
 		.toBeGreaterThanOrEqual(29);
+});
+
+test("текст: синхронные строки подсвечиваются по позиции", async ({ page }) => {
+	await stubPlayer(page);
+	// Регистрируется после stubPlayer, поэтому перехватывает запросы первым.
+	await page.route(
+		(url) => url.pathname === "/api/media/1/lyrics",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					...LYRICS_BODY,
+					lyrics_text: SYNC_TEXT,
+					sync_data: SYNC_DATA,
+				}),
+			}),
+	);
+
+	await page.goto("/audio");
+	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await expect(page).toHaveURL(PLAYER_PATTERN);
+	await expect(page.getByRole("listitem").first()).toBeVisible();
+	// Позиция тикает: первая строка становится текущей почти сразу.
+	const active = page.locator('[aria-current="true"]');
+	await expect(active).toBeVisible({ timeout: 8000 });
+	await expect(active).toContainText("Первая");
+});
+
+function progressEntry(
+	id: number,
+	media: ReturnType<typeof audioItem>,
+	position: number,
+	completed = false,
+) {
+	return {
+		id,
+		user_id: 1,
+		media_id: media.id,
+		position,
+		duration: media.duration,
+		completed,
+		updated_at: "2026-01-01T00:00:00Z",
+		media,
+	};
+}
+
+test("сид не затирает очередь, начатую до ответа сервера", async ({ page }) => {
+	await stubPlayer(page);
+	// Долгий ответ: пользователь успевает нажать раньше резолва.
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 800));
+			await route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					items: [progressEntry(2, audioItem(2, "Второй трек"), 40)],
+					total: 1,
+					limit: 20,
+					offset: 0,
+				}),
+			});
+		},
+	);
+	// Длинный файл: секундный стаб закончился бы и увёл на второй трек.
+	await page.route(
+		(url) => STREAM_PATTERN.test(url.pathname),
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "audio/wav",
+				body: silentWav(60),
+			}),
+	);
+
+	await page.goto("/audio");
+	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await expect(page).toHaveURL(PLAYER_PATTERN);
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Первый трек" }),
+	).toBeVisible();
+	// Ответ пришёл позже — очередь пользователя уцелела.
+	await page.waitForTimeout(1200);
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Первый трек" }),
+	).toBeVisible();
+});
+
+test("сид пропускает завершённый трек к старому недослушанному", async ({
+	page,
+}) => {
+	await stubPlayer(page);
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					items: [
+						// Самый свежий — дослушанный: сид идёт дальше по списку.
+						progressEntry(3, audioItem(2, "Второй трек"), 120, true),
+						progressEntry(1, audioItem(1, "Первый трек"), 30),
+					],
+					total: 2,
+					limit: 20,
+					offset: 0,
+				}),
+			}),
+	);
+
+	await page.goto("/audio");
+	const miniPlayer = page.locator(".audio-mini-player");
+	await expect(miniPlayer).toBeVisible();
+	await expect(miniPlayer.getByText("Первый трек")).toBeVisible();
 });

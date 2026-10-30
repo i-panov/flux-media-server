@@ -1,9 +1,9 @@
 import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
-import { FolderInput } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCollections, useMoveCollectionItem } from "../../api/collections";
 import type { MediaType } from "../../core/media";
+import { CollectionPickList } from "./CollectionPickList";
 import { CreateCollectionModal } from "./CreateCollectionModal";
 import { useCollectionError } from "./useCollectionError";
 
@@ -29,10 +29,6 @@ export function MoveToCollectionModal({
 	const notifyError = useCollectionError();
 	const [createOpened, setCreateOpened] = useState(false);
 
-	const matching = (collections.data ?? []).filter(
-		(collection) => collection.type === type && collection.id !== sourceId,
-	);
-
 	return (
 		<>
 			<Modal
@@ -57,42 +53,33 @@ export function MoveToCollectionModal({
 								{t("common.retry")}
 							</Button>
 						</Alert>
-					) : matching.length === 0 ? (
-						<Text size="sm" c="dimmed">
-							{t("collections.emptyForMove")}
-						</Text>
 					) : (
-						matching.map((collection) => (
-							<Button
-								key={collection.id}
-								variant="light"
-								justify="flex-start"
-								leftSection={<FolderInput size={16} />}
-								loading={move.isPending}
-								onClick={() => {
-									move.mutate(
-										{
-											sourceId,
-											toCollectionId: collection.id,
-											mediaId,
-										},
-										{ onSuccess: onClose, onError: notifyError },
-									);
-								}}
-							>
-								{collection.name}
-							</Button>
-						))
+						<CollectionPickList
+							type={type}
+							collections={collections.data ?? []}
+							excludeIds={new Set([sourceId])}
+							allowRoot={false}
+							pending={move.isPending}
+							onPick={(toCollectionId) => {
+								if (toCollectionId === null) {
+									return;
+								}
+								move.mutate(
+									{
+										sourceId,
+										toCollectionId,
+										mediaId,
+									},
+									{ onSuccess: onClose, onError: notifyError },
+								);
+							}}
+						/>
 					)}
 					<Group justify="flex-end">
 						<Button variant="default" onClick={onClose}>
 							{t("collections.cancel")}
 						</Button>
-						<Button
-							variant="light"
-							leftSection={<FolderInput size={16} />}
-							onClick={() => setCreateOpened(true)}
-						>
+						<Button variant="light" onClick={() => setCreateOpened(true)}>
 							{t("collections.create")}
 						</Button>
 					</Group>

@@ -5,6 +5,7 @@ export function HiddenAudio({
 	src,
 	onLoadedMetadata,
 	onTimeUpdate,
+	onSeeked,
 	onPlay,
 	onPause,
 	onEnded,
@@ -14,6 +15,7 @@ export function HiddenAudio({
 	src: string | undefined;
 	onLoadedMetadata: (event: React.SyntheticEvent<HTMLAudioElement>) => void;
 	onTimeUpdate: (event: React.SyntheticEvent<HTMLAudioElement>) => void;
+	onSeeked: (event: React.SyntheticEvent<HTMLAudioElement>) => void;
 	onPlay: () => void;
 	onPause: () => void;
 	onEnded: () => void;
@@ -28,6 +30,7 @@ export function HiddenAudio({
 			className="hidden"
 			onLoadedMetadata={onLoadedMetadata}
 			onTimeUpdate={onTimeUpdate}
+			onSeeked={onSeeked}
 			onPlay={onPlay}
 			onPause={onPause}
 			onEnded={onEnded}

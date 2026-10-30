@@ -129,6 +129,30 @@ export function moveCollectionItem(
 	});
 }
 
+// Перенос коллекции под другого родителя (как во Flutter):
+// parent_id шлём всегда — отсутствие ключа бэкенд читает как
+// «не трогать», явный null переводит в корень.
+export function moveCollection(
+	id: number,
+	parentId: number | null,
+): Promise<unknown> {
+	return apiFetch<unknown>(`/collections/${id}`, {
+		method: "PUT",
+		body: JSON.stringify({ parent_id: parentId }),
+	});
+}
+
+export function useMoveCollection() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, parentId }: { id: number; parentId: number | null }) =>
+			moveCollection(id, parentId),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["collections"] });
+		},
+	});
+}
+
 export function useMoveCollectionItem() {
 	const queryClient = useQueryClient();
 	return useMutation({

@@ -40,6 +40,7 @@ import { MemeCard } from "../memes/MemeCard";
 import { VideoCard } from "../video/VideoCard";
 import { AddMediaToCollectionModal } from "./AddMediaToCollectionModal";
 import { CollectionTile } from "./CollectionTile";
+import { MoveCollectionModal } from "./MoveCollectionModal";
 import { MoveToCollectionModal } from "./MoveToCollectionModal";
 import { useCollectionError } from "./useCollectionError";
 
@@ -65,6 +66,7 @@ function CollectionHeader({
 	parent,
 	onAdd,
 	onRename,
+	onMove,
 	onDelete,
 }: {
 	collection: Collection;
@@ -74,6 +76,7 @@ function CollectionHeader({
 	parent?: Collection;
 	onAdd: () => void;
 	onRename: () => void;
+	onMove: () => void;
 	onDelete: () => void;
 }) {
 	const { t } = useTranslation();
@@ -124,6 +127,12 @@ function CollectionHeader({
 								{t("collections.rename")}
 							</Menu.Item>
 							<Menu.Item
+								leftSection={<FolderInput size={14} />}
+								onClick={onMove}
+							>
+								{t("collections.moveCollection")}
+							</Menu.Item>
+							<Menu.Item
 								color="red"
 								leftSection={<Trash2 size={14} />}
 								onClick={onDelete}
@@ -151,6 +160,34 @@ function CollectionHeader({
 
 function isMediaType(value: string): value is MediaType {
 	return value === "video" || value === "audio" || value === "image";
+}
+
+// Id себя и всех потомков: переезд коллекции под них замкнул бы цикл
+// (сервер тоже проверяет, но молчание кнопки понятнее ошибки).
+function descendantIds(all: Collection[], rootId: number): Set<number> {
+	const excluded = new Set<number>([rootId]);
+	const childrenByParent = new Map<number, number[]>();
+	for (const collection of all) {
+		if (collection.parent_id !== null && collection.parent_id !== undefined) {
+			const list = childrenByParent.get(collection.parent_id) ?? [];
+			list.push(collection.id);
+			childrenByParent.set(collection.parent_id, list);
+		}
+	}
+	const stack = [rootId];
+	while (stack.length > 0) {
+		const current = stack.pop();
+		if (current === undefined) {
+			continue;
+		}
+		for (const child of childrenByParent.get(current) ?? []) {
+			if (!excluded.has(child)) {
+				excluded.add(child);
+				stack.push(child);
+			}
+		}
+	}
+	return excluded;
 }
 
 function CollectionCard({
@@ -295,6 +332,7 @@ export function CollectionDetailPage() {
 	const [renameOpened, setRenameOpened] = useState(false);
 	const [deleteOpened, setDeleteOpened] = useState(false);
 	const [addOpened, setAddOpened] = useState(false);
+	const [moveOpened, setMoveOpened] = useState(false);
 	const [moveMediaId, setMoveMediaId] = useState<number | null>(null);
 
 	const collection = (collections.data ?? []).find(
@@ -336,6 +374,8 @@ export function CollectionDetailPage() {
 	const children = (collections.data ?? []).filter(
 		(child) => child.parent_id === collectionId,
 	);
+	// Переезд под себя или потомков замкнул бы цикл: исключаем всё поддерево.
+	const moveExcluded = descendantIds(collections.data ?? [], collectionId);
 	const parent =
 		collection.parent_id !== null && collection.parent_id !== undefined
 			? (collections.data ?? []).find(
@@ -353,6 +393,7 @@ export function CollectionDetailPage() {
 				parent={parent}
 				onAdd={() => setAddOpened(true)}
 				onRename={() => setRenameOpened(true)}
+				onMove={() => setMoveOpened(true)}
 				onDelete={() => setDeleteOpened(true)}
 			/>
 
@@ -428,6 +469,19 @@ export function CollectionDetailPage() {
 					mediaId={moveMediaId}
 					type={type}
 					onClose={() => setMoveMediaId(null)}
+				/>
+			)}
+			{moveOpened && (
+				<MoveCollectionModal
+					opened
+					sourceId={collectionId}
+					type={type}
+					excludeIds={moveExcluded}
+					onMoved={() => {
+						setMoveOpened(false);
+						void navigate({ to: backPath });
+					}}
+					onClose={() => setMoveOpened(false)}
 				/>
 			)}
 			<Modal

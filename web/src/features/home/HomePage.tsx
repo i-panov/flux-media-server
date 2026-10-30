@@ -27,7 +27,6 @@ export function HomePage() {
 			</Stack>
 
 			<ContinueWatching kind="video" limit={CONTINUE_PREVIEW_LIMIT} />
-			<ContinueWatching kind="audio" limit={CONTINUE_PREVIEW_LIMIT} />
 
 			<SimpleGrid cols={{ base: 1, md: 2 }}>
 				<HealthCard />

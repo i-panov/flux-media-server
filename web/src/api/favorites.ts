@@ -102,3 +102,82 @@ export function useToggleFavorite(type: MediaType) {
 		},
 	});
 }
+
+const artistFavoritesKey = ["favorites", "artists", "all"] as const;
+
+// Избранные артисты живут отдельно от медиа: в GET /favorites без фильтра
+// по типу их строки (media_id NULL, artist_id задан) приходят вместе
+// с медиа-избранным — забираем только id артистов.
+function artistFavoritesQueryOptions() {
+	return queryOptions({
+		queryKey: artistFavoritesKey,
+		queryFn: async () => {
+			const ids = new Set<number>();
+			let offset = 0;
+			let total = 0;
+			do {
+				const body = await apiFetch<unknown>(
+					`/favorites?limit=${FAVORITES_LIMIT}&offset=${offset}`,
+				);
+				const page = favoritesListSchema.parse(body);
+				total = page.total;
+				for (const entry of page.items) {
+					if (entry.artist_id !== null && entry.artist_id !== undefined) {
+						ids.add(entry.artist_id);
+					}
+				}
+				const fetched = page.items.length;
+				if (fetched === 0) {
+					break;
+				}
+				offset += fetched;
+			} while (offset < total);
+			return ids;
+		},
+		retry: false,
+		refetchOnWindowFocus: false,
+	});
+}
+
+export function useFavoriteArtistIds() {
+	return useQuery(artistFavoritesQueryOptions());
+}
+
+export function useToggleArtistFavorite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async ({
+			artistId,
+			favorite,
+		}: {
+			artistId: number;
+			favorite: boolean;
+		}) => {
+			try {
+				if (favorite) {
+					await apiFetch<unknown>(`/favorites/artist?artist_id=${artistId}`, {
+						method: "DELETE",
+					});
+				} else {
+					await apiFetch<unknown>("/favorites/artist", {
+						method: "POST",
+						body: JSON.stringify({ artist_id: artistId }),
+					});
+				}
+			} catch (error) {
+				// 409 на POST — уже в избранном, 404 на DELETE — уже
+				// удалено в другой вкладке. Оба случая лечим инвалидацией.
+				const stale =
+					(!favorite && error instanceof ApiError && error.status === 409) ||
+					(favorite && error instanceof ApiError && error.status === 404);
+				if (stale) {
+					return;
+				}
+				throw error;
+			}
+		},
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: artistFavoritesKey });
+		},
+	});
+}

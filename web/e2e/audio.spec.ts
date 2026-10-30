@@ -3,8 +3,6 @@ import { stubEmptyLibraryMeta } from "./stubs";
 
 const AUDIO_LIST_PATTERN = /\/audio$/;
 const AUDIO_DETAIL_PATTERN = /\/audio\/1$/;
-// Имя ссылки блока складывается из названия, остатка и aria-label полосы.
-const CONTINUE_LINK_PATTERN = /Осталось 3:15/;
 
 // Клиентский переход TanStack Router сначала меняет URL, а страницу списка
 // держит до коммита новой: в этот момент кнопок «Слушать» несколько (по одной
@@ -176,7 +174,10 @@ test("аудио: список, поиск и переход в детали с 
 	await page.getByRole("link", { name: "Первая песня" }).click();
 	await expectAudioDetail(page);
 	await expect(
-		page.getByText("Исполнитель Один, Исполнитель Два"),
+		page.getByText("Исполнитель Один", { exact: true }),
+	).toBeVisible();
+	await expect(
+		page.getByText("Исполнитель Два", { exact: true }),
 	).toBeVisible();
 	await expect(page.getByText("Альбом Один")).toBeVisible();
 	await expect(page.getByText("Рок")).toBeVisible();
@@ -186,21 +187,11 @@ test("аудио: список, поиск и переход в детали с 
 	await expect(page.locator('div[style*="/api/media/1/cover"]')).toHaveCount(1);
 });
 
-// biome-ignore lint/security/noSecrets: название теста, не секрет.
-test("аудио: «Продолжить прослушивание» отбирает аудио и ведёт к деталям", async ({
+test("аудио: недослушанный трек поднимается мини-плеером на паузе", async ({
 	page,
 }) => {
 	await stubAuthedSession(page);
 	await stubAudioApi(page);
-	const video = {
-		...audioItem(5, "Первый фильм"),
-		type: "video",
-		artists: [],
-		album: "",
-		genre: "",
-		duration: 3600,
-		cover_url: "",
-	};
 	await page.route(
 		(url) => url.pathname === "/api/progress",
 		(route) =>
@@ -208,61 +199,29 @@ test("аудио: «Продолжить прослушивание» отбир
 				status: 200,
 				contentType: "application/json",
 				body: JSON.stringify({
-					items: [
-						progressItem(1, video, 120),
-						progressItem(2, audioItem(1, "Первая песня"), 30),
-						// 220 из 225 — выше порога 90%, в блок не попадает.
-						progressItem(3, audioItem(2, "Вторая песня"), 220),
-					],
-					total: 3,
+					items: [progressItem(2, audioItem(2, "Вторая песня"), 40)],
+					total: 1,
 					limit: 20,
 					offset: 0,
 				}),
 			}),
 	);
-	await page.route("**/api/progress/1", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({
-				id: 2,
-				user_id: 1,
-				media_id: 1,
-				position: 30,
-				duration: 225,
-				completed: false,
-				updated_at: "2026-01-01T00:00:00Z",
-			}),
-		}),
-	);
 
 	await page.goto("/audio");
-
-	const block = page.getByRole("heading", {
-		// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
-		name: "Продолжить прослушивание",
-	});
-	await expect(block).toBeVisible();
-	await expect(page.getByText("Осталось 3:15")).toBeVisible();
+	// Блока продолжения в разделе нет: вместо него мини-плеер с треком.
 	await expect(
-		page.getByRole("progressbar", { name: "Пройдено 0:30 из 3:45" }),
+		page.getByRole("heading", {
+			// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
+			name: "Продолжить прослушивание",
+		}),
+	).toHaveCount(0);
+	const miniPlayer = page.locator(".audio-mini-player");
+	await expect(miniPlayer).toBeVisible();
+	await expect(miniPlayer.getByText("Вторая песня")).toBeVisible();
+	// Стоит на паузе: показана кнопка старта, а не паузы.
+	await expect(
+		miniPlayer.getByRole("button", { name: "Слушать" }),
 	).toBeVisible();
-	// Прогресс по видео и почти дослушанная запись отфильтрованы.
-	await expect(page.getByText("Первый фильм")).toHaveCount(0);
-	await expect(
-		page.getByRole("link", { name: CONTINUE_LINK_PATTERN }),
-	).toHaveCount(1);
-
-	// При поиске блок скрыт: ряд не фильтруется вместе со списком.
-	await page
-		.getByLabel("Поиск по названию, альбому или исполнителю")
-		.fill("небылица");
-	await expect(block).toBeHidden();
-	await page.getByLabel("Поиск по названию, альбому или исполнителю").fill("");
-	await expect(block).toBeVisible();
-
-	await page.getByRole("link", { name: CONTINUE_LINK_PATTERN }).click();
-	await expectAudioDetail(page);
 });
 
 test("аудио открывается из навигации", async ({ page }) => {
@@ -279,4 +238,70 @@ test("аудио открывается из навигации", async ({ page 
 	await page.goto("/");
 	await page.getByRole("link", { name: "Аудио" }).click();
 	await expect(page).toHaveURL(AUDIO_LIST_PATTERN);
+});
+
+test("админ удаляет трек из списка", async ({ page }) => {
+	await page.route("**/api/auth/me", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				id: 1,
+				email: "admin@example.com",
+				is_admin: true,
+			}),
+		}),
+	);
+	await stubEmptyLibraryMeta(page);
+	const items = [audioItem(1, "Первая песня"), audioItem(2, "Вторая песня")];
+	await page.route(
+		(url) => url.pathname === "/api/media",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: listBody(items, items.length),
+			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: [], total: 0, limit: 20, offset: 0 }),
+			}),
+	);
+	let deletedId = 0;
+	await page.route(
+		(url) => url.pathname === "/api/media/1",
+		(route) => {
+			if (route.request().method() === "DELETE") {
+				deletedId = 1;
+				items.shift();
+				return route.fulfill({
+					status: 200,
+					contentType: "application/json",
+					body: JSON.stringify({ message: "Media moved to trash" }),
+				});
+			}
+			return route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify(audioItem(1, "Первая песня")),
+			});
+		},
+	);
+
+	await page.goto("/audio");
+	await expect(page.getByText("Первая песня", { exact: true })).toBeVisible();
+	await page.getByRole("button", { name: "Удалить" }).first().click();
+	await page
+		.getByRole("dialog")
+		.getByRole("button", { name: "Удалить" })
+		.click();
+
+	expect(deletedId).toBe(1);
+	await expect(page.getByText("Первая песня", { exact: true })).toBeHidden();
+	await expect(page.getByText("Вторая песня", { exact: true })).toBeVisible();
 });

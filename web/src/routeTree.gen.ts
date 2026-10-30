@@ -18,6 +18,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TrashRouteImport } from './routes/trash'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as VideoRouteImport } from './routes/video'
+import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as AudioIndexRouteImport } from './routes/audio.index'
 import { Route as AudioIdRouteImport } from './routes/audio.$id'
 import { Route as CollectionsIdRouteImport } from './routes/collections.$id'
@@ -71,6 +72,11 @@ const VideoRoute = VideoRouteImport.update({
   path: '/video',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ArtistsIdRoute = ArtistsIdRouteImport.update({
+  id: '/artists/$id',
+  path: '/artists/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AudioIndexRoute = AudioIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
   '/video': typeof VideoRouteWithChildren
+  '/artists/$id': typeof ArtistsIdRoute
   '/audio/$id': typeof AudioIdRoute
   '/collections/$id': typeof CollectionsIdRoute
   '/memes/$id': typeof MemesIdRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
+  '/artists/$id': typeof ArtistsIdRoute
   '/audio/$id': typeof AudioIdRoute
   '/collections/$id': typeof CollectionsIdRoute
   '/memes/$id': typeof MemesIdRoute
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
   '/video': typeof VideoRouteWithChildren
+  '/artists/$id': typeof ArtistsIdRoute
   '/audio/$id': typeof AudioIdRoute
   '/collections/$id': typeof CollectionsIdRoute
   '/memes/$id': typeof MemesIdRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/trash'
     | '/upload'
     | '/video'
+    | '/artists/$id'
     | '/audio/$id'
     | '/collections/$id'
     | '/memes/$id'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/trash'
     | '/upload'
+    | '/artists/$id'
     | '/audio/$id'
     | '/collections/$id'
     | '/memes/$id'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/trash'
     | '/upload'
     | '/video'
+    | '/artists/$id'
     | '/audio/$id'
     | '/collections/$id'
     | '/memes/$id'
@@ -223,6 +235,7 @@ export interface RootRouteChildren {
   TrashRoute: typeof TrashRoute
   UploadRoute: typeof UploadRoute
   VideoRoute: typeof VideoRouteWithChildren
+  ArtistsIdRoute: typeof ArtistsIdRoute
   CollectionsIdRoute: typeof CollectionsIdRoute
 }
 
@@ -289,6 +302,13 @@ declare module '@tanstack/react-router' {
       path: '/video'
       fullPath: '/video'
       preLoaderRoute: typeof VideoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artists/$id': {
+      id: '/artists/$id'
+      path: '/artists/$id'
+      fullPath: '/artists/$id'
+      preLoaderRoute: typeof ArtistsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/audio/': {
@@ -389,6 +409,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrashRoute: TrashRoute,
   UploadRoute: UploadRoute,
   VideoRoute: VideoRouteWithChildren,
+  ArtistsIdRoute: ArtistsIdRoute,
   CollectionsIdRoute: CollectionsIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -39,3 +39,39 @@ export function splitSubLang(lang: string): { base: string; label: string } {
 	}
 	return { base, label: `${base} (${lang.slice(base.length)})` };
 }
+
+const FILENAME_TITLE_YEAR_PATTERN = /^(.+)\.(\d{4})\.[^.]+$/;
+const FILENAME_TITLE_PAREN_YEAR_PATTERN = /^(.+)\s*\((\d{4})\)\.[^.]+$/;
+const FILENAME_TITLE_EPISODE_PATTERN = /^(.+)\.S(\d{2})E(\d{2})\..+$/;
+
+// Название и год из имени файла — зеркало Flutter FilenameParser:
+// Title.Year.ext, Title (Year).ext, Title.S01E05.ext, иначе имя без
+// расширения с точками вместо пробелов.
+export function parseFilename(filename: string): {
+	title: string;
+	year: number | null;
+} {
+	const dot = FILENAME_TITLE_YEAR_PATTERN.exec(filename);
+	if (dot?.[1] !== undefined && dot[2] !== undefined) {
+		return {
+			title: dot[1].replaceAll(".", " "),
+			year: Number(dot[2]),
+		};
+	}
+	const paren = FILENAME_TITLE_PAREN_YEAR_PATTERN.exec(filename);
+	if (paren?.[1] !== undefined && paren[2] !== undefined) {
+		return {
+			title: paren[1].trim().replaceAll(".", " "),
+			year: Number(paren[2]),
+		};
+	}
+	const episode = FILENAME_TITLE_EPISODE_PATTERN.exec(filename);
+	if (episode?.[1] !== undefined) {
+		return { title: episode[1].replaceAll(".", " "), year: null };
+	}
+	const parts = filename.split(".");
+	if (parts.length > 1) {
+		parts.pop();
+	}
+	return { title: parts.join(" "), year: null };
+}
