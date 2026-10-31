@@ -18,6 +18,7 @@ import {
 	useRequestCodeMutation,
 	useVerifyCodeMutation,
 } from "../../api/session";
+import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 
 type AuthStep = "request" | "verify";
 
@@ -48,6 +49,10 @@ export function LoginPage() {
 	const requestMutation = useRequestCodeMutation();
 	const verifyMutation = useVerifyCodeMutation();
 	const pending = requestMutation.isPending || verifyMutation.isPending;
+	// ТВ-режим: корень страницы — spatial-секция, форма внутри —
+	// контент секции.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("login-page");
 
 	const handleRequestCode = (event: FormEvent) => {
 		event.preventDefault();
@@ -91,96 +96,101 @@ export function LoginPage() {
 			size="xs"
 			px={{ base: "md", sm: "lg" }}
 			py={{ base: "xl", md: 96, xl: 120 }}
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="login-page"
 		>
-			<Card
-				withBorder
-				padding="lg"
-				radius="lg"
-				shadow="sm"
-				maw={480}
-				mx="auto"
-				data-testid="login-card"
-			>
-				<Stack gap="lg">
-					<Stack gap="xs" align="center">
-						<div className="flux-brand-gradient grid h-12 w-12 place-items-center rounded-xl text-white">
-							<Play size={24} fill="currentColor" />
-						</div>
-						<Title order={1} size="h2" ta="center">
-							{t("auth.title")}
-						</Title>
-						<Text size="sm" c="dimmed" ta="center">
-							{t("auth.subtitle")}
-						</Text>
+			<TVFocusScope focusKey="login-page">
+				<Card
+					withBorder
+					padding="lg"
+					radius="lg"
+					shadow="sm"
+					maw={480}
+					mx="auto"
+					data-testid="login-card"
+				>
+					<Stack gap="lg">
+						<Stack gap="xs" align="center">
+							<div className="flux-brand-gradient grid h-12 w-12 place-items-center rounded-xl text-white">
+								<Play size={24} fill="currentColor" />
+							</div>
+							<Title order={1} size="h2" ta="center">
+								{t("auth.title")}
+							</Title>
+							<Text size="sm" c="dimmed" ta="center">
+								{t("auth.subtitle")}
+							</Text>
+						</Stack>
+
+						{error !== null && (
+							<Alert color="red" variant="light">
+								{error}
+							</Alert>
+						)}
+
+						{codeSent ? (
+							<form onSubmit={handleVerify}>
+								<Stack gap="md">
+									<Text size="sm">
+										{t("auth.codeSent", { email: email.trim() })}
+									</Text>
+									{debugCode !== null && (
+										<Alert color="yellow" variant="light">
+											{t("auth.devCode", { code: debugCode })}
+										</Alert>
+									)}
+									<TextInput
+										label={t("auth.code")}
+										inputMode="numeric"
+										autoComplete="one-time-code"
+										required
+										value={code}
+										onChange={(event) => setCode(event.currentTarget.value)}
+										disabled={pending}
+									/>
+									<Button
+										type="submit"
+										loading={verifyMutation.isPending}
+										fullWidth
+									>
+										{t("auth.signIn")}
+									</Button>
+									<Button
+										variant="subtle"
+										onClick={handleChangeEmail}
+										disabled={pending}
+									>
+										{t("auth.changeEmail")}
+									</Button>
+								</Stack>
+							</form>
+						) : (
+							<form onSubmit={handleRequestCode}>
+								<Stack gap="md">
+									<TextInput
+										label={t("auth.email")}
+										placeholder={t("auth.emailPlaceholder")}
+										type="email"
+										autoComplete="email"
+										required
+										value={email}
+										onChange={(event) => setEmail(event.currentTarget.value)}
+										disabled={pending}
+									/>
+									<Button
+										type="submit"
+										loading={requestMutation.isPending}
+										fullWidth
+									>
+										{t("auth.getCode")}
+									</Button>
+								</Stack>
+							</form>
+						)}
 					</Stack>
-
-					{error !== null && (
-						<Alert color="red" variant="light">
-							{error}
-						</Alert>
-					)}
-
-					{codeSent ? (
-						<form onSubmit={handleVerify}>
-							<Stack gap="md">
-								<Text size="sm">
-									{t("auth.codeSent", { email: email.trim() })}
-								</Text>
-								{debugCode !== null && (
-									<Alert color="yellow" variant="light">
-										{t("auth.devCode", { code: debugCode })}
-									</Alert>
-								)}
-								<TextInput
-									label={t("auth.code")}
-									inputMode="numeric"
-									autoComplete="one-time-code"
-									required
-									value={code}
-									onChange={(event) => setCode(event.currentTarget.value)}
-									disabled={pending}
-								/>
-								<Button
-									type="submit"
-									loading={verifyMutation.isPending}
-									fullWidth
-								>
-									{t("auth.signIn")}
-								</Button>
-								<Button
-									variant="subtle"
-									onClick={handleChangeEmail}
-									disabled={pending}
-								>
-									{t("auth.changeEmail")}
-								</Button>
-							</Stack>
-						</form>
-					) : (
-						<form onSubmit={handleRequestCode}>
-							<Stack gap="md">
-								<TextInput
-									label={t("auth.email")}
-									placeholder={t("auth.emailPlaceholder")}
-									type="email"
-									autoComplete="email"
-									required
-									value={email}
-									onChange={(event) => setEmail(event.currentTarget.value)}
-									disabled={pending}
-								/>
-								<Button
-									type="submit"
-									loading={requestMutation.isPending}
-									fullWidth
-								>
-									{t("auth.getCode")}
-								</Button>
-							</Stack>
-						</form>
-					)}
-				</Stack>
-			</Card>
+				</Card>
+			</TVFocusScope>
 		</Container>
 	);
 }

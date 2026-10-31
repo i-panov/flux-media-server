@@ -1,31 +1,42 @@
 import { useHealthQuery } from "@flux/shared";
-import { Text, View } from "react-native";
+import { Link } from "expo-router";
+import { Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HealthScreen() {
 	const health = useHealthQuery();
 
 	if (health.isPending) {
 		return (
-			<View>
+			<SafeAreaView edges={["top", "bottom"]}>
+				<Link href="/settings">
+					<Text>Настройки</Text>
+				</Link>
 				<Text>Подключение к серверу…</Text>
-			</View>
+			</SafeAreaView>
 		);
 	}
 
 	if (health.isError) {
 		return (
-			<View>
+			<SafeAreaView edges={["top", "bottom"]}>
+				<Link href="/settings">
+					<Text>Настройки</Text>
+				</Link>
 				<Text>Сервер недоступен</Text>
-			</View>
+			</SafeAreaView>
 		);
 	}
 
 	return (
-		<View>
+		<SafeAreaView edges={["top", "bottom"]}>
+			<Link href="/settings">
+				<Text>Настройки</Text>
+			</Link>
 			<Text>
 				Сервер: {health.data.status}, версия {health.data.version},{" "}
 				{health.data.latencyMs} мс
 			</Text>
-		</View>
+		</SafeAreaView>
 	);
 }

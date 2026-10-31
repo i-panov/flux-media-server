@@ -19,7 +19,13 @@ import {
 	useRemoveFromCollection,
 } from "../../api/collections";
 import { isMediaType } from "../../components/mediaType";
-import type { MediaType } from "../../core/media";
+import type { Media, MediaType } from "../../core/media";
+import {
+	TVFocusScope,
+	TVModalAutoFocus,
+	TVModalButton,
+	useTVFocusable,
+} from "../tv/tvFocus";
 import { AddMediaToCollectionModal } from "./AddMediaToCollectionModal";
 import { CollectionCard } from "./CollectionCard";
 import { CollectionFallback } from "./CollectionFallback";
@@ -30,6 +36,60 @@ import { MoveCollectionModal } from "./MoveCollectionModal";
 import { MoveToCollectionModal } from "./MoveToCollectionModal";
 import { RenameCollectionModal } from "./RenameCollectionModal";
 import { useCollectionError } from "./useCollectionError";
+
+// Сетка элементов коллекции: свой компонент, чтобы страница оставалась
+// в лимите строк.
+function CollectionMediaGrid({
+	items,
+	type,
+	isPending,
+	isError,
+	onRetry,
+	onRemove,
+	onMove,
+}: {
+	items: Media[];
+	type: MediaType;
+	isPending: boolean;
+	isError: boolean;
+	onRetry: () => void;
+	onRemove: (mediaId: number) => void;
+	onMove: (mediaId: number) => void;
+}) {
+	const { t } = useTranslation();
+	if (isPending) {
+		return <Skeleton height={240} radius="md" />;
+	}
+	if (isError) {
+		return (
+			<Alert color="red" variant="light" title={t("collections.loadError")}>
+				<Button variant="light" size="xs" mt="xs" onClick={onRetry}>
+					{t("common.retry")}
+				</Button>
+			</Alert>
+		);
+	}
+	if (items.length === 0) {
+		return (
+			<Alert color="gray" variant="light">
+				{t("collections.emptyItems")}
+			</Alert>
+		);
+	}
+	return (
+		<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing="md">
+			{items.map((media) => (
+				<CollectionCard
+					key={media.id}
+					media={media}
+					type={type}
+					onRemove={() => onRemove(media.id)}
+					onMove={() => onMove(media.id)}
+				/>
+			))}
+		</SimpleGrid>
+	);
+}
 
 export function CollectionDetailPage() {
 	const { t } = useTranslation();
@@ -47,6 +107,10 @@ export function CollectionDetailPage() {
 	const [addOpened, setAddOpened] = useState(false);
 	const [moveOpened, setMoveOpened] = useState(false);
 	const [moveMediaId, setMoveMediaId] = useState<number | null>(null);
+	// ТВ-режим: корень страницы — spatial-секция, плитки и карточки
+	// внутри — цели навигации.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("collection-detail");
 
 	const collection = (collections.data ?? []).find(
 		(item) => item.id === collectionId,
@@ -108,70 +172,53 @@ export function CollectionDetailPage() {
 			: undefined;
 
 	return (
-		<Stack gap="lg">
-			<CollectionHeader
-				collection={collection}
-				type={type}
-				count={mediaItems.length}
-				backPath={backPath}
-				parent={parent}
-				onAdd={() => setAddOpened(true)}
-				onRename={() => setRenameOpened(true)}
-				onMove={() => setMoveOpened(true)}
-				onDelete={() => setDeleteOpened(true)}
-			/>
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="collection-detail"
+		>
+			<TVFocusScope focusKey="collection-detail">
+				<CollectionHeader
+					collection={collection}
+					type={type}
+					count={mediaItems.length}
+					backPath={backPath}
+					parent={parent}
+					onAdd={() => setAddOpened(true)}
+					onRename={() => setRenameOpened(true)}
+					onMove={() => setMoveOpened(true)}
+					onDelete={() => setDeleteOpened(true)}
+				/>
 
-			{children.length > 0 && (
-				<Stack gap="sm">
-					<Title order={2} size="h4">
-						{t("collections.children")}
-					</Title>
-					<SimpleGrid
-						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
-						spacing="md"
-					>
-						{children.map((child) => (
-							<CollectionTile key={child.id} collection={child} />
-						))}
-					</SimpleGrid>
-				</Stack>
-			)}
+				{children.length > 0 && (
+					<Stack gap="sm">
+						<Title order={2} size="h4">
+							{t("collections.children")}
+						</Title>
+						<SimpleGrid
+							cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+							spacing="md"
+						>
+							{children.map((child) => (
+								<CollectionTile key={child.id} collection={child} />
+							))}
+						</SimpleGrid>
+					</Stack>
+				)}
 
-			{items.isPending ? (
-				<Skeleton height={240} radius="md" />
-			) : items.isError ? (
-				<Alert color="red" variant="light" title={t("collections.loadError")}>
-					<Button
-						variant="light"
-						size="xs"
-						mt="xs"
-						onClick={() => void items.refetch()}
-					>
-						{t("common.retry")}
-					</Button>
-				</Alert>
-			) : mediaItems.length === 0 ? (
-				<Alert color="gray" variant="light">
-					{t("collections.emptyItems")}
-				</Alert>
-			) : (
-				<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing="md">
-					{mediaItems.map((media) => (
-						<CollectionCard
-							key={media.id}
-							media={media}
-							type={type}
-							onRemove={() => {
-								remove.mutate(
-									{ collectionId, mediaId: media.id },
-									{ onError: notifyError },
-								);
-							}}
-							onMove={() => setMoveMediaId(media.id)}
-						/>
-					))}
-				</SimpleGrid>
-			)}
+				<CollectionMediaGrid
+					items={mediaItems}
+					type={type}
+					isPending={items.isPending}
+					isError={items.isError}
+					onRetry={() => void items.refetch()}
+					onRemove={(mediaId) => {
+						remove.mutate({ collectionId, mediaId }, { onError: notifyError });
+					}}
+					onMove={(mediaId) => setMoveMediaId(mediaId)}
+				/>
+			</TVFocusScope>
 
 			<RenameCollectionModal
 				key={`${collection.id}-${renameOpened}`}
@@ -214,13 +261,19 @@ export function CollectionDetailPage() {
 				title={t("collections.deleteTitle")}
 				centered
 			>
+				<TVModalAutoFocus focusKey="delete-collection-cancel" />
 				<Stack gap="md">
 					<Text size="sm">{t("collections.deleteConfirm")}</Text>
 					<Group justify="flex-end">
-						<Button variant="default" onClick={() => setDeleteOpened(false)}>
+						<TVModalButton
+							focusKey="delete-collection-cancel"
+							variant="default"
+							onClick={() => setDeleteOpened(false)}
+						>
 							{t("collections.cancel")}
-						</Button>
-						<Button
+						</TVModalButton>
+						<TVModalButton
+							focusKey="delete-collection-confirm"
 							color="red"
 							loading={removeCollection.isPending}
 							onClick={() => {
@@ -233,7 +286,7 @@ export function CollectionDetailPage() {
 							}}
 						>
 							{t("collections.delete")}
-						</Button>
+						</TVModalButton>
 					</Group>
 				</Stack>
 			</Modal>

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	parseTVSearchParam,
-	readInitialTVMode,
 	readStoredTVMode,
 	TV_MODE_STORAGE_KEY,
 	writeStoredTVMode,
@@ -41,20 +40,5 @@ describe("stored tv mode", () => {
 		expect(readStoredTVMode()).toBe(true);
 		writeStoredTVMode(false);
 		expect(readStoredTVMode()).toBe(false);
-	});
-});
-
-describe("readInitialTVMode", () => {
-	it("URL-параметр побеждает сохранённый флаг", () => {
-		writeStoredTVMode(false);
-		expect(readInitialTVMode("?tv=1")).toBe(true);
-		writeStoredTVMode(true);
-		expect(readInitialTVMode("?tv=0")).toBe(false);
-	});
-
-	it("без параметра берётся сохранённый флаг", () => {
-		writeStoredTVMode(true);
-		expect(readInitialTVMode("")).toBe(true);
-		expect(readInitialTVMode("?foo=1")).toBe(true);
 	});
 });

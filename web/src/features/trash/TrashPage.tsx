@@ -23,6 +23,12 @@ import { useSession } from "../../api/session";
 import { useTrash, useTrashActions } from "../../api/trash";
 import { isMediaType, MEDIA_TYPE_LABEL_KEYS } from "../../components/mediaType";
 import type { Media } from "../../core/media";
+import {
+	TVFocusScope,
+	TVModalAutoFocus,
+	TVModalButton,
+	useTVFocusable,
+} from "../tv/tvFocus";
 
 function TrashActionsBar({
 	onRestore,
@@ -150,6 +156,10 @@ export function TrashPage() {
 	const actions = useTrashActions();
 	const [emptyOpened, setEmptyOpened] = useState(false);
 	const isAdmin = session.data?.is_admin === true;
+	// ТВ-режим: корень страницы — spatial-секция, карточки внутри —
+	// контент секции.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("trash-page");
 	const notifyError = (error: unknown) => {
 		notifications.show({
 			color: "red",
@@ -197,100 +207,110 @@ export function TrashPage() {
 	const empty = data.collections.length === 0 && data.media.length === 0;
 
 	return (
-		<Stack gap="lg">
-			<Group justify="space-between" align="center" wrap="wrap">
-				<Group gap="sm">
-					<Button
-						component={Link}
-						to="/settings"
-						variant="subtle"
-						leftSection={<ArrowLeft size={16} />}
-					>
-						{t("trash.back")}
-					</Button>
-					<Title order={1} size="h2">
-						{t("trash.title")}
-					</Title>
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="trash-page"
+		>
+			<TVFocusScope focusKey="trash-page">
+				<Group justify="space-between" align="center" wrap="wrap">
+					<Group gap="sm">
+						<Button
+							component={Link}
+							to="/settings"
+							variant="subtle"
+							leftSection={<ArrowLeft size={16} />}
+						>
+							{t("trash.back")}
+						</Button>
+						<Title order={1} size="h2">
+							{t("trash.title")}
+						</Title>
+					</Group>
+					{isAdmin && !empty && (
+						<Button
+							color="red"
+							variant="light"
+							leftSection={<Trash2 size={16} />}
+							onClick={() => setEmptyOpened(true)}
+						>
+							{t("trash.emptyAction")}
+						</Button>
+					)}
 				</Group>
-				{isAdmin && !empty && (
-					<Button
-						color="red"
-						variant="light"
-						leftSection={<Trash2 size={16} />}
-						onClick={() => setEmptyOpened(true)}
-					>
-						{t("trash.emptyAction")}
-					</Button>
-				)}
-			</Group>
 
-			{empty ? (
-				<Card withBorder padding="xl" radius="md">
-					<Stack align="center" gap="sm">
-						<Trash2 size={40} className="text-[var(--mantine-color-dimmed)]" />
-						<Text c="dimmed">{t("trash.empty")}</Text>
+				{empty ? (
+					<Card withBorder padding="xl" radius="md">
+						<Stack align="center" gap="sm">
+							<Trash2
+								size={40}
+								className="text-[var(--mantine-color-dimmed)]"
+							/>
+							<Text c="dimmed">{t("trash.empty")}</Text>
+						</Stack>
+					</Card>
+				) : (
+					<Stack gap="lg">
+						{data.collections.length > 0 && (
+							<Stack gap="sm">
+								<Title order={2} size="h4">
+									{t("trash.collections")}
+								</Title>
+								{data.collections.map((collection) => (
+									<TrashCollectionCard
+										key={collection.id}
+										collection={collection}
+										restorePending={actions.restoreCollection.isPending}
+										purgePending={actions.purgeCollection.isPending}
+										onRestore={() => {
+											actions.restoreCollection.mutate(collection.id, {
+												onError: notifyError,
+											});
+										}}
+										onPurge={() => {
+											actions.purgeCollection.mutate(collection.id, {
+												onError: notifyError,
+											});
+										}}
+									/>
+								))}
+							</Stack>
+						)}
+						{data.media.length > 0 && (
+							<Stack gap="sm">
+								<Title order={2} size="h4">
+									{t("trash.media")}
+								</Title>
+								{!isAdmin && (
+									<Text size="sm" c="dimmed">
+										{t("trash.adminOnlyMedia")}
+									</Text>
+								)}
+								{data.media.map((media) => (
+									<TrashMediaCard
+										key={media.id}
+										media={media}
+										isAdmin={isAdmin}
+										restorePending={actions.restoreMedia.isPending}
+										purgePending={actions.purgeMedia.isPending}
+										onRestore={() => {
+											actions.restoreMedia.mutate(media.id, {
+												onError: notifyError,
+											});
+										}}
+										onPurge={() => {
+											actions.purgeMedia.mutate(media.id, {
+												onError: notifyError,
+											});
+										}}
+									/>
+								))}
+							</Stack>
+						)}
 					</Stack>
-				</Card>
-			) : (
-				<Stack gap="lg">
-					{data.collections.length > 0 && (
-						<Stack gap="sm">
-							<Title order={2} size="h4">
-								{t("trash.collections")}
-							</Title>
-							{data.collections.map((collection) => (
-								<TrashCollectionCard
-									key={collection.id}
-									collection={collection}
-									restorePending={actions.restoreCollection.isPending}
-									purgePending={actions.purgeCollection.isPending}
-									onRestore={() => {
-										actions.restoreCollection.mutate(collection.id, {
-											onError: notifyError,
-										});
-									}}
-									onPurge={() => {
-										actions.purgeCollection.mutate(collection.id, {
-											onError: notifyError,
-										});
-									}}
-								/>
-							))}
-						</Stack>
-					)}
-					{data.media.length > 0 && (
-						<Stack gap="sm">
-							<Title order={2} size="h4">
-								{t("trash.media")}
-							</Title>
-							{!isAdmin && (
-								<Text size="sm" c="dimmed">
-									{t("trash.adminOnlyMedia")}
-								</Text>
-							)}
-							{data.media.map((media) => (
-								<TrashMediaCard
-									key={media.id}
-									media={media}
-									isAdmin={isAdmin}
-									restorePending={actions.restoreMedia.isPending}
-									purgePending={actions.purgeMedia.isPending}
-									onRestore={() => {
-										actions.restoreMedia.mutate(media.id, {
-											onError: notifyError,
-										});
-									}}
-									onPurge={() => {
-										actions.purgeMedia.mutate(media.id, {
-											onError: notifyError,
-										});
-									}}
-								/>
-							))}
-						</Stack>
-					)}
-				</Stack>
-			)}
+				)}
+			</TVFocusScope>
 
 			<Modal
 				opened={emptyOpened}
@@ -298,13 +318,19 @@ export function TrashPage() {
 				title={t("trash.emptyTitle")}
 				centered
 			>
+				<TVModalAutoFocus focusKey="empty-trash-cancel" />
 				<Stack gap="md">
 					<Text size="sm">{t("trash.emptyConfirm")}</Text>
 					<Group justify="flex-end">
-						<Button variant="default" onClick={() => setEmptyOpened(false)}>
+						<TVModalButton
+							focusKey="empty-trash-cancel"
+							variant="default"
+							onClick={() => setEmptyOpened(false)}
+						>
 							{t("collections.cancel")}
-						</Button>
-						<Button
+						</TVModalButton>
+						<TVModalButton
+							focusKey="empty-trash-confirm"
 							color="red"
 							loading={actions.emptyTrash.isPending}
 							onClick={() => {
@@ -315,7 +341,7 @@ export function TrashPage() {
 							}}
 						>
 							{t("trash.emptyAction")}
-						</Button>
+						</TVModalButton>
 					</Group>
 				</Stack>
 			</Modal>

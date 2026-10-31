@@ -21,6 +21,7 @@ import { useHealthQuery } from "../../api/health";
 import { useSession } from "../../api/session";
 import { pickLang, SUPPORTED_LANGS, type SupportedLang } from "../../i18n";
 import { useLogout } from "../auth/useLogout";
+import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { useTVMode } from "../tv/useTVMode";
 
 const languageNames: Record<SupportedLang, string> = {
@@ -55,151 +56,162 @@ export function SettingsPage() {
 	const { logout, isPending: logoutPending } = useLogout();
 	const { tvMode, setTVMode } = useTVMode();
 	const currentLang = pickLang(i18n.language);
+	// ТВ-режим: корень страницы — spatial-секция, карточки внутри —
+	// контент секции.
+	const { targetRef: tvRef, tvMode: tvSectionMode } =
+		useTVFocusable<HTMLDivElement>("settings-page");
 
 	return (
-		<Stack gap="lg">
-			<Title order={1} size="h2">
-				{t("settings.title")}
-			</Title>
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvSectionMode ? -1 : undefined}
+			data-tv-focus-key="settings-page"
+		>
+			<TVFocusScope focusKey="settings-page">
+				<Title order={1} size="h2">
+					{t("settings.title")}
+				</Title>
 
-			<SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-				<SettingsCard title={t("settings.appearance.title")}>
-					<Stack gap={4}>
-						<Text size="sm" c="dimmed">
-							{t("settings.appearance.theme")}
-						</Text>
-						<SegmentedControl
-							value={colorScheme}
-							onChange={(value) => setColorScheme(value)}
-							data={[
-								{ value: "auto", label: t("settings.appearance.auto") },
-								{ value: "light", label: t("settings.appearance.light") },
-								{ value: "dark", label: t("settings.appearance.dark") },
-							]}
-							fullWidth
-							size="xs"
-						/>
-					</Stack>
-					<Switch
-						label={t("settings.tv.label")}
-						description={t("settings.tv.hint")}
-						checked={tvMode}
-						onChange={(event) => setTVMode(event.currentTarget.checked)}
-					/>
-				</SettingsCard>
-
-				<SettingsCard title={t("settings.language.title")}>
-					<Select
-						label={t("settings.language.label")}
-						value={currentLang}
-						onChange={(value) => {
-							if (value !== null) {
-								void i18n.changeLanguage(value);
-							}
-						}}
-						data={SUPPORTED_LANGS.map((value) => ({
-							value,
-							label: languageNames[value],
-						}))}
-						allowDeselect={false}
-						w={{ base: "100%", sm: 280 }}
-					/>
-				</SettingsCard>
-
-				<SettingsCard title={t("settings.account.title")}>
-					<Stack gap="sm">
-						<Group justify="space-between" wrap="nowrap">
-							<Text size="sm" truncate>
-								{session?.email ?? t("common.emptyFallback")}
-							</Text>
-							{session?.is_admin === true && (
-								<Badge variant="light" color="violet">
-									{t("settings.account.admin")}
-								</Badge>
-							)}
-						</Group>
-						<Button
-							variant="light"
-							color="red"
-							leftSection={<LogOut size={16} />}
-							loading={logoutPending}
-							onClick={logout}
-							w="fit-content"
-						>
-							{t("settings.account.logout")}
-						</Button>
-						<Button
-							component={Link}
-							to="/trash"
-							variant="light"
-							leftSection={<Trash2 size={16} />}
-							w="fit-content"
-						>
-							{t("settings.trash")}
-						</Button>
-					</Stack>
-				</SettingsCard>
-
-				<SettingsCard title={t("settings.server.title")}>
-					<Stack gap="xs">
-						<Group justify="space-between" wrap="nowrap">
+				<SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+					<SettingsCard title={t("settings.appearance.title")}>
+						<Stack gap={4}>
 							<Text size="sm" c="dimmed">
-								{t("settings.server.origin")}
+								{t("settings.appearance.theme")}
 							</Text>
-							<Text size="sm" fw={600} ta="right" truncate>
-								{window.location.origin}
+							<SegmentedControl
+								value={colorScheme}
+								onChange={(value) => setColorScheme(value)}
+								data={[
+									{ value: "auto", label: t("settings.appearance.auto") },
+									{ value: "light", label: t("settings.appearance.light") },
+									{ value: "dark", label: t("settings.appearance.dark") },
+								]}
+								fullWidth
+								size="xs"
+							/>
+						</Stack>
+						<Switch
+							label={t("settings.tv.label")}
+							description={t("settings.tv.hint")}
+							checked={tvMode}
+							onChange={(event) => setTVMode(event.currentTarget.checked)}
+						/>
+					</SettingsCard>
+
+					<SettingsCard title={t("settings.language.title")}>
+						<Select
+							label={t("settings.language.label")}
+							value={currentLang}
+							onChange={(value) => {
+								if (value !== null) {
+									void i18n.changeLanguage(value);
+								}
+							}}
+							data={SUPPORTED_LANGS.map((value) => ({
+								value,
+								label: languageNames[value],
+							}))}
+							allowDeselect={false}
+							w={{ base: "100%", sm: 280 }}
+						/>
+					</SettingsCard>
+
+					<SettingsCard title={t("settings.account.title")}>
+						<Stack gap="sm">
+							<Group justify="space-between" wrap="nowrap">
+								<Text size="sm" truncate>
+									{session?.email ?? t("common.emptyFallback")}
+								</Text>
+								{session?.is_admin === true && (
+									<Badge variant="light" color="violet">
+										{t("settings.account.admin")}
+									</Badge>
+								)}
+							</Group>
+							<Button
+								variant="light"
+								color="red"
+								leftSection={<LogOut size={16} />}
+								loading={logoutPending}
+								onClick={logout}
+								w="fit-content"
+							>
+								{t("settings.account.logout")}
+							</Button>
+							<Button
+								component={Link}
+								to="/trash"
+								variant="light"
+								leftSection={<Trash2 size={16} />}
+								w="fit-content"
+							>
+								{t("settings.trash")}
+							</Button>
+						</Stack>
+					</SettingsCard>
+
+					<SettingsCard title={t("settings.server.title")}>
+						<Stack gap="xs">
+							<Group justify="space-between" wrap="nowrap">
+								<Text size="sm" c="dimmed">
+									{t("settings.server.origin")}
+								</Text>
+								<Text size="sm" fw={600} ta="right" truncate>
+									{window.location.origin}
+								</Text>
+							</Group>
+							<Group justify="space-between">
+								<Text size="sm" c="dimmed">
+									{t("settings.about.backendVersion")}
+								</Text>
+								<Text size="sm" fw={600}>
+									{data?.version ?? t("common.emptyFallback")}
+								</Text>
+							</Group>
+							{isError && (
+								<Alert
+									color="red"
+									variant="light"
+									title={t("settings.server.unreachable")}
+								>
+									{t("home.server.error")}
+									<Button
+										variant="light"
+										size="xs"
+										mt="xs"
+										loading={isFetching}
+										onClick={() => void refetch()}
+									>
+										{t("common.retry")}
+									</Button>
+								</Alert>
+							)}
+						</Stack>
+					</SettingsCard>
+				</SimpleGrid>
+
+				<SettingsCard title={t("settings.about.title")}>
+					<Stack gap="xs">
+						<Group justify="space-between">
+							<Text size="sm" c="dimmed">
+								{t("settings.about.webVersion")}
+							</Text>
+							<Text size="sm" fw={600}>
+								{__APP_VERSION__}
 							</Text>
 						</Group>
 						<Group justify="space-between">
 							<Text size="sm" c="dimmed">
-								{t("settings.about.backendVersion")}
+								{t("settings.about.stack")}
 							</Text>
-							<Text size="sm" fw={600}>
-								{data?.version ?? t("common.emptyFallback")}
+							<Text size="sm" fw={600} ta="right">
+								{t("settings.about.stackValue")}
 							</Text>
 						</Group>
-						{isError && (
-							<Alert
-								color="red"
-								variant="light"
-								title={t("settings.server.unreachable")}
-							>
-								{t("home.server.error")}
-								<Button
-									variant="light"
-									size="xs"
-									mt="xs"
-									loading={isFetching}
-									onClick={() => void refetch()}
-								>
-									{t("common.retry")}
-								</Button>
-							</Alert>
-						)}
 					</Stack>
 				</SettingsCard>
-			</SimpleGrid>
-
-			<SettingsCard title={t("settings.about.title")}>
-				<Stack gap="xs">
-					<Group justify="space-between">
-						<Text size="sm" c="dimmed">
-							{t("settings.about.webVersion")}
-						</Text>
-						<Text size="sm" fw={600}>
-							{__APP_VERSION__}
-						</Text>
-					</Group>
-					<Group justify="space-between">
-						<Text size="sm" c="dimmed">
-							{t("settings.about.stack")}
-						</Text>
-						<Text size="sm" fw={600} ta="right">
-							{t("settings.about.stackValue")}
-						</Text>
-					</Group>
-				</Stack>
-			</SettingsCard>
+			</TVFocusScope>
 		</Stack>
 	);
 }

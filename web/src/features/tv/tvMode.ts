@@ -25,8 +25,3 @@ export function writeStoredTVMode(enabled: boolean): void {
 		// Приватный режим или отключённое хранилище: режим живёт до перезагрузки.
 	}
 }
-
-// Явный URL-параметр побеждает сохранённый флаг, иначе — сохранённый флаг.
-export function readInitialTVMode(search: string): boolean {
-	return parseTVSearchParam(search) ?? readStoredTVMode();
-}

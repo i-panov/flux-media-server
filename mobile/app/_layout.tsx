@@ -1,14 +1,49 @@
-import "../src/api/setup";
 import { createQueryClient } from "@flux/shared";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Slot } from "expo-router";
-import { useState } from "react";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect, useState } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+// Импорт ради побочного эффекта (дефолт configureApi) и initApiConfig:
+// модуль должен выполниться до любых запросов.
+import { initApiConfig } from "../src/api/setup";
+
+SplashScreen.preventAutoHideAsync().catch(() => {
+	// Повторный вызов при Fast Refresh — не ошибка.
+});
 
 export default function RootLayout() {
 	const [client] = useState(createQueryClient);
+	const [ready, setReady] = useState(false);
+
+	useEffect(() => {
+		let cancelled = false;
+		initApiConfig().finally(() => {
+			if (!cancelled) {
+				setReady(true);
+			}
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (ready) {
+			SplashScreen.hideAsync().catch(() => {
+				// Двойной hide — не ошибка.
+			});
+		}
+	}, [ready]);
+
+	if (!ready) {
+		return null;
+	}
 	return (
-		<QueryClientProvider client={client}>
-			<Slot />
-		</QueryClientProvider>
+		<SafeAreaProvider>
+			<QueryClientProvider client={client}>
+				<Slot />
+			</QueryClientProvider>
+		</SafeAreaProvider>
 	);
 }

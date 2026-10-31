@@ -21,6 +21,12 @@ import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { ChangeCoverButton } from "../media/ChangeCoverButton";
 import { EditMetadataModal } from "../media/EditMetadataModal";
+import {
+	TVFocusScope,
+	TVModalAutoFocus,
+	TVModalButton,
+	useTVFocusable,
+} from "../tv/tvFocus";
 
 function ArtistTrackRow({
 	media,
@@ -97,6 +103,7 @@ function RenameArtistModal({
 			title={t("artists.renameTitle")}
 			centered
 		>
+			<TVModalAutoFocus focusKey="rename-artist-cancel" />
 			<Stack gap="md">
 				<TextInput
 					label={t("artists.name")}
@@ -117,16 +124,21 @@ function RenameArtistModal({
 					</Text>
 				)}
 				<Group justify="flex-end">
-					<Button variant="default" onClick={onClose}>
+					<TVModalButton
+						focusKey="rename-artist-cancel"
+						variant="default"
+						onClick={onClose}
+					>
 						{t("collections.cancel")}
-					</Button>
-					<Button
+					</TVModalButton>
+					<TVModalButton
+						focusKey="rename-artist-save"
 						loading={rename.isPending}
 						disabled={name.trim() === "" || rename.isPending}
 						onClick={submit}
 					>
 						{t("collections.save")}
-					</Button>
+					</TVModalButton>
 				</Group>
 			</Stack>
 		</Modal>
@@ -155,6 +167,10 @@ export function ArtistPage() {
 	const list = useAudioList("");
 	const [renameOpened, setRenameOpened] = useState(false);
 	const [editMedia, setEditMedia] = useState<Media | null>(null);
+	// ТВ-режим: корень страницы — spatial-секция, треки внутри —
+	// контент секции.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("artist-page");
 	const retryLabel = t("common.retry");
 
 	// Серверного фильтра треков по артисту нет — подтягиваем все страницы
@@ -240,72 +256,79 @@ export function ArtistPage() {
 	}
 
 	return (
-		<Stack gap="lg">
-			<Button
-				variant="subtle"
-				w="fit-content"
-				leftSection={<ArrowLeft size={16} />}
-				onClick={backToAudio}
-			>
-				{backLabel}
-			</Button>
-			<Group justify="space-between" align="center" wrap="wrap">
-				<Title order={1} size="h2">
-					{artist.name}
-				</Title>
-				{isAdmin && (
-					<Button
-						variant="light"
-						leftSection={<Pencil size={16} />}
-						onClick={() => setRenameOpened(true)}
-					>
-						{t("artists.rename")}
-					</Button>
-				)}
-			</Group>
-			{list.isError && tracks.length === 0 ? (
-				<Alert color="red" variant="light" title={t("artists.tracksError")}>
-					<Button
-						variant="light"
-						size="xs"
-						mt="xs"
-						onClick={() => void list.refetch()}
-					>
-						{retryLabel}
-					</Button>
-				</Alert>
-			) : tracks.length === 0 ? (
-				<Text c="dimmed">{t("artists.noTracks")}</Text>
-			) : (
-				<Stack gap="xs">
-					{tracks.map((media) => (
-						<ArtistTrackRow
-							key={media.id}
-							media={media}
-							onEdit={() => setEditMedia(media)}
-						/>
-					))}
-				</Stack>
-			)}
-			{isFetchNextPageError ? (
-				<Alert color="red" variant="light" title={t("artists.tracksError")}>
-					<Button
-						variant="light"
-						size="xs"
-						mt="xs"
-						onClick={() => void fetchNextPage()}
-					>
-						{retryLabel}
-					</Button>
-				</Alert>
-			) : (
-				(hasNextPage || isFetchingNextPage) && (
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="artist-page"
+		>
+			<TVFocusScope focusKey="artist-page">
+				<Button
+					variant="subtle"
+					w="fit-content"
+					leftSection={<ArrowLeft size={16} />}
+					onClick={backToAudio}
+				>
+					{backLabel}
+				</Button>
+				<Group justify="space-between" align="center" wrap="wrap">
+					<Title order={1} size="h2">
+						{artist.name}
+					</Title>
+					{isAdmin && (
+						<Button
+							variant="light"
+							leftSection={<Pencil size={16} />}
+							onClick={() => setRenameOpened(true)}
+						>
+							{t("artists.rename")}
+						</Button>
+					)}
+				</Group>
+				{list.isError && tracks.length === 0 ? (
+					<Alert color="red" variant="light" title={t("artists.tracksError")}>
+						<Button
+							variant="light"
+							size="xs"
+							mt="xs"
+							onClick={() => void list.refetch()}
+						>
+							{retryLabel}
+						</Button>
+					</Alert>
+				) : tracks.length === 0 ? (
+					<Text c="dimmed">{t("artists.noTracks")}</Text>
+				) : (
 					<Stack gap="xs">
-						<Skeleton height={64} radius="md" />
-						<Skeleton height={64} radius="md" />
+						{tracks.map((media) => (
+							<ArtistTrackRow
+								key={media.id}
+								media={media}
+								onEdit={() => setEditMedia(media)}
+							/>
+						))}
 					</Stack>
-				)
-			)}
+				)}
+				{isFetchNextPageError ? (
+					<Alert color="red" variant="light" title={t("artists.tracksError")}>
+						<Button
+							variant="light"
+							size="xs"
+							mt="xs"
+							onClick={() => void fetchNextPage()}
+						>
+							{retryLabel}
+						</Button>
+					</Alert>
+				) : (
+					(hasNextPage || isFetchingNextPage) && (
+						<Stack gap="xs">
+							<Skeleton height={64} radius="md" />
+							<Skeleton height={64} radius="md" />
+						</Stack>
+					)
+				)}
+			</TVFocusScope>
 			{/* Модалка монтируется только на время открытия, а key по имени
 			пересоздаёт её, когда артист подгружается позже: поле стартует
 			с загруженным именем, а не с пустого маунта. */}
