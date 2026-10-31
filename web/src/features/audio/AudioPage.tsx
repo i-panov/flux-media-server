@@ -19,6 +19,7 @@ import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteArtistsSection } from "../favorites/FavoriteArtistsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
+import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { AudioTrackRow } from "./AudioTrackRow";
 
@@ -28,6 +29,9 @@ export function AudioPage() {
 	const player = useAudioPlayer();
 	const [query, setQuery] = useState("");
 	const debounced = useDebouncedValue(query);
+	// ТВ-режим: корень — spatial-секция, строки внутри — цели навигации.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("audio-page");
 
 	const list = useAudioList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
@@ -36,7 +40,12 @@ export function AudioPage() {
 	const visibleItems = useVisibleMedia("audio", items, debounced !== "");
 
 	return (
-		<Stack gap="lg">
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="audio-page"
+		>
 			<Group justify="space-between" align="center" wrap="wrap">
 				<Title order={1} size="h2">
 					{t("audio.title")}
@@ -78,7 +87,7 @@ export function AudioPage() {
 			) : items.length === 0 ? (
 				<Text c="dimmed">{t("audio.empty")}</Text>
 			) : (
-				<>
+				<TVFocusScope focusKey="audio-page">
 					<Stack gap="xs">
 						{visibleItems.map((media, index) => (
 							<AudioTrackRow
@@ -119,7 +128,7 @@ export function AudioPage() {
 							</Button>
 						)
 					)}
-				</>
+				</TVFocusScope>
 			)}
 		</Stack>
 	);

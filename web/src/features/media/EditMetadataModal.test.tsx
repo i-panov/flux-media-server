@@ -6,6 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Media } from "../../core/media";
 import { EditMetadataModal } from "./EditMetadataModal";
 
+// Модалка читает ТВ-режим (начальный spatial-фокус), а роутера в тесте
+// нет — подменяем строку поиска пустой, как в useTVMode.test.tsx.
+vi.mock("@tanstack/react-router", () => ({
+	useRouterState: (): string => "",
+}));
+
 function mediaItem(): Media {
 	return {
 		id: 7,

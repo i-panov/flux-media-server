@@ -272,7 +272,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	})
 	transcodeHandler := handlers.NewTranscodeHandler(mediaRepo, transcodeQueue)
 	subsHandler := handlers.NewSubsHandler(mediaRepo, subRepo, cfg.Media)
-	adminHandler := handlers.NewAdminHandler(mediaRepo, taskRepo, transcodeQueue, cfg.Storage, cfg.Media)
+	adminHandler := handlers.NewAdminHandler(mediaRepo, taskRepo, transcodeQueue, cfg.Storage, cfg.Media, userRepo)
 	// Очередь извлечения аудио из видео: отдельный воркер (ffmpeg тяжёлый),
 	// механика статусов — как у загрузок. Строки заданий персистентны:
 	// рестарт поднимает незавершённые обратно в очередь.
@@ -520,13 +520,17 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// Admin-only middleware for destructive/administrative operations.
 	requireAdmin := middleware.RequireAdmin(userRepo)
 
-	// Админка хранилища: диск, карантин оригиналов, ретрай заданий.
+	// Админка хранилища: диск, карантин оригиналов, список и ретрай заданий.
 	admin := api.Group("/admin", requireAdmin)
 	admin.Get("/storage", readRateLimiter, adminHandler.StorageInfo)
 	admin.Get("/originals", readRateLimiter, adminHandler.OriginalsList)
 	admin.Get("/originals/:name/download", uploadRateLimiter, adminHandler.OriginalDownload)
 	admin.Delete("/originals/:name", adminHandler.OriginalDelete)
+	admin.Get("/transcodes", readRateLimiter, adminHandler.TranscodesList)
 	admin.Post("/transcodes/:id/retry", adminHandler.TranscodeRetry)
+	admin.Get("/users", readRateLimiter, adminHandler.UsersList)
+	admin.Put("/users/:id", adminHandler.UserUpdateRole)
+	admin.Delete("/users/:id", adminHandler.UserDelete)
 
 	media := api.Group("/media")
 	// /bulk регистрируем ДО /:id — статический путь имеет приоритет

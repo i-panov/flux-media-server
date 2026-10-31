@@ -60,3 +60,14 @@ body {
 		bottom: 0;
 	}
 }
+
+/* ТВ-режим (управление пультом): крупный видимый фокус. Без анимаций и
+   плавного скролла — железо приставок слабое. Обычный режим не трогаем. */
+.tv-mode {
+	scroll-behavior: auto;
+}
+
+.tv-mode :focus {
+	outline: 3px solid var(--mantine-color-violet-5);
+	outline-offset: 2px;
+}

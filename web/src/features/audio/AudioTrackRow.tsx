@@ -1,12 +1,14 @@
 import { ActionIcon, Group, Stack, Text, Tooltip } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Music, Play, RotateCw } from "lucide-react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { DeleteMediaButton } from "../media/DeleteMediaButton";
+import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
 
 // Плоская строка трека для раздела аудио (как во Flutter): обложка,
 // название, исполнители, длительность и действия в один ряд —
@@ -22,11 +24,21 @@ export function AudioTrackRow({
 }) {
 	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
+	// ТВ-режим: строка — spatial-цель, Enter открывает детали через ссылку.
+	// Кнопка play внутри остаётся нативной (Tab/мышь).
+	// Суффикс useId: тот же трек бывает сразу в списке и избранном.
+	const instanceKey = useId().replaceAll(":", "");
+	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		`audio-row-${media.id}-${instanceKey}`,
+		clickFirstLink,
+	);
 	// Обложки может не быть (mp3 без тегов): сразу плейсхолдер, без <img src="">.
 	const hasCover = media.cover_url !== "" && !reload.failed;
 	const artists = media.artists.map((artist) => artist.name).join(", ");
 	return (
 		<Group
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
 			gap="sm"
 			wrap="nowrap"
 			className="rounded-md border border-[var(--mantine-color-default-border)] px-3 py-2"

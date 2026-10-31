@@ -134,3 +134,23 @@ func (r *TranscodeTaskStore) ListRecent(ctx context.Context, limit int) ([]model
 	}
 	return tasks, q.Find(&tasks).Error
 }
+
+// ListActiveAndRecent возвращает активные задания целиком и терминальные
+// не старше since (история для админки). Без пагинации: очередь короткая.
+// Порядок — по id desc.
+func (r *TranscodeTaskStore) ListActiveAndRecent(ctx context.Context, since time.Time, active, terminal []string) ([]models.TranscodeTask, error) {
+	var tasks []models.TranscodeTask
+	db := r.db.WithContext(ctx)
+	switch {
+	case len(active) == 0 && len(terminal) == 0:
+		return tasks, nil
+	case len(active) == 0:
+		db = db.Where("status IN ? AND updated_at >= ?", terminal, since)
+	case len(terminal) == 0:
+		db = db.Where("status IN ?", active)
+	default:
+		db = db.Where("status IN ?", active).
+			Or("status IN ? AND updated_at >= ?", terminal, since)
+	}
+	return tasks, db.Order("id DESC").Find(&tasks).Error
+}

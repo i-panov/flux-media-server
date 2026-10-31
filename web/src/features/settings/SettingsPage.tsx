@@ -8,6 +8,7 @@ import {
 	Select,
 	SimpleGrid,
 	Stack,
+	Switch,
 	Text,
 	Title,
 	useMantineColorScheme,
@@ -20,6 +21,7 @@ import { useHealthQuery } from "../../api/health";
 import { useSession } from "../../api/session";
 import { pickLang, SUPPORTED_LANGS, type SupportedLang } from "../../i18n";
 import { useLogout } from "../auth/useLogout";
+import { useTVMode } from "../tv/useTVMode";
 
 const languageNames: Record<SupportedLang, string> = {
 	ru: "Русский",
@@ -51,6 +53,7 @@ export function SettingsPage() {
 	const { data, isError, isFetching, refetch } = useHealthQuery();
 	const { data: session } = useSession();
 	const { logout, isPending: logoutPending } = useLogout();
+	const { tvMode, setTVMode } = useTVMode();
 	const currentLang = pickLang(i18n.language);
 
 	return (
@@ -77,6 +80,12 @@ export function SettingsPage() {
 							size="xs"
 						/>
 					</Stack>
+					<Switch
+						label={t("settings.tv.label")}
+						description={t("settings.tv.hint")}
+						checked={tvMode}
+						onChange={(event) => setTVMode(event.currentTarget.checked)}
+					/>
 				</SettingsCard>
 
 				<SettingsCard title={t("settings.language.title")}>

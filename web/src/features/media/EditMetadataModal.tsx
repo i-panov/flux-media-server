@@ -15,6 +15,7 @@ import { useMediaArtists, useUpdateMetadata } from "../../api/metadata";
 import { parseFilename } from "../../core/format";
 import type { Media } from "../../core/media";
 import { useCollectionError } from "../collections/useCollectionError";
+import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
 
 const YEAR_PATTERN = /^\d{4}$/;
 const MIN_YEAR = 1888;
@@ -42,6 +43,41 @@ function isValidSourceUrl(value: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+// Кнопки футера с фокусом пульта: свой компонент, чтобы модалка
+// оставалась в лимите строк. В обычном режиме — обычные кнопки.
+function MetadataFormActions({
+	onClose,
+	onSubmit,
+	canSave,
+	pending,
+}: {
+	onClose: () => void;
+	onSubmit: () => void;
+	canSave: boolean;
+	pending: boolean;
+}) {
+	const { t } = useTranslation();
+	return (
+		<Group justify="flex-end">
+			<TVModalButton
+				focusKey="edit-metadata-cancel"
+				variant="default"
+				onClick={onClose}
+			>
+				{t("collections.cancel")}
+			</TVModalButton>
+			<TVModalButton
+				focusKey="edit-metadata-save"
+				loading={pending}
+				disabled={!canSave}
+				onClick={onSubmit}
+			>
+				{t("collections.save")}
+			</TVModalButton>
+		</Group>
+	);
 }
 
 // Правка метаданных (название, исполнители, альбом, жанр, год, описание,
@@ -117,6 +153,7 @@ export function EditMetadataModal({
 			centered
 			size="lg"
 		>
+			<TVModalAutoFocus focusKey="edit-metadata-cancel" />
 			<Stack gap="md">
 				<TextInput
 					label={t("metadata.name")}
@@ -239,18 +276,12 @@ export function EditMetadataModal({
 						{t("metadata.saveError")}
 					</Text>
 				)}
-				<Group justify="flex-end">
-					<Button variant="default" onClick={onClose}>
-						{t("collections.cancel")}
-					</Button>
-					<Button
-						loading={update.isPending}
-						disabled={!canSave}
-						onClick={submit}
-					>
-						{t("collections.save")}
-					</Button>
-				</Group>
+				<MetadataFormActions
+					onClose={onClose}
+					onSubmit={submit}
+					canSave={canSave}
+					pending={update.isPending}
+				/>
 			</Stack>
 		</Modal>
 	);

@@ -15,6 +15,7 @@ import type { Media } from "../../core/media";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
+import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 
 // Просмотрщик мема: оригинал отдаётся стримом (превью — только для
 // сетки), поэтому картинка грузится в исходном качестве.
@@ -48,6 +49,13 @@ export function MemeDetailPage() {
 	const { id } = useParams({ from: "/memes/$id" });
 	const mediaId = Number(id);
 	const valid = Number.isInteger(mediaId) && mediaId > 0;
+	// ТВ-режим: секция и кнопка назад — точки входа spatial-навигации.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("meme-detail");
+	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
+		"meme-detail-back",
+		clickNode,
+	);
 
 	const media = useMedia(valid ? mediaId : 0, valid);
 
@@ -113,36 +121,44 @@ export function MemeDetailPage() {
 	const filename = item.filename === "" ? item.title : item.filename;
 
 	return (
-		<Stack gap="lg" align="center">
-			<Group w="100%" justify="space-between">
-				<Button variant="subtle" onClick={goBack}>
-					{backLabel}
-				</Button>
-				<Group gap="xs">
-					<FavoriteButton mediaId={item.id} type="image" />
-					<AddToCollectionButton mediaId={item.id} type="image" />
-					<Button
-						component="a"
-						variant="light"
-						href={`/api/media/${item.id}/stream`}
-						download={filename}
-					>
-						{t("memes.download")}
+		<Stack
+			gap="lg"
+			align="center"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="meme-detail"
+		>
+			<TVFocusScope focusKey="meme-detail">
+				<Group w="100%" justify="space-between">
+					<Button variant="subtle" ref={tvBackRef} onClick={goBack}>
+						{backLabel}
 					</Button>
+					<Group gap="xs">
+						<FavoriteButton mediaId={item.id} type="image" />
+						<AddToCollectionButton mediaId={item.id} type="image" />
+						<Button
+							component="a"
+							variant="light"
+							href={`/api/media/${item.id}/stream`}
+							download={filename}
+						>
+							{t("memes.download")}
+						</Button>
+					</Group>
 				</Group>
-			</Group>
-			<MemeImage item={item} />
-			<Stack gap={4} align="center">
-				<Title order={1} size="h2" ta="center">
-					{item.title}
-				</Title>
-				{item.description !== "" && (
-					<Text ta="center" c="dimmed">
-						{item.description}
-					</Text>
-				)}
-				<MediaAdminActions media={item} backPath="/memes" />
-			</Stack>
+				<MemeImage item={item} />
+				<Stack gap={4} align="center">
+					<Title order={1} size="h2" ta="center">
+						{item.title}
+					</Title>
+					{item.description !== "" && (
+						<Text ta="center" c="dimmed">
+							{item.description}
+						</Text>
+					)}
+					<MediaAdminActions media={item} backPath="/memes" />
+				</Stack>
+			</TVFocusScope>
 		</Stack>
 	);
 }

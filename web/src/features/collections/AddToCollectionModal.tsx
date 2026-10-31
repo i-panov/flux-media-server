@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAddToCollection, useCollections } from "../../api/collections";
 import type { MediaType } from "../../core/media";
+import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
 import { CreateCollectionModal } from "./CreateCollectionModal";
 import { useCollectionError } from "./useCollectionError";
 
@@ -44,6 +45,7 @@ export function AddToCollectionModal({
 				title={t("collections.addTitle")}
 				centered
 			>
+				<TVModalAutoFocus focusKey="add-to-collection-cancel" />
 				<Stack gap="sm">
 					{collections.isPending ? (
 						<Group justify="center" py="md">
@@ -70,8 +72,9 @@ export function AddToCollectionModal({
 						</Text>
 					) : (
 						matching.map((collection) => (
-							<Button
+							<TVModalButton
 								key={collection.id}
+								focusKey={`add-to-collection-${collection.id}`}
 								variant="light"
 								justify="flex-start"
 								leftSection={<FolderPlus size={16} />}
@@ -84,20 +87,25 @@ export function AddToCollectionModal({
 								}}
 							>
 								{collection.name}
-							</Button>
+							</TVModalButton>
 						))
 					)}
 					<Group justify="flex-end">
-						<Button variant="default" onClick={onClose}>
+						<TVModalButton
+							focusKey="add-to-collection-cancel"
+							variant="default"
+							onClick={onClose}
+						>
 							{t("collections.cancel")}
-						</Button>
-						<Button
+						</TVModalButton>
+						<TVModalButton
+							focusKey="add-to-collection-create"
 							variant="light"
 							leftSection={<FolderPlus size={16} />}
 							onClick={() => setCreateOpened(true)}
 						>
 							{t("collections.create")}
-						</Button>
+						</TVModalButton>
 					</Group>
 					{add.isError && (
 						<Text size="sm" c="red">

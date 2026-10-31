@@ -30,3 +30,23 @@ class ResizeObserverMock {
 
 vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
+// Spatial-навигация падает в jsdom: регистрация нод запускает асинхронный
+// замер layout, которого в jsdom нет (`measureLayout` of undefined).
+// В реальных браузерах всё работает, поэтому мокаем только тестовое
+// окружение. Файловые моки (как в tvFocus.test.tsx) имеют приоритет
+// над этим глобальным. Возвращаемые формы повторяют используемые места:
+// `useFocusable` → `{ ref, focused }`, `FocusContext.Provider` — passthrough.
+vi.mock("@noriginmedia/norigin-spatial-navigation", () => ({
+	destroy: vi.fn(),
+	FocusContext: {
+		Provider: (props: { children?: unknown }) => props.children,
+	},
+	getCurrentFocusKey: vi.fn(() => ""),
+	init: vi.fn(),
+	setFocus: vi.fn(),
+	useFocusable: vi.fn(() => ({
+		focused: false,
+		ref: { current: null },
+	})),
+}));

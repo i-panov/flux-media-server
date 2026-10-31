@@ -10,15 +10,23 @@ import {
 } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Film, RotateCw } from "lucide-react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { type ContinueEntry, useContinueWatching } from "../../api/progress";
 import { formatDuration } from "../../core/format";
+import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
 
 function ContinueCard({ entry }: { entry: ContinueEntry }) {
 	const { t } = useTranslation();
 	const media = entry.media;
 	const reload = useMediaReload(media.id);
+	// ТВ-режим: карточка — spatial-цель, Enter повторяет клик по ссылке.
+	const instanceKey = useId().replaceAll(":", "");
+	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		`continue-card-${entry.id}-${instanceKey}`,
+		clickFirstLink,
+	);
 	// Превью — кадр видео. Плейсхолдер при пустом URL и окончательно
 	// битой картинке выглядит одинаково.
 	const hasPreview = media.thumbnail_url !== "" && !reload.failed;
@@ -26,7 +34,7 @@ function ContinueCard({ entry }: { entry: ContinueEntry }) {
 	const total = entry.duration > 0 ? entry.duration : media.duration;
 	const percent = total > 0 ? Math.min(100, (entry.position / total) * 100) : 0;
 	return (
-		<div className="relative">
+		<div ref={tvRef} tabIndex={tvMode ? -1 : undefined} className="relative">
 			<Link
 				to="/video/$id"
 				params={{ id: String(media.id) }}

@@ -35,9 +35,10 @@ const (
 	// transcodePollInterval — страховка пропущенного wake: пропусков
 	// быть не должно, но зависшая очередь хуже лишнего SELECT в минуту.
 	transcodePollInterval = time.Minute
-	// transcodeTerminalTTL — сколько хранится история терминальных
-	// заданий для админки.
-	transcodeTerminalTTL = 7 * 24 * time.Hour
+	// TranscodeTerminalTTL — сколько хранится история терминальных
+	// заданий для админки. Экспортирована: cutoff нужен и списку
+	// GET /api/admin/transcodes (handlers), и чистке sweepTerminal.
+	TranscodeTerminalTTL = 7 * 24 * time.Hour
 	// transcodeSweepInterval — периодичность чистки истории.
 	transcodeSweepInterval = time.Hour
 	// transcodeProgressDBInterval / Step — троттлинг записей прогресса:
@@ -197,6 +198,12 @@ func (q *TranscodeQueue) Get(id uint64) (TranscodeJobStatus, bool) {
 		Speed:      task.Speed,
 		ETASeconds: estimateSeconds(task),
 	}, true
+}
+
+// EstimateTranscodeETA — ETA для списков API из той же формулы, что у
+// одиночного статуса Get: ненадёжные входные — 0.
+func EstimateTranscodeETA(task *models.TranscodeTask) int64 {
+	return estimateSeconds(task)
 }
 
 // estimateSeconds считает ETA из прогресса/скорости/длительности.
@@ -1210,7 +1217,7 @@ func (q *TranscodeQueue) sweepLoop() {
 // сколько бы их ни было.
 func (q *TranscodeQueue) sweepTerminal() {
 	ctx := context.Background()
-	cutoff := time.Now().Add(-transcodeTerminalTTL)
+	cutoff := time.Now().Add(-TranscodeTerminalTTL)
 	var afterID uint
 	for {
 		tasks, err := q.tasks.ListTerminalBefore(ctx, cutoff, afterID,

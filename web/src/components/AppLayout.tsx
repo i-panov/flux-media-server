@@ -18,6 +18,7 @@ import {
 	Music,
 	Play,
 	Settings,
+	Shield,
 	Sun,
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
@@ -27,7 +28,7 @@ import { useLogout } from "../features/auth/useLogout";
 import { AudioMiniPlayer } from "../features/player/AudioMiniPlayer";
 import { useMiniPlayerVisible } from "../features/player/useMiniPlayerVisible";
 
-type NavTo = "/" | "/video" | "/audio" | "/memes" | "/settings";
+type NavTo = "/" | "/video" | "/audio" | "/memes" | "/settings" | "/admin";
 
 interface NavItemConfig {
 	to: NavTo;
@@ -47,6 +48,12 @@ const SETTINGS_NAV: NavItemConfig = {
 	to: "/settings",
 	labelKey: "nav.settings",
 	icon: Settings,
+};
+
+const ADMIN_NAV: NavItemConfig = {
+	to: "/admin",
+	labelKey: "nav.admin",
+	icon: Shield,
 };
 
 const desktopNavClass =
@@ -146,6 +153,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 	);
 
 	const authed = session != null;
+	const isAdmin = session?.is_admin === true;
+	const desktopExtra: NavItemConfig[] = isAdmin ? [ADMIN_NAV] : [];
 	// Конфиг навбара задаёт отступ Main даже когда самой панели нет:
 	// на /login без сессии 240 px слева сдвигали карточку входа.
 	const navbar = authed
@@ -198,6 +207,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
 							{MAIN_NAV.map((item) => (
 								<DesktopNavItem key={item.to} item={item} />
 							))}
+							{desktopExtra.map((item) => (
+								<DesktopNavItem key={item.to} item={item} />
+							))}
 						</nav>
 					</AppShell.Section>
 					<AppShell.Section>
@@ -207,6 +219,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 			)}
 
 			<AppShell.Main
+				tabIndex={-1}
 				className={[
 					authed ? "app-shell-main-mobile" : "",
 					miniPlayerVisible ? "app-shell-main-player" : "",
@@ -231,7 +244,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 				>
 					<Group h="100%" gap={0} wrap="nowrap">
 						<nav className="flex h-full w-full" aria-label={t("nav.mobile")}>
-							{[...MAIN_NAV, SETTINGS_NAV].map((item) => (
+							{[...MAIN_NAV, ...desktopExtra, SETTINGS_NAV].map((item) => (
 								<MobileNavItem key={item.to} item={item} />
 							))}
 						</nav>

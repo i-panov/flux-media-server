@@ -148,6 +148,9 @@ func TestUserStore_DeleteCascades(t *testing.T) {
 	require.NoError(t, userRepo.Create(ctx, user))
 	other := &models.User{Email: "other@test.com"}
 	require.NoError(t, userRepo.Create(ctx, other))
+	// victim — первый пользователь, т.е. админ; удаление единственного
+	// админа запрещено (ErrLastAdmin), поэтому второй — тоже админ.
+	require.NoError(t, userRepo.SetAdmin(ctx, other.ID, true))
 
 	media := &models.Media{Title: "Shared Movie", Type: models.MediaTypeVideo, FilePath: "/m.mkv"}
 	require.NoError(t, mediaRepo.Create(ctx, media))

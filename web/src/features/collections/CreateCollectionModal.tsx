@@ -1,9 +1,10 @@
-import { Button, Group, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { Group, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { useCreateCollection } from "../../api/collections";
 import type { MediaType } from "../../core/media";
+import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
 
 export function CreateCollectionModal({
 	opened,
@@ -53,6 +54,7 @@ export function CreateCollectionModal({
 			title={t("collections.createTitle")}
 			centered
 		>
+			<TVModalAutoFocus focusKey="create-collection-cancel" />
 			<Stack gap="md">
 				<TextInput
 					label={t("collections.name")}
@@ -66,16 +68,21 @@ export function CreateCollectionModal({
 					}}
 				/>
 				<Group justify="flex-end">
-					<Button variant="default" onClick={close}>
+					<TVModalButton
+						focusKey="create-collection-cancel"
+						variant="default"
+						onClick={close}
+					>
 						{t("collections.cancel")}
-					</Button>
-					<Button
+					</TVModalButton>
+					<TVModalButton
+						focusKey="create-collection-create"
 						onClick={submit}
 						loading={create.isPending}
 						disabled={name.trim() === ""}
 					>
 						{t("collections.create")}
-					</Button>
+					</TVModalButton>
 				</Group>
 				{create.isError && (
 					<Text c="red" size="sm">

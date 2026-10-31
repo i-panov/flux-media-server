@@ -1,10 +1,12 @@
 import { ActionIcon, Card } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Image as ImageIcon, RotateCw } from "lucide-react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
 
 // Квадратная плитка галереи: подписи нет, название уходит в aria-label
 // ссылки. Превью — серверный JPEG до 512 px, оригинал грузится только
@@ -12,12 +14,19 @@ import { FavoriteButton } from "../favorites/FavoriteButton";
 export function MemeCard({ media }: { media: Media }) {
 	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
+	// ТВ-режим: плитка — spatial-цель, Enter повторяет клик по ссылке.
+	// Суффикс useId: то же медиа бывает сразу в сетке и избранном.
+	const instanceKey = useId().replaceAll(":", "");
+	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		`meme-card-${media.id}-${instanceKey}`,
+		clickFirstLink,
+	);
 	const src =
 		media.thumbnail_url === ""
 			? `/api/media/${media.id}/stream`
 			: media.thumbnail_url;
 	return (
-		<div className="relative">
+		<div ref={tvRef} tabIndex={tvMode ? -1 : undefined} className="relative">
 			<Link
 				to="/memes/$id"
 				params={{ id: String(media.id) }}

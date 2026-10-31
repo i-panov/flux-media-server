@@ -19,12 +19,38 @@ import {
 	useSavedTime,
 } from "../../api/media";
 import { formatDuration, splitSubLang } from "../../core/format";
+import type { Media } from "../../core/media";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
 import { useMediaProgress } from "../media/useMediaProgress";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
+import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+
+// Мета-строка деталей: свой компонент, чтобы страница оставалась
+// в лимите строк.
+function VideoMeta({ item }: { item: Media }) {
+	const { t } = useTranslation();
+	const resolution =
+		item.width > 0 && item.height > 0
+			? `${item.width}×${item.height}`
+			: t("common.emptyFallback");
+	return (
+		<Group gap="xl">
+			<MetaItem
+				label={t("video.meta.year")}
+				value={item.year > 0 ? String(item.year) : t("common.emptyFallback")}
+			/>
+			<MetaItem
+				label={t("video.meta.duration")}
+				value={formatDuration(item.duration)}
+			/>
+			<MetaItem label={t("video.meta.resolution")} value={resolution} />
+			<MetaItem label={t("video.meta.views")} value={String(item.view_count)} />
+		</Group>
+	);
+}
 
 // React не поддерживает onError на <track> (только audio/video/img/...),
 // поэтому ошибку загрузки дорожки ловим нативным слушателем: при истёкшей
@@ -68,6 +94,13 @@ export function VideoDetailPage() {
 	const reload = useMediaReload(valid ? mediaId : 0);
 	const player = useAudioPlayer();
 	const videoRef = useRef<HTMLVideoElement | null>(null);
+	// ТВ-режим: секция и кнопка назад — точки входа spatial-навигации.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("video-detail");
+	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
+		"video-detail-back",
+		clickNode,
+	);
 	const position = useSavedTime(videoRef);
 	const played = useRef(false);
 	const videoProgress = useMediaProgress(mediaId, videoRef, valid);
@@ -157,107 +190,99 @@ export function VideoDetailPage() {
 	}
 
 	const item = media.data;
-	const resolution =
-		item.width > 0 && item.height > 0
-			? `${item.width}×${item.height}`
-			: t("common.emptyFallback");
 
 	return (
-		<Stack gap="lg">
-			<Button variant="subtle" w="fit-content" onClick={goBack}>
-				{backLabel}
-			</Button>
-			{/* Сервер отдаёт только субтитры-переводы, дорожек captions нет —
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="video-detail"
+		>
+			<TVFocusScope focusKey="video-detail">
+				<Button
+					variant="subtle"
+					w="fit-content"
+					ref={tvBackRef}
+					onClick={goBack}
+				>
+					{backLabel}
+				</Button>
+				{/* Сервер отдаёт только субтитры-переводы, дорожек captions нет —
 			размечать перевод как captions было бы неверно. Выбор дорожки
 			доступен в нативных контролах плеера. */}
-			{/* biome-ignore lint/a11y/useMediaCaption: нет captions-дорожек в данных. */}
-			<video
-				ref={videoRef}
-				key={reload.nonce}
-				controls
-				preload="metadata"
-				src={`/api/media/${item.id}/stream`}
-				poster={item.thumbnail_url === "" ? undefined : item.thumbnail_url}
-				className="aspect-video w-full rounded-md bg-black"
-				onError={handleMediaError}
-				onLoadedMetadata={() => {
-					position.restore();
-					videoProgress.handleLoadedMetadata();
-				}}
-				onPlay={() => {
-					// Счётчик backend инкрементирует в Stream: подтягиваем
-					// свежее значение один раз за просмотр, плеер не трогаем.
-					if (!played.current) {
-						played.current = true;
-						void media.refetch();
-					}
-				}}
-				onPause={videoProgress.handlePause}
-				onTimeUpdate={videoProgress.handleTimeUpdate}
-				onEnded={videoProgress.handleEnded}
-			>
-				{(subs.data ?? []).map((track) => {
-					const { base, label } = splitSubLang(track.lang);
-					return (
-						<SubTrack
-							key={track.lang}
-							base={base}
-							label={label}
-							url={track.url}
-							onError={handleMediaError}
-						/>
-					);
-				})}
-			</video>
-			{reload.failed && (
-				<Alert color="red" variant="light" title={t("video.loadError")}>
-					<Button variant="light" size="xs" mt="xs" onClick={handleRetry}>
-						{t("common.retry")}
-					</Button>
-				</Alert>
-			)}
-			{subs.isError && (
-				<Alert color="yellow" variant="light">
-					{t("video.subsError")}
-				</Alert>
-			)}
-			<Stack gap="xs">
-				<Group justify="space-between" align="center" wrap="wrap">
-					<Title order={1} size="h2">
-						{item.title}
-					</Title>
-					<Group gap="xs">
-						<FavoriteButton mediaId={item.id} type="video" />
-						<AddToCollectionButton mediaId={item.id} type="video" />
-						<Button
-							variant="light"
-							leftSection={<ListPlus size={16} />}
-							onClick={() => player.enqueue(item)}
-						>
-							{t("player.enqueue")}
-						</Button>
-					</Group>
-				</Group>
-				<Group gap="xl">
-					<MetaItem
-						label={t("video.meta.year")}
-						value={
-							item.year > 0 ? String(item.year) : t("common.emptyFallback")
+				{/* biome-ignore lint/a11y/useMediaCaption: нет captions-дорожек в данных. */}
+				<video
+					ref={videoRef}
+					key={reload.nonce}
+					controls
+					preload="metadata"
+					src={`/api/media/${item.id}/stream`}
+					poster={item.thumbnail_url === "" ? undefined : item.thumbnail_url}
+					className="aspect-video w-full rounded-md bg-black"
+					onError={handleMediaError}
+					onLoadedMetadata={() => {
+						position.restore();
+						videoProgress.handleLoadedMetadata();
+					}}
+					onPlay={() => {
+						// Счётчик backend инкрементирует в Stream: подтягиваем
+						// свежее значение один раз за просмотр, плеер не трогаем.
+						if (!played.current) {
+							played.current = true;
+							void media.refetch();
 						}
-					/>
-					<MetaItem
-						label={t("video.meta.duration")}
-						value={formatDuration(item.duration)}
-					/>
-					<MetaItem label={t("video.meta.resolution")} value={resolution} />
-					<MetaItem
-						label={t("video.meta.views")}
-						value={String(item.view_count)}
-					/>
-				</Group>
-				{item.description !== "" && <Text>{item.description}</Text>}
-				<MediaAdminActions media={item} extractAudio backPath="/video" />
-			</Stack>
+					}}
+					onPause={videoProgress.handlePause}
+					onTimeUpdate={videoProgress.handleTimeUpdate}
+					onEnded={videoProgress.handleEnded}
+				>
+					{(subs.data ?? []).map((track) => {
+						const { base, label } = splitSubLang(track.lang);
+						return (
+							<SubTrack
+								key={track.lang}
+								base={base}
+								label={label}
+								url={track.url}
+								onError={handleMediaError}
+							/>
+						);
+					})}
+				</video>
+				{reload.failed && (
+					<Alert color="red" variant="light" title={t("video.loadError")}>
+						<Button variant="light" size="xs" mt="xs" onClick={handleRetry}>
+							{t("common.retry")}
+						</Button>
+					</Alert>
+				)}
+				{subs.isError && (
+					<Alert color="yellow" variant="light">
+						{t("video.subsError")}
+					</Alert>
+				)}
+				<Stack gap="xs">
+					<Group justify="space-between" align="center" wrap="wrap">
+						<Title order={1} size="h2">
+							{item.title}
+						</Title>
+						<Group gap="xs">
+							<FavoriteButton mediaId={item.id} type="video" />
+							<AddToCollectionButton mediaId={item.id} type="video" />
+							<Button
+								variant="light"
+								leftSection={<ListPlus size={16} />}
+								onClick={() => player.enqueue(item)}
+							>
+								{t("player.enqueue")}
+							</Button>
+						</Group>
+					</Group>
+					<VideoMeta item={item} />
+					{item.description !== "" && <Text>{item.description}</Text>}
+					<MediaAdminActions media={item} extractAudio backPath="/video" />
+				</Stack>
+			</TVFocusScope>
 		</Stack>
 	);
 }

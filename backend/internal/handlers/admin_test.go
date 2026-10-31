@@ -2,12 +2,14 @@ package handlers_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +51,7 @@ func setupAdminTestApp(t *testing.T, authUserID uint) (*fiber.App, repository.Me
 	)
 	t.Cleanup(transQueue.Stop)
 
-	handler := handlers.NewAdminHandler(mediaRepo, taskRepo, transQueue, storageCfg, mediaCfg)
+	handler := handlers.NewAdminHandler(mediaRepo, taskRepo, transQueue, storageCfg, mediaCfg, userRepo)
 	app := fiber.New()
 	admin := app.Group("/api/admin", func(c *fiber.Ctx) error {
 		c.Locals(middleware.LocalsUserID, authUserID)
@@ -59,6 +61,7 @@ func setupAdminTestApp(t *testing.T, authUserID uint) (*fiber.App, repository.Me
 	admin.Get("/originals", handler.OriginalsList)
 	admin.Get("/originals/:name/download", handler.OriginalDownload)
 	admin.Delete("/originals/:name", handler.OriginalDelete)
+	admin.Get("/transcodes", handler.TranscodesList)
 	admin.Post("/transcodes/:id/retry", handler.TranscodeRetry)
 	return app, mediaRepo, taskRepo, originalsDir, transQueue
 }
@@ -180,7 +183,7 @@ func TestAdminTranscodeRetryConflict(t *testing.T) {
 	// Гонка проиграна (Retry вернул конфликт) — 409 с понятным текстом.
 	stub := &stubTranscodeQueue{retryErr: services.ErrTranscodeConflict}
 	app := fiber.New()
-	handler := handlers.NewAdminHandler(nil, nil, stub, config.StorageConfig{}, config.MediaConfig{})
+	handler := handlers.NewAdminHandler(nil, nil, stub, config.StorageConfig{}, config.MediaConfig{}, nil)
 	app.Post("/api/admin/transcodes/:id/retry", handler.TranscodeRetry)
 
 	resp, err := app.Test(httptest.NewRequest("POST", "/api/admin/transcodes/1/retry", nil))
@@ -194,4 +197,69 @@ func TestAdminTranscodeRetryZeroIDIsBadRequest(t *testing.T) {
 	resp, err := app.Test(httptest.NewRequest("POST", "/api/admin/transcodes/0/retry", nil))
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+}
+
+type adminTranscodeJSON struct {
+	ID         uint    `json:"id"`
+	Status     string  `json:"status"`
+	Progress   int     `json:"progress"`
+	Speed      float64 `json:"speed"`
+	ETASeconds int64   `json:"eta_seconds"`
+	Error      *string `json:"error"`
+	Filename   string  `json:"filename"`
+	MediaID    uint    `json:"media_id"`
+}
+
+func TestAdminTranscodesList(t *testing.T) {
+	app, _, taskRepo, _, queue := setupAdminTestApp(t, 1)
+	// Воркер остановлен: иначе он подхватит queued-задания и статусы
+	// уплывут из-под assert'ов (как в TestAdminTranscodeRetry).
+	queue.Stop()
+	ctx := context.Background()
+
+	require.NoError(t, taskRepo.Create(ctx, &models.TranscodeTask{SourcePath: "/q/a.mkv", Filename: "a.mkv", Status: services.TranscodeTaskQueued}))
+	require.NoError(t, taskRepo.Create(ctx, &models.TranscodeTask{SourcePath: "/q/b.mkv", Filename: "b.mkv", Status: services.TranscodeTaskProcessing, Progress: 40, Speed: 2, DurationSecs: 100}))
+	require.NoError(t, taskRepo.Create(ctx, &models.TranscodeTask{SourcePath: "/q/c.mkv", Filename: "c.mkv", Status: services.TranscodeTaskDone, MediaID: 7}))
+	require.NoError(t, taskRepo.Create(ctx, &models.TranscodeTask{SourcePath: "/q/d.mkv", Filename: "d.mkv", Status: services.TranscodeTaskError, ErrorMsg: "boom"}))
+	old := time.Now().Add(-services.TranscodeTerminalTTL - 24*time.Hour)
+	require.NoError(t, taskRepo.Create(ctx, &models.TranscodeTask{SourcePath: "/q/old.mkv", Filename: "old.mkv", Status: services.TranscodeTaskDone, CreatedAt: old, UpdatedAt: old}))
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/admin/transcodes", nil))
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var items []adminTranscodeJSON
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&items))
+	resp.Body.Close()
+
+	// Активные первыми, внутри групп — по id desc; история старше TTL
+	// не светится.
+	require.Len(t, items, 4)
+	assert.Equal(t, []uint{2, 1, 4, 3}, []uint{items[0].ID, items[1].ID, items[2].ID, items[3].ID})
+	assert.Equal(t, services.TranscodeTaskProcessing, items[0].Status)
+	assert.Equal(t, services.TranscodeTaskQueued, items[1].Status)
+
+	assert.Equal(t, "b.mkv", items[0].Filename)
+	assert.Equal(t, 40, items[0].Progress)
+	assert.Equal(t, 2.0, items[0].Speed)
+	assert.Equal(t, int64(30), items[0].ETASeconds)
+
+	assert.Equal(t, "a.mkv", items[1].Filename)
+	assert.Equal(t, int64(0), items[1].ETASeconds)
+
+	require.NotNil(t, items[2].Error)
+	assert.Equal(t, "boom", *items[2].Error)
+	assert.Equal(t, "d.mkv", items[2].Filename)
+
+	assert.Equal(t, "c.mkv", items[3].Filename)
+	assert.Equal(t, uint(7), items[3].MediaID)
+	assert.Nil(t, items[3].Error)
+}
+
+func TestAdminTranscodesListForbiddenForNonAdmin(t *testing.T) {
+	app, _, _, _, _ := setupAdminTestApp(t, 2)
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/admin/transcodes", nil))
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
 }

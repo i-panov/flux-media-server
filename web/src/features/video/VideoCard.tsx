@@ -1,11 +1,13 @@
 import { ActionIcon, Card, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Film, RotateCw } from "lucide-react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
 
 function ThumbImage({
 	src,
@@ -34,11 +36,20 @@ function ThumbImage({
 export function VideoCard({ media }: { media: Media }) {
 	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
+	// ТВ-режим: карточка — spatial-цель, Enter повторяет клик по ссылке.
+	// В обычном режиме focusable=false, поведение не меняется.
+	// Суффикс useId: то же медиа бывает сразу в сетке, избранном
+	// и продолжении — ключи обязаны быть уникальны на странице.
+	const instanceKey = useId().replaceAll(":", "");
+	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		`video-card-${media.id}-${instanceKey}`,
+		clickFirstLink,
+	);
 	// Пустой URL (превью ещё не сгенерировано) и окончательно битая
 	// картинка: вместо <img src=""> — плейсхолдер без лишних запросов.
 	const hasThumb = media.thumbnail_url !== "" && !reload.failed;
 	return (
-		<div className="relative">
+		<div ref={tvRef} tabIndex={tvMode ? -1 : undefined} className="relative">
 			<Link
 				to="/video/$id"
 				params={{ id: String(media.id) }}

@@ -1,20 +1,29 @@
 import { ActionIcon, Card, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Music, RotateCw } from "lucide-react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
 
 export function AudioCard({ media }: { media: Media }) {
 	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
+	// ТВ-режим: карточка — spatial-цель, Enter повторяет клик по ссылке.
+	// Суффикс useId: то же медиа бывает сразу в сетке и избранном.
+	const instanceKey = useId().replaceAll(":", "");
+	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		`audio-card-${media.id}-${instanceKey}`,
+		clickFirstLink,
+	);
 	// Обложки может не быть (mp3 без тегов): сразу плейсхолдер, без <img src="">.
 	const hasCover = media.cover_url !== "" && !reload.failed;
 	const artists = media.artists.map((artist) => artist.name).join(", ");
 	return (
-		<div className="relative">
+		<div ref={tvRef} tabIndex={tvMode ? -1 : undefined} className="relative">
 			<Link
 				to="/audio/$id"
 				params={{ id: String(media.id) }}

@@ -21,6 +21,8 @@ import { useTranslation } from "react-i18next";
 import { sessionQueryOptions } from "../api/session";
 import { AppLayout } from "../components/AppLayout";
 import { AudioPlayerProvider } from "../features/player/AudioPlayerProvider";
+import { TVModeProvider } from "../features/tv/TVModeContext";
+import { TVSpatialRoot } from "../features/tv/TVSpatialRoot";
 import i18n, { pickLang } from "../i18n";
 import { queryClient } from "../queryClient";
 import { theme } from "../theme";
@@ -89,10 +91,13 @@ function RootDocument() {
 		<MantineProvider theme={theme} defaultColorScheme="auto">
 			<QueryClientProvider client={queryClient}>
 				<AudioPlayerProvider>
-					<Notifications position="top-right" limit={3} />
-					<AppLayout>
-						<Outlet />
-					</AppLayout>
+					<TVModeProvider>
+						<TVSpatialRoot />
+						<Notifications position="top-right" limit={3} />
+						<AppLayout>
+							<Outlet />
+						</AppLayout>
+					</TVModeProvider>
 				</AudioPlayerProvider>
 			</QueryClientProvider>
 		</MantineProvider>

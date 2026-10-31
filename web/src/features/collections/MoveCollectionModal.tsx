@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCollections, useMoveCollection } from "../../api/collections";
 import type { MediaType } from "../../core/media";
+import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
 import { CollectionPickList } from "./CollectionPickList";
 import { CreateCollectionModal } from "./CreateCollectionModal";
 import { useCollectionError } from "./useCollectionError";
@@ -39,6 +40,7 @@ export function MoveCollectionModal({
 				title={t("collections.moveCollectionTitle")}
 				centered
 			>
+				<TVModalAutoFocus focusKey="move-collection-cancel" />
 				<Stack gap="sm">
 					{collections.isError ? (
 						<Alert
@@ -72,12 +74,20 @@ export function MoveCollectionModal({
 						/>
 					)}
 					<Group justify="flex-end">
-						<Button variant="default" onClick={onClose}>
+						<TVModalButton
+							focusKey="move-collection-cancel"
+							variant="default"
+							onClick={onClose}
+						>
 							{t("collections.cancel")}
-						</Button>
-						<Button variant="light" onClick={() => setCreateOpened(true)}>
+						</TVModalButton>
+						<TVModalButton
+							focusKey="move-collection-create"
+							variant="light"
+							onClick={() => setCreateOpened(true)}
+						>
 							{t("collections.create")}
-						</Button>
+						</TVModalButton>
 					</Group>
 					{move.isError && (
 						<Text size="sm" c="red">

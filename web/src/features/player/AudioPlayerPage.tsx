@@ -32,10 +32,12 @@ import { ApiError } from "../../api/client";
 import { useLyrics, useSaveLyrics } from "../../api/lyrics";
 import { useSession } from "../../api/session";
 import { formatDuration } from "../../core/format";
+import { clickNode, TVFocusScope, TVTab, useTVFocusable } from "../tv/tvFocus";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
 import { parseSyncedLyrics } from "./lyricsSync";
 import { SyncedLyricsView } from "./SyncedLyricsView";
+import { useTVPlayerRemote } from "./tvPlayerRemote";
 
 function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 	const { t } = useTranslation();
@@ -249,11 +251,145 @@ function SeekSlider({
 	);
 }
 
+// Кнопки транспорта с фокусом пульта: свой компонент, чтобы страница
+// оставалась в лимите строк. В обычном режиме — обычные кнопки.
+function TransportControls() {
+	const { t } = useTranslation();
+	const player = useAudioPlayer();
+	const { targetRef: tvShuffleRef } = useTVFocusable<HTMLButtonElement>(
+		"player-shuffle",
+		clickNode,
+		() => false,
+	);
+	const { targetRef: tvPrevRef } = useTVFocusable<HTMLButtonElement>(
+		"player-prev",
+		clickNode,
+		() => false,
+	);
+	const { targetRef: tvPlayRef } = useTVFocusable<HTMLButtonElement>(
+		"player-play",
+		clickNode,
+		() => false,
+	);
+	const { targetRef: tvNextRef } = useTVFocusable<HTMLButtonElement>(
+		"player-next",
+		clickNode,
+		() => false,
+	);
+	const { targetRef: tvRepeatRef } = useTVFocusable<HTMLButtonElement>(
+		"player-repeat",
+		clickNode,
+		() => false,
+	);
+	return (
+		<Group justify="center" gap="md">
+			<Tooltip label={t("player.shuffle")} withArrow>
+				<ActionIcon
+					variant={player.shuffle ? "filled" : "subtle"}
+					size="lg"
+					radius="xl"
+					aria-label={t("player.shuffle")}
+					aria-pressed={player.shuffle}
+					ref={tvShuffleRef}
+					onClick={player.toggleShuffle}
+				>
+					<Shuffle size={20} />
+				</ActionIcon>
+			</Tooltip>
+			<Tooltip label={t("player.previous")} withArrow>
+				<ActionIcon
+					variant="subtle"
+					size="lg"
+					aria-label={t("player.previous")}
+					data-testid="player-prev"
+					ref={tvPrevRef}
+					onClick={player.previous}
+				>
+					<SkipBack size={22} />
+				</ActionIcon>
+			</Tooltip>
+			<ActionIcon
+				variant="filled"
+				radius="xl"
+				size={56}
+				aria-label={player.playing ? t("player.pause") : t("player.play")}
+				data-testid={player.playing ? "player-pause" : "player-play"}
+				ref={tvPlayRef}
+				onClick={player.toggle}
+			>
+				{player.playing ? (
+					<Pause size={26} />
+				) : (
+					<Play size={26} fill="currentColor" />
+				)}
+			</ActionIcon>
+			<Tooltip label={t("player.next")} withArrow>
+				<ActionIcon
+					variant="subtle"
+					size="lg"
+					aria-label={t("player.next")}
+					data-testid="player-next"
+					ref={tvNextRef}
+					onClick={player.next}
+				>
+					<SkipForward size={22} />
+				</ActionIcon>
+			</Tooltip>
+			<Tooltip
+				label={
+					player.repeat === "all"
+						? t("player.repeatAll")
+						: player.repeat === "one"
+							? t("player.repeatOne")
+							: t("player.repeatOff")
+				}
+				withArrow
+			>
+				<ActionIcon
+					variant={player.repeat === "off" ? "subtle" : "filled"}
+					size="lg"
+					radius="xl"
+					aria-label={
+						player.repeat === "all"
+							? t("player.repeatAll")
+							: player.repeat === "one"
+								? t("player.repeatOne")
+								: t("player.repeatOff")
+					}
+					ref={tvRepeatRef}
+					onClick={player.cycleRepeat}
+				>
+					{player.repeat === "one" ? (
+						<Repeat1 size={20} />
+					) : (
+						<Repeat size={20} />
+					)}
+				</ActionIcon>
+			</Tooltip>
+		</Group>
+	);
+}
+
 export function AudioPlayerPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const player = useAudioPlayer();
 	const current = player.current;
+	// Пульт в ТВ-режиме: стрелки сикают/меняют громкость, media-клавиши —
+	// транспорт. Хук живёт на странице плеера, Back-клавиши остаются
+	// за глобальным Back-хендлером.
+	useTVPlayerRemote();
+	// ТВ-режим: секция — точка входа spatial-навигации.
+	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		"player-page",
+		undefined,
+		() => false,
+	);
+	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
+		"player-back",
+		clickNode,
+		() => false,
+	);
 	const navigateBack = () => {
 		void navigate({ to: "/audio" });
 	};
@@ -273,170 +409,110 @@ export function AudioPlayerPage() {
 	const artists = current.artists.map((artist) => artist.name).join(", ");
 
 	return (
-		<Stack gap="lg" maw={960} mx="auto" w="100%">
-			<Group justify="space-between">
-				<Button
-					variant="subtle"
-					leftSection={<ArrowLeft size={16} />}
-					onClick={navigateBack}
-				>
-					{t("player.toAudio")}
-				</Button>
-			</Group>
+		<Stack
+			gap="lg"
+			maw={960}
+			mx="auto"
+			w="100%"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="player-page"
+		>
+			<TVFocusScope focusKey="player-page">
+				<Group justify="space-between">
+					<Button
+						variant="subtle"
+						leftSection={<ArrowLeft size={16} />}
+						ref={tvBackRef}
+						onClick={navigateBack}
+					>
+						{t("player.toAudio")}
+					</Button>
+				</Group>
 
-			{player.error !== null && (
-				<Alert color="red" variant="light" title={t("player.error")}>
-					{player.error}
-				</Alert>
-			)}
+				{player.error !== null && (
+					<Alert color="red" variant="light" title={t("player.error")}>
+						{player.error}
+					</Alert>
+				)}
 
-			<Group align="flex-start" gap="xl" wrap="wrap">
-				<div className="grid h-60 w-60 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--mantine-color-default-hover)]">
-					<CoverImage src={current.cover_url} iconSize={48} />
-				</div>
-				<Stack
-					gap="sm"
-					className="min-w-0 flex-1 basis-full min-[48em]:basis-auto"
-				>
-					<Stack gap={2}>
-						<Title order={1} size="h2" lineClamp={2}>
-							{current.title}
-						</Title>
-						<Text c="dimmed">
-							{artists === "" ? t("common.emptyFallback") : artists}
-						</Text>
-						{current.album !== "" && (
-							<Text size="sm" c="dimmed">
-								{current.album}
+				<Group align="flex-start" gap="xl" wrap="wrap">
+					<div className="grid h-60 w-60 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--mantine-color-default-hover)]">
+						<CoverImage src={current.cover_url} iconSize={48} />
+					</div>
+					<Stack
+						gap="sm"
+						className="min-w-0 flex-1 basis-full min-[48em]:basis-auto"
+					>
+						<Stack gap={2}>
+							<Title order={1} size="h2" lineClamp={2}>
+								{current.title}
+							</Title>
+							<Text c="dimmed">
+								{artists === "" ? t("common.emptyFallback") : artists}
 							</Text>
-						)}
-					</Stack>
-
-					<SeekSlider
-						mediaId={current.id}
-						currentTime={player.currentTime}
-						duration={player.duration}
-						onSeek={(value) => player.seek(value)}
-					/>
-
-					<Group justify="center" gap="md">
-						<Tooltip label={t("player.shuffle")} withArrow>
-							<ActionIcon
-								variant={player.shuffle ? "filled" : "subtle"}
-								size="lg"
-								radius="xl"
-								aria-label={t("player.shuffle")}
-								aria-pressed={player.shuffle}
-								onClick={player.toggleShuffle}
-							>
-								<Shuffle size={20} />
-							</ActionIcon>
-						</Tooltip>
-						<Tooltip label={t("player.previous")} withArrow>
-							<ActionIcon
-								variant="subtle"
-								size="lg"
-								aria-label={t("player.previous")}
-								data-testid="player-prev"
-								onClick={player.previous}
-							>
-								<SkipBack size={22} />
-							</ActionIcon>
-						</Tooltip>
-						<ActionIcon
-							variant="filled"
-							radius="xl"
-							size={56}
-							aria-label={player.playing ? t("player.pause") : t("player.play")}
-							data-testid={player.playing ? "player-pause" : "player-play"}
-							onClick={player.toggle}
-						>
-							{player.playing ? (
-								<Pause size={26} />
-							) : (
-								<Play size={26} fill="currentColor" />
+							{current.album !== "" && (
+								<Text size="sm" c="dimmed">
+									{current.album}
+								</Text>
 							)}
-						</ActionIcon>
-						<Tooltip label={t("player.next")} withArrow>
-							<ActionIcon
-								variant="subtle"
-								size="lg"
-								aria-label={t("player.next")}
-								data-testid="player-next"
-								onClick={player.next}
-							>
-								<SkipForward size={22} />
-							</ActionIcon>
-						</Tooltip>
-						<Tooltip
-							label={
-								player.repeat === "all"
-									? t("player.repeatAll")
-									: player.repeat === "one"
-										? t("player.repeatOne")
-										: t("player.repeatOff")
-							}
-							withArrow
-						>
-							<ActionIcon
-								variant={player.repeat === "off" ? "subtle" : "filled"}
-								size="lg"
-								radius="xl"
-								aria-label={
-									player.repeat === "all"
-										? t("player.repeatAll")
-										: player.repeat === "one"
-											? t("player.repeatOne")
-											: t("player.repeatOff")
-								}
-								onClick={player.cycleRepeat}
-							>
-								{player.repeat === "one" ? (
-									<Repeat1 size={20} />
-								) : (
-									<Repeat size={20} />
-								)}
-							</ActionIcon>
-						</Tooltip>
-					</Group>
+						</Stack>
 
-					<Group gap="sm" wrap="nowrap">
-						<Text size="xs" c="dimmed">
-							{t("player.volume")}
-						</Text>
-						<Slider
-							value={player.volume * 100}
-							min={0}
-							max={100}
-							label={`${Math.round(player.volume * 100)}%`}
-							thumbLabel={t("player.volumeLabel")}
-							onChange={(value) => player.setVolume(value / 100)}
-							className="flex-1"
+						<SeekSlider
+							mediaId={current.id}
+							currentTime={player.currentTime}
+							duration={player.duration}
+							onSeek={(value) => player.seek(value)}
 						/>
-					</Group>
-				</Stack>
-			</Group>
 
-			<Tabs defaultValue="lyrics">
-				<Tabs.List>
-					<Tabs.Tab value="lyrics">{t("player.lyrics")}</Tabs.Tab>
-					<Tabs.Tab value="translation">{t("player.translation")}</Tabs.Tab>
-					<Tabs.Tab value="queue" data-testid="player-queue-tab">
-						{t("player.queue")}
-					</Tabs.Tab>
-				</Tabs.List>
-				<Tabs.Panel value="lyrics" pt="md">
-					{/* key: при смене трека редактирование не должно переезжать
+						<TransportControls />
+
+						<Group gap="sm" wrap="nowrap">
+							<Text size="xs" c="dimmed">
+								{t("player.volume")}
+							</Text>
+							<Slider
+								value={player.volume * 100}
+								min={0}
+								max={100}
+								label={`${Math.round(player.volume * 100)}%`}
+								thumbLabel={t("player.volumeLabel")}
+								onChange={(value) => player.setVolume(value / 100)}
+								className="flex-1"
+							/>
+						</Group>
+					</Stack>
+				</Group>
+
+				<Tabs defaultValue="lyrics">
+					<Tabs.List>
+						<TVTab focusKey="player-tab-lyrics" value="lyrics">
+							{t("player.lyrics")}
+						</TVTab>
+						<TVTab focusKey="player-tab-translation" value="translation">
+							{t("player.translation")}
+						</TVTab>
+						<TVTab
+							focusKey="player-tab-queue"
+							value="queue"
+							data-testid="player-queue-tab"
+						>
+							{t("player.queue")}
+						</TVTab>
+					</Tabs.List>
+					<Tabs.Panel value="lyrics" pt="md">
+						{/* key: при смене трека редактирование не должно переезжать
 					на чужой текст — состояние сбрасывается пересозданием. */}
-					<LyricsTab key={`lyrics-${current.id}`} kind="lyrics" />
-				</Tabs.Panel>
-				<Tabs.Panel value="translation" pt="md">
-					<LyricsTab key={`translation-${current.id}`} kind="translation" />
-				</Tabs.Panel>
-				<Tabs.Panel value="queue" pt="md">
-					<QueueTab />
-				</Tabs.Panel>
-			</Tabs>
+						<LyricsTab key={`lyrics-${current.id}`} kind="lyrics" />
+					</Tabs.Panel>
+					<Tabs.Panel value="translation" pt="md">
+						<LyricsTab key={`translation-${current.id}`} kind="translation" />
+					</Tabs.Panel>
+					<Tabs.Panel value="queue" pt="md">
+						<QueueTab />
+					</Tabs.Panel>
+				</Tabs>
+			</TVFocusScope>
 		</Stack>
 	);
 }

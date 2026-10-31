@@ -17,6 +17,7 @@ import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
+import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { VideoCard } from "./VideoCard";
 
@@ -24,13 +25,22 @@ export function VideoPage() {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
 	const debounced = useDebouncedValue(query);
+	// ТВ-режим: корень страницы — spatial-секция, ref на существующем Stack
+	// (вёрстка не меняется), карточки внутри — цели навигации.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("video-page");
 
 	const list = useVideoList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const visibleItems = useVisibleMedia("video", items, debounced !== "");
 
 	return (
-		<Stack gap="lg">
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="video-page"
+		>
 			<Group justify="space-between" align="center" wrap="wrap">
 				<Title order={1} size="h2">
 					{t("video.title")}
@@ -68,7 +78,7 @@ export function VideoPage() {
 			) : items.length === 0 ? (
 				<Text c="dimmed">{t("video.empty")}</Text>
 			) : (
-				<>
+				<TVFocusScope focusKey="video-page">
 					<SimpleGrid
 						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
 						spacing="md"
@@ -104,7 +114,7 @@ export function VideoPage() {
 							</Button>
 						)
 					)}
-				</>
+				</TVFocusScope>
 			)}
 		</Stack>
 	);

@@ -16,6 +16,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
+import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { MemeCard } from "./MemeCard";
 
@@ -23,13 +24,21 @@ export function MemesPage() {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
 	const debounced = useDebouncedValue(query);
+	// ТВ-режим: корень — spatial-секция, плитки внутри — цели навигации.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("memes-page");
 
 	const list = useImageList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const visibleItems = useVisibleMedia("image", items, debounced !== "");
 
 	return (
-		<Stack gap="lg">
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="memes-page"
+		>
 			<Group justify="space-between" align="center" wrap="wrap">
 				<Title order={1} size="h2">
 					{t("memes.title")}
@@ -65,7 +74,7 @@ export function MemesPage() {
 			) : items.length === 0 ? (
 				<Text c="dimmed">{t("memes.empty")}</Text>
 			) : (
-				<>
+				<TVFocusScope focusKey="memes-page">
 					<SimpleGrid
 						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
 						spacing="md"
@@ -101,7 +110,7 @@ export function MemesPage() {
 							</Button>
 						)
 					)}
-				</>
+				</TVFocusScope>
 			)}
 		</Stack>
 	);

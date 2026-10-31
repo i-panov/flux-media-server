@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useMedia } from "../../api/media";
 import { formatDuration } from "../../core/format";
+import type { Media } from "../../core/media";
 import { isSafeImageUrl } from "../../core/media";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { ArtistFavoriteButton } from "../favorites/ArtistFavoriteButton";
@@ -20,6 +21,51 @@ import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
+import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+
+// Кнопки старта трека: свой компонент, чтобы страница оставалась
+// в лимите строк.
+function AudioPlayActions({
+	item,
+	isCurrent,
+}: {
+	item: Media;
+	isCurrent: boolean;
+}) {
+	const { t } = useTranslation();
+	const navigate = useNavigate();
+	const player = useAudioPlayer();
+	return (
+		<Group gap="xs">
+			<Button
+				leftSection={
+					isCurrent && player.playing ? (
+						<Pause size={16} />
+					) : (
+						<Play size={16} fill="currentColor" />
+					)
+				}
+				onClick={() => {
+					if (isCurrent) {
+						player.toggle();
+					} else {
+						player.playMedia(item);
+					}
+				}}
+			>
+				{isCurrent && player.playing ? t("player.pause") : t("player.play")}
+			</Button>
+			{isCurrent && (
+				<Button
+					variant="light"
+					onClick={() => void navigate({ to: "/player" })}
+				>
+					{t("player.open")}
+				</Button>
+			)}
+		</Group>
+	);
+}
 
 export function AudioDetailPage() {
 	const { t } = useTranslation();
@@ -27,6 +73,13 @@ export function AudioDetailPage() {
 	const { id } = useParams({ from: "/audio/$id" });
 	const mediaId = Number(id);
 	const valid = Number.isInteger(mediaId) && mediaId > 0;
+	// ТВ-режим: секция и кнопка назад — точки входа spatial-навигации.
+	const { targetRef: tvRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("audio-detail");
+	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
+		"audio-detail-back",
+		clickNode,
+	);
 
 	const media = useMedia(valid ? mediaId : 0, valid);
 	const player = useAudioPlayer();
@@ -103,117 +156,100 @@ export function AudioDetailPage() {
 		: undefined;
 
 	return (
-		<Stack gap="lg">
-			<Button variant="subtle" w="fit-content" onClick={goBack}>
-				{backLabel}
-			</Button>
-			<Group align="flex-start" gap="lg" wrap="wrap">
-				<div
-					aria-hidden="true"
-					style={coverStyle}
-					className="grid h-60 w-60 shrink-0 place-items-center rounded-md bg-[var(--mantine-color-default-hover)] bg-cover bg-center"
+		<Stack
+			gap="lg"
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			data-tv-focus-key="audio-detail"
+		>
+			<TVFocusScope focusKey="audio-detail">
+				<Button
+					variant="subtle"
+					w="fit-content"
+					ref={tvBackRef}
+					onClick={goBack}
 				>
-					{!hasCover && (
-						<Music size={48} className="text-[var(--mantine-color-dimmed)]" />
-					)}
-				</div>
-				<Stack
-					gap="md"
-					className="min-w-0 flex-1 basis-full min-[48em]:basis-auto"
-				>
-					<Group justify="space-between" align="flex-start" wrap="wrap">
-						<Title order={1} size="h2">
-							{item.title}
-						</Title>
-						<Group gap="xs">
-							<FavoriteButton mediaId={item.id} type="audio" />
-							<AddToCollectionButton mediaId={item.id} type="audio" />
+					{backLabel}
+				</Button>
+				<Group align="flex-start" gap="lg" wrap="wrap">
+					<div
+						aria-hidden="true"
+						style={coverStyle}
+						className="grid h-60 w-60 shrink-0 place-items-center rounded-md bg-[var(--mantine-color-default-hover)] bg-cover bg-center"
+					>
+						{!hasCover && (
+							<Music size={48} className="text-[var(--mantine-color-dimmed)]" />
+						)}
+					</div>
+					<Stack
+						gap="md"
+						className="min-w-0 flex-1 basis-full min-[48em]:basis-auto"
+					>
+						<Group justify="space-between" align="flex-start" wrap="wrap">
+							<Title order={1} size="h2">
+								{item.title}
+							</Title>
+							<Group gap="xs">
+								<FavoriteButton mediaId={item.id} type="audio" />
+								<AddToCollectionButton mediaId={item.id} type="audio" />
+							</Group>
 						</Group>
-					</Group>
-					<Group gap="xs">
-						<Button
-							leftSection={
-								isCurrent && player.playing ? (
-									<Pause size={16} />
-								) : (
-									<Play size={16} fill="currentColor" />
-								)
-							}
-							onClick={() => {
-								if (isCurrent) {
-									player.toggle();
-								} else {
-									player.playMedia(item);
-								}
-							}}
-						>
-							{isCurrent && player.playing
-								? t("player.pause")
-								: t("player.play")}
-						</Button>
-						{isCurrent && (
-							<Button
-								variant="light"
-								onClick={() => void navigate({ to: "/player" })}
-							>
-								{t("player.open")}
-							</Button>
+						<AudioPlayActions item={item} isCurrent={isCurrent} />
+						{isCurrent && player.error !== null && (
+							<Alert color="red" variant="light" title={t("player.error")}>
+								{player.error}
+							</Alert>
 						)}
-					</Group>
-					{isCurrent && player.error !== null && (
-						<Alert color="red" variant="light" title={t("player.error")}>
-							{player.error}
-						</Alert>
-					)}
-					<Group gap="xl">
-						{item.artists.length > 0 && (
-							<Stack gap={4}>
-								<Text size="xs" c="dimmed">
-									{t("audio.meta.artist")}
-								</Text>
-								<Group gap="xs">
-									{item.artists.map((artist) => (
-										<Group key={artist.id} gap={2} wrap="nowrap">
-											<Link
-												to="/artists/$id"
-												params={{ id: String(artist.id) }}
-												className="no-underline [color:inherit]"
-											>
-												<Text size="sm" fw={600}>
-													{artist.name}
-												</Text>
-											</Link>
-											<ArtistFavoriteButton
-												artistId={artist.id}
-												artistName={artist.name}
-												size={15}
-											/>
-										</Group>
-									))}
-								</Group>
-							</Stack>
-						)}
-						{item.album !== "" && (
-							<MetaItem label={t("audio.meta.album")} value={item.album} />
-						)}
-						{item.genre !== "" && (
-							<MetaItem label={t("audio.meta.genre")} value={item.genre} />
-						)}
-						{item.year > 0 && (
+						<Group gap="xl">
+							{item.artists.length > 0 && (
+								<Stack gap={4}>
+									<Text size="xs" c="dimmed">
+										{t("audio.meta.artist")}
+									</Text>
+									<Group gap="xs">
+										{item.artists.map((artist) => (
+											<Group key={artist.id} gap={2} wrap="nowrap">
+												<Link
+													to="/artists/$id"
+													params={{ id: String(artist.id) }}
+													className="no-underline [color:inherit]"
+												>
+													<Text size="sm" fw={600}>
+														{artist.name}
+													</Text>
+												</Link>
+												<ArtistFavoriteButton
+													artistId={artist.id}
+													artistName={artist.name}
+													size={15}
+												/>
+											</Group>
+										))}
+									</Group>
+								</Stack>
+							)}
+							{item.album !== "" && (
+								<MetaItem label={t("audio.meta.album")} value={item.album} />
+							)}
+							{item.genre !== "" && (
+								<MetaItem label={t("audio.meta.genre")} value={item.genre} />
+							)}
+							{item.year > 0 && (
+								<MetaItem
+									label={t("audio.meta.year")}
+									value={String(item.year)}
+								/>
+							)}
 							<MetaItem
-								label={t("audio.meta.year")}
-								value={String(item.year)}
+								label={t("audio.meta.duration")}
+								value={formatDuration(item.duration)}
 							/>
-						)}
-						<MetaItem
-							label={t("audio.meta.duration")}
-							value={formatDuration(item.duration)}
-						/>
-					</Group>
-					{item.description !== "" && <Text>{item.description}</Text>}
-					<MediaAdminActions media={item} backPath="/audio" />
-				</Stack>
-			</Group>
+						</Group>
+						{item.description !== "" && <Text>{item.description}</Text>}
+						<MediaAdminActions media={item} backPath="/audio" />
+					</Stack>
+				</Group>
+			</TVFocusScope>
 		</Stack>
 	);
 }

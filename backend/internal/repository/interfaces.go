@@ -13,6 +13,10 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id uint) (*models.User, error)
 	Create(ctx context.Context, user *models.User) error
 	Update(ctx context.Context, user *models.User) error
+	// List возвращает всех пользователей по id (админка, без пагинации).
+	List(ctx context.Context) ([]models.User, error)
+	// SetAdmin меняет флаг администратора; нет строки — gorm.ErrRecordNotFound.
+	SetAdmin(ctx context.Context, id uint, isAdmin bool) error
 	Delete(ctx context.Context, id uint) error
 	Count(ctx context.Context) (int64, error)
 }
@@ -236,6 +240,10 @@ type TranscodeTaskRepository interface {
 	ListTerminalBefore(ctx context.Context, before time.Time, afterID uint, limit int, terminal ...string) ([]models.TranscodeTask, error)
 	DeleteByIDs(ctx context.Context, ids []uint) error
 	ListRecent(ctx context.Context, limit int) ([]models.TranscodeTask, error)
+	// ListActiveAndRecent — активные целиком + терминальные не старше
+	// since. Для админки: очередь короткая, без пагинации. Порядок —
+	// по id desc, сортировку «активные первыми» делает вызывающий.
+	ListActiveAndRecent(ctx context.Context, since time.Time, active, terminal []string) ([]models.TranscodeTask, error)
 }
 
 // SubtitleRepository defines data access methods for Subtitle entities
