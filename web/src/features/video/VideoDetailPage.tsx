@@ -53,6 +53,8 @@ function VideoMeta({ item }: { item: Media }) {
 // React не поддерживает onError на <track> (только audio/video/img/...),
 // поэтому ошибку загрузки дорожки ловим нативным слушателем: при истёкшей
 // access-куке выбор субтитров даёт 401, а видео при этом продолжает играть.
+const HTTP_URL_PATTERN = /^https?:\/\//i;
+
 export function SubTrack({
 	base,
 	label,
@@ -270,6 +272,18 @@ export function VideoDetailPage() {
 					</Group>
 					<VideoMeta item={item} />
 					{item.description !== "" && <Text>{item.description}</Text>}
+					{HTTP_URL_PATTERN.test(item.source_url) && (
+						<Button
+							component="a"
+							href={item.source_url}
+							target="_blank"
+							rel="noopener noreferrer"
+							variant="subtle"
+							w="fit-content"
+						>
+							{t("metadata.sourceUrl")}
+						</Button>
+					)}
 					<MediaAdminActions media={item} extractAudio backPath="/video" />
 				</Stack>
 			</TVFocusScope>

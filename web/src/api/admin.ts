@@ -18,7 +18,6 @@ const storageSchema = z.object({
 });
 
 export type StorageInfo = z.infer<typeof storageSchema>;
-export type DiskInfo = z.infer<typeof diskSchema>;
 
 const originalSchema = z.object({
 	name: z.string(),

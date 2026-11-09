@@ -1,5 +1,6 @@
 import {
 	Alert,
+	Avatar,
 	Button,
 	Group,
 	Modal,
@@ -10,7 +11,7 @@ import {
 	Title,
 } from "@mantine/core";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Music, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
@@ -250,9 +251,22 @@ export function ArtistPage() {
 					{backLabel}
 				</Button>
 				<Group justify="space-between" align="center" wrap="wrap">
-					<Title order={1} size="h2">
-						{artist.name}
-					</Title>
+					<Group gap="md" align="center">
+						<Avatar
+							size={72}
+							radius="xl"
+							src={
+								artist.has_cover
+									? `/api/artists/${artistId}/cover?v=${encodeURIComponent(artist.updated_at)}`
+									: undefined
+							}
+						>
+							<Music size={28} />
+						</Avatar>
+						<Title order={1} size="h2">
+							{artist.name}
+						</Title>
+					</Group>
 					{isAdmin && (
 						<Button
 							variant="light"

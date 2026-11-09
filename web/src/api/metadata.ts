@@ -62,11 +62,15 @@ export function useUpdateMetadata(mediaId: number) {
 export interface ArtistEntry {
 	id: number;
 	name: string;
+	has_cover: boolean;
+	updated_at: string;
 }
 
 const artistEntrySchema = z.object({
 	id: z.number(),
 	name: z.string(),
+	has_cover: z.boolean().default(false),
+	updated_at: z.string().default(""),
 });
 
 export function useMediaArtists() {
@@ -78,7 +82,12 @@ export function useMediaArtists() {
 			const entries = z
 				.array(artistEntrySchema)
 				.parse(parsed)
-				.map((artist) => ({ id: artist.id, name: artist.name }));
+				.map((artist) => ({
+					id: artist.id,
+					name: artist.name,
+					has_cover: artist.has_cover,
+					updated_at: artist.updated_at,
+				}));
 			const seen = new Set<string>();
 			return entries
 				.filter((artist) => {

@@ -94,10 +94,16 @@ export function AudioPage() {
 								key={media.id}
 								media={media}
 								onPlay={() => {
+									if (player.current?.id === media.id) {
+										player.toggle();
+										return;
+									}
 									player.playQueue(visibleItems, index);
 									void navigate({ to: "/player" });
 								}}
 								showDelete={isAdmin}
+								isCurrent={player.current?.id === media.id}
+								isPlaying={player.playing}
 							/>
 						))}
 					</Stack>

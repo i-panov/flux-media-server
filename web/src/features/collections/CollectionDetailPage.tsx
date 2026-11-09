@@ -1,44 +1,38 @@
 import {
 	Alert,
 	Button,
-	Group,
-	Modal,
 	SimpleGrid,
 	Skeleton,
 	Stack,
-	Text,
 	Title,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	useCollectionItems,
 	useCollections,
-	useDeleteCollection,
 	useRemoveFromCollection,
 } from "../../api/collections";
 import { isMediaType } from "../../components/mediaType";
 import type { Media, MediaType } from "../../core/media";
-import {
-	TVFocusScope,
-	TVModalAutoFocus,
-	TVModalButton,
-	useTVFocusable,
-} from "../tv/tvFocus";
+import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { AddMediaToCollectionModal } from "./AddMediaToCollectionModal";
+import { BulkMoveCollectionModal } from "./BulkMoveCollectionModal";
+import { CollectionBulkBar } from "./CollectionBulkBar";
 import { CollectionCard } from "./CollectionCard";
 import { CollectionFallback } from "./CollectionFallback";
 import { CollectionHeader } from "./CollectionHeader";
 import { CollectionTile } from "./CollectionTile";
 import { descendantIds, TYPE_PATH } from "./collectionUtils";
+import { DeleteCollectionModal } from "./DeleteCollectionModal";
 import { MoveCollectionModal } from "./MoveCollectionModal";
 import { MoveToCollectionModal } from "./MoveToCollectionModal";
 import { RenameCollectionModal } from "./RenameCollectionModal";
 import { useCollectionError } from "./useCollectionError";
+import { useCollectionSelection } from "./useCollectionSelection";
 
-// Сетка элементов коллекции: свой компонент, чтобы страница оставалась
-// в лимите строк.
 function CollectionMediaGrid({
 	items,
 	type,
@@ -47,6 +41,8 @@ function CollectionMediaGrid({
 	onRetry,
 	onRemove,
 	onMove,
+	selected,
+	onToggle,
 }: {
 	items: Media[];
 	type: MediaType;
@@ -55,6 +51,8 @@ function CollectionMediaGrid({
 	onRetry: () => void;
 	onRemove: (mediaId: number) => void;
 	onMove: (mediaId: number) => void;
+	selected: ReadonlySet<number>;
+	onToggle: (mediaId: number) => void;
 }) {
 	const { t } = useTranslation();
 	if (isPending) {
@@ -85,10 +83,25 @@ function CollectionMediaGrid({
 					type={type}
 					onRemove={() => onRemove(media.id)}
 					onMove={() => onMove(media.id)}
+					selected={selected.has(media.id)}
+					onToggle={() => onToggle(media.id)}
 				/>
 			))}
 		</SimpleGrid>
 	);
+}
+
+function toggleSelected(
+	prev: ReadonlySet<number>,
+	mediaId: number,
+): Set<number> {
+	const next = new Set(prev);
+	if (next.has(mediaId)) {
+		next.delete(mediaId);
+	} else {
+		next.add(mediaId);
+	}
+	return next;
 }
 
 export function CollectionDetailPage() {
@@ -100,15 +113,14 @@ export function CollectionDetailPage() {
 	const collections = useCollections();
 	const items = useCollectionItems(collectionId, valid);
 	const remove = useRemoveFromCollection();
-	const removeCollection = useDeleteCollection();
 	const notifyError = useCollectionError();
 	const [renameOpened, setRenameOpened] = useState(false);
 	const [deleteOpened, setDeleteOpened] = useState(false);
 	const [addOpened, setAddOpened] = useState(false);
 	const [moveOpened, setMoveOpened] = useState(false);
 	const [moveMediaId, setMoveMediaId] = useState<number | null>(null);
-	// ТВ-режим: корень страницы — spatial-секция, плитки и карточки
-	// внутри — цели навигации.
+	const { selectedIds, setSelectedIds, bulkMoveOpened, setBulkMoveOpened } =
+		useCollectionSelection(collectionId);
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("collection-detail");
 
@@ -120,7 +132,6 @@ export function CollectionDetailPage() {
 			? collection.type
 			: null;
 	const backPath = type === null ? "/video" : TYPE_PATH[type];
-
 	if (!valid) {
 		return (
 			<CollectionFallback
@@ -162,7 +173,6 @@ export function CollectionDetailPage() {
 	const children = (collections.data ?? []).filter(
 		(child) => child.parent_id === collectionId,
 	);
-	// Переезд под себя или потомков замкнул бы цикл: исключаем всё поддерево.
 	const moveExcluded = descendantIds(collections.data ?? [], collectionId);
 	const parent =
 		collection.parent_id !== null && collection.parent_id !== undefined
@@ -207,6 +217,12 @@ export function CollectionDetailPage() {
 					</Stack>
 				)}
 
+				<CollectionBulkBar
+					collectionId={collectionId}
+					selectedIds={selectedIds}
+					onMove={() => setBulkMoveOpened(true)}
+					onClear={() => setSelectedIds(new Set())}
+				/>
 				<CollectionMediaGrid
 					items={mediaItems}
 					type={type}
@@ -214,9 +230,18 @@ export function CollectionDetailPage() {
 					isError={items.isError}
 					onRetry={() => void items.refetch()}
 					onRemove={(mediaId) => {
+						setSelectedIds((prev) => {
+							const next = new Set(prev);
+							next.delete(mediaId);
+							return next;
+						});
 						remove.mutate({ collectionId, mediaId }, { onError: notifyError });
 					}}
 					onMove={(mediaId) => setMoveMediaId(mediaId)}
+					selected={selectedIds}
+					onToggle={(mediaId) =>
+						setSelectedIds((prev) => toggleSelected(prev, mediaId))
+					}
 				/>
 			</TVFocusScope>
 
@@ -233,6 +258,27 @@ export function CollectionDetailPage() {
 				existingIds={new Set(mediaItems.map((media) => media.id))}
 				onClose={() => setAddOpened(false)}
 			/>
+			{bulkMoveOpened && (
+				<BulkMoveCollectionModal
+					opened
+					sourceId={collectionId}
+					type={type}
+					mediaIds={[...selectedIds]}
+					onClose={() => setBulkMoveOpened(false)}
+					onMoved={(result) => {
+						setBulkMoveOpened(false);
+						setSelectedIds(new Set());
+						if (result.skipped.length > 0) {
+							notifications.show({
+								color: "yellow",
+								message: t("collections.bulkSkipped", {
+									count: result.skipped.length,
+								}),
+							});
+						}
+					}}
+				/>
+			)}
 			{moveMediaId !== null && (
 				<MoveToCollectionModal
 					opened
@@ -255,41 +301,12 @@ export function CollectionDetailPage() {
 					onClose={() => setMoveOpened(false)}
 				/>
 			)}
-			<Modal
+			<DeleteCollectionModal
+				collectionId={collectionId}
 				opened={deleteOpened}
+				backPath={backPath}
 				onClose={() => setDeleteOpened(false)}
-				title={t("collections.deleteTitle")}
-				centered
-			>
-				<TVModalAutoFocus focusKey="delete-collection-cancel" />
-				<Stack gap="md">
-					<Text size="sm">{t("collections.deleteConfirm")}</Text>
-					<Group justify="flex-end">
-						<TVModalButton
-							focusKey="delete-collection-cancel"
-							variant="default"
-							onClick={() => setDeleteOpened(false)}
-						>
-							{t("collections.cancel")}
-						</TVModalButton>
-						<TVModalButton
-							focusKey="delete-collection-confirm"
-							color="red"
-							loading={removeCollection.isPending}
-							onClick={() => {
-								removeCollection.mutate(collection.id, {
-									onSuccess: () => {
-										void navigate({ to: backPath });
-									},
-									onError: notifyError,
-								});
-							}}
-						>
-							{t("collections.delete")}
-						</TVModalButton>
-					</Group>
-				</Stack>
-			</Modal>
+			/>
 		</Stack>
 	);
 }

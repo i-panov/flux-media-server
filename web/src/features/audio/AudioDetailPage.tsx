@@ -67,6 +67,8 @@ function AudioPlayActions({
 	);
 }
 
+const HTTP_URL_PATTERN = /^https?:\/\//i;
+
 export function AudioDetailPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
@@ -246,6 +248,18 @@ export function AudioDetailPage() {
 							/>
 						</Group>
 						{item.description !== "" && <Text>{item.description}</Text>}
+						{HTTP_URL_PATTERN.test(item.source_url) && (
+							<Button
+								component="a"
+								href={item.source_url}
+								target="_blank"
+								rel="noopener noreferrer"
+								variant="subtle"
+								w="fit-content"
+							>
+								{t("metadata.sourceUrl")}
+							</Button>
+						)}
 						<MediaAdminActions media={item} backPath="/audio" />
 					</Stack>
 				</Group>

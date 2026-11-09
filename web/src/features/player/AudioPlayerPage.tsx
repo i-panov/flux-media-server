@@ -24,7 +24,6 @@ import {
 	Shuffle,
 	SkipBack,
 	SkipForward,
-	Trash2,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -36,6 +35,7 @@ import { clickNode, TVFocusScope, TVTab, useTVFocusable } from "../tv/tvFocus";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
 import { parseSyncedLyrics } from "./lyricsSync";
+import { QueueTab } from "./QueueTab";
 import { SyncedLyricsView } from "./SyncedLyricsView";
 import { useTVPlayerRemote } from "./tvPlayerRemote";
 
@@ -145,45 +145,6 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 					{text === "" ? t("player.noText") : text}
 				</Text>
 			)}
-		</Stack>
-	);
-}
-
-function QueueTab() {
-	const { t } = useTranslation();
-	const player = useAudioPlayer();
-	const currentPrefix = t("player.currentPrefix");
-	if (player.queue.length === 0) {
-		return <Text c="dimmed">{t("player.queueEmpty")}</Text>;
-	}
-	return (
-		<Stack gap="xs">
-			{player.queue.map((media, index) => (
-				// biome-ignore lint/suspicious/noArrayIndexKey: один трек может стоять в очереди несколько раз.
-				<Group key={`${media.id}-${index}`} gap="sm" wrap="nowrap">
-					<Button
-						variant={index === player.index ? "light" : "subtle"}
-						justify="flex-start"
-						className="min-w-0 flex-1"
-						onClick={() => player.select(index)}
-					>
-						<Text truncate>
-							{index === player.index ? currentPrefix : ""}
-							{media.title}
-						</Text>
-					</Button>
-					<Tooltip label={t("player.removeFromQueue")} withArrow>
-						<ActionIcon
-							variant="subtle"
-							color="red"
-							aria-label={t("player.removeFromQueue")}
-							onClick={() => player.removeAt(index)}
-						>
-							<Trash2 size={16} />
-						</ActionIcon>
-					</Tooltip>
-				</Group>
-			))}
 		</Stack>
 	);
 }
@@ -375,6 +336,15 @@ export function AudioPlayerPage() {
 	const navigate = useNavigate();
 	const player = useAudioPlayer();
 	const current = player.current;
+	const session = useSession();
+	const isAdmin = session.data?.is_admin === true;
+	const lyrics = useLyrics(current?.id ?? 0, current !== null);
+	const hasTranslation = (lyrics.data?.translation ?? "").trim() !== "";
+	const showTranslation = hasTranslation || isAdmin;
+	const [tab, setTab] = useState("lyrics");
+	// Если перевод пропал (трек сменился/очистили), активная вкладка
+	// становится lyrics без setState в эффекте.
+	const activeTab = !showTranslation && tab === "translation" ? "lyrics" : tab;
 	// Пульт в ТВ-режиме: стрелки сикают/меняют громкость, media-клавиши —
 	// транспорт. Хук живёт на странице плеера, Back-клавиши остаются
 	// за глобальным Back-хендлером.
@@ -484,14 +454,16 @@ export function AudioPlayerPage() {
 					</Stack>
 				</Group>
 
-				<Tabs defaultValue="lyrics">
+				<Tabs value={activeTab} onChange={(value) => setTab(value ?? "lyrics")}>
 					<Tabs.List>
 						<TVTab focusKey="player-tab-lyrics" value="lyrics">
 							{t("player.lyrics")}
 						</TVTab>
-						<TVTab focusKey="player-tab-translation" value="translation">
-							{t("player.translation")}
-						</TVTab>
+						{showTranslation && (
+							<TVTab focusKey="player-tab-translation" value="translation">
+								{t("player.translation")}
+							</TVTab>
+						)}
 						<TVTab
 							focusKey="player-tab-queue"
 							value="queue"
@@ -505,9 +477,11 @@ export function AudioPlayerPage() {
 					на чужой текст — состояние сбрасывается пересозданием. */}
 						<LyricsTab key={`lyrics-${current.id}`} kind="lyrics" />
 					</Tabs.Panel>
-					<Tabs.Panel value="translation" pt="md">
-						<LyricsTab key={`translation-${current.id}`} kind="translation" />
-					</Tabs.Panel>
+					{showTranslation && (
+						<Tabs.Panel value="translation" pt="md">
+							<LyricsTab key={`translation-${current.id}`} kind="translation" />
+						</Tabs.Panel>
+					)}
 					<Tabs.Panel value="queue" pt="md">
 						<QueueTab />
 					</Tabs.Panel>

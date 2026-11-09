@@ -1,6 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 import { stubEmptyLibraryMeta } from "./stubs";
 
+const HOME_URL_PATTERN = /\/$/;
+
 function sessionBody(isAdmin: boolean): string {
 	return JSON.stringify({
 		id: 1,
@@ -133,9 +135,8 @@ test("админка недоступна обычному пользовате�
 	await stubAdmin(page, false);
 	await page.goto("/admin");
 
-	await expect(
-		page.getByText("Раздел доступен только администратору"),
-	).toBeVisible();
+	// beforeLoad-guard уводит обычного пользователя на главную.
+	await expect(page).toHaveURL(HOME_URL_PATTERN);
 	await expect(page.getByRole("heading", { name: "Пользователи" })).toHaveCount(
 		0,
 	);

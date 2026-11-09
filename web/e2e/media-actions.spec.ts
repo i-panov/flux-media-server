@@ -197,7 +197,9 @@ test("метаданные: правка названия на детально�
 	).toBeVisible();
 	const body = JSON.parse(metadataBodies[0] ?? "{}") as Record<string, unknown>;
 	expect(body.title).toBe("Новое название");
-	expect(body).not.toHaveProperty("genre");
+	// Редактор отправляет текущие значения: пустой genre — очистка.
+	expect(body.genre).toBe("");
+	expect(body.description).toBe("Описание Первый фильм");
 	// Ссылку не трогали — она не отправляется и не стирается.
 	expect(body).not.toHaveProperty("source_url");
 

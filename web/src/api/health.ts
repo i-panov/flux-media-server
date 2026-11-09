@@ -1,5 +1,1 @@
-export {
-	type HealthResponse,
-	type HealthSnapshot,
-	useHealthQuery,
-} from "@flux/shared";
+export { useHealthQuery } from "@flux/shared";

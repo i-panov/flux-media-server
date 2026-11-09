@@ -1,6 +1,6 @@
 import { ActionIcon, Group, Stack, Text, Tooltip } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
-import { Music, Play, RotateCw } from "lucide-react";
+import { Music, Pause, Play, RotateCw } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
@@ -17,10 +17,14 @@ export function AudioTrackRow({
 	media,
 	onPlay,
 	showDelete,
+	isCurrent = false,
+	isPlaying = false,
 }: {
 	media: Media;
 	onPlay?: () => void;
 	showDelete?: boolean;
+	isCurrent?: boolean;
+	isPlaying?: boolean;
 }) {
 	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
@@ -41,7 +45,12 @@ export function AudioTrackRow({
 			tabIndex={tvMode ? -1 : undefined}
 			gap="sm"
 			wrap="nowrap"
-			className="rounded-md border border-[var(--mantine-color-default-border)] px-3 py-2"
+			className={[
+				"rounded-md border px-3 py-2",
+				isCurrent
+					? "border-[var(--mantine-color-violet-5)] bg-[var(--mantine-color-violet-light)]"
+					: "border-[var(--mantine-color-default-border)]",
+			].join(" ")}
 		>
 			<div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded bg-[var(--mantine-color-default-hover)]">
 				{hasCover ? (
@@ -83,15 +92,26 @@ export function AudioTrackRow({
 			)}
 			<Group gap={4} wrap="nowrap" className="shrink-0">
 				{onPlay !== undefined && (
-					<Tooltip label={t("player.play")} withArrow>
+					<Tooltip
+						label={
+							isCurrent && isPlaying ? t("player.pause") : t("player.play")
+						}
+						withArrow
+					>
 						<ActionIcon
 							variant="filled"
 							radius="xl"
 							size="lg"
-							aria-label={t("player.play")}
+							aria-label={
+								isCurrent && isPlaying ? t("player.pause") : t("player.play")
+							}
 							onClick={onPlay}
 						>
-							<Play size={18} fill="currentColor" />
+							{isCurrent && isPlaying ? (
+								<Pause size={18} />
+							) : (
+								<Play size={18} fill="currentColor" />
+							)}
 						</ActionIcon>
 					</Tooltip>
 				)}

@@ -15,6 +15,9 @@ export type CoreFetcher = (
 const artistSchema = z.object({
 	id: z.number(),
 	name: z.string(),
+	// has_cover/updated_at нужны для URL обложки и cache-buster'а.
+	has_cover: z.boolean().default(false),
+	updated_at: z.string().default(""),
 });
 
 export const mediaSchema = z.object({

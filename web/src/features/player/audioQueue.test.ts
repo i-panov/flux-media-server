@@ -4,6 +4,8 @@ import {
 	type AudioQueueState,
 	emptyQueue,
 	enqueueItems,
+	movePlayedIndices,
+	moveTrack,
 	pickNextIndex,
 	pickPreviousIndex,
 	removeTrack,
@@ -80,6 +82,29 @@ describe("audioQueue", () => {
 		const state = removeTrack(queue([1, 2, 3], 0), 2);
 		expect(ids(state)).toEqual([1, 2]);
 		expect(state.index).toBe(0);
+	});
+
+	it("moveTrack переставляет трек и сохраняет текущий", () => {
+		const state = moveTrack(queue([1, 2, 3], 1), 2, 0);
+		expect(ids(state)).toEqual([3, 1, 2]);
+		expect(state.index).toBe(2);
+	});
+
+	it("moveTrack не двигает индекс, если текущий не затронут", () => {
+		const state = moveTrack(queue([1, 2, 3], 0), 2, 1);
+		expect(ids(state)).toEqual([1, 3, 2]);
+		expect(state.index).toBe(0);
+	});
+
+	it("movePlayedIndices переносит историю вместе с треком", () => {
+		expect([...movePlayedIndices(new Set([1, 2]), 2, 0)].sort()).toEqual([
+			0, 2,
+		]);
+	});
+
+	it("moveTrack игнорирует выход за границы", () => {
+		const state = queue([1, 2], 0);
+		expect(moveTrack(state, 0, 5)).toBe(state);
 	});
 
 	it("удаление последнего трека отдаёт пустую очередь", () => {

@@ -54,6 +54,91 @@ export function useCollectionItems(collectionId: number, enabled = true) {
 	});
 }
 
+const collectionStatsSchema = z.object({
+	subcollections: z.number(),
+	items: z.number(),
+});
+
+export function useCollectionStats(collectionId: number, enabled = true) {
+	return useQuery({
+		queryKey: ["collections", collectionId, "stats"],
+		queryFn: async () => {
+			const body = await apiFetch<unknown>(
+				`/collections/${collectionId}/stats`,
+			);
+			return collectionStatsSchema.parse(body);
+		},
+		enabled,
+		retry: false,
+		refetchOnWindowFocus: false,
+	});
+}
+
+const bulkResultSchema = z.object({
+	added: z.array(z.number()).optional(),
+	moved: z.array(z.number()).optional(),
+	removed: z.array(z.number()).optional(),
+	skipped: z.array(z.number()).optional(),
+});
+
+export function useBulkRemoveCollectionItems(collectionId: number) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async (mediaIds: number[]) => {
+			const body = await apiFetch<unknown>(
+				`/collections/${collectionId}/items`,
+				{
+					method: "DELETE",
+					body: JSON.stringify({ media_ids: mediaIds }),
+				},
+			);
+			return bulkResultSchema.parse(body);
+		},
+		onSuccess: () => {
+			void queryClient.invalidateQueries({
+				queryKey: ["collections", collectionId, "items"],
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ["collections", collectionId, "stats"],
+			});
+		},
+	});
+}
+
+export function useBulkMoveCollectionItems(collectionId: number) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async ({
+			mediaIds,
+			toCollectionId,
+		}: {
+			mediaIds: number[];
+			toCollectionId: number;
+		}) => {
+			const body = await apiFetch<unknown>(
+				`/collections/${collectionId}/items/move/bulk`,
+				{
+					method: "POST",
+					body: JSON.stringify({
+						media_ids: mediaIds,
+						to_collection_id: toCollectionId,
+					}),
+				},
+			);
+			return bulkResultSchema.parse(body);
+		},
+		onSuccess: () => {
+			void queryClient.invalidateQueries({
+				queryKey: ["collections", collectionId, "items"],
+			});
+			void queryClient.invalidateQueries({ queryKey: ["collections"] });
+			void queryClient.invalidateQueries({
+				queryKey: ["collections", collectionId, "stats"],
+			});
+		},
+	});
+}
+
 export function useCreateCollection() {
 	const queryClient = useQueryClient();
 	return useMutation({

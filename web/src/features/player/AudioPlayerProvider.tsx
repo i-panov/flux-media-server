@@ -50,6 +50,7 @@ interface AudioPlayerContextValue {
 	setVolume: (volume: number) => void;
 	toggleShuffle: () => void;
 	cycleRepeat: () => void;
+	move: (from: number, to: number) => void;
 	removeAt: (index: number) => void;
 	clear: () => void;
 }

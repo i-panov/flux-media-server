@@ -1,5 +1,5 @@
 export const TV_MODE_STORAGE_KEY = "flux.tv-mode";
-export const TV_MODE_SEARCH_PARAM = "tv";
+const TV_MODE_SEARCH_PARAM = "tv";
 
 export function parseTVSearchParam(search: string): boolean | null {
 	const normalized = search.startsWith("?") ? search.slice(1) : search;

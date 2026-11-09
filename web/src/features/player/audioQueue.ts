@@ -49,6 +49,59 @@ export function enqueueItems(
 	};
 }
 
+// Перестановка индексов истории shuffle вместе с треком.
+export function movePlayedIndices(
+	played: ReadonlySet<number>,
+	from: number,
+	to: number,
+): Set<number> {
+	const next = new Set<number>();
+	for (const index of played) {
+		if (index === from) {
+			next.add(to);
+		} else if (from < index && to >= index) {
+			next.add(index - 1);
+		} else if (from > index && to <= index) {
+			next.add(index + 1);
+		} else {
+			next.add(index);
+		}
+	}
+	return next;
+}
+
+// Перестановка трека в очереди с сохранением текущего индекса.
+export function moveTrack(
+	state: AudioQueueState,
+	from: number,
+	to: number,
+): AudioQueueState {
+	if (
+		from < 0 ||
+		from >= state.items.length ||
+		to < 0 ||
+		to >= state.items.length ||
+		from === to
+	) {
+		return state;
+	}
+	const items = [...state.items];
+	const [moved] = items.splice(from, 1);
+	if (moved === undefined) {
+		return state;
+	}
+	items.splice(to, 0, moved);
+	let index = state.index;
+	if (from === index) {
+		index = to;
+	} else if (from < index && to >= index) {
+		index -= 1;
+	} else if (from > index && to <= index) {
+		index += 1;
+	}
+	return { items, index };
+}
+
 export function removeTrack(
 	state: AudioQueueState,
 	index: number,

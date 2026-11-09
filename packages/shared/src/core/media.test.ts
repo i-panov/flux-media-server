@@ -106,8 +106,8 @@ describe("fetchMediaList", () => {
 		expect(calls[0]).toContain("type=audio");
 		expect(page.items[0]?.type).toBe("audio");
 		expect(page.items[0]?.artists).toEqual([
-			{ id: 3, name: "Artist" },
-			{ id: 4, name: "Featuring" },
+			{ id: 3, name: "Artist", has_cover: false, updated_at: "" },
+			{ id: 4, name: "Featuring", has_cover: false, updated_at: "" },
 		]);
 		expect(page.items[0]?.album).toBe("Album");
 		expect(page.items[0]?.genre).toBe("Rock");

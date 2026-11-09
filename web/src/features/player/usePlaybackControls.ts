@@ -7,6 +7,8 @@ import {
 	currentMedia,
 	emptyQueue,
 	enqueueItems,
+	movePlayedIndices,
+	moveTrack,
 	pickNextIndex,
 	pickPreviousIndex,
 	type RepeatMode,
@@ -18,6 +20,19 @@ import {
 import { clearPersistedQueue } from "./playerPersistence";
 
 type Progress = Pick<ReturnType<typeof useMediaProgress>, "handlePause">;
+
+function useQueueMove(
+	setQueueState: React.Dispatch<React.SetStateAction<AudioQueueState>>,
+	setPlayed: React.Dispatch<React.SetStateAction<ReadonlySet<number>>>,
+) {
+	return useCallback(
+		(from: number, to: number) => {
+			setQueueState((prev) => moveTrack(prev, from, to));
+			setPlayed((prev) => movePlayedIndices(prev, from, to));
+		},
+		[setQueueState, setPlayed],
+	);
+}
 
 // Кнопки транспорта: очередь, воспроизведение, громкость и режимы.
 // Провайдер отвечает за элемент и эффекты, а вся механика — здесь,
@@ -205,6 +220,7 @@ export function usePlaybackControls({
 		clearPersistedQueue();
 	}, [audioRef, setError, setPlaying, setQueueState, shouldPlayRef]);
 
+	const move = useQueueMove(setQueueState, setPlayed);
 	const removeAt = useCallback(
 		(removeIndex: number) => {
 			if (removeIndex < 0 || removeIndex >= queue.length) {
@@ -235,6 +251,7 @@ export function usePlaybackControls({
 		select,
 		seek,
 		setVolume,
+		move,
 		removeAt,
 		clear,
 	};

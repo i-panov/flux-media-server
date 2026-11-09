@@ -52,7 +52,12 @@ describe("renameArtist", () => {
 		expect(url).toBe("/api/artists/1");
 		expect(init.method).toBe("PUT");
 		expect(JSON.parse(init.body as string)).toEqual({ name: "Новое имя" });
-		expect(artist).toEqual({ id: 1, name: "Новое имя" });
+		expect(artist).toEqual({
+			id: 1,
+			name: "Новое имя",
+			has_cover: false,
+			updated_at: "",
+		});
 	});
 
 	it("пробрасывает конфликт занятого имени", async () => {

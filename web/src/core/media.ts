@@ -6,15 +6,11 @@ export type {
 	CoreFetcher,
 	Media,
 	MediaKind,
-	MediaList,
 	MediaType,
-	Subtitle,
 } from "@flux/shared";
 export {
 	audioListOptions,
-	fetchMediaById,
 	fetchMediaList,
-	fetchMediaSubs,
 	imageListOptions,
 	isSafeImageUrl,
 	mediaOptions,
