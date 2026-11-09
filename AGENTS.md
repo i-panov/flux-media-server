@@ -74,6 +74,7 @@ npm run typecheck -w mobile && npm run lint -w mobile
 
 - Expo с prebuild; `android/` и `ios/` генерятся и в git не входят.
 - Анализаторы как в вебе: biome (extends) + `eslint-config-expo` + sonarjs.
+- Dogfood-APK (только arm64, ~30 МБ вместо ~92 МБ universal): `EXPO_PUBLIC_API_BASE=<url> ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a ./gradlew assembleRelease` из `mobile/android` (JDK 17 + `local.properties` с SDK/NDK нужны локально, в git не входят).
 
 ## Architecture
 
