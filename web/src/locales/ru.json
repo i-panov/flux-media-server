@@ -93,6 +93,7 @@
 	"upload.button.video": "Загрузить видео",
 	"upload.button.audio": "Загрузить аудио",
 	"upload.button.image": "Загрузить мем",
+	"upload.status.queued": "В очереди",
 	"upload.status.uploading": "Загрузка...",
 	"upload.status.processing": "Обработка на сервере...",
 	"upload.status.done": "Готово",

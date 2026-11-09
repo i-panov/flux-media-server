@@ -141,6 +141,21 @@ describe("схема медиа", () => {
 	});
 });
 
+describe("fetchMediaList artist filter", () => {
+	it("передаёт artist_id для серверного фильтра", async () => {
+		const calls: string[] = [];
+		await fetchMediaList(stubFetcher(listBody([1], 1), calls), {
+			type: "audio",
+			q: "",
+			limit: 24,
+			offset: 0,
+			artistId: 5,
+		});
+		const requested = new URL(String(calls[0] ?? ""), "http://localhost");
+		expect(requested.searchParams.get("artist_id")).toBe("5");
+	});
+});
+
 describe("videoListOptions", () => {
 	it("листает страницы через offset", async () => {
 		const client = new QueryClient();

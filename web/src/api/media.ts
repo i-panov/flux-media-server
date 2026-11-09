@@ -18,8 +18,11 @@ export function useVideoList(q: string) {
 	return useInfiniteQuery(videoListOptions(apiFetch, q));
 }
 
-export function useAudioList(q: string) {
-	return useInfiniteQuery(audioListOptions(apiFetch, q));
+export function useAudioList(q: string, artistId?: number, enabled = true) {
+	return useInfiniteQuery({
+		...audioListOptions(apiFetch, q, artistId),
+		enabled,
+	});
 }
 
 export function useImageList(q: string) {

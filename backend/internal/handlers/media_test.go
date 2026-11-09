@@ -464,3 +464,14 @@ func TestMediaHandler_StreamRangeDoesNotIncrementViews(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), media.ViewCount)
 }
+
+func TestMediaHandler_ListInvalidArtistID(t *testing.T) {
+	app, _ := setupMediaTestApp(t)
+
+	for _, raw := range []string{"abc", "0", "-1", "18446744073709551615"} {
+		resp, err := app.Test(httptest.NewRequest("GET", "/api/media?artist_id="+raw, nil))
+		require.NoError(t, err)
+		assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "artist_id=%s", raw)
+		resp.Body.Close()
+	}
+}

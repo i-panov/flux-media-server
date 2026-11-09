@@ -8,10 +8,15 @@ import {
 	fetchUploadJob,
 	type UploadType,
 } from "../../api/upload";
+import { createUploadSemaphore, type UploadSemaphore } from "./uploadSemaphore";
 
 const POLL_INTERVAL_MS = 900;
+// Сервер буферизует тело загрузки целиком в RAM: десятки параллельных
+// файлов могут положить инстанс. Слот держится только на время POST.
+const MAX_PARALLEL_UPLOADS = 2;
 
 export type ItemStatus =
+	| "queued"
 	| "uploading"
 	| "processing"
 	| "done"
@@ -33,16 +38,94 @@ export interface QueueItem {
 	collectionError: string;
 }
 
+interface PipelineContext {
+	item: QueueItem;
+	force: boolean;
+	token: number;
+	gate: UploadSemaphore;
+	shouldAbort: () => boolean;
+	isCurrent: () => boolean;
+	update: (patch: Partial<QueueItem>) => void;
+	invalidateList: (type: UploadType) => void;
+	addToCollection: (mediaId: number) => Promise<string>;
+}
+
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => {
 		setTimeout(resolve, ms);
 	});
 }
 
-// Очередь загрузок: каждый файл обрабатывается независимо, ответы
-// устаревших попыток отсекаются тикетом (отмена/повтор/force).
+// POST под семафором, затем независимый поллинг серверной обработки.
+// Слот освобождается сразу после enqueue: зависший transcode не стопит
+// загрузку следующих файлов.
+async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
+	let job: QueueItem["job"] = null;
+	await ctx.gate.acquire();
+	try {
+		if (ctx.shouldAbort()) {
+			return;
+		}
+		ctx.update({ status: "uploading" });
+		const enqueued = await enqueueUpload(
+			ctx.item.file,
+			ctx.item.type,
+			ctx.force,
+		);
+		if (ctx.shouldAbort()) {
+			// Отменили, пока запрос летел: задание на сервере всё же
+			// создано — гасим его.
+			void cancelUploadJob(enqueued.jobType, enqueued.jobId).catch(
+				() => undefined,
+			);
+			return;
+		}
+		job = { id: enqueued.jobId, kind: enqueued.jobType };
+		ctx.update({ status: "processing", job });
+	} finally {
+		ctx.gate.release();
+	}
+
+	while (job !== null) {
+		const status = await fetchUploadJob(job.kind, job.id);
+		if (!ctx.isCurrent()) {
+			return;
+		}
+		const progress =
+			typeof status.progress === "number" ? status.progress : null;
+		if (status.status === "done") {
+			const mediaId = status.media?.id ?? null;
+			const collectionError =
+				mediaId === null ? "" : await ctx.addToCollection(mediaId);
+			ctx.update({ status: "done", progress: 100, collectionError });
+			ctx.invalidateList(ctx.item.type);
+			return;
+		}
+		if (status.status === "duplicate") {
+			ctx.update({
+				status: "duplicate",
+				progress: null,
+				duplicate: status.duplicate ?? null,
+			});
+			return;
+		}
+		if (status.status === "error" || status.status === "cancelled") {
+			ctx.update({
+				status: status.status === "cancelled" ? "cancelled" : "error",
+				progress: null,
+				error: status.error ?? "",
+			});
+			return;
+		}
+		ctx.update({ status: "processing", progress });
+		await sleep(POLL_INTERVAL_MS);
+	}
+}
+
+// Очередь загрузок: каждый файл независим, ответы устаревших попыток
+// отсекаются тикетом (отмена/повтор/force).
 // targetCollectionId — коллекция экрана: готовый файл кладётся в неё
-// сразу (как во Flutter), выбор читается на старте обработки.
+// сразу, выбор читается на старте обработки.
 export function useUploadQueue(
 	type: UploadType,
 	targetCollectionId: number | null,
@@ -52,6 +135,13 @@ export function useUploadQueue(
 	const [items, setItems] = useState<QueueItem[]>([]);
 	const counter = useRef(0);
 	const tokens = useRef(new Map<string, number>());
+	const cancelledKeys = useRef(new Set<string>());
+	const activeKeys = useRef(new Set<string>());
+	const stopped = useRef(false);
+	const semaphore = useRef<UploadSemaphore | null>(null);
+	if (semaphore.current === null) {
+		semaphore.current = createUploadSemaphore(MAX_PARALLEL_UPLOADS);
+	}
 
 	const updateItem = (key: string, patch: Partial<QueueItem>) => {
 		setItems((prev) =>
@@ -72,13 +162,38 @@ export function useUploadQueue(
 		void queryClient.invalidateQueries({ queryKey: ["media", uploadType] });
 	};
 
+	const addToCollection = async (mediaId: number): Promise<string> => {
+		if (targetCollectionId === null) {
+			return "";
+		}
+		try {
+			await apiFetch<unknown>(`/collections/${targetCollectionId}/items`, {
+				method: "POST",
+				body: JSON.stringify({ media_id: mediaId }),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ["collections", targetCollectionId, "items"],
+			});
+			return "";
+		} catch (error) {
+			return error instanceof ApiError && error.message !== ""
+				? error.message
+				: t("upload.collectionErrorFallback");
+		}
+	};
+
 	const processItem = async (item: QueueItem, force: boolean) => {
+		if (
+			stopped.current ||
+			cancelledKeys.current.has(item.key) ||
+			activeKeys.current.has(item.key)
+		) {
+			return;
+		}
+		activeKeys.current.add(item.key);
 		const token = bumpToken(item.key);
-		// Коллекция фиксируется на старте обработки (как во Flutter):
-		// смена выбора посреди загрузки на летящий файл не влияет.
-		const targetCollection = targetCollectionId;
 		updateItem(item.key, {
-			status: "uploading",
+			status: "queued",
 			progress: null,
 			error: "",
 			duplicate: null,
@@ -86,74 +201,24 @@ export function useUploadQueue(
 			collectionError: "",
 		});
 		try {
-			const enqueued = await enqueueUpload(item.file, item.type, force);
-			if (!isCurrent(item.key, token)) {
-				// Отменили, пока запрос летел: задание всё же создано на
-				// сервере — гасим его.
-				void cancelUploadJob(enqueued.jobType, enqueued.jobId).catch(
-					() => undefined,
-				);
+			const gate = semaphore.current;
+			if (gate === null) {
 				return;
 			}
-			const job = { id: enqueued.jobId, kind: enqueued.jobType };
-			updateItem(item.key, { status: "processing", job });
-			while (true) {
-				const status = await fetchUploadJob(job.kind, job.id);
-				if (!isCurrent(item.key, token)) {
-					return;
-				}
-				const progress =
-					typeof status.progress === "number" ? status.progress : null;
-				if (status.status === "done") {
-					let collectionError = "";
-					const mediaId = status.media?.id ?? null;
-					if (targetCollection !== null && mediaId !== null) {
-						try {
-							await apiFetch<unknown>(
-								`/collections/${targetCollection}/items`,
-								{
-									method: "POST",
-									body: JSON.stringify({ media_id: mediaId }),
-								},
-							);
-							void queryClient.invalidateQueries({
-								queryKey: ["collections", targetCollection, "items"],
-							});
-						} catch (collectionFailure) {
-							collectionError =
-								collectionFailure instanceof ApiError &&
-								collectionFailure.message !== ""
-									? collectionFailure.message
-									: t("upload.collectionErrorFallback");
-						}
-					}
-					updateItem(item.key, {
-						status: "done",
-						progress: 100,
-						collectionError,
-					});
-					invalidateList(item.type);
-					return;
-				}
-				if (status.status === "duplicate") {
-					updateItem(item.key, {
-						status: "duplicate",
-						progress: null,
-						duplicate: status.duplicate ?? null,
-					});
-					return;
-				}
-				if (status.status === "error" || status.status === "cancelled") {
-					updateItem(item.key, {
-						status: status.status === "cancelled" ? "cancelled" : "error",
-						progress: null,
-						error: status.error ?? "",
-					});
-					return;
-				}
-				updateItem(item.key, { status: "processing", progress });
-				await sleep(POLL_INTERVAL_MS);
-			}
+			await runUploadPipeline({
+				item,
+				force,
+				token,
+				gate,
+				shouldAbort: () =>
+					stopped.current ||
+					cancelledKeys.current.has(item.key) ||
+					!isCurrent(item.key, token),
+				isCurrent: () => isCurrent(item.key, token),
+				update: (patch) => updateItem(item.key, patch),
+				invalidateList,
+				addToCollection,
+			});
 		} catch (error) {
 			if (!isCurrent(item.key, token)) {
 				return;
@@ -163,6 +228,8 @@ export function useUploadQueue(
 				progress: null,
 				error: error instanceof ApiError ? error.message : "",
 			});
+		} finally {
+			activeKeys.current.delete(item.key);
 		}
 	};
 
@@ -176,7 +243,7 @@ export function useUploadQueue(
 				key: `${counter.current}-${file.name}`,
 				file,
 				type,
-				status: "uploading",
+				status: "queued",
 				progress: null,
 				error: "",
 				duplicate: null,
@@ -191,6 +258,7 @@ export function useUploadQueue(
 	};
 
 	const cancelItem = (item: QueueItem) => {
+		cancelledKeys.current.add(item.key);
 		bumpToken(item.key);
 		if (item.job !== null) {
 			void cancelUploadJob(item.job.kind, item.job.id).catch(() => undefined);
@@ -199,6 +267,7 @@ export function useUploadQueue(
 	};
 
 	const removeItem = (item: QueueItem) => {
+		cancelledKeys.current.add(item.key);
 		bumpToken(item.key);
 		// Убранная строка не должна оставлять висящий серверный джоб.
 		if (item.job !== null) {
@@ -208,26 +277,35 @@ export function useUploadQueue(
 	};
 
 	const retryItem = (item: QueueItem) => {
+		cancelledKeys.current.delete(item.key);
 		void processItem(item, false);
 	};
 
 	const forceItem = (item: QueueItem) => {
+		cancelledKeys.current.delete(item.key);
 		void processItem(item, true);
 	};
 
-	// Уход со страницы останавливает опрос: задания на сервере не
-	// отменяем, но ответы больше не трогают состояние.
+	// Уход со страницы: новые заливки не начинаем, поллинг старых
+	// прекращаем тикетами. Серверные задания не отменяем.
 	useEffect(() => {
-		const map = tokens.current;
+		// StrictMode в dev прогоняет setup→cleanup→setup: сбрасываем флаг,
+		// иначе после первого cleanup очередь навсегда «остановлена».
+		stopped.current = false;
+		const tokenMap = tokens.current;
 		return () => {
-			for (const key of map.keys()) {
-				map.set(key, (map.get(key) ?? 0) + 1);
+			stopped.current = true;
+			for (const key of tokenMap.keys()) {
+				tokenMap.set(key, (tokenMap.get(key) ?? 0) + 1);
 			}
 		};
 	}, []);
 
 	const busy = items.some(
-		(item) => item.status === "uploading" || item.status === "processing",
+		(item) =>
+			item.status === "queued" ||
+			item.status === "uploading" ||
+			item.status === "processing",
 	);
 
 	return {

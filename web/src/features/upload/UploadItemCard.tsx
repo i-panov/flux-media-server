@@ -13,6 +13,7 @@ import {
 import {
 	CheckCircle2,
 	CircleAlert,
+	Clock3,
 	Copy,
 	FileAudio,
 	FileVideo,
@@ -26,6 +27,9 @@ import { formatFileSize } from "../../core/format";
 import type { ItemStatus, QueueItem } from "./useUploadQueue";
 
 function StatusIcon({ status }: { status: ItemStatus }) {
+	if (status === "queued") {
+		return <Clock3 size={20} className="text-[var(--mantine-color-dimmed)]" />;
+	}
 	if (status === "uploading" || status === "processing") {
 		return <Loader size="sm" />;
 	}

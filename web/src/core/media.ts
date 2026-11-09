@@ -91,12 +91,13 @@ interface MediaListRequest {
 	limit: number;
 	offset: number;
 	sort?: "asc" | "desc";
+	artistId?: number;
 	signal?: AbortSignal;
 }
 
 export async function fetchMediaList(
 	fetch: CoreFetcher,
-	{ type, q, limit, offset, sort, signal }: MediaListRequest,
+	{ type, q, limit, offset, sort, artistId, signal }: MediaListRequest,
 ): Promise<MediaList> {
 	const params = new URLSearchParams({
 		type,
@@ -109,6 +110,9 @@ export async function fetchMediaList(
 	if (sort !== undefined) {
 		params.set("sort", sort);
 	}
+	if (artistId !== undefined) {
+		params.set("artist_id", String(artistId));
+	}
 	const body = await fetch(`${MEDIA_PATH}?${params.toString()}`, { signal });
 	return mediaListSchema.parse(body);
 }
@@ -118,9 +122,10 @@ function mediaListOptions(
 	type: MediaType,
 	q: string,
 	sort?: "asc" | "desc",
+	artistId?: number,
 ) {
 	return infiniteQueryOptions({
-		queryKey: ["media", type, q, sort ?? ""],
+		queryKey: ["media", type, q, sort ?? "", artistId ?? 0],
 		queryFn: ({ pageParam, signal }) =>
 			fetchMediaList(fetch, {
 				type,
@@ -128,6 +133,7 @@ function mediaListOptions(
 				limit: MEDIA_PAGE_SIZE,
 				offset: pageParam,
 				sort,
+				artistId,
 				signal,
 			}),
 		initialPageParam: 0,
@@ -151,8 +157,12 @@ export function videoListOptions(fetch: CoreFetcher, q: string) {
 	return mediaListOptions(fetch, "video", q, "desc");
 }
 
-export function audioListOptions(fetch: CoreFetcher, q: string) {
-	return mediaListOptions(fetch, "audio", q, "desc");
+export function audioListOptions(
+	fetch: CoreFetcher,
+	q: string,
+	artistId?: number,
+) {
+	return mediaListOptions(fetch, "audio", q, "desc", artistId);
 }
 
 // Мемы — новые сверху: сервер сортирует по id DESC.

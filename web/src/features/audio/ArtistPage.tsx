@@ -11,7 +11,7 @@ import {
 } from "@mantine/core";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useAudioList } from "../../api/media";
@@ -150,7 +150,7 @@ export function ArtistPage() {
 	const navigate = useNavigate();
 	const { id } = useParams({ from: "/artists/$id" });
 	const artistId = Number(id);
-	const valid = Number.isInteger(artistId) && artistId > 0;
+	const valid = Number.isSafeInteger(artistId) && artistId > 0;
 	const backLabel = t("audio.back");
 	const backToAudio = () => {
 		void navigate({ to: "/audio" });
@@ -164,7 +164,7 @@ export function ArtistPage() {
 		isError: isArtistError,
 		refetch: refetchArtists,
 	} = useArtist(valid ? artistId : 0);
-	const list = useAudioList("");
+	const list = useAudioList("", valid ? artistId : undefined, valid);
 	const [renameOpened, setRenameOpened] = useState(false);
 	const [editMedia, setEditMedia] = useState<Media | null>(null);
 	// ТВ-режим: корень страницы — spatial-секция, треки внутри —
@@ -173,38 +173,16 @@ export function ArtistPage() {
 		useTVFocusable<HTMLDivElement>("artist-page");
 	const retryLabel = t("common.retry");
 
-	// Серверного фильтра треков по артисту нет — подтягиваем все страницы
-	// при монтировании и фильтруем на клиенте. Каждая новая страница
-	// меняет флаги и перезапускает эффект до полного списка.
 	const {
-		isPending: listPending,
 		hasNextPage,
 		isFetchingNextPage,
 		isFetchNextPageError,
 		fetchNextPage,
 	} = list;
-	useEffect(() => {
-		if (
-			!listPending &&
-			hasNextPage &&
-			!isFetchingNextPage &&
-			!isFetchNextPageError
-		) {
-			void fetchNextPage();
-		}
-	}, [
-		listPending,
-		hasNextPage,
-		isFetchingNextPage,
-		isFetchNextPageError,
-		fetchNextPage,
-	]);
 
-	const tracks =
-		list.data?.pages
-			.flatMap((page) => page.items)
-			.filter((media) => media.artists.some((item) => item.id === artistId)) ??
-		[];
+	// Фильтр по артисту — на сервере (artist_id), поэтому клиент не
+	// догружает всю аудиотеку и не фильтрует её в памяти.
+	const tracks = list.data?.pages.flatMap((page) => page.items) ?? [];
 
 	if (!valid) {
 		return (
@@ -321,11 +299,15 @@ export function ArtistPage() {
 						</Button>
 					</Alert>
 				) : (
-					(hasNextPage || isFetchingNextPage) && (
-						<Stack gap="xs">
-							<Skeleton height={64} radius="md" />
-							<Skeleton height={64} radius="md" />
-						</Stack>
+					hasNextPage && (
+						<Button
+							variant="light"
+							w="fit-content"
+							loading={isFetchingNextPage}
+							onClick={() => void fetchNextPage()}
+						>
+							{t("audio.loadMore")}
+						</Button>
 					)
 				)}
 			</TVFocusScope>

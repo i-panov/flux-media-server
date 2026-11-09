@@ -32,6 +32,10 @@ func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, o
 	if filters.Year != 0 {
 		query = query.Where("year = ?", filters.Year)
 	}
+	if filters.ArtistID != 0 {
+		query = query.Where(`EXISTS (SELECT 1 FROM media_artists ma
+			WHERE ma.media_id = media.id AND ma.artist_id = ?)`, filters.ArtistID)
+	}
 	if filters.Q != "" {
 		// Экранируем спецсимволы LIKE из пользовательского ввода: иначе
 		// «%» и «_» трактуются как шаблон, а не как литеральные символы.

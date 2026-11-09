@@ -93,6 +93,7 @@
 	"upload.button.video": "Upload video",
 	"upload.button.audio": "Upload audio",
 	"upload.button.image": "Upload meme",
+	"upload.status.queued": "Queued",
 	"upload.status.uploading": "Uploading...",
 	"upload.status.processing": "Processing on the server...",
 	"upload.status.done": "Done",

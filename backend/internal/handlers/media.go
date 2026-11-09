@@ -68,6 +68,15 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 	if q := strings.TrimSpace(c.Query("q")); q != "" {
 		filters.Q = q
 	}
+	if rawArtist := c.Query("artist_id"); rawArtist != "" {
+		// 32 бита: ID — uint, а на 32-битной сборке uint64-значение
+		// молча обрезалось бы и могло отдать чужого артиста.
+		artistID, err := strconv.ParseUint(rawArtist, 10, 32)
+		if err != nil || artistID == 0 {
+			return response.Error(c, fiber.StatusBadRequest, "invalid artist_id")
+		}
+		filters.ArtistID = uint(artistID)
+	}
 	// Порядок по id: по умолчанию старый (совместимо с прежним
 	// поведением), sort=desc — новые сверху для мем-галереи.
 	if sortOrder := c.Query("sort"); sortOrder != "" {

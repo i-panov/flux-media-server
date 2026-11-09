@@ -435,3 +435,37 @@ func TestFindByPathPrefersLiveOverTrashed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, live.ID, gotBasic.ID, "FindByPathBasic должен вернуть живую строку")
 }
+
+// TestMediaStore_FindAllFiltersByArtist: фильтр artist_id должен отдавать
+// только медиа этого артиста — без клиентской догрузки всей библиотеки.
+func TestMediaStore_FindAllFiltersByArtist(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	artistRepo := NewArtistRepository(db)
+	ctx := context.Background()
+
+	first, err := artistRepo.FindOrCreateByName(ctx, "First")
+	require.NoError(t, err)
+	second, err := artistRepo.FindOrCreateByName(ctx, "Second")
+	require.NoError(t, err)
+
+	m1 := &models.Media{Title: "One", Type: models.MediaTypeAudio, FilePath: "/one.mp3"}
+	m2 := &models.Media{Title: "Two", Type: models.MediaTypeAudio, FilePath: "/two.mp3"}
+	require.NoError(t, store.Create(ctx, m1))
+	require.NoError(t, store.Create(ctx, m2))
+	require.NoError(t, db.Create(&models.MediaArtist{MediaID: m1.ID, ArtistID: first.ID}).Error)
+	// m1 связан с двумя артистами: наивный JOIN дал бы две строки,
+	// EXISTS обязан вернуть одну.
+	require.NoError(t, db.Create(&models.MediaArtist{MediaID: m1.ID, ArtistID: second.ID}).Error)
+	require.NoError(t, db.Create(&models.MediaArtist{MediaID: m2.ID, ArtistID: second.ID}).Error)
+
+	got, total, err := store.FindAll(ctx, MediaFilters{ArtistID: first.ID}, 0, 0)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, total)
+	require.Len(t, got, 1)
+	assert.Equal(t, m1.ID, got[0].ID)
+	assert.Equal(t, "First", got[0].Artists[0].Name)
+}

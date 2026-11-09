@@ -27,6 +27,9 @@ type MediaFilters struct {
 	Type models.MediaType
 	Year int
 	Q    string
+	// ArtistID — медиа, связанные с артистом (media_artists). Тип
+	// (video/audio) задаёт вызывающий через Type.
+	ArtistID uint
 	// SortDesc — новые сверху (по id). Нужен мем-галерее; остальные
 	// разделы сохраняют исторический порядок id ASC.
 	SortDesc bool
