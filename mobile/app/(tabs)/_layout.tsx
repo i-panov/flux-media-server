@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import type { ColorValue } from "react-native";
 import { AuthGate } from "../../src/components/AuthGate";
 import { t, useLanguage } from "../../src/i18n";
+import { useTheme } from "../../src/theme/ThemeProvider";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -24,13 +25,19 @@ function TabIcon({
 
 export default function TabsLayout() {
 	useLanguage();
+	const { colors } = useTheme();
 	return (
 		<AuthGate>
 			<Tabs
 				screenOptions={{
 					headerShown: false,
-					tabBarActiveTintColor: "#7048e8",
-					tabBarInactiveTintColor: "#868e96",
+					tabBarActiveTintColor: colors.accent,
+					tabBarInactiveTintColor: colors.textMuted,
+					tabBarStyle: {
+						backgroundColor: colors.surface,
+						borderTopColor: colors.border,
+					},
+					sceneStyle: { backgroundColor: colors.background },
 				}}
 			>
 				<Tabs.Screen

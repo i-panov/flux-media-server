@@ -1,24 +1,24 @@
-import { StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, Text } from "react-native";
 import { useVideoList } from "../../src/api/media";
 import { MediaList } from "../../src/components/MediaList";
+import { Screen } from "../../src/components/Screen";
 import { t, useLanguage } from "../../src/i18n";
+import { useTheme } from "../../src/theme/ThemeProvider";
 
 export default function VideoScreen() {
 	useLanguage();
+	const { colors } = useTheme();
 	const query = useVideoList();
 	return (
-		<SafeAreaView style={styles.screen} edges={["top"]}>
-			<View style={styles.header}>
-				<Text style={styles.title}>{t("video.title")}</Text>
-			</View>
+		<Screen>
+			<Text style={[styles.title, { color: colors.text }]}>
+				{t("video.title")}
+			</Text>
 			<MediaList query={query} />
-		</SafeAreaView>
+		</Screen>
 	);
 }
 
 const styles = StyleSheet.create({
-	screen: { flex: 1, padding: 16, gap: 12 },
-	header: { flexDirection: "row", alignItems: "center", gap: 12 },
 	title: { fontSize: 24, fontWeight: "700" },
 });

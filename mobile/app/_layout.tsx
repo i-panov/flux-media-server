@@ -1,4 +1,5 @@
 import { createQueryClient } from "@flux/shared";
+import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -7,10 +8,54 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 // Импорт ради побочного эффекта (дефолт configureApi) и initApiConfig:
 // модуль должен выполниться до любых запросов.
 import { initApiConfig } from "../src/api/setup";
+import { ThemeProvider, useTheme } from "../src/theme/ThemeProvider";
 
 SplashScreen.preventAutoHideAsync().catch(() => {
 	// Повторный вызов при Fast Refresh — не ошибка.
 });
+
+// Дерево приложения монтируется только когда готовы и API, и тема:
+// иначе первый кадр после splash мог бы уйти в system-схему, хотя
+// пользователь выбрал dark. Splash скрывается на следующем кадре, когда
+// ThemeProvider уже применил SystemUI и Appearance к выбранной схеме.
+function AppShell({
+	client,
+	apiReady,
+}: {
+	client: QueryClient;
+	apiReady: boolean;
+}) {
+	const { hydrated } = useTheme();
+	const ready = apiReady && hydrated;
+
+	useEffect(() => {
+		if (!ready) {
+			return;
+		}
+		// Пассивные эффекты детей выполняются раньше эффектов ThemeProvider,
+		// поэтому ждём следующий кадр: к нему тема уже применена к нативным
+		// контролам и фону корневой вьюхи.
+		const frame = requestAnimationFrame(() => {
+			SplashScreen.hideAsync().catch(() => {
+				// Двойной hide — не ошибка.
+			});
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [ready]);
+
+	if (!ready) {
+		return null;
+	}
+	return (
+		<QueryClientProvider client={client}>
+			<Stack screenOptions={{ headerShown: false }}>
+				<Stack.Screen name="(tabs)" />
+				<Stack.Screen name="login" />
+				<Stack.Screen name="server" />
+			</Stack>
+		</QueryClientProvider>
+	);
+}
 
 export default function RootLayout() {
 	const [client] = useState(createQueryClient);
@@ -28,26 +73,11 @@ export default function RootLayout() {
 		};
 	}, []);
 
-	useEffect(() => {
-		if (ready) {
-			SplashScreen.hideAsync().catch(() => {
-				// Двойной hide — не ошибка.
-			});
-		}
-	}, [ready]);
-
-	if (!ready) {
-		return null;
-	}
 	return (
 		<SafeAreaProvider>
-			<QueryClientProvider client={client}>
-				<Stack screenOptions={{ headerShown: false }}>
-					<Stack.Screen name="(tabs)" />
-					<Stack.Screen name="login" />
-					<Stack.Screen name="server" />
-				</Stack>
-			</QueryClientProvider>
+			<ThemeProvider>
+				<AppShell client={client} apiReady={ready} />
+			</ThemeProvider>
 		</SafeAreaProvider>
 	);
 }

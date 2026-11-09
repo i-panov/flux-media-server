@@ -8,25 +8,19 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, router } from "expo-router";
 import { useState } from "react";
-import {
-	Button,
-	Pressable,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { normalizeServerUrl, SERVER_URL_KEY } from "../src/api/setup";
 import { sessionQueryKey } from "../src/auth/session";
+import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
 import { secureStore } from "../src/storage/secureStore";
+import { useTheme } from "../src/theme/ThemeProvider";
 
 // Публичный экран: адрес сервера задаётся до входа, поэтому AuthGate здесь
 // намеренно не используется.
 export default function ServerScreen() {
 	useLanguage();
+	const { colors } = useTheme();
 	const health = useHealthQuery();
 	const queryClient = useQueryClient();
 	const [draft, setDraft] = useState(() => getApiConfig().baseUrl);
@@ -116,96 +110,159 @@ export default function ServerScreen() {
 	};
 
 	return (
-		<SafeAreaView
-			style={styles.screen}
-			edges={["top", "bottom"]}
-			testID="server-screen"
-		>
-			<ScrollView contentContainerStyle={styles.content}>
-				<View style={styles.header}>
+		<Screen scroll edges={["top", "bottom"]} testID="server-screen">
+			<View style={styles.header}>
+				<Pressable
+					onPress={goBack}
+					accessibilityRole="button"
+					accessibilityLabel={t("common.back")}
+					hitSlop={8}
+					style={styles.backButton}
+				>
+					<Text style={[styles.back, { color: colors.text }]}>‹</Text>
+				</Pressable>
+				<Text style={[styles.title, { color: colors.text }]}>
+					{t("server.title")}
+				</Text>
+			</View>
+
+			<Text style={[styles.hint, { color: colors.textMuted }]}>
+				{t("server.hint")}
+			</Text>
+
+			<View
+				style={[
+					styles.card,
+					{
+						borderColor: colors.borderStrong,
+						backgroundColor: colors.surface,
+					},
+				]}
+			>
+				<Text style={[styles.cardTitle, { color: colors.text }]}>
+					{t("home.server")}
+				</Text>
+				<Text style={[styles.muted, { color: colors.textMuted }]}>
+					{backendStatus}
+				</Text>
+				<Text
+					style={[styles.muted, { color: colors.textMuted }]}
+					numberOfLines={1}
+				>
+					{appliedUrl}
+				</Text>
+			</View>
+
+			<Text style={[styles.label, { color: colors.textMuted }]}>
+				{t("settings.server")}
+			</Text>
+			<TextInput
+				testID="server-url"
+				style={[
+					styles.input,
+					{
+						borderColor: colors.controlBorder,
+						backgroundColor: colors.surface,
+						color: colors.text,
+					},
+				]}
+				value={draft}
+				onChangeText={(value) => {
+					setDraft(value);
+					setSaved(false);
+				}}
+				autoCapitalize="none"
+				autoCorrect={false}
+				keyboardType="url"
+				placeholderTextColor={colors.textMuted}
+			/>
+			{error !== null && (
+				<Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+			)}
+			{saved && error === null && (
+				<Text style={[styles.saved, { color: colors.accent }]}>
+					{t("settings.saved")}
+				</Text>
+			)}
+			<Pressable
+				testID="server-save"
+				accessibilityRole="button"
+				accessibilityState={{ disabled: saving }}
+				disabled={saving}
+				onPress={() => void save()}
+				style={({ pressed }) => [
+					styles.saveButton,
+					{
+						backgroundColor: colors.accent,
+						opacity: saving ? 0.5 : 1,
+					},
+					pressed && !saving && styles.pressed,
+				]}
+			>
+				<Text style={[styles.saveLabel, { color: colors.onAccent }]}>
+					{saving ? t("settings.saving") : t("settings.save")}
+				</Text>
+			</Pressable>
+
+			{!saving && (
+				<Link href="/login" asChild>
 					<Pressable
-						onPress={goBack}
+						testID="server-go-login"
 						accessibilityRole="button"
-						accessibilityLabel={t("common.back")}
+						style={styles.loginLink}
 					>
-						<Text style={styles.back}>‹</Text>
+						<Text style={[styles.link, { color: colors.accent }]}>
+							{t("login.title")}
+						</Text>
 					</Pressable>
-					<Text style={styles.title}>{t("server.title")}</Text>
-				</View>
-
-				<Text style={styles.hint}>{t("server.hint")}</Text>
-
-				<View style={styles.card}>
-					<Text style={styles.cardTitle}>{t("home.server")}</Text>
-					<Text style={styles.muted}>{backendStatus}</Text>
-					<Text style={styles.muted} numberOfLines={1}>
-						{appliedUrl}
-					</Text>
-				</View>
-
-				<Text style={styles.label}>{t("settings.server")}</Text>
-				<TextInput
-					testID="server-url"
-					style={styles.input}
-					value={draft}
-					onChangeText={(value) => {
-						setDraft(value);
-						setSaved(false);
-					}}
-					autoCapitalize="none"
-					autoCorrect={false}
-					keyboardType="url"
-				/>
-				{error !== null && <Text style={styles.error}>{error}</Text>}
-				{saved && error === null && <Text>{t("settings.saved")}</Text>}
-				<Button
-					testID="server-save"
-					title={saving ? t("settings.saving") : t("settings.save")}
-					onPress={() => void save()}
-					disabled={saving}
-				/>
-
-				{!saving && (
-					<Link href="/login" asChild>
-						<Pressable
-							testID="server-go-login"
-							accessibilityRole="button"
-							style={styles.loginLink}
-						>
-							<Text style={styles.link}>{t("login.title")}</Text>
-						</Pressable>
-					</Link>
-				)}
-			</ScrollView>
-		</SafeAreaView>
+				</Link>
+			)}
+		</Screen>
 	);
 }
 
 const styles = StyleSheet.create({
-	screen: { flex: 1 },
-	content: { padding: 16, gap: 12 },
 	header: { flexDirection: "row", alignItems: "center", gap: 12 },
 	title: { fontSize: 24, fontWeight: "700" },
+	backButton: {
+		minWidth: 44,
+		minHeight: 44,
+		alignItems: "center",
+		justifyContent: "center",
+	},
 	back: { fontSize: 30, lineHeight: 32 },
-	hint: { fontSize: 14, opacity: 0.6 },
+	hint: { fontSize: 14 },
 	card: {
 		borderWidth: 1,
-		borderColor: "#8884",
 		borderRadius: 10,
 		padding: 14,
 		gap: 4,
 	},
 	cardTitle: { fontSize: 15, fontWeight: "600" },
-	muted: { fontSize: 13, opacity: 0.6 },
-	label: { fontSize: 13, opacity: 0.6 },
+	muted: { fontSize: 13 },
+	label: { fontSize: 13 },
 	input: {
 		borderWidth: 1,
-		borderColor: "#8884",
 		borderRadius: 8,
 		padding: 12,
 		fontSize: 16,
 	},
-	error: { color: "#e03131" },
-	loginLink: { marginTop: 8, alignSelf: "center" },
-	link: { color: "#7048e8", fontWeight: "600" },
+	error: { fontSize: 13 },
+	saved: { fontSize: 13, fontWeight: "600" },
+	saveButton: {
+		borderRadius: 8,
+		paddingVertical: 14,
+		minHeight: 44,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	saveLabel: { fontSize: 16, fontWeight: "600" },
+	loginLink: {
+		marginTop: 8,
+		minHeight: 44,
+		alignSelf: "center",
+		justifyContent: "center",
+	},
+	link: { fontWeight: "600" },
+	pressed: { opacity: 0.7 },
 });

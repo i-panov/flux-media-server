@@ -1,0 +1,86 @@
+# Тема: вход -> настройки -> system/light/dark -> перезапуск.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора).
+#
+# Flow переиспользует tabs.yaml как subflow: он делает clearState и OTP-вход,
+# поэтому тема начинается с чистого AsyncStorage и дефолтной системной схемы.
+# Дальше проверяется выбор каждого варианта и сохранение dark после
+# полного перезапуска приложения.
+#
+# Запуск:
+#   maestro test .maestro/theme.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/theme.yaml
+appId: app.lib.flux
+name: "Theme: system/light/dark + persistence"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на экране настроек. После clearState выбран
+# системный режим — это дефолт ThemeProvider.
+- assertVisible:
+    id: "settings-screen"
+# Карточка темы ниже языка и версии, на маленьких экранах может быть
+# за пределами viewport.
+- scrollUntilVisible:
+    element:
+      id: "settings-theme-system"
+    direction: DOWN
+- assertVisible:
+    id: "settings-theme-system"
+    selected: true
+
+# Переключаем все три режима и проверяем accessibilityState.selected.
+- tapOn:
+    id: "settings-theme-dark"
+- assertVisible:
+    id: "settings-theme-dark"
+    selected: true
+- tapOn:
+    id: "settings-theme-light"
+- assertVisible:
+    id: "settings-theme-light"
+    selected: true
+- tapOn:
+    id: "settings-theme-dark"
+- assertVisible:
+    id: "settings-theme-dark"
+    selected: true
+# Ждём не анимацию, а завершение записи: ThemeProvider обновляет
+# persistedMode только после await AsyncStorage.setItem, поэтому подпись
+# тёмной темы в settings-theme-persisted гарантирует flush до stopApp.
+# Текст локализован (ru/en), поэтому регэксп перечисляет оба написания:
+# регистронезависимый флаг в Java может не покрывать кириллицу.
+- extendedWaitUntil:
+    visible:
+      id: "settings-theme-persisted"
+      text: "dark|Dark|тёмная|Тёмная"
+    timeout: 10000
+
+# Полный перезапуск: выбор обязан пережить чтение AsyncStorage.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-settings"
+    timeout: 20000
+- tapOn:
+    id: "tab-settings"
+- assertVisible:
+    id: "settings-screen"
+- scrollUntilVisible:
+    element:
+      id: "settings-theme-dark"
+    direction: DOWN
+- assertVisible:
+    id: "settings-theme-dark"
+    selected: true

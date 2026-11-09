@@ -16,13 +16,15 @@ import {
 	TextInput,
 	View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { sessionQueryKey, useSession } from "../src/auth/session";
+import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
 import { secureStore } from "../src/storage/secureStore";
+import { useTheme } from "../src/theme/ThemeProvider";
 
 export default function LoginScreen() {
 	useLanguage();
+	const { colors } = useTheme();
 	const session = useSession();
 	const queryClient = useQueryClient();
 	const [email, setEmail] = useState("");
@@ -77,74 +79,123 @@ export default function LoginScreen() {
 	}
 
 	const pending = request.isPending || verify.isPending;
+	const signInDisabled = pending || code.trim() === "";
+	const requestCodeDisabled = pending || email.trim() === "";
+	const inputStyle = [
+		styles.input,
+		{
+			borderColor: colors.controlBorder,
+			backgroundColor: colors.surface,
+			color: colors.text,
+		},
+	];
 
 	return (
-		<SafeAreaView style={styles.screen} testID="auth-entry">
+		<Screen testID="auth-entry" contentContainerStyle={styles.screen}>
 			<View style={styles.card}>
-				<Text style={styles.title}>{t("login.title")}</Text>
-				<Text style={styles.subtitle}>{t("login.subtitle")}</Text>
-				{error !== null && <Text style={styles.error}>{error}</Text>}
+				<Text style={[styles.title, { color: colors.text }]}>
+					{t("login.title")}
+				</Text>
+				<Text style={[styles.subtitle, { color: colors.textMuted }]}>
+					{t("login.subtitle")}
+				</Text>
+				{error !== null && (
+					<Text style={{ color: colors.danger }}>{error}</Text>
+				)}
 				{codeSent ? (
 					<>
-						<Text style={styles.label}>{t("login.code")}</Text>
+						<Text style={[styles.label, { color: colors.textMuted }]}>
+							{t("login.code")}
+						</Text>
 						<TextInput
 							testID="login-code"
-							style={styles.input}
+							style={inputStyle}
 							value={code}
 							onChangeText={setCode}
 							keyboardType="number-pad"
 							autoComplete="one-time-code"
+							placeholderTextColor={colors.textMuted}
 						/>
 						{debugCode !== null && (
-							<Text testID="login-debug-code" style={styles.debug}>
+							<Text
+								testID="login-debug-code"
+								style={[styles.debug, { color: colors.accent }]}
+							>
 								{t("login.devCode", { code: debugCode })}
 							</Text>
 						)}
 						<Pressable
 							testID="login-sign-in"
 							accessibilityRole="button"
-							style={styles.button}
-							disabled={pending || code.trim() === ""}
+							accessibilityState={{ disabled: signInDisabled }}
+							style={({ pressed }) => [
+								styles.button,
+								{
+									backgroundColor: colors.accent,
+									opacity: signInDisabled ? 0.5 : 1,
+								},
+								pressed && !signInDisabled && styles.pressed,
+							]}
+							disabled={signInDisabled}
 							onPress={() =>
 								verify.mutate({ email: email.trim(), code: code.trim() })
 							}
 						>
 							{pending ? (
-								<ActivityIndicator />
+								<ActivityIndicator color={colors.onAccent} />
 							) : (
-								<Text style={styles.buttonText}>{t("login.signIn")}</Text>
+								<Text style={[styles.buttonText, { color: colors.onAccent }]}>
+									{t("login.signIn")}
+								</Text>
 							)}
 						</Pressable>
 						<Pressable
 							accessibilityRole="button"
+							hitSlop={8}
+							style={styles.linkButton}
 							onPress={() => setCodeSent(false)}
 						>
-							<Text style={styles.link}>{t("login.changeEmail")}</Text>
+							<Text style={[styles.link, { color: colors.accent }]}>
+								{t("login.changeEmail")}
+							</Text>
 						</Pressable>
 					</>
 				) : (
 					<>
-						<Text style={styles.label}>{t("login.email")}</Text>
+						<Text style={[styles.label, { color: colors.textMuted }]}>
+							{t("login.email")}
+						</Text>
 						<TextInput
 							testID="login-email"
-							style={styles.input}
+							style={inputStyle}
 							value={email}
 							onChangeText={setEmail}
 							autoCapitalize="none"
 							autoCorrect={false}
 							keyboardType="email-address"
+							placeholderTextColor={colors.textMuted}
 						/>
 						<Pressable
 							testID="login-request-code"
 							accessibilityRole="button"
-							style={styles.button}
-							disabled={pending || email.trim() === ""}
+							accessibilityState={{ disabled: requestCodeDisabled }}
+							style={({ pressed }) => [
+								styles.button,
+								{
+									backgroundColor: colors.accent,
+									opacity: requestCodeDisabled ? 0.5 : 1,
+								},
+								pressed && !requestCodeDisabled && styles.pressed,
+							]}
+							disabled={requestCodeDisabled}
 							onPress={() => request.mutate(email.trim())}
 						>
 							{pending ? (
-								<ActivityIndicator />
+								<ActivityIndicator color={colors.onAccent} />
 							) : (
-								<Text style={styles.buttonText}>{t("login.getCode")}</Text>
+								<Text style={[styles.buttonText, { color: colors.onAccent }]}>
+									{t("login.getCode")}
+								</Text>
 							)}
 						</Pressable>
 					</>
@@ -152,36 +203,44 @@ export default function LoginScreen() {
 				<Pressable
 					testID="login-open-server"
 					accessibilityRole="button"
+					hitSlop={8}
+					style={styles.linkButton}
 					onPress={() => router.push("/server")}
 				>
-					<Text style={styles.link}>{t("server.open")}</Text>
+					<Text style={[styles.link, { color: colors.accent }]}>
+						{t("server.open")}
+					</Text>
 				</Pressable>
 			</View>
-		</SafeAreaView>
+		</Screen>
 	);
 }
 
 const styles = StyleSheet.create({
-	screen: { flex: 1, justifyContent: "center", padding: 24 },
+	screen: { justifyContent: "center" },
 	card: { gap: 12 },
 	title: { fontSize: 28, fontWeight: "700" },
-	subtitle: { fontSize: 15, opacity: 0.6, marginBottom: 8 },
-	label: { fontSize: 13, opacity: 0.6 },
+	subtitle: { fontSize: 15, marginBottom: 8 },
+	label: { fontSize: 13 },
 	input: {
 		borderWidth: 1,
-		borderColor: "#8884",
 		borderRadius: 8,
 		padding: 12,
 		fontSize: 16,
 	},
 	button: {
-		backgroundColor: "#7048e8",
 		borderRadius: 8,
 		padding: 14,
+		minHeight: 44,
 		alignItems: "center",
+		justifyContent: "center",
 	},
-	buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-	link: { textAlign: "center", marginTop: 8 },
-	error: { color: "#e03131" },
-	debug: { color: "#e8590c", fontSize: 12 },
+	buttonText: { fontWeight: "600", fontSize: 16 },
+	linkButton: {
+		minHeight: 44,
+		justifyContent: "center",
+	},
+	link: { textAlign: "center" },
+	debug: { fontSize: 12 },
+	pressed: { opacity: 0.7 },
 });

@@ -9,15 +9,25 @@ import {
 } from "react-native";
 import { useSession } from "../auth/session";
 import { t, useLanguage } from "../i18n";
+import { useTheme } from "../theme/ThemeProvider";
 
 export function AuthGate({ children }: { children: ReactNode }) {
 	useLanguage();
+	const { colors, spacing } = useTheme();
 	const session = useSession();
 	if (session.isPending) {
 		return (
-			<View style={styles.center}>
-				<ActivityIndicator />
-				<Text>{t("common.loading")}</Text>
+			<View
+				style={[
+					styles.center,
+					{
+						backgroundColor: colors.background,
+						gap: spacing.md,
+					},
+				]}
+			>
+				<ActivityIndicator color={colors.accent} />
+				<Text style={{ color: colors.textMuted }}>{t("common.loading")}</Text>
 			</View>
 		);
 	}
@@ -27,28 +37,49 @@ export function AuthGate({ children }: { children: ReactNode }) {
 		// AuthGate и снова покажет ошибку. Кэшированную сессию не выкидываем:
 		// при isError с data ниже рендерятся табы.
 		return (
-			<View style={styles.center} testID="auth-entry">
-				<Text>{t("common.error")}</Text>
+			<View
+				style={[
+					styles.center,
+					{
+						backgroundColor: colors.background,
+						gap: spacing.md,
+					},
+				]}
+				testID="auth-entry"
+			>
+				<Text style={{ color: colors.text }}>{t("common.error")}</Text>
 				<Pressable
 					testID="auth-retry"
 					accessibilityRole="button"
+					hitSlop={8}
+					style={styles.linkButton}
 					onPress={() => void session.refetch()}
 				>
-					<Text style={styles.link}>{t("common.retry")}</Text>
+					<Text style={[styles.link, { color: colors.accent }]}>
+						{t("common.retry")}
+					</Text>
 				</Pressable>
 				<Pressable
 					testID="auth-open-server"
 					accessibilityRole="button"
+					hitSlop={8}
+					style={styles.linkButton}
 					onPress={() => router.push("/server")}
 				>
-					<Text style={styles.link}>{t("server.open")}</Text>
+					<Text style={[styles.link, { color: colors.accent }]}>
+						{t("server.open")}
+					</Text>
 				</Pressable>
 				<Pressable
 					testID="auth-go-login"
 					accessibilityRole="button"
+					hitSlop={8}
+					style={styles.linkButton}
 					onPress={() => router.replace("/login")}
 				>
-					<Text style={styles.link}>{t("login.title")}</Text>
+					<Text style={[styles.link, { color: colors.accent }]}>
+						{t("login.title")}
+					</Text>
 				</Pressable>
 			</View>
 		);
@@ -64,7 +95,11 @@ const styles = StyleSheet.create({
 		flex: 1,
 		alignItems: "center",
 		justifyContent: "center",
-		gap: 12,
 	},
-	link: { color: "#7048e8", fontWeight: "600" },
+	linkButton: {
+		minHeight: 44,
+		paddingHorizontal: 12,
+		justifyContent: "center",
+	},
+	link: { fontWeight: "600" },
 });

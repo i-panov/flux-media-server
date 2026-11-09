@@ -12,36 +12,38 @@ import {
 	View,
 } from "react-native";
 import { t, useLanguage } from "../i18n";
+import { useTheme } from "../theme/ThemeProvider";
+import { EmptyState } from "./EmptyState";
+import { ErrorState } from "./ErrorState";
+import { ListFooter } from "./ListFooter";
 
 type MediaListQuery = UseInfiniteQueryResult<InfiniteData<MediaListData>>;
 
 export function MediaList({ query }: { query: MediaListQuery }) {
 	useLanguage();
+	const { colors, spacing } = useTheme();
 	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+
 	if (query.isPending) {
 		return (
-			<View style={styles.center}>
-				<ActivityIndicator />
-				<Text>{t("common.loading")}</Text>
+			<View style={[styles.center, { gap: spacing.sm }]}>
+				<ActivityIndicator color={colors.accent} />
+				<Text style={{ color: colors.textMuted }}>{t("common.loading")}</Text>
 			</View>
 		);
 	}
 	if (query.isError && items.length === 0) {
-		return (
-			<View style={styles.center}>
-				<Text>{t("common.error")}</Text>
-				<Text style={styles.link} onPress={() => void query.refetch()}>
-					{t("common.retry")}
-				</Text>
-			</View>
-		);
+		return <ErrorState onRetry={() => void query.refetch()} />;
 	}
 	return (
 		<FlatList
 			data={items}
 			keyExtractor={(item) => String(item.id)}
-			contentContainerStyle={items.length === 0 ? styles.center : styles.list}
-			ListEmptyComponent={<Text>{t("media.empty")}</Text>}
+			style={styles.fill}
+			contentContainerStyle={
+				items.length === 0 ? styles.emptyList : styles.list
+			}
+			ListEmptyComponent={<EmptyState title={t("media.empty")} />}
 			onEndReached={() => {
 				if (query.hasNextPage && !query.isFetchingNextPage) {
 					void query.fetchNextPage();
@@ -49,25 +51,41 @@ export function MediaList({ query }: { query: MediaListQuery }) {
 			}}
 			onEndReachedThreshold={0.4}
 			ListFooterComponent={
-				query.isFetchingNextPage ? (
-					<ActivityIndicator style={styles.footer} />
-				) : query.isError ? (
-					<Text style={styles.link} onPress={() => void query.refetch()}>
-						{t("common.retry")}
-					</Text>
-				) : undefined
+				<ListFooter
+					isFetchingNextPage={query.isFetchingNextPage}
+					isError={query.isError}
+					onRetry={() => void query.refetch()}
+				/>
 			}
 			renderItem={({ item }) => (
-				<View style={styles.row}>
+				<View
+					style={[
+						styles.row,
+						{
+							gap: spacing.md,
+							padding: spacing.md,
+							borderColor: colors.border,
+							backgroundColor: colors.surface,
+						},
+					]}
+				>
 					<View style={styles.info}>
-						<Text style={styles.title} numberOfLines={2}>
+						<Text
+							style={[styles.title, { color: colors.text }]}
+							numberOfLines={2}
+						>
 							{item.title}
 						</Text>
-						<Text style={styles.muted} numberOfLines={1}>
+						<Text
+							style={[styles.muted, { color: colors.textMuted }]}
+							numberOfLines={1}
+						>
 							{item.artists.map((artist) => artist.name).join(", ")}
 						</Text>
 					</View>
-					<Text style={styles.muted}>{formatDuration(item.duration)}</Text>
+					<Text style={[styles.muted, { color: colors.textMuted }]}>
+						{formatDuration(item.duration)}
+					</Text>
 				</View>
 			)}
 		/>
@@ -75,20 +93,17 @@ export function MediaList({ query }: { query: MediaListQuery }) {
 }
 
 const styles = StyleSheet.create({
+	fill: { flex: 1 },
 	list: { gap: 8, paddingBottom: 24 },
-	center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
+	emptyList: { flexGrow: 1 },
+	center: { flex: 1, alignItems: "center", justifyContent: "center" },
 	row: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 12,
-		padding: 12,
 		borderWidth: 1,
-		borderColor: "#8884",
 		borderRadius: 10,
 	},
 	info: { flex: 1 },
 	title: { fontSize: 16, fontWeight: "600" },
-	muted: { fontSize: 13, opacity: 0.6 },
-	footer: { paddingVertical: 16 },
-	link: { color: "#7048e8", fontWeight: "600" },
+	muted: { fontSize: 13 },
 });
