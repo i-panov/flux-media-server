@@ -107,17 +107,58 @@ describe("createTokenTransport.refresh", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it("не-ok ответ пробрасывает статус", async () => {
-		const store = memoryStore({ [REFRESH_TOKEN_KEY]: "old-refresh" });
+	it.each([400, 401])("мёртвый refresh %d чистит пару", async (status) => {
+		const store = memoryStore({
+			[ACCESS_TOKEN_KEY]: "old-access",
+			[REFRESH_TOKEN_KEY]: "old-refresh",
+		});
 		vi.stubGlobal(
 			"fetch",
-			vi.fn().mockResolvedValue(jsonResponse({ error: "revoked" }, 401)),
+			vi.fn().mockResolvedValue(jsonResponse({ error: "revoked" }, status)),
 		);
 		const transport = createTokenTransport(store);
 
 		await expect(transport.refresh("https://example.com/api")).rejects.toThrow(
-			"Token refresh failed: 401",
+			`Token refresh failed: ${status}`,
 		);
+		await expect(store.get(ACCESS_TOKEN_KEY)).resolves.toBeNull();
+		await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBeNull();
+	});
+
+	it.each([500, 502])(
+		"временный сбой refresh %d сохраняет пару",
+		async (status) => {
+			const store = memoryStore({
+				[ACCESS_TOKEN_KEY]: "old-access",
+				[REFRESH_TOKEN_KEY]: "old-refresh",
+			});
+			vi.stubGlobal(
+				"fetch",
+				vi.fn().mockResolvedValue(jsonResponse({ error: "boom" }, status)),
+			);
+			const transport = createTokenTransport(store);
+
+			await expect(
+				transport.refresh("https://example.com/api"),
+			).rejects.toThrow(`Token refresh failed: ${status}`);
+			await expect(store.get(ACCESS_TOKEN_KEY)).resolves.toBe("old-access");
+			await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBe("old-refresh");
+		},
+	);
+
+	it("сетевой сбой сохраняет пару", async () => {
+		const store = memoryStore({
+			[ACCESS_TOKEN_KEY]: "old-access",
+			[REFRESH_TOKEN_KEY]: "old-refresh",
+		});
+		vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+		const transport = createTokenTransport(store);
+
+		await expect(transport.refresh("https://example.com/api")).rejects.toThrow(
+			"offline",
+		);
+		await expect(store.get(ACCESS_TOKEN_KEY)).resolves.toBe("old-access");
+		await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBe("old-refresh");
 	});
 
 	it.each([
@@ -126,12 +167,17 @@ describe("createTokenTransport.refresh", () => {
 		["без полей", jsonResponse({})],
 		["пустые строки", jsonResponse({ token: "", refresh_token: "" })],
 	])("кривое тело %s даёт malformed-ошибку", async (_, response) => {
-		const store = memoryStore({ [REFRESH_TOKEN_KEY]: "old-refresh" });
+		const store = memoryStore({
+			[ACCESS_TOKEN_KEY]: "old-access",
+			[REFRESH_TOKEN_KEY]: "old-refresh",
+		});
 		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
 		const transport = createTokenTransport(store);
 
 		await expect(transport.refresh("https://example.com/api")).rejects.toThrow(
 			"Token refresh failed: malformed response",
 		);
+		await expect(store.get(ACCESS_TOKEN_KEY)).resolves.toBe("old-access");
+		await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBe("old-refresh");
 	});
 });

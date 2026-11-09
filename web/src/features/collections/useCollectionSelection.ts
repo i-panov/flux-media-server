@@ -7,6 +7,7 @@ export function useCollectionSelection(collectionId: number) {
 	const [bulkMoveOpened, setBulkMoveOpened] = useState(false);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: collectionId — триггер сброса.
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- сброс при смене коллекции.
 		setSelectedIds(new Set());
 		setBulkMoveOpened(false);
 	}, [collectionId]);

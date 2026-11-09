@@ -14,8 +14,10 @@ backend/configs/config.yaml
 backend/.env
 /.idea/
 
-# Internal planning docs (not for repo)
-docs/
 
 # Node dependencies (npm workspaces: root + web + mobile + packages/*)
 node_modules/
+
+# Local historical plans (kept out of the repo)
+docs/superpowers/
+frontend/android/build/

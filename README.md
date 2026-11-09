@@ -1,6 +1,8 @@
 # Flux Media Server
 
-Self-hosted media streaming server built with Go (Fiber) backend and Flutter frontend.
+Self-hosted media streaming server: Go (Fiber) backend, React web client and
+Expo mobile client. Legacy Flutter `frontend/` is kept as a feature reference
+only and is not developed.
 
 ## Quick Start
 
@@ -13,20 +15,31 @@ cp configs/config.example.yaml configs/config.yaml
 go run ./cmd/server -config configs/config.yaml
 ```
 
-### Frontend
+### Web
 
 ```bash
-cd frontend
-flutter pub get
-flutter pub run build_runner build --delete-conflicting-outputs
-flutter run
+npm ci
+npm run dev -w web
 ```
+
+Vite runs on `http://127.0.0.1:5173` and proxies `/api` to `:8080`.
+Production build: `npm run build -w web`.
+
+### Mobile
+
+```bash
+npm ci
+cd mobile && npx expo start
+```
+
+OTP login requires a reachable server URL; set it in Settings on first launch.
+Production bundle: `cd mobile && npx expo export --platform android`.
 
 ## Docker
 
 ```bash
 cd backend
-docker-compose up -d
+docker compose up -d
 ```
 
 The server listens on port `8080` inside the container. Docker Compose publishes
@@ -42,6 +55,8 @@ admin JWT and are throttled by the rate limiter, but the per-request memory
 cost is unavoidable with the current engine. If you expect large files on a
 memory-constrained host, lower `server.max_upload_size`.
 
-## Internal Documentation
+## Documentation
 
-See [AGENTS.md](AGENTS.md) for architecture, project structure, and detailed development notes.
+- [AGENTS.md](AGENTS.md) — architecture, commands, conventions.
+- [KODA.md](KODA.md) — project overview and client structure.
+- [docs/review-2026-11-09.md](docs/review-2026-11-09.md) — code review and execution journal.

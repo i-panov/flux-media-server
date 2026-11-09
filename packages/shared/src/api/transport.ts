@@ -75,6 +75,12 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 				signal,
 			});
 			if (!response.ok) {
+				// 401/400 — refresh-токен мёртв: пара больше не нужна,
+				// иначе каждый старт снова пытается им обновиться.
+				if (response.status === 401 || response.status === 400) {
+					await store.del(ACCESS_TOKEN_KEY);
+					await store.del(REFRESH_TOKEN_KEY);
+				}
 				throw new RefreshError(
 					response.status,
 					`Token refresh failed: ${response.status}`,

@@ -1,6 +1,0 @@
-data/
-*.db
-flux-server
-.git
-.gitignore
-configs/config.yaml

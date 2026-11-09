@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useMediaProgress } from "./useMediaProgress";
@@ -96,7 +96,9 @@ describe("useMediaProgress", () => {
 			wrapper: TestWrapper,
 		});
 
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		expect(video.currentTime).toBe(0);
 
 		// Клиент резолвит транспорт асинхронно: fetch вызывается не позже,
@@ -129,7 +131,9 @@ describe("useMediaProgress", () => {
 			expect(fetchMock).toHaveBeenCalled();
 		});
 		// Метаданные приходят после данных: восстановление обязано сработать.
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await waitFor(() => {
 			expect(video.currentTime).toBe(90);
 		});
@@ -147,7 +151,9 @@ describe("useMediaProgress", () => {
 			wrapper: TestWrapper,
 		});
 
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await waitFor(() => {
 			expect(fetchMock).toHaveBeenCalled();
 		});
@@ -167,7 +173,9 @@ describe("useMediaProgress", () => {
 			wrapper: TestWrapper,
 		});
 
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await waitFor(() => {
 			expect(video.currentTime).toBe(120);
 		});
@@ -187,7 +195,9 @@ describe("useMediaProgress", () => {
 			wrapper: TestWrapper,
 		});
 
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await waitFor(() => {
 			expect(fetchMock).toHaveBeenCalled();
 		});
@@ -226,19 +236,25 @@ describe("useMediaProgress", () => {
 		// Между отметками 10 с — PUT не должен уходить на каждый тик.
 		for (const time of [1, 2, 5, 9]) {
 			video.currentTime = time;
-			result.current.handleTimeUpdate();
+			act(() => {
+				result.current.handleTimeUpdate();
+			});
 		}
 		expect(putCalls(fetchMock).length).toBe(0);
 
 		video.currentTime = 10;
-		result.current.handleTimeUpdate();
+		act(() => {
+			result.current.handleTimeUpdate();
+		});
 		await waitFor(() => {
 			expect(putCalls(fetchMock).length).toBe(1);
 		});
 
 		// pause сохраняет последнюю позицию поверх каденции.
 		video.currentTime = 12;
-		result.current.handlePause();
+		act(() => {
+			result.current.handlePause();
+		});
 		await waitFor(() => {
 			expect(putCalls(fetchMock).length).toBe(2);
 		});
@@ -265,7 +281,9 @@ describe("useMediaProgress", () => {
 		});
 
 		video.currentTime = 98;
-		result.current.handlePause();
+		act(() => {
+			result.current.handlePause();
+		});
 
 		await waitFor(() => {
 			expect(putCalls(fetchMock).length).toBe(1);
@@ -290,7 +308,9 @@ describe("useMediaProgress", () => {
 		await waitFor(() => {
 			expect(fetchMock).toHaveBeenCalled();
 		});
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(video.currentTime).toBe(0);
 		expect(putCalls(fetchMock).length).toBe(0);
@@ -313,7 +333,9 @@ describe("useMediaProgress", () => {
 		});
 
 		video.currentTime = 55;
-		result.current.handleTimeUpdate();
+		act(() => {
+			result.current.handleTimeUpdate();
+		});
 
 		// Переход /video/7 → /video/8 без размонтирования: элемент уже новый.
 		rerender({ mediaId: 8 });
@@ -354,7 +376,9 @@ describe("useMediaProgress", () => {
 		const second = fakeVideo(0, 3600);
 		ref.current = second;
 		rerender({ mediaId: 8 });
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 
 		await waitFor(() => {
 			expect(second.currentTime).toBe(40);
@@ -379,7 +403,9 @@ describe("useMediaProgress", () => {
 			({ mediaId }) => useMediaProgress(mediaId, ref),
 			{ wrapper: TestWrapper, initialProps: { mediaId: 7 } },
 		);
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await waitFor(() => {
 			expect(first.currentTime).toBe(120);
 		});
@@ -387,8 +413,12 @@ describe("useMediaProgress", () => {
 		const second = fakeVideo(0, 3600);
 		ref.current = second;
 		rerender({ mediaId: 8 });
-		result.current.handleLoadedMetadata();
-		await new Promise((resolve) => setTimeout(resolve, 30));
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 30));
+		});
 		expect(second.currentTime).toBe(0);
 	});
 
@@ -408,19 +438,25 @@ describe("useMediaProgress", () => {
 		});
 
 		// Восстановление ставит сохранённую позицию...
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await waitFor(() => {
 			expect(video.currentTime).toBe(120);
 		});
 
 		// ...пользователь смотрит (тики времени измеряют ненулевую позицию)...
 		video.currentTime = 45;
-		result.current.handleTimeUpdate();
+		act(() => {
+			result.current.handleTimeUpdate();
+		});
 
 		// ...отматывает в начало и ставит на паузу:
 		// вместо PUT уходит DELETE, переоткрытие стартует с 0.
 		video.currentTime = 0;
-		result.current.handlePause();
+		act(() => {
+			result.current.handlePause();
+		});
 		await waitFor(() => {
 			expect(deleteCalls(fetchMock).length).toBe(1);
 		});
@@ -445,7 +481,9 @@ describe("useMediaProgress", () => {
 		});
 
 		// Восстановление ставит сохранённую позицию...
-		result.current.handleLoadedMetadata();
+		act(() => {
+			result.current.handleLoadedMetadata();
+		});
 		await waitFor(() => {
 			expect(video.currentTime).toBe(120);
 		});
@@ -455,7 +493,9 @@ describe("useMediaProgress", () => {
 		// не должен, иначе восстановленная позиция затёрта не действием
 		// пользователя, а сбоем.
 		video.currentTime = 0;
-		result.current.handlePause();
+		act(() => {
+			result.current.handlePause();
+		});
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(deleteCalls(fetchMock).length).toBe(0);
 		expect(putCalls(fetchMock).length).toBe(0);

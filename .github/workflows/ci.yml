@@ -26,27 +26,6 @@ jobs:
       - name: Test
         run: go test ./internal/... -race
 
-  frontend:
-    name: Frontend
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.x'
-          cache: true
-      - name: Get dependencies
-        run: flutter pub get
-      - name: Code generation
-        run: dart run build_runner build
-      - name: Analyze
-        run: flutter analyze
-      - name: Test
-        run: flutter test
-
   web:
     name: Web
     runs-on: ubuntu-latest
@@ -65,10 +44,18 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Dead code
+        run: npm run lint:deadcode
       - name: Test
         run: npm run test
       - name: Build
         run: npm run build
+      - name: Size budgets
+        run: npm run size
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      - name: E2E
+        run: npm run test:e2e
 
   shared-mobile:
     name: Shared & Mobile
@@ -90,3 +77,10 @@ jobs:
         run: npm run typecheck -w @flux/shared && npm run typecheck -w mobile
       - name: Lint mobile
         run: npm run lint -w mobile
+      - name: Test mobile
+        run: npm run test -w mobile
+      - name: Check mobile version
+        run: npm run version:sync -w mobile -- --check
+      - name: Smoke export mobile
+        working-directory: mobile
+        run: npx expo export --platform android --output-dir dist

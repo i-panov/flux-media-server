@@ -4,7 +4,7 @@
 
 ## Обзор проекта
 
-**Flux Media Server** — self-hosted медиа-сервер для стриминга видео и аудио. Состоит из Go-бэкенда (Fiber) и Flutter-клиента (Android, iOS, Linux, Windows, macOS, Web).
+**Flux Media Server** — self-hosted медиа-сервер для стриминга видео и аудио. Go-бэкенд (Fiber), web-клиент (React + Mantine), mobile-клиент (Expo + React Native) и общий пакет `@flux/shared`. Legacy `frontend/` на Flutter оставлен только как справочник функций и не развивается.
 
 ## Структура репозитория
 
@@ -23,44 +23,25 @@ flux-media-server/
 │   │   ├── models/           — GORM-модели: Media, Metadata, User, WatchProgress, MediaLibrary, Artist, Collection, CollectionItem, Favorite, Lyrics, RefreshToken, MediaType
 │   │   ├── repository/       — интерфейсы и реализации репозиториев (SQLite через GORM)
 │   │   └── services/         — бизнес-логика: scanner, watcher, streamer, thumbnail, auth (JWT, OTP), upload_queue
-│   ├── Dockerfile            — multi-stage build (golang:1.22-alpine → alpine:3.19 + ffmpeg)
-│   └── docker-compose.yml    — проброс порта 8080, volume для data и media
+│   ├── Dockerfile            — multi-stage build (golang:1.25-alpine → alpine:3.22 + ffmpeg)
+│   └── docker-compose.yaml   — проброс 8080/8095, volume для data и media
 │
-├── frontend/                 — Flutter-клиент
-│   ├── lib/
-│   │   ├── main.dart         — инициализация MediaKit, auto-login, роутинг
-│   │   ├── core/
-│   │   │   ├── network/      — Chopper API-клиент, интерсепторы (auth, logging)
-│   │   │   ├── providers/    — глобальные Riverpod-провайдеры
-│   │   │   ├── router/       — auto_route роутер, AuthGuard
-│   │   │   ├── error/        — обработка ошибок
-│   │   │   ├── usecases/     — use cases
-│   │   │   ├── utils/        — утилиты
-│   │   │   ├── session/      — управление сессией
-│   │   │   └── widgets/      — переиспользуемые виджеты
-│   │   ├── features/         — feature-based архитектура
-│   │   │   ├── auth/         — аутентификация (data/domain/presentation)
-│   │   │   ├── library/      — библиотеки (data/domain/presentation)
-│   │   │   ├── media/        — медиа (data/domain/presentation)
-│   │   │   ├── player/       — плеер на media_kit (data/domain/presentation)
-│   │   │   ├── settings/     — настройки (data/domain/presentation)
-│   │   │   ├── audio/        — аудио-плеер и интерфейс
-│   │   │   ├── video/        — видео-плеер и интерфейс
-│   │   │   ├── collections/  — пользовательские коллекции/плейлисты
-│   │   │   ├── favorites/    — избранное (медиа и артисты)
-│   │   │   ├── lyrics/       — текст песен с синхронизацией
-│   │   │   └── offline/      — офлайн-контент
-│   │   └── shared/models/    — общие модели
-│   ├── pubspec.yaml
-│   └── analysis_options.yaml — very_good_analysis
-│
-└── .zcode/plans/             — планы разработки
+├── web/                      — React 19 + TypeScript + Vite + Mantine
+│   ├── src/features/         — video, audio, collections, favorites, player, upload, admin, settings
+│   ├── src/api/              — TanStack Query хуки и zod-схемы
+│   ├── src/routes/           — TanStack Router (routeTree.gen.ts генерируется)
+│   └── e2e/                  — Playwright
+├── mobile/                   — Expo + expo-router + React Native
+│   ├── app/                  — экраны (login, video, audio, settings)
+│   └── src/                  — auth, api, i18n, компоненты
+├── packages/shared/          — платформенно-нейтральный TS: api, media/format, query
+└── frontend/                 — legacy Flutter, только справочник функций
 ```
 
 ## Бэкенд
 
 ### Технологии
-- **Язык:** Go 1.23
+- **Язык:** Go 1.25
 - **Веб-фреймворк:** Fiber v2
 - **ORM:** GORM + SQLite (WAL mode, busy_timeout=5000)
 - **Аутентификация:** JWT + Refresh Tokens + OTP через email (SMTP)
@@ -183,43 +164,30 @@ cd backend
 go run ./cmd/server -config configs/config.yaml
 
 # Docker
-docker-compose up -d
+docker compose up -d
 ```
 
-## Фронтенд
+## Клиенты
 
-### Технологии
-- **Фреймворк:** Flutter (SDK ≥3.2.0 <4.0.0)
-- **Стейт-менеджмент:** Riverpod (flutter_riverpod + riverpod_annotation + riverpod_generator)
-- **Сеть:** Chopper (генерация клиентов) + http
-- **Роутинг:** auto_route (auto_route_generator)
-- **Модели:** freezed + json_serializable
-- **Плеер:** media_kit (media_kit, media_kit_video, media_kit_libs_video)
-- **Линт:** very_good_analysis
-- **Прочее:** file_picker, flutter_secure_storage, connectivity_plus, cached_network_image, fpdart, crypto
+### Web (`web/`)
+- React 19, TypeScript, Vite, Mantine, TanStack Router/Query, zod.
+- `npm run dev` — Vite на :5173 с прокси `/api` на :8080.
+- `npm run build` — codegen роутов, typecheck, production-сборка.
+- `npm run lint`, `npm run test`, `npm run test:e2e`, `npm run lint:deadcode`, `npm run size`.
+- API same-origin (`/api`), offline-режим сознательно не поддерживается: стриминг требует сервера.
 
-### Архитектура
-- Feature-based с трёхслойной структурой: `data/` → `domain/` → `presentation/`
-- Сгенерированные файлы: `*.g.dart`, `*.chopper.dart`, `*.gr.dart`, `*.freezed.dart` (исключены из анализа)
+### Mobile (`mobile/`)
+- Expo, expo-router, React Native; `android/` и `ios/` генерируются и не коммитятся.
+- OTP-вход, SecureStore, списки видео/аудио, i18n ru/en.
+- `npm run typecheck -w mobile`, `npm run lint -w mobile`, `npx expo export --platform android`.
+- `npm run version:sync -w mobile` синхронизирует `app.json` с `package.json` и поднимает `versionCode`.
 
-### Стиль кода (Dart)
-- Material 3, colorSchemeSeed: deepPurple, поддержка light/dark темы
-- Riverpod для DI и стейт-менеджмента
-- Chopper-генерация API-клиента из аннотаций
-- auto_route с AuthGuard для защищённых маршрутов
-- `fpdart` `Either<Failure, T>` для error handling в репозиториях
-- Отключённые линты: public_member_api_docs, lines_longer_than_80_chars, require_trailing_commas, avoid_print, comment_references
+### Shared (`packages/shared/`)
+- Чистый TypeScript без DOM/React Native: транспорт, auth-контракт, media/format, query, storage.
+- `npm run typecheck -w @flux/shared`, `npm run test -w @flux/shared`, `npm run lint -w @flux/shared`.
 
-### Запуск фронтенда
-
-```bash
-cd frontend
-flutter pub get
-flutter pub run build_runner build --delete-conflicting-outputs  # codegen обязателен
-flutter analyze    # lint (very_good_analysis)
-flutter test       # run tests
-flutter run        # run app
-```
+### Legacy (`frontend/`)
+Flutter-клиент не развивается; новые функции делаются в web/mobile.
 
 ## Планы разработки
 
@@ -233,7 +201,7 @@ flutter run        # run app
 - При `debug: true` OTP-коды возвращаются в ответе (без отправки email)
 - JWT secret должен быть не короче 32 символов
 - Docker-образ включает ffmpeg и ca-certificates
-- Volume для данных: `/app/data`, для медиа: `/media` (read-only)
+- Volume для данных: `/app/data`, для медиа: каталог библиотеки (rw; индексация и превью)
 - Refresh tokens: фоновая очистка истёкших токенов каждые 24 часа
 - Soft delete для Media (gorm.DeletedAt)
 - Upload-запросы обрабатываются асинхронно через очередь (202 Accepted)

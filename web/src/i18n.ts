@@ -9,7 +9,7 @@ type SupportedLang = (typeof SUPPORTED_LANGS)[number];
 
 function pickLang(raw: string): SupportedLang {
 	const base = raw.split("-")[0]?.toLowerCase();
-	return base === "en" ? "en" : "ru";
+	return base === "ru" ? "ru" : "en";
 }
 
 void i18n
@@ -20,7 +20,7 @@ void i18n
 			en: { translation: en },
 			ru: { translation: ru },
 		},
-		fallbackLng: "ru",
+		fallbackLng: "en",
 		detection: {
 			order: ["localStorage", "navigator"],
 			caches: ["localStorage"],
