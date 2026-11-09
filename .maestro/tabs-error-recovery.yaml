@@ -1,0 +1,100 @@
+# Recovery smoke: недоступный дефолтный адрес -> AuthGate error ->
+# публичный /server -> смена URL -> OTP-вход -> табы.
+#
+# Предусловия:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано без рабочего EXPO_PUBLIC_API_BASE и запускается на
+#     Android-эмуляторе БЕЗ `adb reverse tcp:8080 tcp:8080` (дефолтный
+#     http://localhost:8080/api с эмулятора недоступен) — иначе AuthGate
+#     сразу покажет /login и сценарий ошибки не воспроизведётся;
+#   * SERVER_URL доступен с устройства: http://10.0.2.2:8080/api для
+#     Android-эмулятора, LAN-адрес для физического устройства.
+#
+# Сохранение детерминированное: сначала SENTINEL_URL (заведомо отличается от
+# дефолта), затем реальный SERVER_URL. Оба save — changed, после каждого
+# обязательно появляется /login; conditional-ветки нет.
+#
+# Запуск:
+#   maestro test .maestro/tabs-error-recovery.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api \
+#     .maestro/tabs-error-recovery.yaml
+appId: app.lib.flux
+name: "Tabs error recovery: unreachable default -> /server -> login -> tabs"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- launchApp:
+    clearState: true
+
+# 1. Сессия не получена из-за сети — AuthGate показывает error-ветку
+#    с публичным CTA на /server.
+- extendedWaitUntil:
+    visible:
+      id: "auth-open-server"
+    timeout: 20000
+- tapOn:
+    id: "auth-open-server"
+- assertVisible:
+    id: "server-screen"
+
+# 2. Первый save: заведомо changed sentinel. Уводит на /login.
+- tapOn:
+    id: "server-url"
+- eraseText: 100
+- inputText: ${SENTINEL_URL}
+- hideKeyboard
+- tapOn:
+    id: "server-save"
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+
+# 3. Второй save: реальный адрес, changed относительно sentinel.
+- tapOn:
+    id: "login-open-server"
+- assertVisible:
+    id: "server-screen"
+- tapOn:
+    id: "server-url"
+- eraseText: 100
+- inputText: ${SERVER_URL}
+- hideKeyboard
+- tapOn:
+    id: "server-save"
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+
+# 4. OTP-вход. Debug-код виден на экране, вытаскиваем из него цифры.
+- tapOn:
+    id: "login-email"
+- inputText: "maestro@example.com"
+- hideKeyboard
+- tapOn:
+    id: "login-request-code"
+- copyTextFrom:
+    id: "login-debug-code"
+- evalScript: ${output.otp = maestro.copiedText.replace(/[^0-9]/g, '')}
+- tapOn:
+    id: "login-code"
+- inputText: ${output.otp}
+- hideKeyboard
+- tapOn:
+    id: "login-sign-in"
+
+# 5. После восстановления сервера и входа табы должны быть доступны.
+- assertVisible:
+    id: "tab-video"
+- assertVisible:
+    id: "tab-audio"
+- assertVisible:
+    id: "tab-library"
+- assertVisible:
+    id: "tab-settings"
+- tapOn:
+    id: "tab-settings"
+- assertVisible:
+    id: "settings-screen"

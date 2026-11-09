@@ -1,6 +1,6 @@
 import { createQueryClient } from "@flux/shared";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Slot } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -42,7 +42,11 @@ export default function RootLayout() {
 	return (
 		<SafeAreaProvider>
 			<QueryClientProvider client={client}>
-				<Slot />
+				<Stack screenOptions={{ headerShown: false }}>
+					<Stack.Screen name="(tabs)" />
+					<Stack.Screen name="login" />
+					<Stack.Screen name="server" />
+				</Stack>
 			</QueryClientProvider>
 		</SafeAreaProvider>
 	);

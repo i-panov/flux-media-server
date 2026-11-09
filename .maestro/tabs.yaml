@@ -1,0 +1,140 @@
+# Smoke: публичный /server -> OTP-вход -> табы -> настройки.
+#
+# Предусловия:
+#   * backend запущен с debug: true и allow_unknown_email: true —
+#     тогда OTP приходит в ответе и показывается на экране входа;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства: для Android-эмулятора это
+#     http://10.0.2.2:8080/api, для iOS-симулятора — http://localhost:8080/api,
+#     для физического устройства — LAN-адрес машины;
+#   * на iOS clearState может не очистить Keychain — при залипшей сессии
+#     используйте чистый симулятор.
+#
+# Старт устойчив к обоим состояниям: если дефолтный URL доступен, приложение
+# показывает /login; если недоступен — AuthGate error. Обе ветки ведут на
+# публичный /server.
+#
+# Сохранение URL сделано детерминированным: сначала SENTINEL_URL (заведомо
+# отличается от дефолта сборки), затем реальный SERVER_URL. Оба save — changed,
+# поэтому после каждого обязательно появляется /login; conditional-ветки нет.
+# Отдельный сценарий error-recovery: .maestro/tabs-error-recovery.yaml.
+#
+# Запуск:
+#   maestro test .maestro/tabs.yaml
+#   maestro test -e SERVER_URL=http://localhost:8080/api .maestro/tabs.yaml
+appId: app.lib.flux
+name: "Tabs smoke: login -> tabs -> settings"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- launchApp:
+    clearState: true
+
+# 0. Дожидаемся либо /login, либо AuthGate error (общий testID auth-entry).
+- extendedWaitUntil:
+    visible:
+      id: "auth-entry"
+    timeout: 20000
+
+# 1. Открываем публичный /server с того экрана, который оказался на экране.
+- runFlow:
+    when:
+      visible:
+        id: "auth-open-server"
+    commands:
+      - tapOn:
+          id: "auth-open-server"
+- runFlow:
+    when:
+      visible:
+        id: "login-open-server"
+    commands:
+      - tapOn:
+          id: "login-open-server"
+- assertVisible:
+    id: "server-screen"
+
+# 2. Первый save: заведомо changed адрес. После него сервер обязан увести
+#    на /login, потому что токены старого origin удаляются.
+- tapOn:
+    id: "server-url"
+- eraseText: 100
+- inputText: ${SENTINEL_URL}
+- hideKeyboard
+- tapOn:
+    id: "server-save"
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+
+# 3. Второй save: реальный адрес, changed относительно sentinel.
+- tapOn:
+    id: "login-open-server"
+- assertVisible:
+    id: "server-screen"
+- tapOn:
+    id: "server-url"
+- eraseText: 100
+- inputText: ${SERVER_URL}
+- hideKeyboard
+- tapOn:
+    id: "server-save"
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+
+# 4. Проверка back-stack: /server -> /login без сохранения, затем успешный
+#    вход. login onSuccess делает dismissAll, поэтому server не остаётся
+#    в истории после перехода в табы.
+- tapOn:
+    id: "login-open-server"
+- assertVisible:
+    id: "server-screen"
+- tapOn:
+    id: "server-go-login"
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+
+# 5. OTP-вход. Debug-код виден на экране, вытаскиваем из него цифры.
+- tapOn:
+    id: "login-email"
+- inputText: "maestro@example.com"
+- hideKeyboard
+- tapOn:
+    id: "login-request-code"
+- copyTextFrom:
+    id: "login-debug-code"
+- evalScript: ${output.otp = maestro.copiedText.replace(/[^0-9]/g, '')}
+- tapOn:
+    id: "login-code"
+- inputText: ${output.otp}
+- hideKeyboard
+- tapOn:
+    id: "login-sign-in"
+
+# 6. Каркас табов: все четыре вкладки на месте.
+- assertVisible:
+    id: "tab-video"
+- assertVisible:
+    id: "tab-audio"
+- assertVisible:
+    id: "tab-library"
+- assertVisible:
+    id: "tab-settings"
+
+# 7. Плейсхолдер библиотеки и экран настроек.
+- tapOn:
+    id: "tab-library"
+- assertVisible:
+    id: "library-screen"
+- tapOn:
+    id: "tab-settings"
+- assertVisible:
+    id: "settings-screen"
+- assertVisible:
+    id: "settings-open-server"

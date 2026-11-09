@@ -2,7 +2,8 @@
   "expo": {
     "name": "Flux",
     "slug": "mobile",
-    "version": "0.1.10",
+    "scheme": "flux",
+    "version": "0.1.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -24,7 +25,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.lib.flux",
-      "versionCode": 28
+      "versionCode": 29
     },
     "web": {
       "favicon": "./assets/favicon.png"

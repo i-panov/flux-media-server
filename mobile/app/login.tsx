@@ -56,6 +56,11 @@ export default function LoginScreen() {
 			// removeQueries также отменяет висящий /auth/me со старым токеном.
 			queryClient.removeQueries();
 			queryClient.setQueryData(sessionQueryKey, data.user);
+			// Login мог быть открыт поверх /server (ссылка «Вход»): replace
+			// оставил бы server/login в истории. Схлопываем стек до входа.
+			if (router.canDismiss()) {
+				router.dismissAll();
+			}
 			router.replace("/");
 		},
 		onError: (failure) => {
@@ -74,7 +79,7 @@ export default function LoginScreen() {
 	const pending = request.isPending || verify.isPending;
 
 	return (
-		<SafeAreaView style={styles.screen}>
+		<SafeAreaView style={styles.screen} testID="auth-entry">
 			<View style={styles.card}>
 				<Text style={styles.title}>{t("login.title")}</Text>
 				<Text style={styles.subtitle}>{t("login.subtitle")}</Text>
@@ -83,6 +88,7 @@ export default function LoginScreen() {
 					<>
 						<Text style={styles.label}>{t("login.code")}</Text>
 						<TextInput
+							testID="login-code"
 							style={styles.input}
 							value={code}
 							onChangeText={setCode}
@@ -90,11 +96,13 @@ export default function LoginScreen() {
 							autoComplete="one-time-code"
 						/>
 						{debugCode !== null && (
-							<Text style={styles.debug}>
+							<Text testID="login-debug-code" style={styles.debug}>
 								{t("login.devCode", { code: debugCode })}
 							</Text>
 						)}
 						<Pressable
+							testID="login-sign-in"
+							accessibilityRole="button"
 							style={styles.button}
 							disabled={pending || code.trim() === ""}
 							onPress={() =>
@@ -107,7 +115,10 @@ export default function LoginScreen() {
 								<Text style={styles.buttonText}>{t("login.signIn")}</Text>
 							)}
 						</Pressable>
-						<Pressable onPress={() => setCodeSent(false)}>
+						<Pressable
+							accessibilityRole="button"
+							onPress={() => setCodeSent(false)}
+						>
 							<Text style={styles.link}>{t("login.changeEmail")}</Text>
 						</Pressable>
 					</>
@@ -115,6 +126,7 @@ export default function LoginScreen() {
 					<>
 						<Text style={styles.label}>{t("login.email")}</Text>
 						<TextInput
+							testID="login-email"
 							style={styles.input}
 							value={email}
 							onChangeText={setEmail}
@@ -123,6 +135,8 @@ export default function LoginScreen() {
 							keyboardType="email-address"
 						/>
 						<Pressable
+							testID="login-request-code"
+							accessibilityRole="button"
 							style={styles.button}
 							disabled={pending || email.trim() === ""}
 							onPress={() => request.mutate(email.trim())}
@@ -135,8 +149,12 @@ export default function LoginScreen() {
 						</Pressable>
 					</>
 				)}
-				<Pressable onPress={() => router.push("/settings")}>
-					<Text style={styles.link}>{t("home.settings")}</Text>
+				<Pressable
+					testID="login-open-server"
+					accessibilityRole="button"
+					onPress={() => router.push("/server")}
+				>
+					<Text style={styles.link}>{t("server.open")}</Text>
 				</Pressable>
 			</View>
 		</SafeAreaView>

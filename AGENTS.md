@@ -89,7 +89,8 @@ npx expo export --platform android --output-dir dist
 ```
 
 - `android/` и `ios/` генерируются и в git не входят.
-- OTP-вход через SecureStore; сервер задаётся в Settings.
+- OTP-вход через SecureStore; публичная настройка сервера — `/server`
+  (доступна до входа), таб Settings защищён.
 - Анализаторы: biome (extends web) + `eslint-config-expo` + sonarjs.
 - Dogfood-APK (arm64, ~30 МБ вместо ~92 МБ universal):
   `EXPO_PUBLIC_API_BASE=<url> ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a ./gradlew assembleRelease`
@@ -126,7 +127,8 @@ npx expo export --platform android --output-dir dist
 
 ### Mobile (`mobile/`)
 
-- `app/` — экраны expo-router: `login`, `index`, `video`, `audio`, `settings`.
+- `app/` — expo-router: `(tabs)/{video,audio,library,settings}`, `index`,
+  `login`, `server`.
 - `src/auth/` — сессия, logout, `AuthGate`.
 - `src/api/` — shared `CoreFetcher` + query-хуки.
 - `src/i18n/` — ru/en, реактивный `useLanguage`.
@@ -146,8 +148,8 @@ npx expo export --platform android --output-dir dist
 - Ошибки API: `response.Error`; ошибки репозитория мапятся `repoError`.
 - Web-запросы — только через `apiFetch`/`apiFetchBlob`; сырой `fetch` в
   компонентах запрещён (кроме транспорта).
-- Mobile-токены — только SecureStore; `AuthGate` защищает экраны, Settings
-  доступен без сессии.
+- Mobile-токены — только SecureStore; `AuthGate` защищает табы (включая
+  Settings), публичная настройка сервера — `/server`.
 - Shared не импортирует React/DOM/RN; платформенные различия — через
   `AuthTransport`/`KeyValueStore`.
 
