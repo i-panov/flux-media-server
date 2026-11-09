@@ -14,7 +14,39 @@ export {
 	getHealth,
 	type HealthResponse,
 } from "./api/client";
+export {
+	type Favorite,
+	favoriteSchema,
+	favoritesListSchema,
+	fetchFavoriteArtistIds,
+	fetchFavoriteMedia,
+	isStaleFavoriteError,
+	toggleArtistFavorite,
+	toggleFavorite,
+} from "./api/favorites";
 export { type HealthSnapshot, useHealthQuery } from "./api/health";
+export {
+	fetchLyrics,
+	type Lyrics,
+	lyricsSchema,
+	type SaveLyricsInput,
+	saveLyrics,
+} from "./api/lyrics";
+export {
+	type ContinueEntry,
+	deleteProgress,
+	fetchContinueWatching,
+	fetchLatestUnfinishedAudio,
+	fetchProgress,
+	isUnfinishedProgress,
+	type Progress,
+	type ProgressEntry,
+	progressEntrySchema,
+	progressListSchema,
+	progressSchema,
+	type SaveProgressInput,
+	saveProgress,
+} from "./api/progress";
 export type { CredentialsMode } from "./api/transport";
 export {
 	ACCESS_TOKEN_KEY,
