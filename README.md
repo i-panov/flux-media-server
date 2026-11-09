@@ -29,7 +29,9 @@ cd backend
 docker-compose up -d
 ```
 
-The server listens on port `8080`. Media files are expected under `/media` (volume mount).
+The server listens on port `8080` inside the container. Docker Compose publishes
+it on `${HOST_PORT:-8095}` (8095 by default), so the API is available at
+`http://127.0.0.1:8095`. Media files are expected under `/media` (volume mount).
 
 ### Memory requirements for uploads
 

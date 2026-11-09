@@ -99,10 +99,12 @@ func (r *MediaStore) FindByPath(ctx context.Context, path string) (*models.Media
 	var media models.Media
 	// Unscoped: дедуп видит и корзину — файл с trashed-строкой не
 	// импортируется дублем, а пропуск дубликата решает вызывающий
-	// (сканер) по DeletedAt.
+	// (сканер) по DeletedAt. Живые строки раньше trashed: при нескольких
+	// записях на один путь (замена файла) сканер должен видеть живую.
 	err := r.db.WithContext(ctx).Unscoped().
 		Preload("Metadata").
-		Where("file_path = ?", path).First(&media).Error
+		Where("file_path = ?", path).
+		Order("deleted_at").Order("id").First(&media).Error
 	if err != nil {
 		return &media, err
 	}
@@ -121,7 +123,11 @@ func (r *MediaStore) FindByPath(ctx context.Context, path string) (*models.Media
 // Unscoped — как FindByPath: trashed-строка тоже «существует».
 func (r *MediaStore) FindByPathBasic(ctx context.Context, path string) (*models.Media, error) {
 	var media models.Media
-	err := r.db.WithContext(ctx).Unscoped().Where("file_path = ?", path).First(&media).Error
+	// Живые раньше trashed — как в FindByPath: путь не unique, на нём
+	// может быть и заменённая живая запись, и старая в корзине.
+	err := r.db.WithContext(ctx).Unscoped().
+		Where("file_path = ?", path).
+		Order("deleted_at").Order("id").First(&media).Error
 	return &media, err
 }
 
@@ -464,13 +470,34 @@ func escapeLike(s string) string {
 }
 
 func (r *MediaStore) Delete(ctx context.Context, id uint) error {
-	// Корзина: только флаг, без каскадов и без файлов — связи
-	// (избранное, прогресс, коллекции) и восстановление целы.
-	// Файл остаётся на диске: сканер пропускает trashed-строки
-	// и дублей не создаёт. Навсегда — PurgeMedia.
+	// Пользовательская корзина: только флаг, без каскадов и без файлов —
+	// связи (избранное, прогресс, коллекции) и восстановление целы.
+	// AutoTrashed=false важно: purge такой записи удалит файл с диска.
 	return r.db.WithContext(ctx).Model(&models.Media{}).
 		Where("id = ?", id).
-		Update("deleted_at", time.Now().UTC()).Error
+		Updates(map[string]any{
+			"deleted_at":   time.Now().UTC(),
+			"auto_trashed": false,
+		}).Error
+}
+
+// TrashMissing — soft delete по причине пропажи файла. В отличие от
+// пользовательской корзины помечает AutoTrashed: purge не должен удалять
+// файл, который мог вернуться на место (mount, переименование).
+func (r *MediaStore) TrashMissing(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Model(&models.Media{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{
+			"deleted_at":   time.Now().UTC(),
+			"auto_trashed": true,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotInTrash
+	}
+	return nil
 }
 
 // ErrPathConflict — восстановление невозможно: путь уже занят живой строкой.
@@ -500,7 +527,10 @@ func (r *MediaStore) RestoreMedia(ctx context.Context, id uint) error {
 		}
 		return tx.Unscoped().Model(&models.Media{}).
 			Where("id = ?", id).
-			Update("deleted_at", nil).Error
+			Updates(map[string]any{
+				"deleted_at":   nil,
+				"auto_trashed": false,
+			}).Error
 	})
 }
 

@@ -414,3 +414,31 @@ func TestMediaStore_UpdateWithSourceURL(t *testing.T) {
 		gorm.ErrRecordNotFound,
 	)
 }
+
+// TestFindByPathPrefersLiveOverTrashed: путь не unique, на нём может быть
+// старая trashed-строка и новая живая (замена файла). Оба поиска должны
+// возвращать живую: иначе сканер/watcher залипают на корзине.
+func TestFindByPathPrefersLiveOverTrashed(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+	path := "/media/replaced.mkv"
+
+	old := &models.Media{Title: "Old", Filename: "replaced.mkv", Type: models.MediaTypeVideo, FilePath: path}
+	require.NoError(t, store.Create(ctx, old))
+	require.NoError(t, store.Delete(ctx, old.ID))
+
+	live := &models.Media{Title: "New", Filename: "replaced.mkv", Type: models.MediaTypeVideo, FilePath: path}
+	require.NoError(t, store.Create(ctx, live))
+
+	got, err := store.FindByPath(ctx, path)
+	require.NoError(t, err)
+	assert.Equal(t, live.ID, got.ID, "FindByPath должен вернуть живую строку")
+
+	gotBasic, err := store.FindByPathBasic(ctx, path)
+	require.NoError(t, err)
+	assert.Equal(t, live.ID, gotBasic.ID, "FindByPathBasic должен вернуть живую строку")
+}

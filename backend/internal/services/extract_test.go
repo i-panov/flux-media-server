@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -558,4 +559,46 @@ func TestFFmpegArgs(t *testing.T) {
 		"-i", "/v/clip.mkv", "-vn", "-n", "-f", "flac",
 		"-map", "0:a:0", "-c:a", "flac", "/a/clip.flac.part-3",
 	}, flacArgs)
+}
+
+// TestExtractProcessFailureKeepsExistingDestination — регрессия: при
+// ошибке ffmpeg задание не должно удалять уже существующий итоговый файл,
+// совпавший по имени. job.outPath не должен указывать на dst до commitFile.
+func TestExtractProcessFailureKeepsExistingDestination(t *testing.T) {
+	q, mediaRepo, audioDir := setupExtractTestService(t, 0)
+	q.probeFn = func(context.Context, string) (string, float64, error) {
+		return "aac", 2, nil
+	}
+	q.runFFmpegFn = func(context.Context, string, string, extractTarget, float64) error {
+		return errors.New("ffmpeg failed")
+	}
+
+	srcPath := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(srcPath, []byte("fake video"), 0644))
+	source := &models.Media{
+		Title:    "Clip",
+		Filename: "clip.mp4",
+		Type:     models.MediaTypeVideo,
+		FilePath: srcPath,
+	}
+	require.NoError(t, mediaRepo.Create(context.Background(), source))
+
+	dst := filepath.Join(audioDir, "Clip.m4a")
+	const oldContent = "old track"
+	require.NoError(t, os.WriteFile(dst, []byte(oldContent), 0644))
+
+	id, err := q.Enqueue(source.ID)
+	require.NoError(t, err)
+
+	q.mu.Lock()
+	job := q.jobs[id]
+	q.mu.Unlock()
+	require.NotNil(t, job)
+
+	q.process(job)
+
+	assert.FileExists(t, dst, "ошибка ffmpeg не должна удалять существующий итоговый файл")
+	got, readErr := os.ReadFile(dst)
+	require.NoError(t, readErr)
+	assert.Equal(t, oldContent, string(got))
 }

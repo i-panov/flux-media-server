@@ -286,14 +286,28 @@ func (h *TrashHandler) mapTrashError(c *fiber.Ctx, err error) error {
 // Строки сабов сносит FK-каскад, а файлы без этого вызова копились бы
 // невидимыми для БД.
 func (h *TrashHandler) removeMediaFiles(ctx context.Context, media *models.Media) {
-	if media.FilePath != "" {
-		allowed, err := h.streamer.IsPathAllowed(ctx, media.FilePath)
-		if err != nil {
-			log.Printf("Trash purge: IsPathAllowed %s: %v", media.FilePath, err)
-		} else if !allowed {
-			log.Printf("Trash purge: skip removing %s — outside registered libraries", media.FilePath)
-		} else if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Trash purge: remove file %s: %v", media.FilePath, err)
+	// AutoTrashed — запись убрал сканер из-за пропажи файла, а не
+	// пользователь. К моменту purge файл мог вернуться (mount,
+	// переименование), поэтому сам файл не удаляем. Сайдкары и превью
+	// старой строки чистим: новая индексация создаст свои.
+	if media.FilePath != "" && !media.AutoTrashed {
+		if other, err := h.mediaRepo.FindByPathBasic(ctx, media.FilePath); err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Printf("Trash purge: find path owner %s: %v", media.FilePath, err)
+			}
+		} else if other != nil && other.ID != 0 && other.ID != media.ID {
+			// Путь уже принадлежит другой записи (замена файла): файл
+			// удалять нельзя, иначе purge старой строки снесёт живые данные.
+			log.Printf("Trash purge: keep %s — referenced by media %d", media.FilePath, other.ID)
+		} else {
+			allowed, err := h.streamer.IsPathAllowed(ctx, media.FilePath)
+			if err != nil {
+				log.Printf("Trash purge: IsPathAllowed %s: %v", media.FilePath, err)
+			} else if !allowed {
+				log.Printf("Trash purge: skip removing %s — outside registered libraries", media.FilePath)
+			} else if err := os.Remove(media.FilePath); err != nil && !os.IsNotExist(err) {
+				log.Printf("Trash purge: remove file %s: %v", media.FilePath, err)
+			}
 		}
 	}
 	if h.subRepo != nil {

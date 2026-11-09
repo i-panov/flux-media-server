@@ -91,11 +91,96 @@ func TestScannerSweepDeletedMedia(t *testing.T) {
 	err = scanner.ScanPath(ctx, tempDir)
 	require.NoError(t, err)
 
-	_, err = mediaRepo.FindByPath(ctx, testFile)
-	assert.Error(t, err)
+	// Файл исчез: запись уходит в корзину (soft delete), а не удаляется
+	// навсегда — избранное/прогресс/коллекции должны пережить пропажу.
+	trashed, err := mediaRepo.FindByPath(ctx, testFile)
+	require.NoError(t, err)
+	assert.True(t, trashed.DeletedAt.Valid, "пропавший файл должен попасть в корзину")
+	assert.True(t, trashed.AutoTrashed, "сканер помечает запись как AutoTrashed")
+	_, err = mediaRepo.FindByID(ctx, media.ID)
+	assert.Error(t, err, "живой список не должен видеть пропавший файл")
 }
 
-// TestScannerSweepDeletedKeysetNoSkips: больше pageSize (200) записей без
+// TestScannerRestoresAutoTrashedFile: файл исчез (AutoTrashed в корзине),
+// затем по тому же пути появился файл (в т.ч. другое содержимое) — сканер
+// восстанавливает ту же строку и обновляет её. Второй живой записи на тот
+// же путь быть не должно: иначе purge старой строки удалит новый файл.
+func TestScannerRestoresAutoTrashedFile(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	tempDir := t.TempDir()
+	ctx := context.Background()
+	testFile := filepath.Join(tempDir, "replace.mp4")
+
+	require.NoError(t, os.WriteFile(testFile, []byte("first version"), 0644))
+	cfg := &config.Config{
+		Media: config.MediaConfig{
+			ThumbnailPath: t.TempDir(),
+			VideoPath:     tempDir,
+		},
+	}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	old, err := mediaRepo.FindByPath(ctx, testFile)
+	require.NoError(t, err)
+	require.NoError(t, os.Remove(testFile))
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	trashed, err := mediaRepo.FindByPath(ctx, testFile)
+	require.NoError(t, err)
+	require.True(t, trashed.DeletedAt.Valid)
+	require.True(t, trashed.AutoTrashed)
+
+	// Другое содержимое по тому же пути.
+	require.NoError(t, os.WriteFile(testFile, []byte("second version, longer"), 0644))
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	restored, err := mediaRepo.FindByID(ctx, old.ID)
+	require.NoError(t, err, "файл вернулся — запись должна быть восстановлена")
+	assert.Equal(t, testFile, restored.FilePath)
+
+	live, total, err := mediaRepo.FindAll(ctx, repository.MediaFilters{Type: models.MediaTypeVideo}, 0, 0)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, total, "второй живой записи на тот же путь быть не должно")
+	require.Len(t, live, 1)
+	assert.Equal(t, old.ID, live[0].ID)
+
+	// Повторный скан не должен ничего менять/дублировать.
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+	_, total, err = mediaRepo.FindAll(ctx, repository.MediaFilters{}, 0, 0)
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, total)
+}
+
+// TestScannerDoesNotRestoreUserTrashedFile: пользовательская корзина
+// файл не удаляет, и скан не должен воскрешать осознанно удалённую запись.
+func TestScannerDoesNotRestoreUserTrashedFile(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	tempDir := t.TempDir()
+	ctx := context.Background()
+	testFile := filepath.Join(tempDir, "user-trash.mp4")
+	require.NoError(t, os.WriteFile(testFile, []byte("content"), 0644))
+
+	cfg := &config.Config{Media: config.MediaConfig{ThumbnailPath: t.TempDir(), VideoPath: tempDir}}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	media, err := mediaRepo.FindByPath(ctx, testFile)
+	require.NoError(t, err)
+	require.NoError(t, mediaRepo.Delete(ctx, media.ID))
+
+	// Файл на месте, но запись удалена пользователем — скан не восстанавливает.
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	_, err = mediaRepo.FindByID(ctx, media.ID)
+	assert.Error(t, err)
+	trashed, err := mediaRepo.FindByPath(ctx, testFile)
+	require.NoError(t, err)
+	assert.True(t, trashed.DeletedAt.Valid)
+	assert.False(t, trashed.AutoTrashed)
+}
+
+// TestScannerSweepDeletedKeysetNoSkips:// TestScannerSweepDeletedKeysetNoSkips: больше pageSize (200) записей без
 // файлов на диске — sweep обязан удалить ВСЕ. Offset-пагинация с удалением
 // в цикле сдвигала окно и пропускала записи (регрессия).
 func TestScannerSweepDeletedKeysetNoSkips(t *testing.T) {
@@ -127,7 +212,11 @@ func TestScannerSweepDeletedKeysetNoSkips(t *testing.T) {
 
 	_, total, err := mediaRepo.FindAll(ctx, repository.MediaFilters{}, 0, 0)
 	require.NoError(t, err)
-	assert.Zero(t, total, "sweep должен удалить все записи без файлов, без пропусков")
+	assert.Zero(t, total, "живой список не должен видеть записи без файлов")
+
+	trashed, err := mediaRepo.TrashedMedia(ctx, 0, 0)
+	require.NoError(t, err)
+	assert.Len(t, trashed, count, "sweep должен отправить все записи в корзину, без пропусков")
 }
 
 // TestScannerContextCancellation: отмена контекста прерывает скан.
@@ -311,7 +400,8 @@ func TestHandleFSEventsCreate(t *testing.T) {
 	assert.NotEmpty(t, media.FileHash)
 }
 
-// TestHandleFSEventsRemove: событие Remove → запись и миниатюра удаляются.
+// TestHandleFSEventsRemove: событие Remove → запись уходит в корзину,
+// превью остаётся для восстановления.
 func TestHandleFSEventsRemove(t *testing.T) {
 	mediaRepo := setupTestDB(t)
 	tempDir := t.TempDir()
@@ -346,11 +436,16 @@ func TestHandleFSEventsRemove(t *testing.T) {
 		{Path: testFile, Op: fsnotify.Remove},
 	})
 
-	_, err = mediaRepo.FindByPath(ctx, testFile)
-	assert.Error(t, err, "запись должна быть удалена после Remove-события")
+	trashed, err := mediaRepo.FindByPath(ctx, testFile)
+	require.NoError(t, err)
+	assert.True(t, trashed.DeletedAt.Valid, "запись должна уйти в корзину после Remove-события")
+	assert.True(t, trashed.AutoTrashed, "watcher помечает запись как AutoTrashed")
+
+	_, err = mediaRepo.FindByID(ctx, media.ID)
+	assert.Error(t, err, "живой список не должен видеть удалённый файл")
 
 	_, statErr := os.Stat(thumbPath)
-	assert.True(t, os.IsNotExist(statErr), "миниатюра должна быть удалена вместе с записью")
+	assert.NoError(t, statErr, "миниатюра должна остаться для восстановления")
 }
 
 // TestHandleFSEventsRemoveUnknownPath: удаление файла без записи — не ошибка.

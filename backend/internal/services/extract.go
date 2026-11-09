@@ -110,8 +110,8 @@ type ExtractJob struct {
 	MediaID   uint
 	sourceID  uint
 	createdAt time.Time
-	// outPath — итоговый путь результата (известен после probe). Нужен
-	// fail() для чистки файла при поздних ошибках.
+	// outPath — итоговый путь уже закоммиченного результата. До успешного
+	// commitFile остаётся пустым: fail() не должен удалять чужой файл.
 	outPath string
 	// jobCancel убивает запущенный ffmpeg. Выставляется воркером при
 	// старте обработки; Cancel дёргает под локом.
@@ -142,6 +142,11 @@ type ExtractService struct {
 	// available — ffmpeg+ffprobe найдены при создании. Без них сервер
 	// стартует, но хендлер отвечает 503 (см. Available).
 	available bool
+	// probeFn/runFFmpegFn — точки подмены для тестов. В продакшене nil:
+	// используются probeAudioCodec и runFFmpeg. Нужны, чтобы проверять
+	// порядок cleanup без реальных ffmpeg/ffprobe (их может не быть в CI).
+	probeFn     func(context.Context, string) (string, float64, error)
+	runFFmpegFn func(context.Context, string, string, extractTarget, float64) error
 }
 
 func NewExtractService(
@@ -467,7 +472,7 @@ func (q *ExtractService) process(job *ExtractJob) {
 		return
 	}
 
-	codec, duration, err := probeAudioCodec(jobCtx, source.FilePath)
+	codec, duration, err := q.probeAudio(jobCtx, source.FilePath)
 	if err != nil {
 		q.fail(job, err, "Failed to probe audio stream")
 		return
@@ -493,10 +498,10 @@ func (q *ExtractService) process(job *ExtractJob) {
 		q.fail(job, err, "Failed to create directory")
 		return
 	}
-	q.mu.Lock()
-	job.outPath = dstPath
-	q.mu.Unlock()
-
+	// job.outPath до commitFile НЕ выставляем: там ещё нет нашего файла,
+	// а cleanupJob по outPath удаляет путь. Иначе ошибка ffmpeg/хэша
+	// сносила бы чужой существующий файл с тем же именем.
+	//
 	// Частичный результат не должен светиться в сканируемой директории:
 	// пишем в tmp и коммитим rename в конце. Имя уникально на джоб —
 	// параллельные ffmpeg не делят файл даже при workers>1.
@@ -511,7 +516,7 @@ func (q *ExtractService) process(job *ExtractJob) {
 	// бы перезаписывать, и поднятое задание упало бы сразу. Имя уникально
 	// на джоб (.part-<id>), чужое не сносим.
 	os.Remove(tmpPath)
-	if err := q.runFFmpeg(jobCtx, source.FilePath, tmpPath, target, duration); err != nil {
+	if err := q.runFFmpegForJob(jobCtx, source.FilePath, tmpPath, target, duration); err != nil {
 		os.Remove(tmpPath)
 		if cancelled := q.markCancelled(job); cancelled {
 			return
@@ -552,9 +557,6 @@ func (q *ExtractService) process(job *ExtractJob) {
 	committed := false
 	for attempt := 0; attempt < 3 && !committed; attempt++ {
 		finalPath = uniquePath(dstPath)
-		q.mu.Lock()
-		job.outPath = finalPath
-		q.mu.Unlock()
 		if err := commitFile(tmpPath, finalPath); err != nil {
 			if errors.Is(err, errExtractFileExists) {
 				continue
@@ -564,6 +566,9 @@ func (q *ExtractService) process(job *ExtractJob) {
 			return
 		}
 		committed = true
+		q.mu.Lock()
+		job.outPath = finalPath
+		q.mu.Unlock()
 	}
 	if !committed {
 		os.Remove(tmpPath)
@@ -664,6 +669,22 @@ func ffmpegArgs(src, dst string, target extractTarget) []string {
 		args = append(args, "-c:a", "copy")
 	}
 	return append(args, dst)
+}
+
+// probeAudio — probeAudioCodec с точкой подмены для тестов.
+func (q *ExtractService) probeAudio(ctx context.Context, path string) (string, float64, error) {
+	if q.probeFn != nil {
+		return q.probeFn(ctx, path)
+	}
+	return probeAudioCodec(ctx, path)
+}
+
+// runFFmpegForJob — runFFmpeg с точкой подмены для тестов.
+func (q *ExtractService) runFFmpegForJob(ctx context.Context, src, dst string, target extractTarget, durationSecs float64) error {
+	if q.runFFmpegFn != nil {
+		return q.runFFmpegFn(ctx, src, dst, target, durationSecs)
+	}
+	return q.runFFmpeg(ctx, src, dst, target, durationSecs)
 }
 
 // runFFmpeg извлекает аудиодорожку: stream copy (качество 1:1) либо

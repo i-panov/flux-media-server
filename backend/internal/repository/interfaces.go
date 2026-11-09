@@ -38,6 +38,8 @@ type MediaRepository interface {
 	// FindByIDs возвращает медиа по списку ID с Metadata и Artists.
 	FindByIDs(ctx context.Context, ids []uint) ([]models.Media, error)
 	FindByID(ctx context.Context, id uint) (*models.Media, error)
+	// FindByPath ищет по пути, включая корзину. При нескольких строках
+	// на один путь (замена файла) возвращает живую раньше trashed.
 	FindByPath(ctx context.Context, path string) (*models.Media, error)
 	// SetPHash записывает perceptual hash без «только непустые поля»:
 	// ноль обязан затирать устаревший хэш изменённого файла.
@@ -47,6 +49,7 @@ type MediaRepository interface {
 	FindImagesWithPHash(ctx context.Context, excludeID uint) ([]models.Media, error)
 	// FindByPathBasic ищет по пути одним SELECT без Preload — для горячих
 	// путей, где Metadata/Artists не нужны (сканирование больших библиотек).
+	// Как FindByPath: живые строки раньше trashed.
 	FindByPathBasic(ctx context.Context, path string) (*models.Media, error)
 	FindByHash(ctx context.Context, hash string) (*models.Media, error)
 	// FindBySourceHash ищет по хэшу исходника из карантина (дедуп
@@ -83,9 +86,12 @@ type MediaRepository interface {
 	// пропускает пустые значения, чтобы сканер и очередь не затирали
 	// ручные правки. nil = ссылку не трогать.
 	UpdateWithSourceURL(ctx context.Context, media *models.Media, sourceURL *string) error
-	// Delete — корзина: только флаг, связи/файлы целы, восстановление
-	// мгновенное. Навсегда — PurgeMedia.
+	// Delete — пользовательская корзина: только флаг, связи/файлы целы,
+	// восстановление мгновенное. Навсегда — PurgeMedia.
 	Delete(ctx context.Context, id uint) error
+	// TrashMissing — soft delete по причине пропажи файла (сканер/watcher).
+	// Помечает AutoTrashed: purge такой строки не трогает файлы на диске.
+	TrashMissing(ctx context.Context, id uint) error
 	// RestoreMedia возвращает из корзины; путь занят живым — ErrPathConflict.
 	RestoreMedia(ctx context.Context, id uint) error
 	// PurgeMedia сносит навсегда: связи каскадом, строка — hard.

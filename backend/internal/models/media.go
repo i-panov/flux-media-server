@@ -63,6 +63,11 @@ type Media struct {
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	// AutoTrashed — запись убрана сканером из-за пропажи файла, а не
+	// пользователем. Purge такой записи не удаляет файлы с диска: файл
+	// мог вернуться, а строка осталась в корзине. Пользовательская
+	// корзина (MediaStore.Delete) всегда ставит false.
+	AutoTrashed bool `gorm:"default:false" json:"-"`
 }
 
 type Metadata struct {

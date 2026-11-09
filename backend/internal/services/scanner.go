@@ -186,12 +186,19 @@ func (s *ScannerService) trimStatusesLocked() {
 	}
 }
 
-// sweepDeleted removes media records under the given path whose files were
-// not seen during the scan (i.e. deleted from disk).
+// sweepDeleted moves media records under the given path whose files were
+// not seen during the scan to the trash (soft delete). Hard-purge здесь
+// недопустим: пропажа файла (отвалившийся mount, переименование) не должна
+// уничтожать избранное, прогресс и элементы коллекций. Окончательно чистит
+// только корзина.
+//
+// Автовосстановление при возврате файла намеренно не делаем: пользовательская
+// корзина файл не удаляет, и скан воскресил бы осознанно удалённые записи.
+//
 // Uses pagination to avoid loading the entire table at once. Offset-based
-// pagination combined with in-place deletes would shift the window and skip
-// records, so when a page contained deletions we re-request the SAME offset:
-// rows that slid into the window are examined before advancing.
+// pagination combined with in-place soft deletes would shift the window and
+// skip records, so when a page contained deletions we re-request the SAME
+// offset: rows that slid into the window are examined before advancing.
 func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen map[string]struct{}) error {
 	const pageSize = 200
 	offset := 0
@@ -208,11 +215,11 @@ func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen
 		deleted := false
 		for _, m := range mediaList {
 			if _, ok := seen[m.FilePath]; !ok {
-				if err := s.mediaRepo.PurgeMedia(ctx, m.ID); err != nil {
-					log.Printf("Sweep: delete media %d (%s): %v", m.ID, m.FilePath, err)
+				if err := s.mediaRepo.TrashMissing(ctx, m.ID); err != nil {
+					log.Printf("Sweep: trash media %d (%s): %v", m.ID, m.FilePath, err)
 				} else {
 					deleted = true
-					log.Printf("Sweep: removed missing file: %s", m.FilePath)
+					log.Printf("Sweep: moved missing file to trash: %s", m.FilePath)
 				}
 			}
 		}
@@ -336,8 +343,10 @@ func waitUntilFileStable(ctx context.Context, path string, attempts int, interva
 	return false
 }
 
-// removeMediaForPath удаляет запись Media (и миниатюру/обложки) для файла,
-// исчезнувшего с диска. Идемпотентно: отсутствующая запись — не ошибка.
+// removeMediaForPath отправляет запись Media в корзину, если файл исчез
+// с диска. Превью/обложки НЕ удаляются: они нужны для восстановления,
+// а окончательную чистку делает purge из корзины. Идемпотентно:
+// отсутствующая запись — не ошибка.
 func (s *ScannerService) removeMediaForPath(ctx context.Context, path string) {
 	existing, err := s.mediaRepo.FindByPathBasic(ctx, path)
 	if err != nil {
@@ -349,19 +358,16 @@ func (s *ScannerService) removeMediaForPath(ctx context.Context, path string) {
 	if existing == nil || existing.ID == 0 {
 		return
 	}
-
-	if err := s.mediaRepo.PurgeMedia(ctx, existing.ID); err != nil {
-		log.Printf("watch scan: delete media %d (%s): %v", existing.ID, path, err)
+	if existing.DeletedAt.Valid {
+		// Уже в корзине: повторный Remove не должен обновлять deleted_at.
 		return
 	}
-	log.Printf("watch scan: removed missing file: %s", path)
 
-	if s.thumbService != nil {
-		if err := os.Remove(s.thumbService.GetPath(existing.ID)); err != nil && !os.IsNotExist(err) {
-			log.Printf("watch scan: remove thumbnail %d: %v", existing.ID, err)
-		}
-		s.thumbService.RemoveCovers(existing.ID)
+	if err := s.mediaRepo.TrashMissing(ctx, existing.ID); err != nil {
+		log.Printf("watch scan: trash media %d (%s): %v", existing.ID, path, err)
+		return
 	}
+	log.Printf("watch scan: moved missing file to trash: %s", path)
 }
 
 // scanFile обрабатывает один файл: создаёт запись для нового файла или
@@ -401,7 +407,22 @@ func (s *ScannerService) scanFile(ctx context.Context, path string) {
 		// Корзина: файл с trashed-строкой не импортируем дублем
 		// и не обновляем — seen уже помечен вызывающим, sweep
 		// (scoped) строку не видит и не тронет.
+		//
+		// AutoTrashed — системная запись после пропажи файла: если файл
+		// вернулся на место, восстанавливаем ту же строку и обновляем её.
+		// Так не появляется вторая живая запись на тот же путь, а purge
+		// старой строки не удалит вернувшийся файл. Пользовательскую
+		// корзину не воскрешаем: файл у неё остаётся на диске намеренно.
 		if existing.DeletedAt.Valid {
+			if !existing.AutoTrashed {
+				return
+			}
+			if err := s.mediaRepo.RestoreMedia(ctx, existing.ID); err != nil {
+				log.Printf("Restore auto-trashed media %d (%s): %v", existing.ID, path, err)
+				return
+			}
+			// updateChangedFile сам перечитает полный объект с Metadata/Artists.
+			s.updateChangedFile(ctx, path, info, existing)
 			return
 		}
 		s.updateChangedFile(ctx, path, info, existing)

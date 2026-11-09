@@ -258,3 +258,55 @@ func TestTrash_Stats(t *testing.T) {
 	assert.Equal(t, int64(1), stats["subcollections"])
 	assert.Equal(t, int64(3), stats["items"])
 }
+
+// TestTrash_PurgeAutoTrashedKeepsFile: AutoTrashed-запись появилась из-за
+// пропажи файла, а не по воле пользователя. К моменту purge файл мог
+// вернуться — удалять его нельзя, иначе «Очистить корзину» сносит живые файлы.
+func TestTrash_PurgeAutoTrashedKeepsFile(t *testing.T) {
+	app, libraryPath, db := setupTrashTestApp(t)
+	ctx := context.Background()
+
+	videoPath := filepath.Join(libraryPath, "returned.mkv")
+	require.NoError(t, os.WriteFile(videoPath, []byte("data"), 0644))
+
+	mediaRepo := repository.NewMediaRepository(db)
+	media := &models.Media{Title: "Returned", Type: models.MediaTypeVideo, FilePath: videoPath}
+	require.NoError(t, mediaRepo.Create(ctx, media))
+	require.NoError(t, mediaRepo.TrashMissing(ctx, media.ID))
+
+	req := httptest.NewRequest("DELETE", "/api/trash/media/"+strconv.Itoa(int(media.ID)), nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	_, err = os.Stat(videoPath)
+	assert.NoError(t, err, "purge AutoTrashed не должен удалять вернувшийся файл")
+}
+
+// TestTrash_PurgeKeepsFileReferencedByAnotherRow: даже пользовательская
+// корзина не должна удалять файл, если на тот же путь уже ссылается другая
+// запись (замена файла, ручное создание). Иначе purge старой строки снесёт
+// живые данные.
+func TestTrash_PurgeKeepsFileReferencedByAnotherRow(t *testing.T) {
+	app, libraryPath, db := setupTrashTestApp(t)
+	ctx := context.Background()
+
+	videoPath := filepath.Join(libraryPath, "shared-path.mkv")
+	require.NoError(t, os.WriteFile(videoPath, []byte("data"), 0644))
+
+	mediaRepo := repository.NewMediaRepository(db)
+	old := &models.Media{Title: "Old", Type: models.MediaTypeVideo, FilePath: videoPath}
+	require.NoError(t, mediaRepo.Create(ctx, old))
+	require.NoError(t, mediaRepo.Delete(ctx, old.ID))
+
+	live := &models.Media{Title: "Live", Type: models.MediaTypeVideo, FilePath: videoPath}
+	require.NoError(t, mediaRepo.Create(ctx, live))
+
+	req := httptest.NewRequest("DELETE", "/api/trash/media/"+strconv.Itoa(int(old.ID)), nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	_, err = os.Stat(videoPath)
+	assert.NoError(t, err, "файл живой записи не должен удаляться purge-ем старой")
+}
