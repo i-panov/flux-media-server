@@ -194,11 +194,22 @@ func (h *ThumbHandler) UploadCover(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
 	}
 
-	// Сначала сохраняем новую обложку — при сбое записи старая остаётся
-	// нетронутой. Файл с тем же расширением перезаписывается, остальные
-	// расширения удаляются только после успешного сохранения.
-	if err := c.SaveFile(fileHeader, coverPath); err != nil {
+	// Пишем во временный файл и заменяем atomic rename: при сбое записи
+	// старая обложка (в т.ч. с тем же расширением) остаётся нетронутой.
+	tmp, err := os.CreateTemp(filepath.Dir(coverPath), "cover-*.tmp")
+	if err != nil {
+		log.Printf("UploadCover: temp file: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
+	}
+	tmpPath := tmp.Name()
+	_ = tmp.Close()
+	defer os.Remove(tmpPath)
+	if err := c.SaveFile(fileHeader, tmpPath); err != nil {
 		log.Printf("UploadCover: save file: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
+	}
+	if err := os.Rename(tmpPath, coverPath); err != nil {
+		log.Printf("UploadCover: commit cover: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
 	}
 	// .gif включён: extractEmbeddedArt может создать gif-обложку (загрузить
