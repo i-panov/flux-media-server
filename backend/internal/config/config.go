@@ -24,14 +24,17 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host          string `yaml:"host"`
-	Port          int    `yaml:"port"`
-	Debug         bool   `yaml:"debug"`
-	Env           string `yaml:"env"` // "dev" | "production" (default)
-	CORSOrigins   string `yaml:"cors_origins"`
-	CookieSecure  bool   `yaml:"cookie_secure"` // Secure-флаг сессионных кук, нужен HTTPS
-	MaxUploadSize int64  `yaml:"max_upload_size"`
-	WebDist       string `yaml:"web_dist"` // каталог собранного веба (web/dist); пусто — API-only
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	Debug       bool   `yaml:"debug"`
+	Env         string `yaml:"env"` // "dev" | "production" (default)
+	CORSOrigins string `yaml:"cors_origins"`
+	// TrustedProxies — CIDR/IP прокси, от которых принимаем X-Forwarded-For.
+	// Пусто — заголовок игнорируется (клиент = c.IP()).
+	TrustedProxies string `yaml:"trusted_proxies"`
+	CookieSecure   bool   `yaml:"cookie_secure"` // Secure-флаг сессионных кук, нужен HTTPS
+	MaxUploadSize  int64  `yaml:"max_upload_size"`
+	WebDist        string `yaml:"web_dist"` // каталог собранного веба (web/dist); пусто — API-only
 }
 
 type DatabaseConfig struct {

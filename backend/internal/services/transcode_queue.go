@@ -683,7 +683,19 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 	if thumbPath := q.thumbSvc.GenerateWithContext(jobCtx, media.ID, resultPath); thumbPath != "" {
 		media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
 		if err := q.media.Update(context.Background(), media); err != nil {
-			q.fail(task, err, "Failed to update media thumbnail", true)
+			// Результат создан, но состояние не записалось. Если исходник
+			// ещё на месте — ретрай возможен, чистим результат. Если исходник
+			// уже перемещён/удалён (Direct/Remux), результат — единственная
+			// копия: удалять его нельзя, ретрай всё равно упрётся в
+			// отсутствующий SourcePath.
+			sourceExists := false
+			if _, statErr := os.Stat(task.SourcePath); statErr == nil {
+				sourceExists = true
+			}
+			if sourceExists {
+				q.removeResult(media)
+			}
+			q.fail(task, err, "Failed to update media thumbnail", sourceExists)
 			return
 		}
 	}
@@ -971,6 +983,11 @@ func (q *TranscodeQueue) removeResult(media *models.Media) {
 	}
 	if err := q.media.PurgeMedia(context.Background(), media.ID); err != nil {
 		log.Printf("transcode: purge media %d: %v", media.ID, err)
+		// Файл уже удалён: оставлять живой ряд нельзя, иначе повторный
+		// checkHashMatch примет его за дубликат и снесёт исходник.
+		if delErr := q.media.Delete(context.Background(), media.ID); delErr != nil {
+			log.Printf("transcode: soft-delete media %d after purge failure: %v", media.ID, delErr)
+		}
 	}
 	q.thumbSvc.RemoveCovers(media.ID)
 	if err := os.Remove(q.thumbSvc.GetPath(media.ID)); err != nil && !os.IsNotExist(err) {

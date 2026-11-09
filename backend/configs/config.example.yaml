@@ -11,6 +11,7 @@ server:
   # logging (including secrets). NEVER enable outside local development.
   debug: false
   cors_origins: "*"  # Set to your frontend origin in production
+  # trusted_proxies: "127.0.0.1/32,10.0.0.0/8"  # X-Forwarded-For принимается только от этих CIDR
   # cookie_secure: true включает Secure-флаг у сессионных кук веб-клиента
   # (flux_access, flux_refresh). Нужен HTTPS; в LAN по HTTP оставьте false,
   # иначе браузер не будет отправлять куки.

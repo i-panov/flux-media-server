@@ -30,7 +30,7 @@ COPY packages/shared/ ./packages/shared/
 RUN npm run build --workspace=flux-web
 
 # Runtime stage
-FROM alpine:3.19
+FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates tzdata ffmpeg
 

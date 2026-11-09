@@ -109,6 +109,28 @@ func (s *ThumbnailService) Exists(mediaID uint) bool {
 	return err == nil
 }
 
+// tempThumbPath создаёт временный файл в каталоге превью. ffmpeg пишет
+// туда, а финальный файл заменяется atomic rename — сбой не портит старое
+// превью и не оставляет частичный файл под боевым именем.
+func (s *ThumbnailService) tempThumbPath(mediaID uint, kind string) (string, error) {
+	// Суффикс .jpg обязателен: ffmpeg выбирает муксер по расширению,
+	// и на .tmp падает с «Unable to find a suitable output format».
+	f, err := os.CreateTemp(s.thumbnailsDir, fmt.Sprintf("%d-%s-*.jpg", mediaID, kind))
+	if err != nil {
+		return "", err
+	}
+	name := f.Name()
+	if err := f.Chmod(0o644); err != nil {
+		os.Remove(name)
+		return "", err
+	}
+	if closeErr := f.Close(); closeErr != nil {
+		os.Remove(name)
+		return "", closeErr
+	}
+	return name, nil
+}
+
 // generateVideoThumbnail extracts a frame from a video using ffmpeg.
 // Кадр берётся на отметке min(10 секунд, 10% длительности): для коротких
 // роликов фиксированная -ss 10 уезжала бы в конец или за границы.
@@ -120,6 +142,12 @@ func (s *ThumbnailService) generateVideoThumbnail(ctx context.Context, mediaID u
 		log.Printf("thumb: mkdir %s: %v", s.thumbnailsDir, err)
 		return ""
 	}
+	tmpPath, err := s.tempThumbPath(mediaID, "video")
+	if err != nil {
+		log.Printf("thumb: temp for %d: %v", mediaID, err)
+		return ""
+	}
+	defer os.Remove(tmpPath)
 
 	ss := "10"
 	if dur := probeDuration(ctx, filePath); dur > 0 {
@@ -137,7 +165,7 @@ func (s *ThumbnailService) generateVideoThumbnail(ctx context.Context, mediaID u
 		"-vframes", "1",
 		"-q:v", "2",
 		"-y",
-		outPath,
+		tmpPath,
 	)
 
 	var stderr bytes.Buffer
@@ -148,6 +176,10 @@ func (s *ThumbnailService) generateVideoThumbnail(ctx context.Context, mediaID u
 		return ""
 	}
 
+	if err := os.Rename(tmpPath, outPath); err != nil {
+		log.Printf("thumb: commit %s: %v", outPath, err)
+		return ""
+	}
 	return outPath
 }
 
@@ -165,6 +197,12 @@ func (s *ThumbnailService) generateImageThumbnail(ctx context.Context, mediaID u
 		log.Printf("thumb: mkdir %s: %v", s.thumbnailsDir, err)
 		return ""
 	}
+	tmpPath, err := s.tempThumbPath(mediaID, "image")
+	if err != nil {
+		log.Printf("thumb: temp for %d: %v", mediaID, err)
+		return ""
+	}
+	defer os.Remove(tmpPath)
 
 	// Один битый файл не должен подвешивать скан.
 	cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -179,7 +217,7 @@ func (s *ThumbnailService) generateImageThumbnail(ctx context.Context, mediaID u
 		"-frames:v", "1",
 		"-q:v", "3",
 		"-y",
-		outPath,
+		tmpPath,
 	)
 
 	var stderr bytes.Buffer
@@ -190,6 +228,10 @@ func (s *ThumbnailService) generateImageThumbnail(ctx context.Context, mediaID u
 		return ""
 	}
 
+	if err := os.Rename(tmpPath, outPath); err != nil {
+		log.Printf("thumb: commit image %s: %v", outPath, err)
+		return ""
+	}
 	return outPath
 }
 
@@ -208,15 +250,19 @@ func probeDuration(ctx context.Context, filePath string) float64 {
 // extractEmbeddedArt extracts embedded album art using ffmpeg.
 func (s *ThumbnailService) extractEmbeddedArt(ctx context.Context, mediaID uint, filePath string) string {
 	// Формат обложки заранее неизвестен (jpg/png/webp/gif), поэтому
-	// извлекаем во временный .jpg и переименовываем по фактическому
+	// извлекаем во временный файл и переименовываем по фактическому
 	// формату — FindCoverPath поддерживает все варианты.
-	outPath := s.GetCoverPath(mediaID)
-
 	// Ensure thumbnails directory exists.
 	if err := os.MkdirAll(s.thumbnailsDir, 0755); err != nil {
 		log.Printf("thumb: mkdir %s: %v", s.thumbnailsDir, err)
 		return ""
 	}
+	tmpPath, err := s.tempThumbPath(mediaID, "cover")
+	if err != nil {
+		log.Printf("thumb: temp cover for %d: %v", mediaID, err)
+		return ""
+	}
+	defer os.Remove(tmpPath)
 
 	// Use a timeout so a hung ffmpeg cannot block the worker indefinitely.
 	cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -224,7 +270,7 @@ func (s *ThumbnailService) extractEmbeddedArt(ctx context.Context, mediaID uint,
 	cmd := exec.CommandContext(cmdCtx, "ffmpeg",
 		"-i", filePath,
 		"-an", "-vcodec", "copy",
-		"-y", outPath,
+		"-y", tmpPath,
 	)
 
 	var stderr bytes.Buffer
@@ -235,16 +281,19 @@ func (s *ThumbnailService) extractEmbeddedArt(ctx context.Context, mediaID uint,
 		return ""
 	}
 
-	final := s.CoverPathForExt(mediaID, detectImageFormat(outPath))
-	if final != outPath {
-		_ = os.Remove(final) // старая копия с другим расширением
-		if err := os.Rename(outPath, final); err != nil {
-			log.Printf("thumb: rename cover %s -> %s: %v", outPath, final, err)
-			return outPath
-		}
-		return final
+	final := s.CoverPathForExt(mediaID, detectImageFormat(tmpPath))
+	if err := os.Rename(tmpPath, final); err != nil {
+		log.Printf("thumb: commit cover %s: %v", final, err)
+		return ""
 	}
-	return outPath
+	// Старые копии с другим расширением — только после успешного commit.
+	for _, ext := range []string{".jpg", ".png", ".webp", ".gif"} {
+		old := s.CoverPathForExt(mediaID, ext)
+		if old != final {
+			_ = os.Remove(old)
+		}
+	}
+	return final
 }
 
 // detectImageFormat определяет формат изображения по сигнатуре файла.

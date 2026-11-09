@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -119,6 +120,8 @@ func TestSecurityHeaders(t *testing.T) {
 	assert.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
 	assert.Equal(t, "DENY", resp.Header.Get("X-Frame-Options"))
 	assert.Equal(t, "no-referrer", resp.Header.Get("Referrer-Policy"))
+	assert.Equal(t, "camera=(), microphone=(), geolocation=()", resp.Header.Get("Permissions-Policy"))
+	assert.Empty(t, resp.Header.Get("Strict-Transport-Security"), "HSTS только на HTTPS")
 }
 
 // --- Auth flow ---
@@ -516,4 +519,34 @@ func TestReadRateLimiter(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, fiber.StatusTooManyRequests, resp.StatusCode)
 	resp.Body.Close()
+}
+
+func TestGetClientIPTrustedProxy(t *testing.T) {
+	trusted := parseTrustedProxies("10.0.0.0/8")
+	app := fiber.New()
+	app.Get("/", func(c *fiber.Ctx) error {
+		c.Context().SetRemoteAddr(&net.TCPAddr{IP: net.ParseIP("10.1.2.3")})
+		c.Request().Header.Set("X-Forwarded-For", "203.0.113.9, 10.1.2.3")
+		return c.SendString(getClientIP(c, trusted))
+	})
+	resp, err := app.Test(httptest.NewRequest("GET", "/", nil))
+	require.NoError(t, err)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "203.0.113.9", string(body))
+}
+
+func TestGetClientIPUntrustedProxyIgnoresHeader(t *testing.T) {
+	trusted := parseTrustedProxies("10.0.0.0/8")
+	app := fiber.New()
+	app.Get("/", func(c *fiber.Ctx) error {
+		c.Context().SetRemoteAddr(&net.TCPAddr{IP: net.ParseIP("192.0.2.5")})
+		c.Request().Header.Set("X-Forwarded-For", "203.0.113.9")
+		return c.SendString(getClientIP(c, trusted))
+	})
+	resp, err := app.Test(httptest.NewRequest("GET", "/", nil))
+	require.NoError(t, err)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "192.0.2.5", string(body))
 }

@@ -84,7 +84,37 @@ func (h *TrashHandler) RestoreMedia(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
-	if err := h.mediaRepo.RestoreMedia(c.UserContext(), id); err != nil {
+	ctx := c.UserContext()
+	media, err := h.mediaRepo.FindTrashedMedia(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, repository.ErrNotInTrash) {
+			return response.Error(c, fiber.StatusNotFound, "Media not found in trash")
+		}
+		log.Printf("Trash restore media load: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to restore media")
+	}
+	// Restore без файла вернул бы в библиотеку заведомо битую запись.
+	allowed, pathErr := h.streamer.IsPathAllowed(ctx, media.FilePath)
+	if pathErr != nil {
+		log.Printf("Trash restore: IsPathAllowed %s: %v", media.FilePath, pathErr)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to check media file")
+	}
+	if !allowed {
+		return response.Error(c, fiber.StatusConflict, "Media file is unavailable")
+	}
+	info, statErr := os.Stat(media.FilePath)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return response.Error(c, fiber.StatusConflict, "Media file is missing")
+		}
+		log.Printf("Trash restore: stat %s: %v", media.FilePath, statErr)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to check media file")
+	}
+	if info.IsDir() {
+		return response.Error(c, fiber.StatusConflict, "Media file is not a file")
+	}
+
+	if err := h.mediaRepo.RestoreMedia(ctx, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, repository.ErrNotInTrash) {
 			return response.Error(c, fiber.StatusNotFound, "Media not found in trash")
 		}

@@ -310,3 +310,22 @@ func TestTrash_PurgeKeepsFileReferencedByAnotherRow(t *testing.T) {
 	_, err = os.Stat(videoPath)
 	assert.NoError(t, err, "файл живой записи не должен удаляться purge-ем старой")
 }
+
+// TestTrash_RestoreMediaMissingFile: восстановление записи без файла
+// вернуло бы в библиотеку заведомо битую строку — отвечаем 409.
+func TestTrash_RestoreMediaMissingFile(t *testing.T) {
+	app, libraryPath, db := setupTrashTestApp(t)
+	ctx := context.Background()
+
+	videoPath := filepath.Join(libraryPath, "missing.mkv")
+	require.NoError(t, os.WriteFile(videoPath, []byte("data"), 0644))
+	repo := repository.NewMediaRepository(db)
+	media := &models.Media{Title: "Missing", Type: models.MediaTypeVideo, FilePath: videoPath}
+	require.NoError(t, repo.Create(ctx, media))
+	require.NoError(t, repo.Delete(ctx, media.ID))
+	require.NoError(t, os.Remove(videoPath))
+
+	resp, err := app.Test(httptest.NewRequest("POST", "/api/trash/media/"+strconv.Itoa(int(media.ID))+"/restore", nil))
+	require.NoError(t, err)
+	assert.Equal(t, 409, resp.StatusCode)
+}

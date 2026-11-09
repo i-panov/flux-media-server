@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -439,13 +440,18 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		})
 	})
 
+	// Доверенные прокси парсим один раз: X-Forwarded-For принимаем
+	// только от них, иначе клиент подделает IP и обойдёт лимитер.
+	trustedProxies := parseTrustedProxies(cfg.Server.TrustedProxies)
+	clientKey := func(c *fiber.Ctx) string {
+		return getClientIP(c, trustedProxies)
+	}
+
 	// Auth rate limiter — parameters from config.
 	authRateLimiter := limiter.New(limiter.Config{
-		Max:        cfg.RateLimiter.Max,
-		Expiration: time.Duration(cfg.RateLimiter.Expiration) * time.Second,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return getClientIP(c)
-		},
+		Max:          cfg.RateLimiter.Max,
+		Expiration:   time.Duration(cfg.RateLimiter.Expiration) * time.Second,
+		KeyGenerator: clientKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Rate limit exceeded, please try again later",
@@ -456,11 +462,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// Upload limiter — upload-запросы тяжёлые (multipart-тело), их
 	// нужно лимитировать отдельно от auth-роутов.
 	uploadRateLimiter := limiter.New(limiter.Config{
-		Max:        cfg.RateLimiter.Max,
-		Expiration: time.Duration(cfg.RateLimiter.Expiration) * time.Second,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return getClientIP(c)
-		},
+		Max:          cfg.RateLimiter.Max,
+		Expiration:   time.Duration(cfg.RateLimiter.Expiration) * time.Second,
+		KeyGenerator: clientKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Rate limit exceeded, please try again later",
@@ -473,11 +477,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// съедался бы опросами. POST тяжёлый (ffmpeg), GET/DELETE лёгкие,
 	// но без лимита их можно дёргать в цикле.
 	extractRateLimiter := limiter.New(limiter.Config{
-		Max:        cfg.RateLimiter.Max,
-		Expiration: time.Duration(cfg.RateLimiter.Expiration) * time.Second,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return getClientIP(c)
-		},
+		Max:          cfg.RateLimiter.Max,
+		Expiration:   time.Duration(cfg.RateLimiter.Expiration) * time.Second,
+		KeyGenerator: clientKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Rate limit exceeded, please try again later",
@@ -492,11 +494,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// неограниченный обход всей библиотеки, поэтому чтения лимитируем
 	// отдельно, а не оставляем открытыми.
 	readRateLimiter := limiter.New(limiter.Config{
-		Max:        cfg.RateLimiter.ReadMax,
-		Expiration: time.Duration(cfg.RateLimiter.ReadExpiration) * time.Second,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return getClientIP(c)
-		},
+		Max:          cfg.RateLimiter.ReadMax,
+		Expiration:   time.Duration(cfg.RateLimiter.ReadExpiration) * time.Second,
+		KeyGenerator: clientKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Rate limit exceeded, please try again later",
@@ -732,13 +732,64 @@ func (a *App) Listen() error {
 	return a.Fiber.Listen(fmt.Sprintf("%s:%d", host, port))
 }
 
-// getClientIP returns the client IP for rate limiting. We deliberately do
-// NOT trust X-Forwarded-For / X-Real-IP headers because an attacker can
-// trivially spoof them, obtaining a unique key per request and bypassing
-// the rate limiter. Note: this also means that behind a reverse proxy all
-// clients share the proxy's IP; TrustedProxies is not configurable yet.
-func getClientIP(c *fiber.Ctx) string {
+// getClientIP возвращает IP клиента для rate limiter. X-Forwarded-For /
+// X-Real-IP принимаются только если непосредственный peer входит в
+// trusted_proxies: иначе клиент подделает IP и получит уникальный ключ
+// на каждый запрос. Пустой список — заголовки игнорируются.
+func getClientIP(c *fiber.Ctx, trusted []*net.IPNet) string {
+	peer := net.ParseIP(c.IP())
+	if len(trusted) == 0 || peer == nil || !ipTrusted(peer, trusted) {
+		return c.IP()
+	}
+	// Идём по X-Forwarded-For справа налево: правый адрес добавил
+	// ближайший доверенный прокси, левые мог подставить клиент.
+	parts := strings.Split(c.Get("X-Forwarded-For"), ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		ip := net.ParseIP(strings.TrimSpace(parts[i]))
+		if ip == nil {
+			continue
+		}
+		if !ipTrusted(ip, trusted) {
+			return ip.String()
+		}
+	}
+	// X-Real-IP не используем: прокси не обязан его санитизировать,
+	// а клиент получает произвольный ключ лимитера.
 	return c.IP()
+}
+
+func parseTrustedProxies(raw string) []*net.IPNet {
+	var result []*net.IPNet
+	for _, part := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			continue
+		}
+		if !strings.Contains(value, "/") {
+			if ip := net.ParseIP(value); ip != nil {
+				bits := 32
+				if ip.To4() == nil {
+					bits = 128
+				}
+				value = fmt.Sprintf("%s/%d", ip.String(), bits)
+			}
+		}
+		if _, network, err := net.ParseCIDR(value); err == nil {
+			result = append(result, network)
+			continue
+		}
+		log.Printf("trusted_proxies: ignoring invalid entry %q", value)
+	}
+	return result
+}
+
+func ipTrusted(ip net.IP, trusted []*net.IPNet) bool {
+	for _, network := range trusted {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // goSafe runs fn in a goroutine, recovering from panics so a bug in a

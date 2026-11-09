@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -41,7 +42,8 @@ func (h *SubsHandler) ListSubs(c *fiber.Ctx) error {
 
 	subs, err := h.subRepo.ListByMedia(ctx, mediaID)
 	if err != nil {
-		return repoError(c, err, "Media not found", "Failed to fetch subtitles")
+		log.Printf("ListSubs media=%d: %v", mediaID, err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch subtitles")
 	}
 
 	items := make([]subListItem, 0, len(subs))
@@ -76,7 +78,8 @@ func (h *SubsHandler) ServeSub(c *fiber.Ctx) error {
 
 	subs, err := h.subRepo.ListByMedia(ctx, mediaID)
 	if err != nil {
-		return repoError(c, err, "Media not found", "Failed to fetch subtitles")
+		log.Printf("ServeSub media=%d: %v", mediaID, err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to fetch subtitles")
 	}
 	for _, sub := range subs {
 		if sub.Lang == lang {

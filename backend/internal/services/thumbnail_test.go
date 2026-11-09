@@ -64,3 +64,31 @@ func TestThumbnailService_GenerateImage(t *testing.T) {
 		})
 	}
 }
+
+// TestGenerateImageKeepsOldThumbOnFFmpegFailure: ffmpeg пишет частичный
+// файл и падает — старое превью должно остаться нетронутым, а не быть
+// перезаписано мусором под боевым именем.
+func TestGenerateImageKeepsOldThumbOnFFmpegFailure(t *testing.T) {
+	dir := t.TempDir()
+	scriptDir := t.TempDir()
+	script := filepath.Join(scriptDir, "ffmpeg")
+	require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\nfor last; do :; done\nprintf garbage > \"$last\"\nexit 1\n"), 0o755))
+	t.Setenv("PATH", scriptDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	thumb := services.NewThumbnailService(dir)
+	oldPath := thumb.GetPath(7)
+	const oldContent = "old thumbnail"
+	require.NoError(t, os.WriteFile(oldPath, []byte(oldContent), 0644))
+
+	src := filepath.Join(t.TempDir(), "pic.jpg")
+	require.NoError(t, os.WriteFile(src, []byte("not a real jpeg"), 0644))
+
+	require.Equal(t, "", thumb.GenerateWithContext(context.Background(), 7, src))
+	got, err := os.ReadFile(oldPath)
+	require.NoError(t, err)
+	assert.Equal(t, oldContent, string(got))
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "временные файлы не должны оставаться")
+}
