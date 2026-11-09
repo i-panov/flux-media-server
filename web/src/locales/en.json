@@ -223,7 +223,6 @@
 	"player.edit": "Edit",
 	"player.noText": "No text yet",
 	"player.shuffle": "Shuffle",
-	"player.enqueue": "Add to queue",
 	"player.repeatOff": "Repeat off",
 	"player.repeatAll": "Repeat queue",
 	"player.repeatOne": "Repeat track",

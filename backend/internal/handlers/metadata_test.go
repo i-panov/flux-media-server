@@ -423,3 +423,82 @@ func readBody(t *testing.T, resp *http.Response) string {
 	require.NoError(t, err)
 	return buf.String()
 }
+
+// TestMetadataHandler_UpdateClearsFields: пустые значения из редактора —
+// это осознанная очистка, а не «поле не прислали». Раньше repository.Update
+// пропускал пустые строки/ноль, и очистить title/description/album/genre/year
+// было невозможно.
+func TestMetadataHandler_UpdateClearsFields(t *testing.T) {
+	app := setupMetadataTestApp(t)
+
+	resp := putMetadata(t, app, map[string]interface{}{
+		"title":       "Filled",
+		"description": "Description",
+		"album":       "Album",
+		"genre":       "Genre",
+		"year":        2001,
+		"artists":     []string{"Artist A"},
+	})
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	seeded := decodeMedia(t, resp)
+	assert.Equal(t, "Filled", seeded["title"])
+	assert.Equal(t, "Description", seeded["description"])
+	assert.Equal(t, "Album", seeded["album"])
+	assert.Equal(t, "Genre", seeded["genre"])
+	assert.EqualValues(t, 2001, seeded["year"])
+	require.Len(t, seeded["artists"], 1)
+
+	// Partial patch не затирает не переданные поля.
+	resp = putMetadata(t, app, map[string]interface{}{"title": "Partial"})
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	partial := decodeMedia(t, resp)
+	assert.Equal(t, "Partial", partial["title"])
+	assert.Equal(t, "Description", partial["description"])
+	assert.Equal(t, "Album", partial["album"])
+	assert.Equal(t, "Genre", partial["genre"])
+	assert.EqualValues(t, 2001, partial["year"])
+
+	resp = putMetadata(t, app, map[string]interface{}{
+		"title":       "",
+		"description": "",
+		"album":       "",
+		"genre":       "",
+		"year":        0,
+		"artists":     []string{},
+	})
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	decoded := decodeMedia(t, resp)
+	assert.Equal(t, "", decoded["title"])
+	assert.Equal(t, "", decoded["description"])
+	assert.Equal(t, "", decoded["album"])
+	assert.Equal(t, "", decoded["genre"])
+	assert.EqualValues(t, 0, decoded["year"])
+	assert.Empty(t, decoded["artists"], "пустой artists очищает связи")
+}
+
+// TestMetadataHandler_TitleOnlyDoesNotCreateMetadata: обновление title не
+// должно создавать пустую строку Metadata (раньше создавало).
+func TestMetadataHandler_TitleOnlyDoesNotCreateMetadata(t *testing.T) {
+	app := setupMetadataTestApp(t)
+
+	resp := putMetadata(t, app, map[string]interface{}{"title": "Only Title"})
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	decoded := decodeMedia(t, resp)
+	assert.Equal(t, "Only Title", decoded["title"])
+	assert.Nil(t, decoded["metadata"], "пустая Metadata не должна создаваться")
+}
+
+// TestMetadataHandler_ClearMissingMetadataDoesNotCreateRow: очистка
+// несуществующих poster/rating/genres не должна создавать пустую Metadata.
+func TestMetadataHandler_ClearMissingMetadataDoesNotCreateRow(t *testing.T) {
+	app := setupMetadataTestApp(t)
+
+	resp := putMetadata(t, app, map[string]interface{}{
+		"poster_url": "",
+		"rating":     0,
+		"genres":     "",
+	})
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	decoded := decodeMedia(t, resp)
+	assert.Nil(t, decoded["metadata"], "пустая Metadata не должна создаваться")
+}

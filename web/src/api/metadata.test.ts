@@ -56,12 +56,35 @@ describe("updateMetadata", () => {
 		expect(body.title).toBe("Новое название");
 		expect(body.artists).toEqual(["Исполнитель"]);
 		expect(body.album).toBe("Альбом");
-		// Пустые необязательные поля не отправляются, source_url — всегда.
-		expect(body).not.toHaveProperty("genre");
-		expect(body).not.toHaveProperty("description");
+		// Пустые необязательные поля отправляются как очистка,
+		// source_url — тоже (редактор шлёт его только при изменении).
+		expect(body.genre).toBe("");
+		expect(body.description).toBe("");
 		expect(body.source_url).toBe("");
 		expect(body.year).toBe(2024);
 		expect(media.title).toBe("Новое название");
+	});
+
+	it("отправляет пустые значения и year=0 для очистки", async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse(mediaItem()));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await updateMetadata(7, {
+			title: "Новое название",
+			artists: [],
+			album: "",
+			genre: "",
+			year: 0,
+			description: "",
+		});
+
+		const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(init.body as string) as Record<string, unknown>;
+		expect(body.album).toBe("");
+		expect(body.genre).toBe("");
+		expect(body.year).toBe(0);
+		expect(body.description).toBe("");
+		expect(body).not.toHaveProperty("source_url");
 	});
 
 	it("не отправляет source_url без изменений", async () => {

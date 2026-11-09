@@ -13,9 +13,9 @@ export interface MetadataInput {
 	sourceUrl?: string;
 }
 
-// Бэкенд различает «не передано» и «пусто» указателями: пустые строки
-// не шлём, чтобы не затирать (очистка — только у source_url, как во
-// Flutter: пустое при непустом исходном считается осознанной очисткой).
+// Бэкенд различает «не передано» и «пусто» указателями: undefined —
+// поле не трогать, пустая строка/0 — осознанная очистка. Редактор всегда
+// присылает текущие значения, поэтому пустые поля очищают запись.
 export async function updateMetadata(
 	mediaId: number,
 	input: MetadataInput,
@@ -24,16 +24,16 @@ export async function updateMetadata(
 		title: input.title,
 		artists: input.artists,
 	};
-	if (input.album !== undefined && input.album !== "") {
+	if (input.album !== undefined) {
 		body.album = input.album;
 	}
-	if (input.genre !== undefined && input.genre !== "") {
+	if (input.genre !== undefined) {
 		body.genre = input.genre;
 	}
 	if (input.year !== undefined) {
 		body.year = input.year;
 	}
-	if (input.description !== undefined && input.description !== "") {
+	if (input.description !== undefined) {
 		body.description = input.description;
 	}
 	if (input.sourceUrl !== undefined) {

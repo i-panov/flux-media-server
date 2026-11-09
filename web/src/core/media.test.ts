@@ -182,6 +182,23 @@ describe("videoListOptions", () => {
 	});
 });
 
+describe("list sort defaults", () => {
+	it("видео и аудио запрашиваются новыми сверху", async () => {
+		for (const options of [
+			(fetch: CoreFetcher) => videoListOptions(fetch, ""),
+			(fetch: CoreFetcher) => audioListOptions(fetch, ""),
+		]) {
+			const calls: string[] = [];
+			const client = new QueryClient();
+			await client.fetchInfiniteQuery(
+				options(stubFetcher(listBody([1], 1), calls)),
+			);
+			const requested = new URL(String(calls[0] ?? ""), "http://localhost");
+			expect(requested.searchParams.get("sort")).toBe("desc");
+		}
+	});
+});
+
 describe("audioListOptions", () => {
 	it("листает аудио через offset", async () => {
 		const client = new QueryClient();

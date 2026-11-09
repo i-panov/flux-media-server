@@ -359,20 +359,17 @@ test("удаление медиа уводит в раздел", async ({ page }
 	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
 });
 
-test("видео добавляется в очередь без прерывания", async ({ page }) => {
+test("видео не попадает в аудио-очередь", async ({ page }) => {
 	await stubAdmin(page);
 	await stubVideoDetail(page);
 
 	await page.goto("/video/1");
 	await expect(page).toHaveURL(VIDEO_DETAIL_PATTERN);
-	await page.getByRole("button", { name: "В очередь" }).click();
 
-	// Трек в мини-плеере, страница не сменилась, воспроизведение не стартует само.
-	await expect(page).toHaveURL(VIDEO_DETAIL_PATTERN);
-	await expect(page.locator(".audio-mini-player")).toBeVisible();
-	await expect(
-		page.locator(".audio-mini-player").getByText("Первый фильм"),
-	).toBeVisible();
+	// Кнопки «В очередь» на видео больше нет: аудио-плеер не должен
+	// пытаться проиграть видео как трек.
+	await expect(page.getByRole("button", { name: "В очередь" })).toHaveCount(0);
+	await expect(page.locator(".audio-mini-player")).toHaveCount(0);
 });
 
 test("перенос элемента в другую коллекцию", async ({ page }) => {

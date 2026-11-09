@@ -278,23 +278,139 @@ func (r *MediaStore) Update(ctx context.Context, media *models.Media) error {
 	}
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return updateMediaTx(tx, media, nil)
+		return updateMediaTx(tx, media)
 	})
 }
 
-// UpdateWithSourceURL — то же, что Update, плюс безусловная запись ссылки
-// на источник (включая пустую строку = очистка), всё в одной транзакции.
-func (r *MediaStore) UpdateWithSourceURL(ctx context.Context, media *models.Media, sourceURL *string) error {
-	if media.ID == 0 {
-		return errors.New("repository: media ID required for UpdateWithSourceURL")
+// MetadataPatch — поля админского редактора метаданных. nil означает
+// «не прислали, не трогать»; указатель на пустое значение — очистка.
+// Слайс артистов: nil — не трогать, пустой — удалить все связи.
+type MetadataPatch struct {
+	Title       *string
+	Description *string
+	Album       *string
+	Genre       *string
+	Year        *int
+	Artists     *[]string
+	SourceURL   *string
+	PosterURL   *string
+	Rating      *float64
+	Genres      *string
+}
+
+// PatchMetadata применяет patch метаданных в одной транзакции. Отдельный
+// метод, а не Update: Update пропускает пустые значения, чтобы сканер и
+// очередь не затирали ручные правки, а редактору нужна осознанная очистка.
+func (r *MediaStore) PatchMetadata(ctx context.Context, id uint, p MetadataPatch) (*models.Media, error) {
+	if id == 0 {
+		return nil, errors.New("repository: media ID required for PatchMetadata")
 	}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var media models.Media
+		if err := tx.Preload("Metadata").First(&media, id).Error; err != nil {
+			return err
+		}
 
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return updateMediaTx(tx, media, sourceURL)
+		updates := make(map[string]interface{})
+		if p.Title != nil {
+			updates["title"] = *p.Title
+		}
+		if p.Description != nil {
+			updates["description"] = *p.Description
+		}
+		if p.Album != nil {
+			updates["album"] = *p.Album
+		}
+		if p.Genre != nil {
+			updates["genre"] = *p.Genre
+		}
+		if p.Year != nil {
+			updates["year"] = *p.Year
+		}
+		if p.SourceURL != nil {
+			normalized, err := metadata.NormalizeSourceURL(*p.SourceURL)
+			if err != nil {
+				return err
+			}
+			updates["source_url"] = normalized
+		}
+		if len(updates) > 0 {
+			if err := tx.Model(&media).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+
+		if p.Artists != nil {
+			artists := make([]models.Artist, 0, len(*p.Artists))
+			for _, name := range *p.Artists {
+				if name = strings.TrimSpace(name); name != "" {
+					artists = append(artists, models.Artist{Name: name})
+				}
+			}
+			resolved, err := resolveArtists(tx, artists)
+			if err != nil {
+				return err
+			}
+			if err := tx.Model(&media).Association("Artists").Replace(&resolved); err != nil {
+				return err
+			}
+		}
+
+		// Постер нормализуем до решения о создании строки: "   " — это
+		// очистка, а не значение, ради которого стоит заводить Metadata.
+		var normalizedPosterURL string
+		if p.PosterURL != nil {
+			normalized, err := metadata.NormalizeSourceURL(*p.PosterURL)
+			if err != nil {
+				return err
+			}
+			normalizedPosterURL = normalized
+		}
+		// Пустые значения без существующей строки Metadata — это no-op:
+		// не создаём пустую Metadata ради очистки несуществующего поля.
+		hasMetaValue := (p.PosterURL != nil && normalizedPosterURL != "") ||
+			(p.Rating != nil && *p.Rating != 0) ||
+			(p.Genres != nil && *p.Genres != "")
+		if (p.PosterURL != nil || p.Rating != nil || p.Genres != nil) && (media.Metadata != nil || hasMetaValue) {
+			meta := media.Metadata
+			if meta == nil {
+				meta = &models.Metadata{}
+				if err := tx.Create(meta).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&media).Update("metadata_id", meta.ID).Error; err != nil {
+					return err
+				}
+			}
+			if p.PosterURL != nil {
+				meta.PosterURL = normalizedPosterURL
+			}
+			if p.Rating != nil {
+				meta.Rating = *p.Rating
+			}
+			if p.Genres != nil {
+				meta.Genres = *p.Genres
+			}
+			if err := tx.Save(meta).Error; err != nil {
+				return err
+			}
+		}
+		// Metadata/artists-only patch не проходит через Updates(media),
+		// поэтому updated_at бампаем явно — он служит cache-buster'ом.
+		if len(updates) == 0 && (p.Artists != nil || p.PosterURL != nil || p.Rating != nil || p.Genres != nil) {
+			if err := tx.Model(&media).UpdateColumn("updated_at", time.Now()).Error; err != nil {
+				return err
+			}
+		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return r.FindByID(ctx, id)
 }
 
-func updateMediaTx(tx *gorm.DB, media *models.Media, sourceURL *string) error {
+func updateMediaTx(tx *gorm.DB, media *models.Media) error {
 	// Запись существует? Без проверки удаление между Find и Update — или
 	// вызов в обход чтения вообще — дало бы 200 с фантомом (при пустом
 	// updates не пишется ничего, и пропажа видна только здесь).
@@ -306,17 +422,6 @@ func updateMediaTx(tx *gorm.DB, media *models.Media, sourceURL *string) error {
 	}
 	if count == 0 {
 		return gorm.ErrRecordNotFound
-	}
-
-	// Defense-in-depth: ссылку перепроверяем и здесь, а не только в
-	// хендлере — прямой вызов репозитория в обход валидации не должен
-	// положить мусор в БД.
-	if sourceURL != nil {
-		normalized, err := metadata.NormalizeSourceURL(*sourceURL)
-		if err != nil {
-			return err
-		}
-		*sourceURL = normalized
 	}
 
 	// Артисты: nil означает «не загружено» (запись прочитана без
@@ -390,10 +495,6 @@ func updateMediaTx(tx *gorm.DB, media *models.Media, sourceURL *string) error {
 	if media.MetadataID != nil && media.Metadata == nil {
 		updates["metadata_id"] = *media.MetadataID
 	}
-	if sourceURL != nil {
-		updates["source_url"] = *sourceURL
-	}
-
 	if len(updates) > 0 {
 		if err := tx.Model(media).Updates(updates).Error; err != nil {
 			return err

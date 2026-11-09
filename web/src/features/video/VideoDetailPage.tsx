@@ -8,7 +8,6 @@ import {
 	Title,
 } from "@mantine/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { ListPlus } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
@@ -25,7 +24,6 @@ import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
 import { useMediaProgress } from "../media/useMediaProgress";
-import { useAudioPlayer } from "../player/AudioPlayerProvider";
 import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 
 // Мета-строка деталей: свой компонент, чтобы страница оставалась
@@ -92,7 +90,6 @@ export function VideoDetailPage() {
 	const media = useMedia(valid ? mediaId : 0, valid);
 	const subs = useMediaSubs(valid ? mediaId : 0, valid);
 	const reload = useMediaReload(valid ? mediaId : 0);
-	const player = useAudioPlayer();
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	// ТВ-режим: секция и кнопка назад — точки входа spatial-навигации.
 	const { targetRef: tvRef, tvMode } =
@@ -269,13 +266,6 @@ export function VideoDetailPage() {
 						<Group gap="xs">
 							<FavoriteButton mediaId={item.id} type="video" />
 							<AddToCollectionButton mediaId={item.id} type="video" />
-							<Button
-								variant="light"
-								leftSection={<ListPlus size={16} />}
-								onClick={() => player.enqueue(item)}
-							>
-								{t("player.enqueue")}
-							</Button>
 						</Group>
 					</Group>
 					<VideoMeta item={item} />

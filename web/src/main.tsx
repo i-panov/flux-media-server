@@ -6,19 +6,12 @@ import { getRouter } from "./router";
 import "./i18n";
 import "./styles.css";
 
-// Base URL бэкенда из окружения сборки: отдельный деплой веба живёт не на
-// same-origin. Дефолт shared (/api) — для раздачи с того же origin.
-const rawBase = (import.meta.env.VITE_API_BASE?.trim() || "/api").replace(
-	/\/+$/,
-	"",
-);
-const crossOrigin =
-	new URL(rawBase, window.location.origin).origin !== window.location.origin;
+// Веб раздаётся Go-сервером с того же origin (см. server.web_dist), поэтому
+// API и cookie-сессия first-party. Отдельный API-origin не поддерживаем:
+// SameSite=Lax-куки кросс-сайт не отправляются, а медиа-ссылки относительные.
 configureApi({
-	baseUrl: rawBase,
-	transport: createWebTransport({
-		credentials: crossOrigin ? "include" : "same-origin",
-	}),
+	baseUrl: "/api",
+	transport: createWebTransport(),
 });
 
 const rootElement = document.getElementById("root");

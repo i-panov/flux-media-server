@@ -354,7 +354,7 @@ func TestMediaStore_DeleteCascadesArtistLinks(t *testing.T) {
 	assert.Equal(t, int64(0), links, "media_artists rows must be deleted with the media")
 }
 
-func TestMediaStore_UpdateWithSourceURL(t *testing.T) {
+func TestMediaStore_PatchMetadataSourceURL(t *testing.T) {
 	db, err := InitDB(":memory:")
 	require.NoError(t, err)
 	require.NoError(t, AutoMigrate(db))
@@ -368,47 +368,40 @@ func TestMediaStore_UpdateWithSourceURL(t *testing.T) {
 	str := func(s string) *string { return &s }
 
 	// Запись ссылки вместе с остальными полями — одна транзакция.
-	require.NoError(t, store.UpdateWithSourceURL(ctx, &models.Media{
-		ID:    media.ID,
-		Title: "Renamed",
-	}, str("https://youtu.be/abc")))
-	got, err := store.FindByID(ctx, media.ID)
+	got, err := store.PatchMetadata(ctx, media.ID, MetadataPatch{
+		Title:     str("Renamed"),
+		SourceURL: str("https://youtu.be/abc"),
+	})
 	require.NoError(t, err)
 	assert.Equal(t, "https://youtu.be/abc", got.SourceURL)
 	assert.Equal(t, "Renamed", got.Title)
 
 	// Пустая строка стирает ссылку, остальные поля не трогает.
-	require.NoError(t, store.UpdateWithSourceURL(ctx, &models.Media{ID: media.ID}, str("")))
-	got, err = store.FindByID(ctx, media.ID)
+	got, err = store.PatchMetadata(ctx, media.ID, MetadataPatch{SourceURL: str("")})
 	require.NoError(t, err)
 	assert.Equal(t, "", got.SourceURL)
 	assert.Equal(t, "Renamed", got.Title)
 
 	// nil = ссылку не трогать.
-	require.NoError(t, store.UpdateWithSourceURL(ctx, &models.Media{ID: media.ID}, str("https://x.example/")))
-	require.NoError(t, store.UpdateWithSourceURL(ctx, &models.Media{ID: media.ID}, nil))
-	got, err = store.FindByID(ctx, media.ID)
+	got, err = store.PatchMetadata(ctx, media.ID, MetadataPatch{SourceURL: str("https://x.example/")})
+	require.NoError(t, err)
+	require.Equal(t, "https://x.example/", got.SourceURL)
+	got, err = store.PatchMetadata(ctx, media.ID, MetadataPatch{})
 	require.NoError(t, err)
 	assert.Equal(t, "https://x.example/", got.SourceURL)
 
 	// Мусор в обход хендлера отклоняется самим репозиторием.
-	assert.ErrorIs(t,
-		store.UpdateWithSourceURL(ctx, &models.Media{ID: media.ID}, str("bogus")),
-		metadata.ErrSourceURLInvalid,
-	)
-	assert.ErrorIs(t,
-		store.UpdateWithSourceURL(ctx, &models.Media{ID: media.ID}, str("http://u:p@h.example/")),
-		metadata.ErrSourceURLInvalid,
-	)
+	_, err = store.PatchMetadata(ctx, media.ID, MetadataPatch{SourceURL: str("bogus")})
+	assert.ErrorIs(t, err, metadata.ErrSourceURLInvalid)
+	_, err = store.PatchMetadata(ctx, media.ID, MetadataPatch{SourceURL: str("http://u:p@h.example/")})
+	assert.ErrorIs(t, err, metadata.ErrSourceURLInvalid)
 	got, err = store.FindByID(ctx, media.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "https://x.example/", got.SourceURL, "rejected write must not touch the row")
 
 	// Несуществующая запись — ErrRecordNotFound, а не тихий 200.
-	assert.ErrorIs(t,
-		store.UpdateWithSourceURL(ctx, &models.Media{ID: 9999}, str("https://x.example/")),
-		gorm.ErrRecordNotFound,
-	)
+	_, err = store.PatchMetadata(ctx, 9999, MetadataPatch{SourceURL: str("https://x.example/")})
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	assert.ErrorIs(t,
 		store.Update(ctx, &models.Media{ID: 9999, Title: "Ghost"}),
 		gorm.ErrRecordNotFound,

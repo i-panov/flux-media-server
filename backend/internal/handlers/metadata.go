@@ -3,13 +3,11 @@ package handlers
 import (
 	"errors"
 	"path/filepath"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v2"
 
 	"flux/internal/metadata"
-	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
 )
@@ -82,12 +80,6 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
-	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, mediaID)
-	if err != nil {
-		return repoError(c, err, "Media not found", "Failed to fetch media")
-	}
-
 	// Pointer fields allow distinguishing "not provided" from "set to empty",
 	// so values can also be cleared.
 	var req struct {
@@ -136,72 +128,41 @@ func (h *MetadataHandler) Update(c *fiber.Ctx) error {
 		posterURL = &normalized
 	}
 
-	if req.Title != nil {
-		media.Title = *req.Title
+	// 0 — валидное «год неизвестен»: редактор должен уметь очищать поле.
+	if req.Year != nil && *req.Year != 0 && !metadata.IsValidYear(*req.Year) {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid year: must be between 1888 and current year + 2")
 	}
-	if req.Description != nil {
-		media.Description = *req.Description
-	}
-	if req.Artists != nil {
-		// Build Artist slice from names; repository will find-or-create.
-		media.Artists = make([]models.Artist, 0, len(*req.Artists))
-		for _, name := range *req.Artists {
-			name = strings.TrimSpace(name)
-			if name != "" {
-				media.Artists = append(media.Artists, models.Artist{Name: name})
-			}
-		}
-	}
-	if req.Album != nil {
-		media.Album = *req.Album
-	}
-	if req.Genre != nil {
-		media.Genre = *req.Genre
-	}
-	if req.Year != nil {
-		if !metadata.IsValidYear(*req.Year) {
-			return response.Error(c, fiber.StatusBadRequest, "Invalid year: must be between 1888 and current year + 2")
-		}
-		media.Year = *req.Year
+	if req.Rating != nil && (*req.Rating < 0 || *req.Rating > 10) {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid rating: must be between 0 and 10")
 	}
 
-	if media.Metadata == nil {
-		media.Metadata = &models.Metadata{}
-	}
-	if req.PosterURL != nil {
-		media.Metadata.PosterURL = *posterURL
-	}
-	if req.Rating != nil {
-		if *req.Rating < 0 || *req.Rating > 10 {
-			return response.Error(c, fiber.StatusBadRequest, "Invalid rating: must be between 0 and 10")
-		}
-		media.Metadata.Rating = *req.Rating
-	}
-	if req.Genres != nil {
-		media.Metadata.Genres = *req.Genres
+	patch := repository.MetadataPatch{
+		Title:       req.Title,
+		Description: req.Description,
+		Artists:     req.Artists,
+		Album:       req.Album,
+		Genre:       req.Genre,
+		Year:        req.Year,
+		SourceURL:   sourceURL,
+		PosterURL:   posterURL,
+		Rating:      req.Rating,
+		Genres:      req.Genres,
 	}
 
-	// Одна транзакция на всё: метаданные и ссылка пишутся вместе.
-	// Пустая source_url означает «очистить» — общий Update такое
-	// пропускает, поэтому ссылка идёт через UpdateWithSourceURL.
-	// Сентinелы валидации маппятся в 400 и здесь тоже: репозиторий
-	// перепроверяет ссылку как defense-in-depth, и его ответ не должен
-	// превращаться в 500.
-	if err := h.mediaRepo.UpdateWithSourceURL(ctx, media, sourceURL); err != nil {
+	ctx := c.UserContext()
+	media, err := h.mediaRepo.PatchMetadata(ctx, mediaID, patch)
+	if err != nil {
+		// Сентинелы валидации репозиторий перепроверяет как
+		// defense-in-depth — его ответ не должен превращаться в 500.
+		// Репозиторий перепроверяет и source_url, и poster_url, но не
+		// различает их в ошибке: сообщение не должно врать про поле.
 		if errors.Is(err, metadata.ErrSourceURLTooLong) {
-			return response.Error(c, fiber.StatusBadRequest, "Invalid source_url: too long (max 2048 characters)")
+			return response.Error(c, fiber.StatusBadRequest, "Invalid metadata URL: too long (max 2048 characters)")
 		}
 		if errors.Is(err, metadata.ErrSourceURLInvalid) {
-			return response.Error(c, fiber.StatusBadRequest, "Invalid source_url: must be an http(s) URL")
+			return response.Error(c, fiber.StatusBadRequest, "Invalid metadata URL: must be an http(s) URL")
 		}
 		return repoError(c, err, "Media not found", "Failed to update metadata")
-	}
-
-	// Перечитываем для ответа: UpdatedAt и связанные данные после записи
-	// свежее, чем в объекте до неё.
-	media, err = h.mediaRepo.FindByID(ctx, mediaID)
-	if err != nil {
-		return repoError(c, err, "Media not found", "Failed to fetch media")
 	}
 
 	return c.JSON(media)

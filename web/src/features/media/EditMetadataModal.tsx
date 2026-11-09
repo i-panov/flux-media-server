@@ -133,7 +133,8 @@ export function EditMetadataModal({
 					.filter((name) => name !== ""),
 				album: album.trim(),
 				genre: genre.trim(),
-				year: trimmedYear === "" ? undefined : Number(trimmedYear),
+				// Пустое поле — осознанная очистка года (0), а не «не трогать».
+				year: trimmedYear === "" ? 0 : Number(trimmedYear),
 				description: description.trim(),
 				// Ссылку шлём только при изменении (как во Flutter):
 				// иначе каждое сохранение стирало бы выставленную

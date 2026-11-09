@@ -80,12 +80,11 @@ type MediaRepository interface {
 	// Update обновляет только непустые поля; ассоциации Artists заменяются
 	// целиком, Metadata сохраняется upsert'ом при наличии.
 	Update(ctx context.Context, media *models.Media) error
-	// UpdateWithSourceURL — то же, что Update, плюс безусловная запись
-	// ссылки на источник в той же транзакции (включая пустую строку =
-	// очистка). Отдельный метод, а не флаг в Update: общий Update
-	// пропускает пустые значения, чтобы сканер и очередь не затирали
-	// ручные правки. nil = ссылку не трогать.
-	UpdateWithSourceURL(ctx context.Context, media *models.Media, sourceURL *string) error
+	// PatchMetadata — явный patch метаданных из админского редактора:
+	// nil = поле не прислали (не трогать), указатель на пустое значение =
+	// осознанная очистка. В отличие от Update, пишет и нулевые значения.
+	// Вся запись (media + artists + metadata + source_url) — одна транзакция.
+	PatchMetadata(ctx context.Context, id uint, patch MetadataPatch) (*models.Media, error)
 	// Delete — пользовательская корзина: только флаг, связи/файлы целы,
 	// восстановление мгновенное. Навсегда — PurgeMedia.
 	Delete(ctx context.Context, id uint) error
