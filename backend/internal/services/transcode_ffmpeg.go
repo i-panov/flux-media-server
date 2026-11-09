@@ -79,7 +79,9 @@ func (r *SystemFFmpegRunner) Probe(ctx context.Context, path string) (ProbeResul
 	if err != nil {
 		return ProbeResult{}, err
 	}
-	return ProbeFromData(data), nil
+	probe := ProbeFromData(data)
+	probe.Filename = path
+	return probe, nil
 }
 
 // TranscodeVideo запускает ffmpeg с -progress пайпом: проценты и скорость

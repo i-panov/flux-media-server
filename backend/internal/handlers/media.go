@@ -33,17 +33,8 @@ func NewMediaHandler(mediaRepo repository.MediaRepository, streamer services.Str
 	}
 }
 
-type CreateMediaRequest struct {
-	Title       string           `json:"title"`
-	Year        int              `json:"year"`
-	Description string           `json:"description"`
-	Type        models.MediaType `json:"type"`
-	FilePath    string           `json:"file_path"`
-}
-
 // isValidMediaType возвращает true для пустой строки или валидного типа.
-// (Используется в Create/Update: там пустой тип валиден только при проверке
-// на обязательность отдельным условием.)
+// Используется фильтром избранного: пустой тип означает «все типы».
 func isValidMediaType(t string) bool {
 	return t == "" || models.ParseMediaType(t).Valid()
 }
@@ -115,100 +106,6 @@ func (h *MediaHandler) Get(c *fiber.Ctx) error {
 	media, err := h.mediaRepo.FindByID(ctx, id)
 	if err != nil {
 		return repoError(c, err, "Media not found", "Failed to fetch media")
-	}
-
-	return c.JSON(media)
-}
-
-func (h *MediaHandler) Create(c *fiber.Ctx) error {
-	var req CreateMediaRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
-	}
-
-	if req.Title == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Title is required")
-	}
-	if req.FilePath == "" {
-		return response.Error(c, fiber.StatusBadRequest, "FilePath is required")
-	}
-	if req.Type == "" || !models.ParseMediaType(string(req.Type)).Valid() {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid type")
-	}
-
-	ctx := c.UserContext()
-	allowed, err := h.streamer.IsPathAllowed(ctx, req.FilePath)
-	if err != nil {
-		log.Printf("IsPathAllowed: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to validate file path")
-	}
-	if !allowed {
-		return response.Error(c, fiber.StatusForbidden, "File path is not within any registered library")
-	}
-
-	media := &models.Media{
-		Title:       req.Title,
-		Year:        req.Year,
-		Description: req.Description,
-		Type:        req.Type,
-		FilePath:    req.FilePath,
-	}
-
-	if err := h.mediaRepo.Create(ctx, media); err != nil {
-		log.Printf("Create: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to create media")
-	}
-
-	return c.Status(fiber.StatusCreated).JSON(media)
-}
-
-func (h *MediaHandler) Update(c *fiber.Ctx) error {
-	id, err := parseIDParam(c, "id")
-	if err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
-	}
-
-	ctx := c.UserContext()
-	media, err := h.mediaRepo.FindByID(ctx, id)
-	if err != nil {
-		return repoError(c, err, "Media not found", "Failed to fetch media")
-	}
-
-	var req CreateMediaRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
-	}
-
-	if req.Title == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Title is required")
-	}
-	if req.FilePath == "" {
-		return response.Error(c, fiber.StatusBadRequest, "FilePath is required")
-	}
-	// Тип обязателен как в Create: пустой type при Update молча игнорировался
-	// репозиторием (контракт «только непустые поля») и затирал бы изменение.
-	if req.Type == "" || !models.ParseMediaType(string(req.Type)).Valid() {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid type")
-	}
-
-	allowed, err := h.streamer.IsPathAllowed(ctx, req.FilePath)
-	if err != nil {
-		log.Printf("IsPathAllowed: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to validate file path")
-	}
-	if !allowed {
-		return response.Error(c, fiber.StatusForbidden, "File path is not within any registered library")
-	}
-
-	media.Title = req.Title
-	media.Year = req.Year
-	media.Description = req.Description
-	media.Type = req.Type
-	media.FilePath = req.FilePath
-
-	if err := h.mediaRepo.Update(ctx, media); err != nil {
-		log.Printf("Update: %v", err)
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to update media")
 	}
 
 	return c.JSON(media)

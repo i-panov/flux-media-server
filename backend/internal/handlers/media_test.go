@@ -42,7 +42,7 @@ func (f *fakeStreamer) ResolveStreamPath(_ context.Context, filePath string) (bo
 	return allowed, filePath, err
 }
 
-func setupMediaTestApp(t *testing.T) (*fiber.App, string) {
+func setupMediaTestApp(t *testing.T) (*fiber.App, string, repository.MediaRepository) {
 	t.Helper()
 
 	db, err := repository.InitDB(":memory:")
@@ -58,29 +58,22 @@ func setupMediaTestApp(t *testing.T) (*fiber.App, string) {
 	app.Get("/api/media", handler.List)
 	app.Get("/api/media/bulk", handler.Bulk)
 	app.Get("/api/media/:id", handler.Get)
-	app.Post("/api/media", handler.Create)
-	app.Put("/api/media/:id", handler.Update)
 	app.Delete("/api/media/:id", handler.Delete)
 
-	return app, libraryPath
+	return app, libraryPath, mediaRepo
 }
 
-func createTestMedia(t *testing.T, app *fiber.App, libraryPath string, filename string) {
+func createTestMedia(t *testing.T, repo repository.MediaRepository, libraryPath string, filename string) {
 	t.Helper()
-	body, _ := json.Marshal(map[string]interface{}{
-		"title":     "Test Movie",
-		"type":      string(models.MediaTypeVideo),
-		"file_path": filepath.Join(libraryPath, filename),
-	})
-	req := httptest.NewRequest("POST", "/api/media", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req)
-	require.NoError(t, err)
-	require.Equal(t, fiber.StatusCreated, resp.StatusCode)
+	require.NoError(t, repo.Create(context.Background(), &models.Media{
+		Title:    "Test Movie",
+		Type:     models.MediaTypeVideo,
+		FilePath: filepath.Join(libraryPath, filename),
+	}))
 }
 
 func TestMediaHandler_ListEmptyItems(t *testing.T) {
-	app, _ := setupMediaTestApp(t)
+	app, _, _ := setupMediaTestApp(t)
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/media", nil))
 	require.NoError(t, err)
@@ -93,7 +86,7 @@ func TestMediaHandler_ListEmptyItems(t *testing.T) {
 }
 
 func TestMediaHandler_ListInvalidYear(t *testing.T) {
-	app, _ := setupMediaTestApp(t)
+	app, _, _ := setupMediaTestApp(t)
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/media?year=abc", nil))
 	require.NoError(t, err)
@@ -101,9 +94,9 @@ func TestMediaHandler_ListInvalidYear(t *testing.T) {
 }
 
 func TestMediaHandler_ListSortDesc(t *testing.T) {
-	app, libraryPath := setupMediaTestApp(t)
+	app, libraryPath, repo := setupMediaTestApp(t)
 	for _, name := range []string{"first.mkv", "second.mkv", "third.mkv"} {
-		createTestMedia(t, app, libraryPath, name)
+		createTestMedia(t, repo, libraryPath, name)
 	}
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/media?sort=desc", nil))
@@ -124,7 +117,7 @@ func TestMediaHandler_ListSortDesc(t *testing.T) {
 }
 
 func TestMediaHandler_ListInvalidSort(t *testing.T) {
-	app, _ := setupMediaTestApp(t)
+	app, _, _ := setupMediaTestApp(t)
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/media?sort=random", nil))
 	require.NoError(t, err)
@@ -133,7 +126,7 @@ func TestMediaHandler_ListInvalidSort(t *testing.T) {
 }
 
 func TestMediaHandler_GetInvalidID(t *testing.T) {
-	app, _ := setupMediaTestApp(t)
+	app, _, _ := setupMediaTestApp(t)
 
 	// Отрицательный id не должен превращаться в огромный uint.
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/media/-1", nil))
@@ -143,58 +136,6 @@ func TestMediaHandler_GetInvalidID(t *testing.T) {
 	resp, err = app.Test(httptest.NewRequest("GET", "/api/media/not-a-number", nil))
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
-}
-
-func TestMediaHandler_UpdateRequiresType(t *testing.T) {
-	app, libraryPath := setupMediaTestApp(t)
-	createTestMedia(t, app, libraryPath, "movie.mkv")
-
-	// Обновление без type — 400: пустой type не должен затирать/игнорировать
-	// тип медиа.
-	body, _ := json.Marshal(map[string]interface{}{
-		"title":     "New Title",
-		"file_path": filepath.Join(libraryPath, "movie.mkv"),
-	})
-	req := httptest.NewRequest("PUT", "/api/media/1", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req)
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
-
-	// Невалидный type — тоже 400.
-	body, _ = json.Marshal(map[string]interface{}{
-		"title":     "New Title",
-		"type":      "garbage",
-		"file_path": filepath.Join(libraryPath, "movie.mkv"),
-	})
-	req = httptest.NewRequest("PUT", "/api/media/1", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err = app.Test(req)
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
-}
-
-func TestMediaHandler_UpdateValid(t *testing.T) {
-	app, libraryPath := setupMediaTestApp(t)
-	createTestMedia(t, app, libraryPath, "movie.mkv")
-
-	body, _ := json.Marshal(map[string]interface{}{
-		"title":     "Updated Title",
-		"type":      string(models.MediaTypeAudio),
-		"file_path": filepath.Join(libraryPath, "movie.mkv"),
-	})
-	req := httptest.NewRequest("PUT", "/api/media/1", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req)
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
-
-	var media models.Media
-	buf := bytes.Buffer{}
-	buf.ReadFrom(resp.Body)
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &media))
-	assert.Equal(t, "Updated Title", media.Title)
-	assert.Equal(t, models.MediaTypeAudio, media.Type)
 }
 
 func TestMediaHandler_DeleteOutsideLibrary(t *testing.T) {
@@ -266,21 +207,14 @@ func TestMediaHandler_DeleteInsideLibrary(t *testing.T) {
 }
 
 func TestMediaHandler_Bulk(t *testing.T) {
-	app, libraryPath := setupMediaTestApp(t)
+	app, libraryPath, repo := setupMediaTestApp(t)
 
-	// Создаём медиа через API (пути — внутри библиотеки, иначе Create
-	// ответит 403).
 	for i := 1; i <= 3; i++ {
-		body, _ := json.Marshal(map[string]interface{}{
-			"title":     fmt.Sprintf("Movie %d", i),
-			"type":      string(models.MediaTypeVideo),
-			"file_path": filepath.Join(libraryPath, "movie.mkv"),
-		})
-		req := httptest.NewRequest("POST", "/api/media", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req)
-		require.NoError(t, err)
-		require.Equal(t, fiber.StatusCreated, resp.StatusCode)
+		require.NoError(t, repo.Create(context.Background(), &models.Media{
+			Title:    fmt.Sprintf("Movie %d", i),
+			Type:     models.MediaTypeVideo,
+			FilePath: filepath.Join(libraryPath, fmt.Sprintf("movie-%d.mkv", i)),
+		}))
 	}
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/media/bulk?ids=1,2,2,3", nil))
@@ -309,7 +243,7 @@ func TestMediaHandler_Bulk(t *testing.T) {
 }
 
 func TestMediaHandler_BulkInvalidIDs(t *testing.T) {
-	app, _ := setupMediaTestApp(t)
+	app, _, _ := setupMediaTestApp(t)
 
 	for _, q := range []string{"", "ids=", "ids=abc", "ids=1,abc", "ids=0", "ids=-1", "ids=1.5"} {
 		url := "/api/media/bulk"
@@ -466,7 +400,7 @@ func TestMediaHandler_StreamRangeDoesNotIncrementViews(t *testing.T) {
 }
 
 func TestMediaHandler_ListInvalidArtistID(t *testing.T) {
-	app, _ := setupMediaTestApp(t)
+	app, _, _ := setupMediaTestApp(t)
 
 	for _, raw := range []string{"abc", "0", "-1", "18446744073709551615"} {
 		resp, err := app.Test(httptest.NewRequest("GET", "/api/media?artist_id="+raw, nil))

@@ -28,6 +28,8 @@ type SearchResponse struct {
 	Year  int    `json:"year"`
 }
 
+// Search — экспериментальная заглушка: не ходит во внешние провайдеры,
+// а разбирает имя файла. Контракт может измениться; UI её не использует.
 func (h *MetadataHandler) Search(c *fiber.Ctx) error {
 	query := c.Query("q")
 	if query == "" {

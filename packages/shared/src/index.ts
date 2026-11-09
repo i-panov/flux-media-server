@@ -10,6 +10,7 @@ export {
 export {
 	ApiError,
 	apiFetch,
+	apiFetchBlob,
 	getHealth,
 	type HealthResponse,
 } from "./api/client";

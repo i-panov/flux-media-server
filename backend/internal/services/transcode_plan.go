@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -52,7 +53,10 @@ type SubTrack struct {
 // Собственная структура вместо *ffprobe.ProbeData: классификатор
 // тестируется фикстурами без ffmpeg.
 type ProbeResult struct {
-	Container   string
+	Container string
+	// Filename — исходный путь/имя: ffprobe для .mov и .mp4 отдаёт один
+	// и тот же format_name, поэтому QuickTime определяем по расширению.
+	Filename    string
 	DurationSec float64
 	HasVideo    bool
 	VideoCodec  string
@@ -177,7 +181,7 @@ func ClassifyPlan(probe ProbeResult, maxHeight int) NormalizePlan {
 	videoOK := probe.VideoCodec == HouseVideoCodec && probe.PixFmt == HousePixFmt && probe.Height <= maxHeight
 	audioOK := audioCompatible(probe.AudioCodecs)
 	if videoOK && audioOK {
-		if isMP4Container(probe.Container) {
+		if isMP4Container(probe.Container) && !isQuickTimeFile(probe.Filename) {
 			plan.Kind = NormalizeDirect
 			return plan
 		}
@@ -194,12 +198,18 @@ func ClassifyPlan(probe ProbeResult, maxHeight int) NormalizePlan {
 	return plan
 }
 
+// isQuickTimeFile — .mov отдаётся браузерам как video/quicktime и не
+// гарантированно играет, поэтому его ремуксим в mp4 даже при H.264/AAC.
+func isQuickTimeFile(name string) bool {
+	return strings.EqualFold(filepath.Ext(name), ".mov")
+}
+
 // isMP4Container проверяет контейнер по имени формата ffprobe
 // ("mov,mp4,m4a,3gp,3g2,mj2" и варианты).
 func isMP4Container(formatName string) bool {
 	for part := range strings.SplitSeq(formatName, ",") {
 		switch strings.ToLower(strings.TrimSpace(part)) {
-		case "mp4", "m4v", "mov":
+		case "mp4", "m4v":
 			return true
 		}
 	}

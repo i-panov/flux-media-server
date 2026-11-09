@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiFetch, getHealth } from "./client";
+import { ApiError, apiFetch, apiFetchBlob, getHealth } from "./client";
 
 function jsonResponse(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -107,6 +107,19 @@ describe("apiFetch", () => {
 			message: "expired",
 		});
 		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("apiFetchBlob проходит refresh и отдаёт бинарный ответ", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(jsonResponse({ error: "expired" }, 401))
+			.mockResolvedValueOnce(jsonResponse({ ok: true }))
+			.mockResolvedValueOnce(new Response(new Blob(["payload"])));
+		vi.stubGlobal("fetch", fetchMock);
+
+		const blob = await apiFetchBlob("/admin/originals/a%20b/download");
+		expect(await blob.text()).toBe("payload");
+		expect(fetchMock).toHaveBeenCalledTimes(3);
 	});
 
 	it("не маскирует сетевой сбой refresh под 401", async () => {

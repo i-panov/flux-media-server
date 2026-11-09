@@ -104,61 +104,23 @@ func TestJWTExpiredToken(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// issueLegacyToken создаёт токен БЕЗ type-claim (как выпускались до
-// введения разделения access/refresh), с заданным IssuedAt и истекающий
-// через час от текущего момента — иначе валидация упадёт на expiry
-// раньше, чем на проверке type.
-func issueLegacyToken(t *testing.T, issuedAt time.Time) string {
-	t.Helper()
+func TestJWTRejectsTokenWithoutType(t *testing.T) {
+	j := newTestJWT()
 	claims := Claims{
 		UserID: 1,
 		Email:  "a@b.c",
 		RegisteredClaims: jwt.RegisteredClaims{
-			IssuedAt:  jwt.NewNumericDate(issuedAt),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 		},
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	s, err := tok.SignedString([]byte("test-secret-key-that-is-long-enough-32chars"))
-	require.NoError(t, err)
-	return s
-}
-
-func TestJWTRejectsLegacyTokenOutsideGracePeriod(t *testing.T) {
-	j := newTestJWT()
-
-	// Внутри grace-периода legacy-токен ещё принимается как access
-	// (обратная совместимость для токенов, выпущенных до перехода).
-	claims, err := j.ValidateToken(issueLegacyToken(t, legacyTokenGraceUntil.Add(-time.Hour)))
-	require.NoError(t, err)
-	assert.Equal(t, uint(1), claims.UserID)
-
-	// После границы grace-периода токены без type жёстко отвергаются.
-	_, err = j.ValidateToken(issueLegacyToken(t, legacyTokenGraceUntil.Add(time.Hour)))
-	assert.Error(t, err, "legacy-токен после grace-периода не должен быть access-токеном")
-
-	// Токен без IssuedAt не может подтвердить возраст — отвергается.
-	noIat := Claims{
-		UserID: 1,
-		Email:  "a@b.c",
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-		},
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, noIat)
 	raw, err := tok.SignedString([]byte("test-secret-key-that-is-long-enough-32chars"))
 	require.NoError(t, err)
+
 	_, err = j.ValidateToken(raw)
-	assert.Error(t, err, "legacy-токен без IssuedAt должен отвергаться")
-}
-
-func TestJWTRejectsLegacyTokenAsRefresh(t *testing.T) {
-	j := newTestJWT()
-
-	// Даже в grace-периоде legacy-токен без type не может быть refresh:
-	// иначе украденный старый refresh остался бы валидным на месяц.
-	_, err := j.ValidateRefreshToken(issueLegacyToken(t, legacyTokenGraceUntil.Add(-time.Hour)))
-	assert.Error(t, err)
+	assert.Error(t, err, "токен без type не должен быть access-токеном")
+	_, err = j.ValidateRefreshToken(raw)
+	assert.Error(t, err, "токен без type не должен быть refresh-токеном")
 }
 
 // --- Path sanitization tests ---

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { ApiError, apiFetch, getApiConfig } from "./client";
+import { apiFetch, apiFetchBlob } from "./client";
 
 const diskSchema = z.object({
 	path: z.string(),
@@ -55,24 +55,13 @@ export async function listOriginals(
 	return originalsSchema.parse(body);
 }
 
-export async function downloadOriginal(
+export function downloadOriginal(
 	name: string,
 	signal?: AbortSignal,
 ): Promise<Blob> {
-	const { baseUrl, transport } = getApiConfig();
-	const authHeaders = await transport.authHeaders();
-	const response = await fetch(
-		`${baseUrl}/admin/originals/${encodeURIComponent(name)}/download`,
-		{
-			headers: authHeaders,
-			credentials: transport.credentials(),
-			signal,
-		},
-	);
-	if (!response.ok) {
-		throw new ApiError(response.status, `HTTP ${response.status}`);
-	}
-	return response.blob();
+	return apiFetchBlob(`/admin/originals/${encodeURIComponent(name)}/download`, {
+		signal,
+	});
 }
 
 export async function deleteOriginal(name: string): Promise<void> {

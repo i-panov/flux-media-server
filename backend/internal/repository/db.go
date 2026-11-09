@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"flux/internal/models"
 
@@ -122,6 +123,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.ExtractTask{},
 		&models.UploadTask{},
 		&models.Subtitle{},
+		&models.SchemaMigration{},
 	)
 }
 
@@ -133,7 +135,19 @@ func AutoMigrate(db *gorm.DB) error {
 // поэтому обрыв на середине откатывается целиком, а не оставляет частично
 // мигрированную БД (guard-функции tableExists/columnExists работают на tx).
 func RunMigrations(db *gorm.DB) error {
+	const schemaVersion = 1
 	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
 		// --- Phase 1: fix indexes and dedupe (from earlier migrations) ---
 
 		// favorites: the old unique index on artist_name alone made every second
@@ -329,7 +343,10 @@ func RunMigrations(db *gorm.DB) error {
 			}
 		}
 
-		return nil
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
 	})
 }
 

@@ -67,13 +67,43 @@ function scheduleRefresh(signal?: AbortSignal): Promise<void> {
 // Каст результата через `as T` без валидации новому коду запрещён:
 // контракт ответа фиксирует схема, а не утверждение типа.
 export function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-	return requestWithRefresh<T>(path, init, true);
+	return requestWithRefresh<T>(path, init, true, parseJSON);
+}
+
+// Бинарные ответы (скачивание оригинала) нужны с тем же refresh-путём,
+// что и JSON: сырой fetch падал 401 после истечения access-токена.
+export function apiFetchBlob(path: string, init?: RequestInit): Promise<Blob> {
+	return requestWithRefresh<Blob>(path, init, true, (response) =>
+		response.blob(),
+	);
+}
+
+type ResponseParser<T> = (response: Response) => Promise<T>;
+
+async function parseJSON<T>(response: Response): Promise<T> {
+	if (response.status === 204) {
+		return undefined as T;
+	}
+	const text = await response.text();
+	if (text.length === 0) {
+		return undefined as T;
+	}
+	try {
+		return JSON.parse(text) as T;
+	} catch {
+		throw new ApiError(
+			response.status,
+			"Invalid JSON response",
+			text.slice(0, 200),
+		);
+	}
 }
 
 async function requestWithRefresh<T>(
 	path: string,
 	init: RequestInit | undefined,
 	allowRetry: boolean,
+	parse: ResponseParser<T>,
 ): Promise<T> {
 	const headers = new Headers(init?.headers);
 	if (init?.body !== undefined && !(init.body instanceof FormData)) {
@@ -118,30 +148,12 @@ async function requestWithRefresh<T>(
 			// Ушёл со страницы во время refresh — молча отменяемся,
 			// TanStack такое глотает.
 			init?.signal?.throwIfAborted();
-			return requestWithRefresh<T>(path, init, false);
+			return requestWithRefresh<T>(path, init, false, parse);
 		}
 		throw error;
 	}
 
-	// 204 (отмена задания) тела не имеет — json() бросил бы.
-	if (response.status === 204) {
-		return undefined as T;
-	}
-
-	// 200 с пустым телом — тоже пустой результат, а не JSON-ошибка.
-	const text = await response.text();
-	if (text.length === 0) {
-		return undefined as T;
-	}
-	try {
-		return JSON.parse(text) as T;
-	} catch {
-		throw new ApiError(
-			response.status,
-			"Invalid JSON response",
-			text.slice(0, 200),
-		);
-	}
+	return parse(response);
 }
 
 const healthSchema = z.object({

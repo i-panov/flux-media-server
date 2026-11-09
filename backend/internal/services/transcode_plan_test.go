@@ -11,6 +11,7 @@ import (
 func TestClassifyDirect(t *testing.T) {
 	plan := ClassifyPlan(ProbeResult{
 		Container:   "mov,mp4,m4a,3gp,3g2,mj2",
+		Filename:    "film.mp4",
 		HasVideo:    true,
 		VideoCodec:  "h264",
 		VideoIndex:  0,
@@ -238,4 +239,21 @@ func TestParseProgressLine(t *testing.T) {
 	update, ok = ParseProgressLine("out_time_ms=1000", 0)
 	require.True(t, ok)
 	assert.Equal(t, 100.0, update.Percent)
+}
+
+func TestClassifyPlanRemuxesMOV(t *testing.T) {
+	// QuickTime-контейнер не гарантированно играет в браузере: даже с
+	// h264/aac его надо ремуксить в mp4, а не отдавать direct.
+	plan := ClassifyPlan(ProbeResult{
+		Container:   "mov,mp4,m4a,3gp,3g2,mj2",
+		Filename:    "film.mov",
+		HasVideo:    true,
+		VideoCodec:  "h264",
+		PixFmt:      "yuv420p",
+		Width:       1920,
+		Height:      1080,
+		HasAudio:    true,
+		AudioCodecs: []string{"aac"},
+	}, 1080)
+	assert.Equal(t, NormalizeRemux, plan.Kind)
 }

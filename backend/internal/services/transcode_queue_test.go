@@ -35,13 +35,15 @@ type fakeTranscodeRunner struct {
 	progressSteps  []ProgressUpdate
 }
 
-func (f *fakeTranscodeRunner) Probe(_ context.Context, _ string) (ProbeResult, error) {
+func (f *fakeTranscodeRunner) Probe(_ context.Context, path string) (ProbeResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.probeErr != nil {
 		return ProbeResult{}, f.probeErr
 	}
-	return f.probe, nil
+	probe := f.probe
+	probe.Filename = path
+	return probe, nil
 }
 
 func (f *fakeTranscodeRunner) TranscodeVideo(ctx context.Context, _, dst string, _ NormalizePlan, _ TranscodeOptions, progress func(ProgressUpdate)) error {
@@ -809,7 +811,7 @@ func TestTranscodeCancelMappings(t *testing.T) {
 }
 
 func TestTranscodeSameStemSubsDontClash(t *testing.T) {
-	// film.mov (direct) и film.mkv→film.mp4 (remux) делят stem "film":
+	// film.mov и film.mkv оба ремуксятся в mp4 и делят stem "film":
 	// сайдкары обязаны разойтись по media ID, а не перезаписать друг друга.
 	runner := &fakeTranscodeRunner{}
 	env := setupTranscodeTest(t, runner, false)
@@ -843,8 +845,8 @@ func TestTranscodeSameStemSubsDontClash(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, subsB, 1)
 	require.NotEqual(t, subsA[0].Path, subsB[0].Path, "sidecars must not share a path")
-	assert.Contains(t, subsA[0].Path, "film.")
-	assert.Contains(t, subsB[0].Path, "film.")
+	assert.Contains(t, subsA[0].Path, "film")
+	assert.Contains(t, subsB[0].Path, "film")
 	for _, p := range []string{subsA[0].Path, subsB[0].Path} {
 		_, err := os.Stat(p)
 		require.NoError(t, err, "both sidecars must exist")

@@ -48,7 +48,6 @@ func setupTrashTestApp(t *testing.T) (*fiber.App, string, *gorm.DB) {
 		return c.Next()
 	})
 	app.Post("/api/collections", colHandler.Create)
-	app.Post("/api/media", mediaHandler.Create)
 	app.Get("/api/media/:id", mediaHandler.Get)
 	app.Delete("/api/media/:id", mediaHandler.Delete)
 	app.Delete("/api/collections/:id", colHandler.Delete)
@@ -64,23 +63,23 @@ func setupTrashTestApp(t *testing.T) (*fiber.App, string, *gorm.DB) {
 }
 
 func TestTrash_FullCycle(t *testing.T) {
-	app, libraryPath, _ := setupTrashTestApp(t)
+	app, libraryPath, db := setupTrashTestApp(t)
 
 	// Медиа с реальным файлом в библиотеке.
 	videoPath := filepath.Join(libraryPath, "film.mkv")
 	require.NoError(t, os.WriteFile(videoPath, []byte("data"), 0644))
-	body := `{"title":"Film","type":"video","file_path":"` + videoPath + `"}`
-	req := httptest.NewRequest("POST", "/api/media", bytes.NewReader([]byte(body)))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req)
-	require.NoError(t, err)
-	require.Equal(t, 201, resp.StatusCode)
+	repo := repository.NewMediaRepository(db)
+	require.NoError(t, repo.Create(context.Background(), &models.Media{
+		Title:    "Film",
+		Type:     models.MediaTypeVideo,
+		FilePath: videoPath,
+	}))
 
 	// Коллекция с сезоном.
 	colBody := `{"name":"Сериал","type":"video"}`
-	req = httptest.NewRequest("POST", "/api/collections", bytes.NewReader([]byte(colBody)))
+	req := httptest.NewRequest("POST", "/api/collections", bytes.NewReader([]byte(colBody)))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err = app.Test(req)
+	resp, err := app.Test(req)
 	require.NoError(t, err)
 	require.Equal(t, 201, resp.StatusCode)
 	var root models.Collection

@@ -235,13 +235,6 @@ func (s *JWTManager) ValidateRefreshToken(tokenString string) (*Claims, error) {
 	return s.validateToken(tokenString, TokenTypeRefresh)
 }
 
-// legacyTokenGraceUntil — граница grace-периода для legacy-токенов без
-// type-claim (выпущенных до введения разделения access/refresh). Такие
-// токены принимаются как access только если их IssuedAt не позже этой
-// даты: легитимных токенов без type после перехода не существует, поэтому
-// всё более свежее — это подделка или украденный старый refresh.
-var legacyTokenGraceUntil = time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
-
 func (s *JWTManager) validateToken(tokenString, expectedType string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -259,16 +252,9 @@ func (s *JWTManager) validateToken(tokenString, expectedType string) (*Claims, e
 		return nil, errors.New("invalid token")
 	}
 
-	if claims.Type == "" {
-		// Legacy-токен без type-claim: только как access и только в рамках
-		// grace-периода. IssuedAt обязателен — без него невозможно проверить
-		// возраст токена, поэтому такой токен не принимается.
-		if expectedType != TokenTypeAccess ||
-			claims.IssuedAt == nil ||
-			claims.IssuedAt.Time.After(legacyTokenGraceUntil) {
-			return nil, errors.New("invalid token type")
-		}
-	} else if claims.Type != expectedType {
+	// Токены без type-claim (старый формат) больше не принимаются:
+	// grace-период истёк, а пустой type позволял путать access и refresh.
+	if claims.Type != expectedType {
 		return nil, errors.New("invalid token type")
 	}
 

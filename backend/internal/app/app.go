@@ -106,6 +106,9 @@ type App struct {
 	scanCancelFn context.CancelFunc
 	// scanWG дожидается завершения фонового скана до закрытия БД.
 	scanWG *sync.WaitGroup
+	// backfillWG дожидается разовой заливки dimensions.
+	backfillWG       *sync.WaitGroup
+	dimensionsCancel context.CancelFunc
 }
 
 // Scanner возвращает сервис сканирования для консольного режима (-scan).
@@ -224,6 +227,42 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		cfg.RateLimiter.ReadExpiration = config.DefaultReadExpiration
 	}
 
+	// Ensure media directories exist.
+	if err := os.MkdirAll(cfg.Media.VideoPath, 0755); err != nil {
+		return nil, fmt.Errorf("create video dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Media.AudioPath, 0755); err != nil {
+		return nil, fmt.Errorf("create audio dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Storage.OriginalsDir, 0755); err != nil {
+		return nil, fmt.Errorf("create originals dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Storage.TempDir, 0755); err != nil {
+		return nil, fmt.Errorf("create temp dir: %w", err)
+	}
+	// Каталоги контента не должны пересекаться: иначе сканер
+	// проиндексирует карантин как библиотеку, а чистка удалит не то.
+	// Fail fast с понятной ошибкой вместо тихих дублей.
+	contentDirs := map[string]string{
+		"media.video_path":      cfg.Media.VideoPath,
+		"media.audio_path":      cfg.Media.AudioPath,
+		"storage.originals_dir": cfg.Storage.OriginalsDir,
+		"storage.temp_dir":      cfg.Storage.TempDir,
+	}
+	// image_path необязателен в конфиге (config.Load подставляет дефолт),
+	// но тесты и встраиваемые конфиги могут его не задавать.
+	if cfg.Media.ImagePath != "" {
+		contentDirs["media.image_path"] = cfg.Media.ImagePath
+	}
+	if err := services.ValidateContentDirs(contentDirs); err != nil {
+		return nil, fmt.Errorf("validate content dirs: %w", err)
+	}
+	if cfg.Media.ImagePath != "" {
+		if err := os.MkdirAll(cfg.Media.ImagePath, 0755); err != nil {
+			return nil, fmt.Errorf("create image dir: %w", err)
+		}
+	}
+
 	// Очередь нормализации видео: один воркер (ffmpeg тяжёлый),
 	// задания в БД (переживают рестарт).
 	transcodeQueue := services.NewTranscodeQueue(
@@ -287,42 +326,6 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		services.DefaultExtractQueueLimit,
 	)
 	extractHandler := handlers.NewExtractHandler(mediaRepo, extractQueue)
-
-	// Ensure media directories exist.
-	if err := os.MkdirAll(cfg.Media.VideoPath, 0755); err != nil {
-		return nil, fmt.Errorf("create video dir: %w", err)
-	}
-	if err := os.MkdirAll(cfg.Media.AudioPath, 0755); err != nil {
-		return nil, fmt.Errorf("create audio dir: %w", err)
-	}
-	if err := os.MkdirAll(cfg.Storage.OriginalsDir, 0755); err != nil {
-		return nil, fmt.Errorf("create originals dir: %w", err)
-	}
-	if err := os.MkdirAll(cfg.Storage.TempDir, 0755); err != nil {
-		return nil, fmt.Errorf("create temp dir: %w", err)
-	}
-	// Каталоги контента не должны пересекаться: иначе сканер
-	// проиндексирует карантин как библиотеку, а чистка удалит не то.
-	// Fail fast с понятной ошибкой вместо тихих дублей.
-	contentDirs := map[string]string{
-		"media.video_path":      cfg.Media.VideoPath,
-		"media.audio_path":      cfg.Media.AudioPath,
-		"storage.originals_dir": cfg.Storage.OriginalsDir,
-		"storage.temp_dir":      cfg.Storage.TempDir,
-	}
-	// image_path необязателен в конфиге (config.Load подставляет дефолт),
-	// но тесты и встраиваемые конфиги могут его не задавать.
-	if cfg.Media.ImagePath != "" {
-		contentDirs["media.image_path"] = cfg.Media.ImagePath
-	}
-	if err := services.ValidateContentDirs(contentDirs); err != nil {
-		return nil, fmt.Errorf("validate content dirs: %w", err)
-	}
-	if cfg.Media.ImagePath != "" {
-		if err := os.MkdirAll(cfg.Media.ImagePath, 0755); err != nil {
-			return nil, fmt.Errorf("create image dir: %w", err)
-		}
-	}
 
 	progressHandler := handlers.NewProgressHandler(progressRepo, mediaRepo)
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
@@ -538,7 +541,6 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Get("/bulk", readRateLimiter, mediaHandler.Bulk)
 	media.Get("", readRateLimiter, mediaHandler.List)
 	media.Get("/:id", readRateLimiter, mediaHandler.Get)
-	media.Post("", requireAdmin, mediaHandler.Create)
 	media.Post(uploadRouteSuffix, requireAdmin, uploadRateLimiter, uploadHandler.Upload)
 	media.Get("/uploads/:id", requireAdmin, uploadHandler.UploadStatus)
 	media.Delete("/uploads/:id", requireAdmin, uploadHandler.CancelUpload)
@@ -558,7 +560,6 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Delete("/extract/:id", requireAdmin, extractRateLimiter, extractHandler.CancelExtract)
 	media.Get("/:id/extracted", requireAdmin, extractRateLimiter, extractHandler.Extracted)
 	media.Post("/check-hash", mediaHandler.CheckHash)
-	media.Put("/:id", requireAdmin, mediaHandler.Update)
 	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
 	media.Get("/:id/stream", readRateLimiter, mediaHandler.Stream)
 	media.Get("/:id/thumb", readRateLimiter, thumbHandler.Get)
@@ -695,32 +696,37 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// должен принимать запросы, пока идёт проход. Отменяется вместе с
 	// cleanupStop, чтобы не мешать завершению.
 	dimensionsCtx, cancelDimensions := context.WithCancel(context.Background())
+	backfillWG := new(sync.WaitGroup)
+	backfillWG.Add(1)
 	goSafe(func() {
-		go func() {
-			<-cleanupStop
-			cancelDimensions()
-		}()
+		defer backfillWG.Done()
 		updated := services.BackfillVideoDimensions(dimensionsCtx, mediaRepo)
 		if updated > 0 {
 			log.Printf("dimensions: залито размеров кадра для %d видео", updated)
 		}
 	})
+	goSafe(func() {
+		<-cleanupStop
+		cancelDimensions()
+	})
 
 	ok = true
 	return &App{
-		Fiber:          fiberApp,
-		Config:         cfg,
-		OTPStore:       otpStore,
-		Watcher:        watcherService,
-		UploadQueue:    uploadQueue,
-		ExtractQueue:   extractQueue,
-		TranscodeQueue: transcodeQueue,
-		Version:        version,
-		sqlDB:          sqlDB,
-		cleanupStop:    cleanupStop,
-		scanner:        scanner,
-		scanCancelFn:   scanCancelFn,
-		scanWG:         scanWG,
+		Fiber:            fiberApp,
+		Config:           cfg,
+		OTPStore:         otpStore,
+		Watcher:          watcherService,
+		UploadQueue:      uploadQueue,
+		ExtractQueue:     extractQueue,
+		TranscodeQueue:   transcodeQueue,
+		Version:          version,
+		sqlDB:            sqlDB,
+		cleanupStop:      cleanupStop,
+		scanner:          scanner,
+		scanCancelFn:     scanCancelFn,
+		scanWG:           scanWG,
+		backfillWG:       backfillWG,
+		dimensionsCancel: cancelDimensions,
 	}, nil
 }
 
@@ -850,6 +856,18 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 		case <-scanDone:
 		case <-shutdownCtx.Done():
 			log.Printf("shutdown: timed out waiting for background scan; closing database anyway")
+		}
+	}
+	if a.backfillWG != nil {
+		backfillDone := make(chan struct{})
+		go func() {
+			a.backfillWG.Wait()
+			close(backfillDone)
+		}()
+		select {
+		case <-backfillDone:
+		case <-shutdownCtx.Done():
+			log.Printf("shutdown: timed out waiting for dimensions backfill; closing database anyway")
 		}
 	}
 	if a.sqlDB != nil {
