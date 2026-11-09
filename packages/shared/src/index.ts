@@ -1,4 +1,13 @@
 export {
+	type AuthUser,
+	fetchMe,
+	logout,
+	type RequestCodeResponse,
+	requestCode,
+	type VerifyCodeResponse,
+	verifyCode,
+} from "./api/auth";
+export {
 	ApiError,
 	apiFetch,
 	getHealth,

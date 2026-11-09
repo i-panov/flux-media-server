@@ -30,10 +30,25 @@ export function createWebTransport(opts?: {
 				signal,
 			});
 			if (!response.ok) {
-				throw new Error(`Token refresh failed: ${response.status}`);
+				throw new RefreshError(
+					response.status,
+					`Token refresh failed: ${response.status}`,
+				);
 			}
 		},
 	};
+}
+
+// Отказ именно на refresh, а не исходный 401 запроса. status=0 —
+// сеть/битый ответ (транзиентно), 401/400 — refresh-токен невалиден.
+export class RefreshError extends Error {
+	readonly status: number;
+
+	constructor(status: number, message: string) {
+		super(message);
+		this.name = "RefreshError";
+		this.status = status;
+	}
 }
 
 export const ACCESS_TOKEN_KEY = "flux.access_token";
@@ -51,7 +66,7 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 		refresh: async (baseUrl: string, signal?: AbortSignal) => {
 			const refreshToken = await store.get(REFRESH_TOKEN_KEY);
 			if (refreshToken === null) {
-				throw new Error("No refresh token stored");
+				throw new RefreshError(401, "No refresh token stored");
 			}
 			const response = await fetch(`${baseUrl}/auth/refresh`, {
 				method: "POST",
@@ -60,13 +75,16 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 				signal,
 			});
 			if (!response.ok) {
-				throw new Error(`Token refresh failed: ${response.status}`);
+				throw new RefreshError(
+					response.status,
+					`Token refresh failed: ${response.status}`,
+				);
 			}
 			const body: unknown = await response.json().catch(() => {
-				throw new Error(MALFORMED_RESPONSE_MESSAGE);
+				throw new RefreshError(0, MALFORMED_RESPONSE_MESSAGE);
 			});
 			if (typeof body !== "object" || body === null) {
-				throw new Error(MALFORMED_RESPONSE_MESSAGE);
+				throw new RefreshError(0, MALFORMED_RESPONSE_MESSAGE);
 			}
 			const { token, refresh_token: nextRefresh } = body as {
 				token?: unknown;
@@ -78,7 +96,7 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 				typeof nextRefresh !== "string" ||
 				nextRefresh.length === 0
 			) {
-				throw new Error(MALFORMED_RESPONSE_MESSAGE);
+				throw new RefreshError(0, MALFORMED_RESPONSE_MESSAGE);
 			}
 			await store.set(ACCESS_TOKEN_KEY, token);
 			await store.set(REFRESH_TOKEN_KEY, nextRefresh);

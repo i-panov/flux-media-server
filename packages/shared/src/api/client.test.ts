@@ -109,6 +109,19 @@ describe("apiFetch", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
+	it("не маскирует сетевой сбой refresh под 401", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(jsonResponse({ error: "expired" }, 401))
+			.mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(apiFetch("/x")).rejects.not.toMatchObject({
+			status: 401,
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
 	it("не обновляет токены для публичных auth-эндпоинтов", async () => {
 		const fetchMock = vi
 			.fn()

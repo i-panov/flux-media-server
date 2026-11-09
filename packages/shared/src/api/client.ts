@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getApiConfig } from "./transport";
+import { getApiConfig, RefreshError } from "./transport";
 
 // ApiError keeps the HTTP status and the parsed body: the UI needs to tell
 // "not found" from "unauthorized" without parsing strings.
@@ -103,8 +103,17 @@ async function requestWithRefresh<T>(
 		) {
 			try {
 				await scheduleRefresh(init?.signal ?? undefined);
-			} catch {
-				throw error;
+			} catch (refreshError) {
+				// 401/400 на refresh — сессия действительно мертва, отдаём
+				// исходный 401. Сеть/5xx/битый ответ — транзиентная ошибка,
+				// её нельзя маскировать под «нет сессии».
+				if (
+					refreshError instanceof RefreshError &&
+					(refreshError.status === 401 || refreshError.status === 400)
+				) {
+					throw error;
+				}
+				throw refreshError;
 			}
 			// Ушёл со страницы во время refresh — молча отменяемся,
 			// TanStack такое глотает.
