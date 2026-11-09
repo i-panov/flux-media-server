@@ -23,7 +23,11 @@ export function AudioCard({ media }: { media: Media }) {
 	const hasCover = media.cover_url !== "" && !reload.failed;
 	const artists = media.artists.map((artist) => artist.name).join(", ");
 	return (
-		<div ref={tvRef} tabIndex={tvMode ? -1 : undefined} className="relative">
+		<div
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			className="media-card relative"
+		>
 			<Link
 				to="/audio/$id"
 				params={{ id: String(media.id) }}

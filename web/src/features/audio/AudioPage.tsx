@@ -2,6 +2,7 @@ import {
 	Alert,
 	Button,
 	Group,
+	SegmentedControl,
 	Stack,
 	Text,
 	TextInput,
@@ -28,12 +29,13 @@ export function AudioPage() {
 	const navigate = useNavigate();
 	const player = useAudioPlayer();
 	const [query, setQuery] = useState("");
+	const [sort, setSort] = useState<"desc" | "asc">("desc");
 	const debounced = useDebouncedValue(query);
 	// ТВ-режим: корень — spatial-секция, строки внутри — цели навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("audio-page");
 
-	const list = useAudioList(debounced);
+	const list = useAudioList(debounced, undefined, true, sort);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const { data: session } = useSession();
 	const isAdmin = session?.is_admin === true;
@@ -52,15 +54,26 @@ export function AudioPage() {
 				</Title>
 				<UploadButton type="audio" />
 			</Group>
-			<TextInput
-				placeholder={t("audio.search")}
-				aria-label={t("audio.search")}
-				value={query}
-				onChange={(event) => {
-					setQuery(event.currentTarget.value);
-				}}
-				w={{ base: "100%", sm: 320 }}
-			/>
+			<Group gap="sm" wrap="wrap">
+				<TextInput
+					placeholder={t("audio.search")}
+					aria-label={t("audio.search")}
+					value={query}
+					onChange={(event) => {
+						setQuery(event.currentTarget.value);
+					}}
+					w={{ base: "100%", sm: 320 }}
+				/>
+				<SegmentedControl
+					size="xs"
+					value={sort}
+					onChange={(value) => setSort(value === "asc" ? "asc" : "desc")}
+					data={[
+						{ value: "desc", label: t("common.newest") },
+						{ value: "asc", label: t("common.oldest") },
+					]}
+				/>
+			</Group>
 			{/* При поиске секции не нужны: они не фильтруются.
 			Блока продолжения здесь нет: недослушанный трек поднимается
 			мини-плеером на паузе сразу после загрузки. */}
@@ -88,6 +101,11 @@ export function AudioPage() {
 				<Text c="dimmed">{t("audio.empty")}</Text>
 			) : (
 				<TVFocusScope focusKey="audio-page">
+					{debounced === "" && (
+						<Title order={2} size="h4">
+							{t("audio.all")}
+						</Title>
+					)}
 					<Stack gap="xs">
 						{visibleItems.map((media, index) => (
 							<AudioTrackRow

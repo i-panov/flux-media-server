@@ -214,6 +214,22 @@ describe("list sort defaults", () => {
 	});
 });
 
+describe("list sort asc", () => {
+	it("передаёт asc и меняет queryKey", async () => {
+		const calls: string[] = [];
+		const options = videoListOptions(
+			stubFetcher(listBody([1], 1), calls),
+			"",
+			"asc",
+		);
+		const client = new QueryClient();
+		await client.fetchInfiniteQuery(options);
+		const requested = new URL(String(calls[0] ?? ""), "http://localhost");
+		expect(requested.searchParams.get("sort")).toBe("asc");
+		expect(options.queryKey).toContain("asc");
+	});
+});
+
 describe("audioListOptions", () => {
 	it("листает аудио через offset", async () => {
 		const client = new QueryClient();

@@ -26,7 +26,11 @@ export function MemeCard({ media }: { media: Media }) {
 			? `/api/media/${media.id}/stream`
 			: media.thumbnail_url;
 	return (
-		<div ref={tvRef} tabIndex={tvMode ? -1 : undefined} className="relative">
+		<div
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			className="media-card relative"
+		>
 			<Link
 				to="/memes/$id"
 				params={{ id: String(media.id) }}

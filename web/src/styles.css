@@ -71,3 +71,21 @@ body {
 	outline: 3px solid var(--mantine-color-violet-5);
 	outline-offset: 2px;
 }
+
+/* Долгие списки: браузер не рендерит карточки вне вьюпорта, пока они
+   не понадобятся. Это не меняет DOM, но снимает стоимость layout/paint. */
+.media-card {
+	content-visibility: auto;
+	contain-intrinsic-size: auto 200px;
+}
+
+.media-row {
+	content-visibility: auto;
+	contain-intrinsic-size: auto 72px;
+}
+
+/* Paint containment иначе обрезает focus-ring ссылки/строки. */
+.media-card:focus-within,
+.media-row:focus-within {
+	content-visibility: visible;
+}

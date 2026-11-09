@@ -49,7 +49,11 @@ export function VideoCard({ media }: { media: Media }) {
 	// картинка: вместо <img src=""> — плейсхолдер без лишних запросов.
 	const hasThumb = media.thumbnail_url !== "" && !reload.failed;
 	return (
-		<div ref={tvRef} tabIndex={tvMode ? -1 : undefined} className="relative">
+		<div
+			ref={tvRef}
+			tabIndex={tvMode ? -1 : undefined}
+			className="media-card relative"
+		>
 			<Link
 				to="/video/$id"
 				params={{ id: String(media.id) }}

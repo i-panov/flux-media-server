@@ -156,16 +156,21 @@ function mediaListOptions(
 
 // Видео и аудио — новые сверху: свежая загрузка должна быть на экране,
 // а не в конце бесконечного списка. Мемы уже сортируются так же.
-export function videoListOptions(fetch: CoreFetcher, q: string) {
-	return mediaListOptions(fetch, "video", q, "desc");
+export function videoListOptions(
+	fetch: CoreFetcher,
+	q: string,
+	sort: "asc" | "desc" = "desc",
+) {
+	return mediaListOptions(fetch, "video", q, sort);
 }
 
 export function audioListOptions(
 	fetch: CoreFetcher,
 	q: string,
 	artistId?: number,
+	sort: "asc" | "desc" = "desc",
 ) {
-	return mediaListOptions(fetch, "audio", q, "desc", artistId);
+	return mediaListOptions(fetch, "audio", q, sort, artistId);
 }
 
 // Мемы — новые сверху: сервер сортирует по id DESC.

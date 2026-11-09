@@ -327,5 +327,9 @@
 	"admin.users.actions": "Действия",
 	"admin.users.delete": "Удалить",
 	"admin.users.deleteTitle": "Удалить пользователя?",
-	"admin.users.deleteConfirm": "Пользователь {{email}} будет удалён без возможности восстановления."
+	"admin.users.deleteConfirm": "Пользователь {{email}} будет удалён без возможности восстановления.",
+	"common.newest": "Новые",
+	"common.oldest": "Старые",
+	"video.all": "Все видео",
+	"audio.all": "Все треки"
 }

@@ -46,7 +46,7 @@ export function AudioTrackRow({
 			gap="sm"
 			wrap="nowrap"
 			className={[
-				"rounded-md border px-3 py-2",
+				"media-row rounded-md border px-3 py-2",
 				isCurrent
 					? "border-[var(--mantine-color-violet-5)] bg-[var(--mantine-color-violet-light)]"
 					: "border-[var(--mantine-color-default-border)]",

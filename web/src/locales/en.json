@@ -327,5 +327,9 @@
 	"admin.users.actions": "Actions",
 	"admin.users.delete": "Delete",
 	"admin.users.deleteTitle": "Delete the user?",
-	"admin.users.deleteConfirm": "User {{email}} will be permanently removed."
+	"admin.users.deleteConfirm": "User {{email}} will be permanently removed.",
+	"common.newest": "Newest",
+	"common.oldest": "Oldest",
+	"video.all": "All videos",
+	"audio.all": "All tracks"
 }

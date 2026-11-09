@@ -2,6 +2,7 @@ import {
 	Alert,
 	Button,
 	Group,
+	SegmentedControl,
 	SimpleGrid,
 	Stack,
 	Text,
@@ -24,13 +25,14 @@ import { VideoCard } from "./VideoCard";
 export function VideoPage() {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
+	const [sort, setSort] = useState<"desc" | "asc">("desc");
 	const debounced = useDebouncedValue(query);
 	// ТВ-режим: корень страницы — spatial-секция, ref на существующем Stack
 	// (вёрстка не меняется), карточки внутри — цели навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("video-page");
 
-	const list = useVideoList(debounced);
+	const list = useVideoList(debounced, sort);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const visibleItems = useVisibleMedia("video", items, debounced !== "");
 
@@ -47,15 +49,26 @@ export function VideoPage() {
 				</Title>
 				<UploadButton type="video" />
 			</Group>
-			<TextInput
-				placeholder={t("video.search")}
-				aria-label={t("video.search")}
-				value={query}
-				onChange={(event) => {
-					setQuery(event.currentTarget.value);
-				}}
-				w={{ base: "100%", sm: 320 }}
-			/>
+			<Group gap="sm" wrap="wrap">
+				<TextInput
+					placeholder={t("video.search")}
+					aria-label={t("video.search")}
+					value={query}
+					onChange={(event) => {
+						setQuery(event.currentTarget.value);
+					}}
+					w={{ base: "100%", sm: 320 }}
+				/>
+				<SegmentedControl
+					size="xs"
+					value={sort}
+					onChange={(value) => setSort(value === "asc" ? "asc" : "desc")}
+					data={[
+						{ value: "desc", label: t("common.newest") },
+						{ value: "asc", label: t("common.oldest") },
+					]}
+				/>
+			</Group>
 			{/* При поиске ряды продолжения не нужны: они не фильтруются. */}
 			{debounced === "" && <ContinueWatching limit={1} />}
 			{debounced === "" && <FavoriteSection type="video" />}
@@ -79,6 +92,11 @@ export function VideoPage() {
 				<Text c="dimmed">{t("video.empty")}</Text>
 			) : (
 				<TVFocusScope focusKey="video-page">
+					{debounced === "" && (
+						<Title order={2} size="h4">
+							{t("video.all")}
+						</Title>
+					)}
 					<SimpleGrid
 						cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
 						spacing="md"

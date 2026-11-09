@@ -14,13 +14,18 @@ import {
 	videoListOptions,
 } from "../core/media";
 import { apiFetch } from "./client";
-export function useVideoList(q: string) {
-	return useInfiniteQuery(videoListOptions(apiFetch, q));
+export function useVideoList(q: string, sort: "asc" | "desc" = "desc") {
+	return useInfiniteQuery(videoListOptions(apiFetch, q, sort));
 }
 
-export function useAudioList(q: string, artistId?: number, enabled = true) {
+export function useAudioList(
+	q: string,
+	artistId?: number,
+	enabled = true,
+	sort: "asc" | "desc" = "desc",
+) {
 	return useInfiniteQuery({
-		...audioListOptions(apiFetch, q, artistId),
+		...audioListOptions(apiFetch, q, artistId, sort),
 		enabled,
 	});
 }

@@ -1,7 +1,7 @@
 {
 	"name": "flux-web",
 	"private": true,
-	"version": "0.1.29",
+	"version": "0.1.30",
 	"type": "module",
 	"engines": {
 		"node": ">=22"
@@ -34,7 +34,7 @@
 		"size": "size-limit"
 	},
 	"dependencies": {
-		"@flux/shared": "0.1.6",
+		"@flux/shared": "0.1.7",
 		"@mantine/core": "^9.2.2",
 		"@mantine/hooks": "^9.2.2",
 		"@mantine/notifications": "^9.2.2",
