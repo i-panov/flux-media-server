@@ -2,8 +2,9 @@
 	"private": true,
 	"name": "flux-media-server",
 	"version": "0.0.0",
-	"workspaces": ["web", "mobile", "packages/shared"],
-	"devDependencies": {
-		"jsdom": "^30.1.3"
-	}
+	"workspaces": [
+		"web",
+		"mobile",
+		"packages/shared"
+	]
 }
