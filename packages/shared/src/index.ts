@@ -15,6 +15,28 @@ export {
 	type HealthResponse,
 } from "./api/client";
 export {
+	addToCollection,
+	type BulkMoveCollectionItemsInput,
+	type BulkResult,
+	bulkAddCollectionItems,
+	bulkMoveCollectionItems,
+	bulkRemoveCollectionItems,
+	bulkResultSchema,
+	type Collection,
+	type CollectionStats,
+	collectionSchema,
+	collectionStatsSchema,
+	createCollection,
+	deleteCollection,
+	fetchCollectionItems,
+	fetchCollectionStats,
+	fetchCollections,
+	moveCollection,
+	moveCollectionItem,
+	removeFromCollection,
+	renameCollection,
+} from "./api/collections";
+export {
 	type Favorite,
 	favoriteSchema,
 	favoritesListSchema,
