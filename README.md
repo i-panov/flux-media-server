@@ -111,6 +111,8 @@ cd web && npm run test:e2e && npm run build && npm run size
 - [docs/README.md](docs/README.md) — индекс документов.
 - [docs/review-2026-11-09.md](docs/review-2026-11-09.md) — итоговое ревью,
   решения, ограничения и журнал коммитов.
+- [docs/mobile-parity-plan-2026-11-09.md](docs/mobile-parity-plan-2026-11-09.md)
+  — план доведения mobile до паритета с Flutter.
 
 ## Лицензия
 
