@@ -27,6 +27,38 @@ function contrastRatio(foreground: string, background: string): number {
 	return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
+const RGBA_PATTERN = /^rgba?\(([^)]+)\)$/;
+
+function parseColor(value: string): [number, number, number, number] {
+	if (value.startsWith("#")) {
+		return [
+			Number.parseInt(value.slice(1, 3), 16),
+			Number.parseInt(value.slice(3, 5), 16),
+			Number.parseInt(value.slice(5, 7), 16),
+			1,
+		];
+	}
+	const parts = RGBA_PATTERN.exec(value)?.[1]
+		.split(",")
+		.map((part) => Number.parseFloat(part.trim()));
+	if (parts === undefined || parts.length < 3) {
+		throw new Error(`Unsupported color: ${value}`);
+	}
+	return [parts[0], parts[1], parts[2], parts[3] ?? 1];
+}
+
+// Композит полупрозрачного цвета поверх непрозрачного фона → hex для
+// переиспользования contrastRatio.
+function compositeOver(foreground: string, background: string): string {
+	const [fr, fg, fb, fa] = parseColor(foreground);
+	const [br, bg, bb] = parseColor(background);
+	const blend = (front: number, back: number) =>
+		Math.round(front * fa + back * (1 - fa));
+	return `#${[blend(fr, br), blend(fg, bg), blend(fb, bb)]
+		.map((channel) => channel.toString(16).padStart(2, "0"))
+		.join("")}`;
+}
+
 describe("mobile theme", () => {
 	it("resolveTheme учитывает явный выбор и системную схему", () => {
 		expect(resolveTheme("light", "dark")).toBe("light");
@@ -72,6 +104,31 @@ describe("mobile theme", () => {
 			expect(
 				contrastRatio(colors.controlBorder, colors.background),
 			).toBeGreaterThanOrEqual(3);
+		}
+	});
+
+	it("заливка таймлайна контрастирует с треком в обеих темах", () => {
+		const themes: ThemeColors[] = [
+			getThemeTokens("light").colors,
+			getThemeTokens("dark").colors,
+		];
+		for (const colors of themes) {
+			const track = compositeOver(colors.playerTrack, colors.playerChrome);
+			expect(contrastRatio(colors.onOverlay, track)).toBeGreaterThanOrEqual(3);
+		}
+	});
+
+	it("playerChrome тёмный и контрастирует с onOverlay в обеих темах", () => {
+		const themes: ThemeColors[] = [
+			getThemeTokens("light").colors,
+			getThemeTokens("dark").colors,
+		];
+		for (const colors of themes) {
+			// Плеерная подложка не зависит от темы: поверх неё всегда белые
+			// подписи/иконки, поэтому контраст должен быть высоким.
+			expect(
+				contrastRatio(colors.onOverlay, colors.playerChrome),
+			).toBeGreaterThanOrEqual(7);
 		}
 	});
 });

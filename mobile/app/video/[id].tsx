@@ -1,9 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ApiError, type Media } from "@flux/shared";
-import { Image } from "expo-image";
+import { ApiError } from "@flux/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import type { ComponentProps } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -26,12 +25,8 @@ import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
 import { VideoMeta } from "../../src/components/VideoMeta";
 import { t, useLanguage } from "../../src/i18n";
-import {
-	coverPath,
-	imageSource,
-	isHttpSourceUrl,
-	thumbPath,
-} from "../../src/media/source";
+import { isHttpSourceUrl } from "../../src/media/source";
+import { VideoPlayer } from "../../src/player/VideoPlayer";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -122,87 +117,6 @@ function ActionButton({
 				{label}
 			</Text>
 		</Pressable>
-	);
-}
-
-// Постер берёт авторизованный source из imageSource: media.cover_url уже
-// содержит /api и без заголовков отдал бы 401. Cover используем, только
-// если он реально есть, иначе — thumbnail.
-function VideoPoster({ media }: { media: Media }) {
-	const { colors, radii } = useTheme();
-	// Cover есть не у всех видео, а файл cover мог быть удалён отдельно:
-	// при ошибке загрузки откатываемся на thumbnail.
-	const thumbnail = thumbPath(media.id);
-	const [path, setPath] = useState(
-		media.cover_url === "" ? thumbnail : coverPath(media.id),
-	);
-	const [source, setSource] = useState<Awaited<
-		ReturnType<typeof imageSource>
-	> | null>(null);
-	// Оба варианта (cover и thumbnail) могут отсутствовать/биться: тогда
-	// показываем заглушку, а не пустую surface-плашку с broken image.
-	const [failed, setFailed] = useState(false);
-
-	useEffect(() => {
-		let active = true;
-		imageSource(path).then(
-			(next) => {
-				if (active) {
-					setSource(next);
-				}
-			},
-			() => {
-				if (active) {
-					setSource(null);
-				}
-			},
-		);
-		return () => {
-			active = false;
-		};
-	}, [path]);
-
-	const aspectRatio =
-		media.width > 0 && media.height > 0 ? media.width / media.height : 16 / 9;
-
-	return (
-		<View
-			testID="video-detail-poster"
-			style={[
-				styles.poster,
-				{
-					aspectRatio,
-					backgroundColor: colors.surfaceMuted,
-					borderRadius: radii.md,
-				},
-			]}
-		>
-			{source === null || failed ? (
-				<View style={styles.posterPlaceholder}>
-					<Ionicons
-						name="videocam-outline"
-						size={40}
-						color={colors.textMuted}
-					/>
-				</View>
-			) : (
-				<Image
-					source={source}
-					style={StyleSheet.absoluteFill}
-					contentFit="cover"
-					transition={150}
-					accessibilityIgnoresInvertColors
-					onError={() => {
-						if (path !== thumbnail) {
-							setFailed(false);
-							setPath(thumbnail);
-							return;
-						}
-						setFailed(true);
-					}}
-				/>
-			)}
-		</View>
 	);
 }
 
@@ -330,7 +244,7 @@ function VideoDetailContent() {
 	return (
 		<Screen scroll testID="video-detail-screen">
 			<BackButton />
-			<VideoPoster key={item.id} media={item} />
+			<VideoPlayer key={item.id} media={item} />
 			<View style={{ gap: spacing.xs }}>
 				<Text
 					testID="video-detail-title"
@@ -426,12 +340,6 @@ const styles = StyleSheet.create({
 		minHeight: 44,
 	},
 	backLabel: { fontSize: 15, fontWeight: "600" },
-	poster: { width: "100%", overflow: "hidden" },
-	posterPlaceholder: {
-		flex: 1,
-		alignItems: "center",
-		justifyContent: "center",
-	},
 	title: { fontSize: 24, fontWeight: "700" },
 	artists: { fontSize: 15 },
 	description: { fontSize: 15, lineHeight: 22 },

@@ -1,0 +1,143 @@
+# Плеер в деталях видео: вход -> вкладка видео -> первое видео -> play/pause
+# и переключение скорости. Fullscreen и PiP здесь не проверяются: это
+# системные окна, а кнопка PiP рендерится только при
+# isPictureInPictureSupported(). Для device-only проверки есть отдельный
+# .maestro/video-player-device.yaml; этот flow остаётся стабильным для CI.
+#
+# Предусловия те же, что у tabs.yaml и video-detail.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть хотя бы одно видео.
+#
+# Запуск:
+#   maestro test .maestro/video-player.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/video-player.yaml
+appId: app.lib.flux
+name: "Video player: play/pause, speed"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на экране настроек — уходим на видео.
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+
+# Плеер стоит первым элементом экрана. Центральный Play гейтится по
+# hasStarted, поэтому после загрузки источника он есть даже если первый кадр
+# уже отрисован. Ждём его явно, а не проверяем условно.
+- assertVisible:
+    id: "video-player"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-play-overlay"
+    timeout: 20000
+- tapOn:
+    id: "video-player-play-overlay"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "playing"
+    timeout: 20000
+- assertVisible:
+    id: "video-player-state"
+- assertNotVisible:
+    id: "video-player-error"
+
+# Пауза и повторный запуск не должны ломать экран и навигацию.
+- tapOn:
+    id: "video-player-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "paused"
+    timeout: 5000
+- assertVisible:
+    id: "video-player-timeline"
+- tapOn:
+    id: "video-player-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "playing"
+    timeout: 20000
+- assertNotVisible:
+    id: "video-player-error"
+
+# Скорость проверяем на паузе: на iOS установка playbackRate не должна
+# запускать видео. Цикл 1× -> 1.25× -> 1.5×, состояние остаётся paused.
+- tapOn:
+    id: "video-player-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "paused"
+    timeout: 5000
+- tapOn:
+    id: "video-player-speed"
+- extendedWaitUntil:
+    visible: "1.25×"
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "paused"
+    timeout: 5000
+- tapOn:
+    id: "video-player-speed"
+- extendedWaitUntil:
+    visible: "1.5×"
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "paused"
+    timeout: 5000
+
+# Seek ±10 и таймлайн: нажатия не должны уводить плеер в error.
+- tapOn:
+    id: "video-player-forward-10"
+- tapOn:
+    id: "video-player-back-10"
+- tapOn:
+    id: "video-player-timeline"
+- assertVisible:
+    id: "video-player-timeline"
+- assertNotVisible:
+    id: "video-player-error"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "paused"
+    timeout: 5000
+
+# Fullscreen/PiP: device-only и вынесены в .maestro/video-player-device.yaml
+# (tapOn video-player-fullscreen -> back -> условный tapOn video-player-pip).
+# Здесь их не автоматизируем и не выдаём за прогон.
+
+# Назад возвращает к списку: плеер не остаётся висеть поверх табов.
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- assertVisible:
+    id: "tab-video"

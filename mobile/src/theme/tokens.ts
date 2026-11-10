@@ -49,6 +49,14 @@ export interface ThemeColors {
 	readonly danger: string;
 	readonly overlay: string;
 	readonly onOverlay: string;
+	/**
+	 * Подложка плеера: всегда тёмная, независимо от темы, потому что поверх
+	 * неё лежат белые иконки/подписи onOverlay. Полупрозрачный overlay здесь
+	 * не подходит — на светлой теме он давал серый фон с контрастом ~1:1.
+	 */
+	readonly playerChrome: string;
+	/** Незаполненная часть таймлайна на playerChrome (декоративная). */
+	readonly playerTrack: string;
 	readonly favorite: string;
 }
 
@@ -82,6 +90,8 @@ export const lightColors: ThemeColors = {
 	danger: "#c92a2a",
 	overlay: "rgba(0, 0, 0, 0.6)",
 	onOverlay: "#ffffff",
+	playerChrome: "#000000",
+	playerTrack: "rgba(255, 255, 255, 0.3)",
 	favorite: "#c92a2a",
 };
 
@@ -99,6 +109,8 @@ export const darkColors: ThemeColors = {
 	danger: "#ff6b6b",
 	overlay: "rgba(0, 0, 0, 0.6)",
 	onOverlay: "#ffffff",
+	playerChrome: "#000000",
+	playerTrack: "rgba(255, 255, 255, 0.3)",
 	favorite: "#c92a2a",
 };
 

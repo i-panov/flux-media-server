@@ -1,0 +1,80 @@
+# Плеер на реальном устройстве: fullscreen -> back -> PiP (если поддерживается).
+#
+# ЭТО DEVICE-ONLY FLOW. Его нельзя считать прогоном в CI и нельзя выдавать за
+# него: полноэкранный режим и Picture-in-Picture — это системные окна, а кнопка
+# PiP рендерится только при isPictureInPictureSupported(). Нужны реальное
+# Android-устройство или эмулятор с включённым PiP (API 26+, в эмуляторе
+# настройка PiP для приложения). На iOS-симуляторе PiP/fullscreen ведут себя
+# иначе, а команда `back` недоступна — flow рассчитан на Android.
+#
+# Запуск (CLI maestro в репозитории отсутствует; запускать вручную):
+#   maestro test .maestro/video-player-device.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/video-player-device.yaml
+#
+# Предусловия те же, что у video-player.yaml: backend с debug/allow_unknown_email,
+# установленное приложение (appId app.lib.flux), доступный SERVER_URL и хотя бы
+# одно видео в библиотеке.
+appId: app.lib.flux
+name: "Video player (device): fullscreen + PiP"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+# Основной стабильный flow доводит до списка видео (логин, play/pause,
+# скорость, назад). Отдельный файл, чтобы обычный video-player.yaml не зависел
+# от системного PiP.
+- runFlow:
+    file: video-player.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# Снова открываем первое видео: после video-player.yaml мы на списке.
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- assertVisible:
+    id: "video-player"
+
+# Запускаем видео с центрального постера и дожидаемся фактического playback.
+- extendedWaitUntil:
+    visible:
+      id: "video-player-play-overlay"
+    timeout: 20000
+- tapOn:
+    id: "video-player-play-overlay"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "playing"
+    timeout: 20000
+- assertNotVisible:
+    id: "video-player-error"
+
+# Fullscreen: нативная модалка поверх приложения. Android back закрывает её и
+# возвращает на экран деталей с нашими контролами.
+- tapOn:
+    id: "video-player-fullscreen"
+- back
+- extendedWaitUntil:
+    visible:
+      id: "video-player-toggle"
+    timeout: 20000
+- assertVisible:
+    id: "video-player-timeline"
+- assertNotVisible:
+    id: "video-player-error"
+
+# PiP есть не на всех устройствах: кнопка условная. После входа в PiP
+# приложение уходит в системное окно, поэтому flow заканчивается здесь —
+# результат (окно PiP, возврат по тапу) проверяется глазами.
+- runFlow:
+    when:
+      visible:
+        id: "video-player-pip"
+    commands:
+      - tapOn:
+          id: "video-player-pip"
