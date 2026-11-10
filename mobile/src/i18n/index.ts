@@ -48,7 +48,7 @@ const ru = {
 	"video.extractError": "Не удалось извлечь аудио",
 	"video.extractUnavailable":
 		"Сервер не может извлечь аудио: не установлен ffmpeg.",
-	"video.extractQueueFull": "Очередь извлечения переполнена. Попробуйте позже.",
+	"video.extractRateLimited": "Слишком много запросов. Попробуйте позже.",
 	"video.meta.year": "Год",
 	"video.meta.duration": "Длительность",
 	"video.meta.resolution": "Разрешение",
@@ -147,7 +147,7 @@ const en: Record<keyof typeof ru, string> = {
 	"video.extractError": "Could not extract the audio",
 	"video.extractUnavailable":
 		"The server cannot extract audio: ffmpeg is not installed.",
-	"video.extractQueueFull": "The extraction queue is full. Try again later.",
+	"video.extractRateLimited": "Too many requests. Try again later.",
 	"video.meta.year": "Year",
 	"video.meta.duration": "Duration",
 	"video.meta.resolution": "Resolution",

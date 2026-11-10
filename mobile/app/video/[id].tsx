@@ -141,8 +141,8 @@ function extractFailureLabel(failure: ExtractFailure): string {
 			return t("video.extractAlready");
 		case "unavailable":
 			return t("video.extractUnavailable");
-		case "queueFull":
-			return t("video.extractQueueFull");
+		case "rateLimited":
+			return t("video.extractRateLimited");
 		default:
 			return t("video.extractError");
 	}
@@ -206,7 +206,10 @@ function ExtractAudioControl({ mediaId }: { mediaId: number }) {
 					testID="video-detail-extract-status"
 				>
 					<ActivityIndicator size="small" color={colors.accent} />
-					<Text style={[styles.extractStatusText, { color: colors.textMuted }]}>
+					<Text
+						accessibilityLiveRegion="polite"
+						style={[styles.extractStatusText, { color: colors.textMuted }]}
+					>
 						{extractPhaseLabel(extract.phase)}
 					</Text>
 					<Pressable
@@ -228,6 +231,7 @@ function ExtractAudioControl({ mediaId }: { mediaId: number }) {
 			{extract.failure !== null && !extract.isExtracting && (
 				<Text
 					accessibilityRole="alert"
+					accessibilityLiveRegion="polite"
 					testID="video-detail-extract-error"
 					style={[styles.extractError, { color: colors.danger }]}
 				>

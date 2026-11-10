@@ -8,6 +8,8 @@ import {
 	EXTRACT_POLL_INTERVAL_MS,
 	MAX_EXTRACT_POLL_FAILURES,
 	nextPollFailure,
+	phaseAfterStart,
+	pollExtractJob,
 } from "./extract";
 
 function mediaFixture(overrides: Record<string, unknown> = {}) {
@@ -108,12 +110,12 @@ describe("classifyExtractError", () => {
 		);
 	});
 
-	it("503 — нет ffmpeg, 429 — очередь переполнена", () => {
+	it("503 — нет ffmpeg, 429 — общий rate limit", () => {
 		expect(classifyExtractError(new ApiError(503, "no ffmpeg")).kind).toBe(
 			"unavailable",
 		);
 		expect(classifyExtractError(new ApiError(429, "full")).kind).toBe(
-			"queueFull",
+			"rateLimited",
 		);
 	});
 
@@ -137,5 +139,168 @@ describe("createCancellableDelay", () => {
 		delay.cancel();
 		await wait;
 		expect(resolved).toBe(true);
+	});
+});
+
+describe("phaseAfterStart", () => {
+	it("200-трек не оставляет экран в isExtracting", () => {
+		expect(phaseAfterStart("track")).toBeNull();
+	});
+
+	it("202-задание сразу показывает очередь", () => {
+		expect(phaseAfterStart("job")).toBe("queued");
+	});
+});
+
+describe("pollExtractJob", () => {
+	const signal = new AbortController().signal;
+	const base = {
+		jobId: 7,
+		signal,
+		onPhase: () => {
+			// Фазы проверяются в тестах хука через onPhase, здесь не нужны.
+		},
+	};
+
+	it("done с media возвращает готовый трек", async () => {
+		const result = await pollExtractJob({
+			...base,
+			isActive: () => true,
+			wait: () => Promise.resolve(),
+			fetchStatus: () =>
+				Promise.resolve({
+					id: 7,
+					status: "done",
+					error: null,
+					media: mediaFixture(),
+				}),
+		});
+		expect(result.kind).toBe("done");
+		if (result.kind !== "done") {
+			return;
+		}
+		expect(result.result.track.id).toBe(9);
+		expect(result.result.alreadyExtracted).toBe(false);
+	});
+
+	it("done без media — сбой, а не пустой успех", async () => {
+		const result = await pollExtractJob({
+			...base,
+			isActive: () => true,
+			wait: () => Promise.resolve(),
+			fetchStatus: () =>
+				Promise.resolve({
+					id: 7,
+					status: "done",
+					error: "track deleted",
+					media: null,
+				}),
+		});
+		expect(result.kind).toBe("failed");
+		if (result.kind !== "failed") {
+			return;
+		}
+		expect(result.failure.kind).toBe("failed");
+		expect(result.failure.message).toBe("track deleted");
+	});
+
+	it("status=error завершает опрос с сообщением задания", async () => {
+		const result = await pollExtractJob({
+			...base,
+			isActive: () => true,
+			wait: () => Promise.resolve(),
+			fetchStatus: () =>
+				Promise.resolve({
+					id: 7,
+					status: "error",
+					error: "decode failed",
+				}),
+		});
+		expect(result.kind).toBe("failed");
+		if (result.kind !== "failed") {
+			return;
+		}
+		expect(result.failure.message).toBe("decode failed");
+	});
+
+	it("сдаётся после трёх сетевых ошибок подряд", async () => {
+		let calls = 0;
+		const result = await pollExtractJob({
+			...base,
+			isActive: () => true,
+			wait: () => Promise.resolve(),
+			fetchStatus: () => {
+				calls += 1;
+				return Promise.reject(new Error("network"));
+			},
+		});
+		expect(result.kind).toBe("failed");
+		expect(calls).toBe(MAX_EXTRACT_POLL_FAILURES);
+	});
+
+	it("успешный статус сбрасывает серию сбоев", async () => {
+		const responses: (() => Promise<unknown>)[] = [
+			() => Promise.reject(new Error("network 1")),
+			() => Promise.reject(new Error("network 2")),
+			() => Promise.resolve({ id: 7, status: "processing" }),
+			() => Promise.reject(new Error("network 3")),
+			() => Promise.reject(new Error("network 4")),
+			() => Promise.resolve({ id: 7, status: "done", media: mediaFixture() }),
+		];
+		let calls = 0;
+		const result = await pollExtractJob({
+			...base,
+			isActive: () => true,
+			wait: () => Promise.resolve(),
+			fetchStatus: () => {
+				const next = responses[calls];
+				calls += 1;
+				if (next === undefined) {
+					return Promise.reject(new Error("unexpected poll"));
+				}
+				return next();
+			},
+		});
+		expect(result.kind).toBe("done");
+		expect(calls).toBe(responses.length);
+	});
+
+	it("отмена до wait не делает ни одного запроса", async () => {
+		let waited = false;
+		let fetched = false;
+		const result = await pollExtractJob({
+			...base,
+			isActive: () => false,
+			wait: () => {
+				waited = true;
+				return Promise.resolve();
+			},
+			fetchStatus: () => {
+				fetched = true;
+				return Promise.reject(new Error("не должно вызываться"));
+			},
+		});
+		expect(result).toEqual({ kind: "cancelled" });
+		expect(waited).toBe(false);
+		expect(fetched).toBe(false);
+	});
+
+	it("отмена во время wait не переходит к запросу", async () => {
+		let active = true;
+		let fetched = false;
+		const result = await pollExtractJob({
+			...base,
+			isActive: () => active,
+			wait: () => {
+				active = false;
+				return Promise.resolve();
+			},
+			fetchStatus: () => {
+				fetched = true;
+				return Promise.reject(new Error("не должно вызываться"));
+			},
+		});
+		expect(result).toEqual({ kind: "cancelled" });
+		expect(fetched).toBe(false);
 	});
 });

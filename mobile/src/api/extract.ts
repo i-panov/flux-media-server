@@ -35,7 +35,7 @@ export type ExtractStartResult =
 export type ExtractFailureKind =
 	| "conflict"
 	| "unavailable"
-	| "queueFull"
+	| "rateLimited"
 	| "failed";
 
 export interface ExtractFailure {
@@ -65,6 +65,15 @@ export function classifyExtractStart(body: unknown): ExtractStartResult {
 		track: mediaSchema.parse(body),
 		alreadyExtracted: true,
 	};
+}
+
+// 200 с готовым треком означает, что извлечения больше нет: фаза должна
+// сброситься, иначе isExtracting залипнет навсегда. 202 — задание сразу
+// уходит в очередь.
+export function phaseAfterStart(
+	kind: ExtractStartResult["kind"],
+): ExtractPhase | null {
+	return kind === "track" ? null : "queued";
 }
 
 export function classifyExtractStatus(body: unknown): ExtractJobStatus {
@@ -104,8 +113,9 @@ export function nextPollFailure(failures: number): {
 	return { failures: next, giveUp: next >= MAX_EXTRACT_POLL_FAILURES };
 }
 
-// 409 — дорожка уже есть/задание готово; 503 — нет ffmpeg; 429 — очередь
-// переполнена. Всё остальное (сеть, 5xx, битый ответ) — общий сбой.
+// 409 — дорожка уже есть/задание готово; 503 — нет ffmpeg; 429 — общий
+// rate limit (он же отдаётся при переполненной очереди). Всё остальное
+// (сеть, 5xx, битый ответ) — общий сбой.
 export function classifyExtractError(error: unknown): ExtractFailure {
 	if (error instanceof ApiError) {
 		if (error.status === 409) {
@@ -115,7 +125,7 @@ export function classifyExtractError(error: unknown): ExtractFailure {
 			return { kind: "unavailable", message: error.message };
 		}
 		if (error.status === 429) {
-			return { kind: "queueFull", message: error.message };
+			return { kind: "rateLimited", message: error.message };
 		}
 		return { kind: "failed", message: error.message };
 	}
@@ -165,6 +175,10 @@ export function createCancellableDelay(): CancellableDelay {
 interface ExtractRun {
 	jobId: number | null;
 	cancelled: boolean;
+	// true только для ручной отмены: unmount не должен удалять задание на
+	// сервере, иначе поздний DELETE убьёт новый прогон, который мог
+	// подхватить то же активное задание.
+	explicitCancel: boolean;
 	readonly controller: AbortController;
 }
 
@@ -183,22 +197,36 @@ type ExtractPollOutcome =
 	| { kind: "failed"; failure: ExtractFailure }
 	| { kind: "cancelled" };
 
-interface ExtractPollOptions {
+export interface ExtractPollOptions {
 	readonly jobId: number;
 	readonly signal: AbortSignal;
 	readonly isActive: () => boolean;
 	readonly wait: () => Promise<void>;
 	readonly onPhase: (phase: ExtractPhase) => void;
+	// Точка подмены для тестов; в приложении — apiFetch статуса.
+	readonly fetchStatus?: (
+		jobId: number,
+		signal: AbortSignal,
+	) => Promise<unknown>;
+}
+
+async function fetchExtractStatus(
+	jobId: number,
+	signal: AbortSignal,
+): Promise<unknown> {
+	return await apiFetch<unknown>(`/media/extract/${jobId}`, { signal });
 }
 
 // Цикл опроса вынесен из хука: start остаётся коротким, а вся политика
-// «3 сбоя подряд / done / error» живёт в одной функции.
-async function pollExtractJob({
+// «3 сбоя подряд / done / error» живёт в одной функции. Экспортирован для
+// тестов без RNTL: wait/isActive/fetchStatus подменяются.
+export async function pollExtractJob({
 	jobId,
 	signal,
 	isActive,
 	wait,
 	onPhase,
+	fetchStatus = fetchExtractStatus,
 }: ExtractPollOptions): Promise<ExtractPollOutcome> {
 	let failures = 0;
 	while (isActive()) {
@@ -209,9 +237,7 @@ async function pollExtractJob({
 
 		let job: ExtractJobStatus;
 		try {
-			const raw = await apiFetch<unknown>(`/media/extract/${jobId}`, {
-				signal,
-			});
+			const raw = await fetchStatus(jobId, signal);
 			job = classifyExtractStatus(raw);
 		} catch (error) {
 			if (!isActive()) {
@@ -261,8 +287,8 @@ export interface ExtractAudioState {
 }
 
 // Хук держит один активный прогон: повторный старт во время извлечения
-// игнорируется (кнопка и так disabled), а unmount снимает опрос и
-// отправляет DELETE — задание не продолжает жить на сервере зря.
+// игнорируется (кнопка и так disabled). Unmount только снимает опрос
+// (как web), а DELETE шлёт лишь ручная отмена.
 export function useExtractAudio(mediaId: number): ExtractAudioState {
 	const queryClient = useQueryClient();
 	const [phase, setPhase] = useState<ExtractPhase | null>(null);
@@ -286,20 +312,24 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 		}
 	}, []);
 
-	// Unmount: опрос прекращается, а незавершённое задание отменяется на
-	// сервере. DELETE не привязываем к AbortController: его нужно довести
-	// до конца уже после abort'а запросов статуса.
+	// Единая точка завершения: снять прогон и убрать isExtracting. Нужна
+	// и для 200-трека, где опроса не было вовсе.
+	const finish = useCallback(
+		(run: ExtractRun) => {
+			stop(run);
+			setPhase(null);
+		},
+		[stop],
+	);
+
+	// Unmount: только гасим опрос/запросы статуса. Задание на сервере
+	// продолжает жить: DELETE здесь гонялся бы с новым прогоном, который
+	// после перемонтирования мог подхватить то же активное задание.
 	useEffect(
 		() => () => {
 			const run = runRef.current;
-			if (run === null) {
-				return;
-			}
-			stop(run);
-			if (run.jobId !== null) {
-				void cancelExtractJob(run.jobId).catch(() => {
-					// 404/409: задание уже завершилось — отменять нечего.
-				});
+			if (run !== null) {
+				stop(run);
 			}
 		},
 		[stop],
@@ -312,6 +342,7 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 		const run: ExtractRun = {
 			jobId: null,
 			cancelled: false,
+			explicitCancel: false,
 			controller: new AbortController(),
 		};
 		runRef.current = run;
@@ -334,10 +365,11 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 				return null;
 			}
 
-			// Отмена/unmount случились, пока POST был в полёте: id задания
-			// узнали только сейчас, поэтому DELETE отправляем здесь.
+			// Ручная отмена/unmount случились, пока POST был в полёте. Для
+			// явной отмены id задания узнали только сейчас — удаляем; при
+			// unmount задание оставляем серверу (см. cleanup выше).
 			if (run.cancelled || runRef.current !== run) {
-				if (parsedStart.kind === "job") {
+				if (run.explicitCancel && parsedStart.kind === "job") {
 					void cancelExtractJob(parsedStart.jobId).catch(() => {
 						// Задание уже завершилось — отменять нечего.
 					});
@@ -345,8 +377,11 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 				return null;
 			}
 
+			// 200-трек: фазы извлечения нет — finish сбросит её ниже.
+			// 202: задание сразу в очереди.
+			setPhase(phaseAfterStart(parsedStart.kind));
 			if (parsedStart.kind === "track") {
-				stop(run);
+				finish(run);
 				invalidateMediaLists(queryClient);
 				return {
 					track: parsedStart.track,
@@ -355,15 +390,6 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 			}
 
 			run.jobId = parsedStart.jobId;
-			if (run.cancelled || runRef.current !== run) {
-				// Unmount успел раньше ответа: id задания узнали только
-				// сейчас — отменяем его сразу, иначе прогон останется сиротой.
-				void cancelExtractJob(run.jobId).catch(() => {
-					// Задание уже завершилось — отменять нечего.
-				});
-				return null;
-			}
-			setPhase("queued");
 			const outcome = await pollExtractJob({
 				jobId: run.jobId,
 				signal: run.controller.signal,
@@ -374,8 +400,7 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 			if (outcome.kind === "cancelled") {
 				return null;
 			}
-			stop(run);
-			setPhase(null);
+			finish(run);
 			if (outcome.kind === "failed") {
 				setFailure(outcome.failure);
 				return null;
@@ -387,7 +412,7 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 				runRef.current = null;
 			}
 		}
-	}, [getDelay, mediaId, queryClient, stop]);
+	}, [finish, getDelay, mediaId, queryClient]);
 
 	const cancel = useCallback(async (): Promise<void> => {
 		const run = runRef.current;
@@ -395,6 +420,7 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 			return;
 		}
 		const jobId = run.jobId;
+		run.explicitCancel = true;
 		stop(run);
 		setPhase(null);
 		setFailure(null);
