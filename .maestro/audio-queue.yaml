@@ -1,0 +1,130 @@
+# Аудиоочередь: старт с трека, next, shuffle, repeat и восстановление
+# очереди после перезапуска без автоплея.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть минимум ДВА аудиотрека: next и index 2/N
+#     проверяются на реальной очереди, а не на заглушке.
+#
+# Запуск:
+#   maestro test .maestro/audio-queue.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/audio-queue.yaml
+appId: app.lib.flux
+name: "Audio queue: start, next, shuffle, repeat, restore"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на настройках — уходим на аудио и запускаем
+# очередь с первого видимого трека.
+- tapOn:
+    id: "tab-audio"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar-pause"
+    timeout: 20000
+- assertVisible:
+    id: "audio-bar-index"
+    text: "1/.*"
+
+# Next: очередь не заканчивается на первом треке, индекс сдвигается.
+- tapOn:
+    id: "audio-bar-next"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar-index"
+      text: "2/.*"
+    timeout: 20000
+- assertVisible:
+    id: "audio-bar-pause"
+- assertNotVisible:
+    id: "audio-bar-error"
+
+# Пауза и возврат к воспроизведению.
+- tapOn:
+    id: "audio-bar-pause"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar-play"
+    timeout: 5000
+- tapOn:
+    id: "audio-bar-play"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar-pause"
+    timeout: 20000
+
+# Shuffle: off -> on -> off. testID отражает состояние, поэтому проверка
+# не зависит от локали и иконки.
+- assertVisible:
+    id: "audio-bar-shuffle-off"
+- tapOn:
+    id: "audio-bar-shuffle-off"
+- assertVisible:
+    id: "audio-bar-shuffle-on"
+- tapOn:
+    id: "audio-bar-shuffle-on"
+- assertVisible:
+    id: "audio-bar-shuffle-off"
+
+# Repeat: off -> all -> one -> off.
+- assertVisible:
+    id: "audio-bar-repeat-off"
+- tapOn:
+    id: "audio-bar-repeat-off"
+- assertVisible:
+    id: "audio-bar-repeat-all"
+- tapOn:
+    id: "audio-bar-repeat-all"
+- assertVisible:
+    id: "audio-bar-repeat-one"
+- tapOn:
+    id: "audio-bar-repeat-one"
+- assertVisible:
+    id: "audio-bar-repeat-off"
+
+# Восстановление: очередь и режимы переживают перезапуск, но источник не
+# загружается сам — бар показывает play, а не pause.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-audio"
+    timeout: 20000
+- tapOn:
+    id: "tab-audio"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 20000
+- assertVisible:
+    id: "audio-bar-index"
+    text: "2/.*"
+- assertVisible:
+    id: "audio-bar-play"
+- assertNotVisible:
+    id: "audio-bar-pause"
+
+# Закрытие плеера очищает очередь и убирает бар.
+- tapOn:
+    id: "audio-bar-close"
+- assertNotVisible:
+    id: "audio-bar"
