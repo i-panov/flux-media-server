@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
 import type { ComponentProps } from "react";
 import {
 	FlatList,
@@ -198,6 +199,15 @@ export function AudioQueueSheet({ visible, onClose }: AudioQueueSheetProps) {
 												</Text>
 											</View>
 										</Pressable>
+										<QueueAction
+											icon="document-text-outline"
+											label={`${item.title} — ${t("audio.lyrics.open")}`}
+											testID={`audio-queue-lyrics-${position}`}
+											onPress={() => {
+												onClose();
+												router.push(`/audio/${item.id}`);
+											}}
+										/>
 										<QueueAction
 											icon="chevron-up"
 											label={t("audio.player.moveUp")}

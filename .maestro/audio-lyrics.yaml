@@ -1,0 +1,197 @@
+# Текст и перевод: вход из полного плеера, seek-подсветка, вкладка
+# перевода, админский редактор и открытие текста чужого трека из очереди.
+#
+# Предусловия те же, что у audio-player.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть минимум два аудиотрека;
+#   * для sync-проверки у первого трека должен быть lyrics с непустым
+#     sync_data в формате LRC. Без такой фикстуры flow проверяет только
+#     каркас экрана «Текст», а подсветка и вкладка перевода пропускаются:
+#     это условные проверки, а не acceptance.
+#
+# Запуск:
+#   maestro test .maestro/audio-lyrics.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/audio-lyrics.yaml
+appId: app.lib.flux
+name: "Audio lyrics: tabs, seek highlight, editor, other track"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# Стартуем первый трек и открываем полный плеер.
+- tapOn:
+    id: "tab-audio"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 20000
+- tapOn:
+    id: "audio-bar"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player"
+    timeout: 20000
+
+# Пауза и seek вперёд, чтобы позиция ушла дальше начала: активная строка
+# появляется только после первого таймкода.
+- tapOn:
+    id: "audio-player-pause"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player-play"
+    timeout: 5000
+- tapOn:
+    id: "audio-player-forward-10"
+- tapOn:
+    id: "audio-player-forward-10"
+- tapOn:
+    id: "audio-player-forward-10"
+
+# Вход в текст из шапки полного плеера.
+- tapOn:
+    id: "audio-player-lyrics"
+- extendedWaitUntil:
+    visible:
+      id: "audio-lyrics"
+    timeout: 20000
+
+# Ждём фактическую загрузку lyrics (plain/синхронизированные строки/пусто).
+# Без этого на медленной сети условные блоки ниже скипаются, не проверив
+# ни вкладку перевода, ни активную строку.
+- extendedWaitUntil:
+    visible:
+      id: "(lyrics-line-.*|audio-lyrics-plain|audio-lyrics-empty)"
+    timeout: 20000
+- assertVisible:
+    id: "audio-lyrics-title"
+- assertVisible:
+    id: "audio-lyrics-cover"
+- assertVisible:
+    id: "audio-lyrics-tab-lyrics"
+
+# Текст с LRC: после seek хотя бы одна строка должна быть активной.
+# Без lyrics/sync_data в фикстуре блок пропускается и acceptance не
+# подменяет: обязательным остаётся только каркас экрана.
+- runFlow:
+    when:
+      visible:
+        id: "lyrics-line-.*"
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "lyrics-line-.*-active"
+          timeout: 10000
+
+# Вкладка перевода видна только при непустом переводе; переключение
+# показывает обычный (несинхронизированный) текст. Если перевода нет,
+# вкладки нет и блок пропускается.
+- runFlow:
+    when:
+      visible:
+        id: "audio-lyrics-tab-translation"
+    commands:
+      - tapOn:
+          id: "audio-lyrics-tab-translation"
+      - assertVisible:
+          id: "audio-lyrics-plain"
+      - tapOn:
+          id: "audio-lyrics-tab-lyrics"
+
+# Админский редактор: если аккаунт админ, открываем и отменяем без записи.
+- runFlow:
+    when:
+      visible:
+        id: "audio-lyrics-edit"
+    commands:
+      # Админская кнопка появляется вместе с сессией, но ждём её явно:
+      # на медленной сети условный блок не должен скипнуться раньше UI.
+      - extendedWaitUntil:
+          visible:
+            id: "audio-lyrics-edit"
+          timeout: 10000
+      - tapOn:
+          id: "audio-lyrics-edit"
+      - assertVisible:
+          id: "lyrics-editor"
+      - assertVisible:
+          id: "lyrics-editor-text"
+      - assertVisible:
+          id: "lyrics-editor-translation"
+      - assertVisible:
+          id: "lyrics-editor-sync"
+      - tapOn:
+          id: "lyrics-editor-cancel"
+      - extendedWaitUntil:
+          notVisible:
+            id: "lyrics-editor"
+          timeout: 5000
+
+# Назад в плеер.
+- tapOn:
+    id: "audio-lyrics-back"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player"
+    timeout: 10000
+
+# Чужой трек из очереди: текст открывается, но подсветка выключена.
+- tapOn:
+    id: "audio-player-queue"
+- extendedWaitUntil:
+    visible:
+      id: "audio-queue-sheet"
+    timeout: 10000
+- runFlow:
+    when:
+      visible:
+        id: "audio-queue-row-1"
+    commands:
+      - tapOn:
+          id: "audio-queue-lyrics-1"
+      - extendedWaitUntil:
+          visible:
+            id: "audio-lyrics"
+          timeout: 20000
+      - assertVisible:
+          id: "audio-lyrics-other-track"
+      - assertNotVisible:
+          id: "lyrics-line-.*-active"
+      - tapOn:
+          id: "audio-lyrics-back"
+      - extendedWaitUntil:
+          visible:
+            id: "audio-player"
+          timeout: 10000
+- runFlow:
+    when:
+      visible:
+        id: "audio-queue-sheet"
+    commands:
+      - tapOn:
+          id: "audio-queue-close"
+
+# Возврат в табы и очистка очереди, чтобы не влиять на следующие прогоны.
+- tapOn:
+    id: "audio-player-close"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 10000
+- tapOn:
+    id: "audio-bar-close"
+- assertNotVisible:
+    id: "audio-bar"

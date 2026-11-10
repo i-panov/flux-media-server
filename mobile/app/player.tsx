@@ -120,7 +120,20 @@ function AudioPlayerContent() {
 				<Text style={[styles.headerTitle, { color: colors.textMuted }]}>
 					{t("audio.player.nowPlaying")}
 				</Text>
-				<View style={styles.headerSpacer} />
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("audio.lyrics.open")}
+					onPress={() => router.push(`/audio/${current.id}`)}
+					testID="audio-player-lyrics"
+					hitSlop={8}
+					style={({ pressed }) => [styles.close, pressed && styles.pressed]}
+				>
+					<Ionicons
+						name="document-text-outline"
+						size={24}
+						color={colors.text}
+					/>
+				</Pressable>
 			</View>
 			<View style={styles.coverWrap}>
 				<AudioCover media={current} size={260} testID="audio-player-cover" />
@@ -205,7 +218,6 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 	},
 	headerTitle: { fontSize: 13, fontWeight: "600", letterSpacing: 0.5 },
-	headerSpacer: { width: 44 },
 	close: {
 		width: 44,
 		height: 44,
