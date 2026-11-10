@@ -4,6 +4,7 @@ import {
 	authSource,
 	coverPath,
 	imageSource,
+	isHttpSourceUrl,
 	streamPath,
 	thumbPath,
 } from "./source";
@@ -90,6 +91,29 @@ describe("authSource", () => {
 
 		expect(first.headers.Authorization).toBe("Bearer first-token");
 		expect(second.headers.Authorization).toBe("Bearer second-token");
+	});
+});
+
+describe("source URL validation", () => {
+	it("принимает только абсолютные http(s)-ссылки", () => {
+		expect(isHttpSourceUrl("https://example.com/watch?v=1")).toBe(true);
+		expect(isHttpSourceUrl("http://example.com")).toBe(true);
+		expect(isHttpSourceUrl("  https://example.com/path  ")).toBe(true);
+	});
+
+	it("отсекает опасные и относительные схемы", () => {
+		expect(isHttpSourceUrl("javascript:alert(1)")).toBe(false);
+		expect(isHttpSourceUrl("file:///etc/passwd")).toBe(false);
+		expect(isHttpSourceUrl("data:text/html,hi")).toBe(false);
+		expect(isHttpSourceUrl("/media/1")).toBe(false);
+		expect(isHttpSourceUrl("example.com")).toBe(false);
+	});
+
+	it("не пропускает пустую ссылку и URL без хоста", () => {
+		expect(isHttpSourceUrl("")).toBe(false);
+		expect(isHttpSourceUrl("https://")).toBe(false);
+		expect(isHttpSourceUrl("https:///path")).toBe(false);
+		expect(isHttpSourceUrl("https://exa mple.com")).toBe(false);
 	});
 });
 

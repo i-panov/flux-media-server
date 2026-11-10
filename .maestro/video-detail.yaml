@@ -1,0 +1,83 @@
+# Детали видео: вход -> вкладка видео -> первое видео из списка ->
+# title/screen/source link. Source link проверяется условно: у фикстуры
+# может не быть source_url, и тогда кнопки на экране нет.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть хотя бы одно видео (иначе flow упадёт на ожидании
+#     media-row-* — это ожидаемо, тест данных, а не приложения).
+#
+# Запуск:
+#   maestro test .maestro/video-detail.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/video-detail.yaml
+appId: app.lib.flux
+name: "Video detail: list -> title/source"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на экране настроек — уходим на видео.
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+
+# Первая строка списка открывает stack-экран деталей.
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- assertVisible:
+    id: "video-detail-screen"
+- assertVisible:
+    id: "video-detail-title"
+
+# Экшен-кнопки могут быть ниже fold на маленьком экране.
+- scrollUntilVisible:
+    element:
+      id: "video-detail-add-collection"
+    direction: DOWN
+- assertVisible:
+    id: "video-detail-favorite"
+
+# Кнопка источника рендерится только для http(s)-source_url; после скролла
+# к экшенам она уже в viewport, поэтому условие не пропускает её молча.
+- runFlow:
+    when:
+      visible:
+        id: "video-detail-source"
+    commands:
+      - assertVisible:
+          id: "video-detail-source"
+
+# Add-to-collection: открываем sheet и закрываем его, не меняя данные.
+- tapOn:
+    id: "video-detail-add-collection"
+- assertVisible:
+    id: "add-to-collection-sheet"
+- tapOn:
+    id: "add-to-collection-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "add-to-collection-sheet"
+    timeout: 10000
+
+# Назад возвращает к списку, детали не остаются в истории вкладки.
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000

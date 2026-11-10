@@ -1,4 +1,4 @@
-import type { MediaList as MediaListData } from "@flux/shared";
+import type { Media, MediaList as MediaListData } from "@flux/shared";
 import { formatDuration } from "@flux/shared";
 import type {
 	InfiniteData,
@@ -7,6 +7,7 @@ import type {
 import {
 	ActivityIndicator,
 	FlatList,
+	Pressable,
 	StyleSheet,
 	Text,
 	View,
@@ -19,7 +20,13 @@ import { ListFooter } from "./ListFooter";
 
 type MediaListQuery = UseInfiniteQueryResult<InfiniteData<MediaListData>>;
 
-export function MediaList({ query }: { query: MediaListQuery }) {
+interface MediaListProps {
+	query: MediaListQuery;
+	/** Optional: без обработчика строка остаётся статичной (аудио-таб). */
+	onPressItem?: (item: Media) => void;
+}
+
+export function MediaList({ query, onPressItem }: MediaListProps) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -58,8 +65,18 @@ export function MediaList({ query }: { query: MediaListQuery }) {
 				/>
 			}
 			renderItem={({ item }) => (
-				<View
-					style={[
+				<Pressable
+					accessibilityRole={onPressItem === undefined ? undefined : "button"}
+					accessibilityLabel={
+						onPressItem === undefined ? undefined : item.title
+					}
+					onPress={
+						onPressItem === undefined ? undefined : () => onPressItem(item)
+					}
+					testID={
+						onPressItem === undefined ? undefined : `media-row-${item.id}`
+					}
+					style={({ pressed }) => [
 						styles.row,
 						{
 							gap: spacing.md,
@@ -67,6 +84,7 @@ export function MediaList({ query }: { query: MediaListQuery }) {
 							borderColor: colors.border,
 							backgroundColor: colors.surface,
 						},
+						pressed && onPressItem !== undefined && styles.pressed,
 					]}
 				>
 					<View style={styles.info}>
@@ -86,7 +104,7 @@ export function MediaList({ query }: { query: MediaListQuery }) {
 					<Text style={[styles.muted, { color: colors.textMuted }]}>
 						{formatDuration(item.duration)}
 					</Text>
-				</View>
+				</Pressable>
 			)}
 		/>
 	);
@@ -106,4 +124,5 @@ const styles = StyleSheet.create({
 	info: { flex: 1 },
 	title: { fontSize: 16, fontWeight: "600" },
 	muted: { fontSize: 13 },
+	pressed: { opacity: 0.7 },
 });

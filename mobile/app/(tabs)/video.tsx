@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { StyleSheet, Text } from "react-native";
 import { useVideoList } from "../../src/api/media";
 import { MediaList } from "../../src/components/MediaList";
@@ -14,7 +15,10 @@ export default function VideoScreen() {
 			<Text style={[styles.title, { color: colors.text }]}>
 				{t("video.title")}
 			</Text>
-			<MediaList query={query} />
+			<MediaList
+				query={query}
+				onPressItem={(item) => router.push(`/video/${item.id}`)}
+			/>
 		</Screen>
 	);
 }

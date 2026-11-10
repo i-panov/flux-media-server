@@ -34,6 +34,15 @@ export async function authSource(path: string): Promise<AuthSource> {
 // алиас нужен для читаемости вызовов у постеров и обложек.
 export const imageSource = authSource;
 
+// Ссылка на источник открывается только по http(s): javascript:, file:,
+// data: и относительные пути не должны попасть в Linking.openURL.
+// Хост обязателен, поэтому "https://" и пустая строка отсекаются.
+const HTTP_URL_PATTERN = /^https?:\/\/[^\s/]+(?:[/?#]\S*)?$/i;
+
+export function isHttpSourceUrl(value: string): boolean {
+	return HTTP_URL_PATTERN.test(value.trim());
+}
+
 // Единственная точка сборки медиа-URL: id — числовой из схемы Media.
 export function streamPath(id: number): string {
 	return `/media/${id}/stream`;
