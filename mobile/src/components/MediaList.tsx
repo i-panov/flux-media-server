@@ -24,9 +24,25 @@ interface MediaListProps {
 	query: MediaListQuery;
 	/** Optional: без обработчика строка остаётся статичной (аудио-таб). */
 	onPressItem?: (item: Media) => void;
+	/** Локальные тексты пустого/ошибочного состояния (экран артиста). */
+	emptyTitle?: string;
+	emptyDescription?: string;
+	emptyTestID?: string;
+	errorTitle?: string;
+	errorTestID?: string;
+	testID?: string;
 }
 
-export function MediaList({ query, onPressItem }: MediaListProps) {
+export function MediaList({
+	query,
+	onPressItem,
+	emptyTitle,
+	emptyDescription,
+	emptyTestID,
+	errorTitle,
+	errorTestID,
+	testID,
+}: MediaListProps) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -39,18 +55,33 @@ export function MediaList({ query, onPressItem }: MediaListProps) {
 			</View>
 		);
 	}
-	if (query.isError && items.length === 0) {
-		return <ErrorState onRetry={() => void query.refetch()} />;
+	// data-first: ошибка рефетча не прячет уже загруженные страницы;
+	// для пустого/частичного ответа retry остаётся в футере.
+	if (query.isError && query.data === undefined) {
+		return (
+			<ErrorState
+				title={errorTitle}
+				onRetry={() => void query.refetch()}
+				testID={errorTestID}
+			/>
+		);
 	}
 	return (
 		<FlatList
+			testID={testID}
 			data={items}
 			keyExtractor={(item) => String(item.id)}
 			style={styles.fill}
 			contentContainerStyle={
 				items.length === 0 ? styles.emptyList : styles.list
 			}
-			ListEmptyComponent={<EmptyState title={t("media.empty")} />}
+			ListEmptyComponent={
+				<EmptyState
+					title={emptyTitle ?? t("media.empty")}
+					description={emptyDescription}
+					testID={emptyTestID}
+				/>
+			}
 			onEndReached={() => {
 				if (query.hasNextPage && !query.isFetchingNextPage) {
 					void query.fetchNextPage();

@@ -24,6 +24,7 @@ import { useSession } from "../auth/session";
 import { t, useLanguage } from "../i18n";
 import { desiredAfterStatus } from "./audioPlaybackPolicy";
 import { shouldPreemptResumeOn401 } from "./audioProgress";
+import { useAudioArtistSync } from "./useAudioArtistSync";
 import { useAudioProgress } from "./useAudioProgress";
 import {
 	type AudioControls,
@@ -110,6 +111,20 @@ function useStableAudioActions(actions: AudioActions): AudioActions {
 	);
 }
 
+// Выход из аккаунта не оставляет очередь прошлого пользователя.
+// undefined — сессия ещё грузится (или упала сеть), тогда не трогаем.
+function useSignOutQueueClear(
+	hydrated: boolean,
+	signedOut: boolean,
+	clearQueue: () => void,
+): void {
+	useEffect(() => {
+		if (hydrated && signedOut) {
+			clearQueue();
+		}
+	}, [clearQueue, hydrated, signedOut]);
+}
+
 export function AudioProvider({ children }: { children: ReactNode }) {
 	useLanguage();
 	// Императивный createAudioPlayer + useReleasingSharedObject: плеер
@@ -185,6 +200,14 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		setDesiredPlaying(play);
 		loadSource(media, { play: () => desiredPlayingRef.current });
 	};
+
+	useAudioArtistSync(
+		queueState,
+		setQueueState,
+		current,
+		player,
+		isSourceLoaded,
+	);
 
 	const controls = useAudioQueueControls({
 		queueState,
@@ -293,15 +316,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		}
 	});
 
-	// Выход из аккаунта не оставляет очередь прошлого пользователя.
-	// undefined — сессия ещё грузится (или упала сеть), тогда не трогаем.
 	const session = useSession();
-	const clearQueue = editing.clear;
-	useEffect(() => {
-		if (hydrated && session.data === null) {
-			clearQueue();
-		}
-	}, [clearQueue, hydrated, session.data]);
+	useSignOutQueueClear(hydrated, session.data === null, editing.clear);
 
 	const seek = useAudioSeek(player, handleSeek, markUserStarted);
 

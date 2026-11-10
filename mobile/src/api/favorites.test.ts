@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	artistFavoritesQueryKey,
 	audioFavoritesQueryKey,
 	favoriteIds,
 	videoFavoritesQueryKey,
@@ -23,5 +24,9 @@ describe("favoritesQueryKey", () => {
 	it("разделяет избранное видео и аудио", () => {
 		expect(videoFavoritesQueryKey).toEqual(["favorites", "video", "all"]);
 		expect(audioFavoritesQueryKey).toEqual(["favorites", "audio", "all"]);
+	});
+
+	it("избранные артисты получают собственный ключ", () => {
+		expect(artistFavoritesQueryKey).toEqual(["favorites", "artists", "all"]);
 	});
 });

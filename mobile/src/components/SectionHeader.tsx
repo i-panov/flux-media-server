@@ -1,8 +1,16 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+	Pressable,
+	type StyleProp,
+	StyleSheet,
+	Text,
+	type TextStyle,
+	View,
+} from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 
 interface SectionHeaderProps {
 	title: string;
+	titleStyle?: StyleProp<TextStyle>;
 	subtitle?: string;
 	actionLabel?: string;
 	onActionPress?: () => void;
@@ -12,6 +20,7 @@ interface SectionHeaderProps {
 
 export function SectionHeader({
 	title,
+	titleStyle,
 	subtitle,
 	actionLabel,
 	onActionPress,
@@ -24,7 +33,9 @@ export function SectionHeader({
 	return (
 		<View style={[styles.row, { gap: spacing.sm }]} testID={testID}>
 			<View style={styles.info}>
-				<Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+				<Text style={[styles.title, { color: colors.text }, titleStyle]}>
+					{title}
+				</Text>
 				{subtitle !== undefined && (
 					<Text style={[styles.subtitle, { color: colors.textMuted }]}>
 						{subtitle}

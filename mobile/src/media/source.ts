@@ -55,3 +55,9 @@ export function thumbPath(id: number): string {
 export function coverPath(id: number): string {
 	return `/media/${id}/cover`;
 }
+
+// Обложка артиста кешируется по updated_at: после загрузки новой обложки
+// прежний URL не должен оставаться в кэше expo-image.
+export function artistCoverPath(id: number, updatedAt: string): string {
+	return `/artists/${id}/cover?v=${encodeURIComponent(updatedAt)}`;
+}

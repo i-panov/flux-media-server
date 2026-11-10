@@ -35,7 +35,7 @@ interface PendingSeek {
 // promise раньше, чем источник реально перемотался.
 const SEEK_VERIFY_TOLERANCE_SECONDS = 1.5;
 
-function metadataFor(media: Media): AudioMetadata {
+export function audioMetadataFor(media: Media): AudioMetadata {
 	const artist = media.artists
 		.map((entry) => entry.name)
 		.filter((name) => name !== "")
@@ -156,7 +156,7 @@ export function useAudioSource(player: AudioPlayer): AudioSourceController {
 			try {
 				// Ошибка lock screen (нет разрешения/платформы) не должна
 				// помечать источник сломанным: звук при этом уже загружен.
-				player.setActiveForLockScreen(true, metadataFor(media));
+				player.setActiveForLockScreen(true, audioMetadataFor(media));
 			} catch {
 				// Играем без lock screen.
 			}

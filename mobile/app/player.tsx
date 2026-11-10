@@ -13,6 +13,7 @@ import {
 	useFavoriteAudioIds,
 	useToggleAudioFavorite,
 } from "../src/api/favorites";
+import { ArtistLinks } from "../src/components/ArtistLinks";
 import { AuthGate } from "../src/components/AuthGate";
 import { EmptyState } from "../src/components/EmptyState";
 import { Screen } from "../src/components/Screen";
@@ -101,7 +102,6 @@ function AudioPlayerContent() {
 		);
 	}
 
-	const artists = current.artists.map((entry) => entry.name).join(", ");
 	const isFavorite = favorites.data?.has(current.id) ?? false;
 	const favoriteBusy = favorites.isFetching || toggleFavorite.isPending;
 	const bufferingNow = loading || buffering;
@@ -146,13 +146,13 @@ function AudioPlayerContent() {
 				>
 					{current.title}
 				</Text>
-				<Text
+				<ArtistLinks
+					artists={current.artists}
+					emptyLabel={t("audio.player.unknownArtist")}
+					style={styles.artist}
 					testID="audio-player-artist"
-					numberOfLines={1}
-					style={[styles.artist, { color: colors.textMuted }]}
-				>
-					{artists === "" ? t("audio.player.unknownArtist") : artists}
-				</Text>
+					align="center"
+				/>
 				<View style={[styles.metaRow, { gap: spacing.sm }]}>
 					<Text
 						testID="audio-player-index"
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
 	coverWrap: { alignItems: "center", paddingVertical: 8 },
 	info: { alignItems: "center" },
 	title: { fontSize: 24, fontWeight: "700", textAlign: "center" },
-	artist: { fontSize: 15, textAlign: "center" },
+	artist: { fontSize: 15 },
 	metaRow: { flexDirection: "row", alignItems: "center" },
 	meta: { fontSize: 13, fontVariant: ["tabular-nums"] },
 	error: { fontSize: 14, textAlign: "center" },

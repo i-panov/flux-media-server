@@ -1,6 +1,7 @@
 import { type AuthTransport, configureApi, resetApiConfig } from "@flux/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+	artistCoverPath,
 	authSource,
 	coverPath,
 	imageSource,
@@ -37,6 +38,15 @@ describe("media paths", () => {
 		expect(streamPath(42)).toBe("/media/42/stream");
 		expect(thumbPath(42)).toBe("/media/42/thumb");
 		expect(coverPath(42)).toBe("/media/42/cover");
+	});
+});
+
+describe("artistCoverPath", () => {
+	it("добавляет cache-buster из updated_at", () => {
+		expect(artistCoverPath(7, "2026-11-10T18:00:00Z")).toBe(
+			"/artists/7/cover?v=2026-11-10T18%3A00%3A00Z",
+		);
+		expect(artistCoverPath(7, "")).toBe("/artists/7/cover?v=");
 	});
 });
 

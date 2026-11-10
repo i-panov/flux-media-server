@@ -1,6 +1,8 @@
 import {
+	fetchFavoriteArtistIds,
 	fetchFavoriteMedia,
 	type MediaType,
+	toggleArtistFavorite,
 	toggleFavorite,
 } from "@flux/shared";
 import {
@@ -74,4 +76,35 @@ export function useFavoriteAudioIds() {
 
 export function useToggleAudioFavorite() {
 	return useToggleMediaFavorite("audio");
+}
+
+// Избранные артисты: ключ отдельный от медиа (id приходят из тех же
+// /favorites, но набор другой), поэтому инвалидация не трогает треки.
+export const artistFavoritesQueryKey = ["favorites", "artists", "all"] as const;
+
+export function useFavoriteArtistIds() {
+	return useQuery({
+		queryKey: artistFavoritesQueryKey,
+		queryFn: () => fetchFavoriteArtistIds(),
+		retry: false,
+		refetchOnWindowFocus: false,
+	});
+}
+
+export function useToggleArtistFavorite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			artistId,
+			favorite,
+		}: {
+			artistId: number;
+			favorite: boolean;
+		}) => toggleArtistFavorite(artistId, favorite),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({
+				queryKey: ["favorites", "artists"],
+			});
+		},
+	});
 }

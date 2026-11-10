@@ -24,6 +24,15 @@ export function useAudioList() {
 	return useInfiniteQuery(audioListOptions(fetcher, ""));
 }
 
+// Треки артиста фильтруются на сервере (artist_id): клиент не тянет всю
+// аудиотеку и не фильтрует её в памяти. enabled — для невалидного id.
+export function useArtistTracks(artistId: number, enabled = true) {
+	return useInfiniteQuery({
+		...audioListOptions(fetcher, "", artistId),
+		enabled,
+	});
+}
+
 // Детали медиа: enabled выключает запрос для невалидного id из маршрута,
 // чтобы экран показал 404, а не запрашивал /media/0.
 export function useMedia(id: number, enabled = true) {

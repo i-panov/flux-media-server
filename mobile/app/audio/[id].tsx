@@ -13,6 +13,7 @@ import {
 import { useLyrics, useSaveLyrics } from "../../src/api/lyrics";
 import { useMedia } from "../../src/api/media";
 import { useSession } from "../../src/auth/session";
+import { ArtistLinks } from "../../src/components/ArtistLinks";
 import { AuthGate } from "../../src/components/AuthGate";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
@@ -306,8 +307,6 @@ function AudioLyricsContent() {
 		);
 	}
 
-	const artists = track.artists.map((artist) => artist.name).join(", ");
-
 	return (
 		<Screen testID="audio-lyrics" edges={["top", "bottom"]}>
 			{header}
@@ -321,13 +320,12 @@ function AudioLyricsContent() {
 					>
 						{track.title}
 					</Text>
-					<Text
+					<ArtistLinks
+						artists={track.artists}
+						emptyLabel={t("audio.player.unknownArtist")}
+						style={styles.artist}
 						testID="audio-lyrics-artist"
-						numberOfLines={1}
-						style={[styles.artist, { color: colors.textMuted }]}
-					>
-						{artists === "" ? t("audio.player.unknownArtist") : artists}
-					</Text>
+					/>
 				</View>
 			</View>
 			{current !== null && !isCurrentTrack && (

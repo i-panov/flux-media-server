@@ -1,0 +1,237 @@
+# Артисты: вход с вкладки аудио и из библиотеки, ссылка из плеера,
+# избранное, треки и админское переименование.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть минимум один аудиотрек, поэтому у него есть артист.
+#
+# Избранное проверяется условно: состояние могло остаться от прошлых
+# прогонов. Переключение в обе стороны возвращает сердечко в «выкл».
+# Переименование доступно только админу: без админа блок пропускается,
+# с админом открываем модалку и отменяем, не меняя фикстуру.
+#
+# Запуск:
+#   maestro test .maestro/artists.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/artists.yaml
+appId: app.lib.flux
+name: "Artists: list, detail, favorite, tracks, rename"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# Вход в список артистов из шапки вкладки «Аудио».
+- tapOn:
+    id: "tab-audio"
+- extendedWaitUntil:
+    visible:
+      id: "audio-open-artists"
+    timeout: 20000
+- tapOn:
+    id: "audio-open-artists"
+- extendedWaitUntil:
+    visible:
+      id: "artists-screen"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "artist-row-.*"
+    timeout: 20000
+- assertVisible:
+    id: "artist-cover-.*"
+- extendedWaitUntil:
+    visible:
+      id: "artist-favorite-.*-(on|off)"
+    timeout: 20000
+- tapOn:
+    id: "artists-back"
+- extendedWaitUntil:
+    visible:
+      id: "tab-audio"
+    timeout: 10000
+
+# Ссылка на артиста из полного плеера.
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 20000
+- tapOn:
+    id: "audio-bar"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "artist-link-.*"
+    timeout: 20000
+- tapOn:
+    id: "artist-link-.*"
+- extendedWaitUntil:
+    visible:
+      id: "artist-screen"
+    timeout: 20000
+- assertVisible:
+    id: "artist-detail-name"
+- assertVisible:
+    id: "artist-detail-cover"
+- extendedWaitUntil:
+    visible:
+      id: "(media-row-.*|artist-tracks-empty)"
+    timeout: 20000
+
+# Избранное артиста: состояние заранее неизвестно, поэтому проверяем
+# переключение условными блоками и возвращаем сердечко в «выкл».
+- extendedWaitUntil:
+    visible:
+      id: "artist-detail-favorite-(on|off)"
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "artist-detail-favorite-off"
+    commands:
+      - tapOn:
+          id: "artist-detail-favorite-off"
+      - extendedWaitUntil:
+          visible:
+            id: "artist-detail-favorite-on"
+          timeout: 10000
+- runFlow:
+    when:
+      visible:
+        id: "artist-detail-favorite-on"
+    commands:
+      - tapOn:
+          id: "artist-detail-favorite-on"
+      - extendedWaitUntil:
+          visible:
+            id: "artist-detail-favorite-off"
+          timeout: 10000
+
+# Переименование: только админ. Модалка открывается и отменяется без
+# записи, чтобы fixture-имена не менялись между прогонами.
+- runFlow:
+    when:
+      visible:
+        id: "artist-rename"
+    commands:
+      - tapOn:
+          id: "artist-rename"
+      - assertVisible:
+          id: "artist-rename-modal"
+      - assertVisible:
+          id: "artist-rename-input"
+      - tapOn:
+          id: "artist-rename-cancel"
+      - extendedWaitUntil:
+          notVisible:
+            id: "artist-rename-modal"
+          timeout: 5000
+
+# Назад в плеер, закрываем плеер и очередь.
+- tapOn:
+    id: "artist-back"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player"
+    timeout: 10000
+- tapOn:
+    id: "audio-player-close"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 10000
+- tapOn:
+    id: "audio-bar-close"
+- assertNotVisible:
+    id: "audio-bar"
+
+# Вход в список из библиотеки и переход к артисту.
+- tapOn:
+    id: "tab-library"
+- assertVisible:
+    id: "library-screen"
+- tapOn:
+    id: "library-artists"
+- extendedWaitUntil:
+    visible:
+      id: "artists-screen"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "artist-row-.*"
+    timeout: 20000
+- tapOn:
+    id: "artist-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "artist-screen"
+    timeout: 20000
+
+# Треки артиста: если они есть, тап запускает очередь этих треков.
+- extendedWaitUntil:
+    visible:
+      id: "(media-row-.*|artist-tracks-empty)"
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "media-row-.*"
+    commands:
+      - tapOn:
+          id: "media-row-.*"
+
+# Мини-бар и таб-бар живут в (tabs), а не на стековом экране артиста:
+# сначала возвращаемся в библиотеку и только там проверяем очередь.
+- tapOn:
+    id: "artist-back"
+- extendedWaitUntil:
+    visible:
+      id: "artists-screen"
+    timeout: 10000
+- tapOn:
+    id: "artists-back"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 10000
+
+- runFlow:
+    when:
+      visible:
+        id: "audio-bar"
+    commands:
+      - assertVisible:
+          id: "audio-bar-pause"
+      - tapOn:
+          id: "audio-bar"
+      - extendedWaitUntil:
+          visible:
+            id: "audio-player"
+          timeout: 20000
+      - assertVisible:
+          id: "audio-player-title"
+      - tapOn:
+          id: "audio-player-close"
+      - extendedWaitUntil:
+          visible:
+            id: "audio-bar"
+          timeout: 10000
+      - tapOn:
+          id: "audio-bar-close"
+      - assertNotVisible:
+          id: "audio-bar"

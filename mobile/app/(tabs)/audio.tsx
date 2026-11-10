@@ -1,15 +1,14 @@
+import { router } from "expo-router";
 import { useMemo } from "react";
-import { StyleSheet, Text } from "react-native";
 import { useAudioList } from "../../src/api/media";
 import { MediaList } from "../../src/components/MediaList";
 import { Screen } from "../../src/components/Screen";
+import { SectionHeader } from "../../src/components/SectionHeader";
 import { t, useLanguage } from "../../src/i18n";
 import { useAudioActions } from "../../src/player/AudioProvider";
-import { useTheme } from "../../src/theme/ThemeProvider";
 
 export default function AudioScreen() {
 	useLanguage();
-	const { colors } = useTheme();
 	const query = useAudioList();
 	// Только stable actions-контекст: вкладка не перерисовывается каждые
 	// 500 мс от currentTime мини-плеера.
@@ -23,9 +22,13 @@ export default function AudioScreen() {
 
 	return (
 		<Screen>
-			<Text style={[styles.title, { color: colors.text }]}>
-				{t("audio.title")}
-			</Text>
+			<SectionHeader
+				title={t("audio.title")}
+				titleStyle={{ fontSize: 24 }}
+				actionLabel={t("artists.title")}
+				onActionPress={() => router.push("/artists")}
+				actionTestID="audio-open-artists"
+			/>
 			<MediaList
 				query={query}
 				onPressItem={(item) => {
@@ -38,7 +41,3 @@ export default function AudioScreen() {
 		</Screen>
 	);
 }
-
-const styles = StyleSheet.create({
-	title: { fontSize: 24, fontWeight: "700" },
-});
