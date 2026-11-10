@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { favoriteIds } from "./favorites";
+import {
+	audioFavoritesQueryKey,
+	favoriteIds,
+	videoFavoritesQueryKey,
+} from "./favorites";
 
 describe("favoriteIds", () => {
 	it("собирает id избранных медиа в Set", () => {
@@ -12,5 +16,12 @@ describe("favoriteIds", () => {
 
 	it("дубликаты не раздувают Set", () => {
 		expect(favoriteIds([{ id: 3 }, { id: 3 }])).toEqual(new Set([3]));
+	});
+});
+
+describe("favoritesQueryKey", () => {
+	it("разделяет избранное видео и аудио", () => {
+		expect(videoFavoritesQueryKey).toEqual(["favorites", "video", "all"]);
+		expect(audioFavoritesQueryKey).toEqual(["favorites", "audio", "all"]);
 	});
 });

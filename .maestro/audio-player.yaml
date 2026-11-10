@@ -1,0 +1,140 @@
+# Полный аудиоплеер: переход из мини-бара, seek, скорость, favorite,
+# очередь и возврат назад.
+#
+# Предусловия те же, что у tabs.yaml/audio-queue.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть минимум ДВА аудиотрека: выбор второго в очереди
+#     проверяется на реальной очереди.
+#
+# Запуск:
+#   maestro test .maestro/audio-player.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/audio-player.yaml
+appId: app.lib.flux
+name: "Audio player: bar, seek, speed, favorite, queue"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# Стартуем очередь с первого трека и открываем полный плеер тапом по бару.
+- tapOn:
+    id: "tab-audio"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 20000
+- tapOn:
+    id: "audio-bar"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player"
+    timeout: 20000
+- assertVisible:
+    id: "audio-player-title"
+- assertVisible:
+    id: "audio-player-index"
+    text: "1/.*"
+- assertVisible:
+    id: "audio-player-cover"
+
+# Пауза и seek кнопкой +10: позиция гарантированно уходит с 0:00.
+- tapOn:
+    id: "audio-player-pause"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player-play"
+    timeout: 5000
+- tapOn:
+    id: "audio-player-forward-10"
+- assertNotVisible:
+    id: "audio-player-position"
+    text: "0:00"
+
+# Скорость: 1× -> 1.25× (цикл 0.5…2×, тот же, что у видео).
+- extendedWaitUntil:
+    visible: "1×"
+    timeout: 5000
+- tapOn:
+    id: "audio-player-speed"
+- extendedWaitUntil:
+    visible: "1.25×"
+    timeout: 5000
+
+# Favorite: состояние может быть любым после прошлых прогонов, поэтому
+# проверяем переключение в обе стороны условными блоками.
+- extendedWaitUntil:
+    visible:
+      id: "audio-player-favorite-(on|off)"
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "audio-player-favorite-off"
+    commands:
+      - tapOn:
+          id: "audio-player-favorite-off"
+      - extendedWaitUntil:
+          visible:
+            id: "audio-player-favorite-on"
+          timeout: 10000
+- runFlow:
+    when:
+      visible:
+        id: "audio-player-favorite-on"
+    commands:
+      - tapOn:
+          id: "audio-player-favorite-on"
+      - extendedWaitUntil:
+          visible:
+            id: "audio-player-favorite-off"
+          timeout: 10000
+
+# Очередь: лист показывает треки, выбор второго закрывает лист и двигает
+# индекс в полном плеере.
+- tapOn:
+    id: "audio-player-queue"
+- extendedWaitUntil:
+    visible:
+      id: "audio-queue-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "audio-queue-row-0"
+- tapOn:
+    id: "audio-queue-row-1"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player-index"
+      text: "2/.*"
+    timeout: 20000
+- assertVisible:
+    id: "audio-player-title"
+
+# Возврат в табы: бар остаётся, очередь не сбрасывается.
+- tapOn:
+    id: "audio-player-close"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 10000
+- assertVisible:
+    id: "audio-bar-index"
+    text: "2/.*"
+
+# Чистим очередь, чтобы не влиять на следующие прогоны.
+- tapOn:
+    id: "audio-bar-close"
+- assertNotVisible:
+    id: "audio-bar"

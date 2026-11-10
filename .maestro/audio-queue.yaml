@@ -72,34 +72,47 @@ env:
       id: "audio-bar-pause"
     timeout: 20000
 
-# Shuffle: off -> on -> off. testID отражает состояние, поэтому проверка
-# не зависит от локали и иконки.
-- assertVisible:
-    id: "audio-bar-shuffle-off"
+# Shuffle/repeat живут в полном плеере: мини-бар открывается тапом и
+# остаётся на месте, пока модальный экран не закрыт.
 - tapOn:
-    id: "audio-bar-shuffle-off"
+    id: "audio-bar"
+- extendedWaitUntil:
+    visible:
+      id: "audio-player"
+    timeout: 20000
 - assertVisible:
-    id: "audio-bar-shuffle-on"
+    id: "audio-player-shuffle-off"
 - tapOn:
-    id: "audio-bar-shuffle-on"
+    id: "audio-player-shuffle-off"
 - assertVisible:
-    id: "audio-bar-shuffle-off"
+    id: "audio-player-shuffle-on"
+- tapOn:
+    id: "audio-player-shuffle-on"
+- assertVisible:
+    id: "audio-player-shuffle-off"
 
 # Repeat: off -> all -> one -> off.
 - assertVisible:
-    id: "audio-bar-repeat-off"
+    id: "audio-player-repeat-off"
 - tapOn:
-    id: "audio-bar-repeat-off"
+    id: "audio-player-repeat-off"
 - assertVisible:
-    id: "audio-bar-repeat-all"
+    id: "audio-player-repeat-all"
 - tapOn:
-    id: "audio-bar-repeat-all"
+    id: "audio-player-repeat-all"
 - assertVisible:
-    id: "audio-bar-repeat-one"
+    id: "audio-player-repeat-one"
 - tapOn:
-    id: "audio-bar-repeat-one"
+    id: "audio-player-repeat-one"
 - assertVisible:
-    id: "audio-bar-repeat-off"
+    id: "audio-player-repeat-off"
+
+- tapOn:
+    id: "audio-player-close"
+- extendedWaitUntil:
+    visible:
+      id: "audio-bar"
+    timeout: 10000
 
 # Восстановление: очередь и режимы переживают перезапуск, но источник не
 # загружается сам — бар показывает play, а не pause.

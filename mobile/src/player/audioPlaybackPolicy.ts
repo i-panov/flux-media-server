@@ -16,9 +16,12 @@ export interface TogglePlaybackState {
 // Пауза по тапу: играет — ставим паузу; грузится или буферизует начатое —
 // отменяем намерение. Если играть никто не просил, это не пауза, а play:
 // после внешней паузы desired может быть ещё true, но playing уже false.
+// Загрузка без намерения играть — это первый play во время in-flight load:
+// apply дочитает desired из ref и запустит звук, второй load не нужен.
 export function shouldPauseOnToggle(state: TogglePlaybackState): boolean {
 	return (
-		state.playing || state.loading || (state.desiredPlaying && state.buffering)
+		state.playing ||
+		(state.desiredPlaying && (state.loading || state.buffering))
 	);
 }
 
@@ -34,14 +37,12 @@ export interface TrackChangePlaybackState {
 // паузу, хотя пользователь просто переключил буферизующийся трек.
 // После внешней паузы desired сбрасывается sync-эффектом, поэтому stale
 // намерение само по себе не включает звук.
-export function wasPlayingBeforeChange(
+// Семантика совпадает с shouldPauseOnToggle: «играет или вот-вот заиграет».
+// Отдельное имя нужно вызывающему коду next/prev; общая реализация не
+// дублирует условие и не расходится между двумя сценариями.
+export const wasPlayingBeforeChange: (
 	state: TrackChangePlaybackState,
-): boolean {
-	return (
-		state.playing ||
-		(state.desiredPlaying && (state.loading || state.buffering))
-	);
-}
+) => boolean = shouldPauseOnToggle;
 
 // Нужно ли продолжать звук после смены трека. Конец трека — всегда да
 // (repeat one перезапускает тот же, иначе играет следующий), даже если

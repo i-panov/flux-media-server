@@ -1,9 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Tabs } from "expo-router";
+import { BottomTabBar, Tabs } from "expo-router/js-tabs";
 import type { ComponentProps } from "react";
-import type { ColorValue } from "react-native";
+import { type ColorValue, View } from "react-native";
 import { AuthGate } from "../../src/components/AuthGate";
 import { t, useLanguage } from "../../src/i18n";
+import { AudioBar } from "../../src/player/AudioBar";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -29,6 +30,15 @@ export default function TabsLayout() {
 	return (
 		<AuthGate>
 			<Tabs
+				// Мини-бар — часть таб-бара, а не absolute-оверлей: высота
+				// экрана сама уменьшается, список не перекрывается, а safe
+				// area снизу остаётся у BottomTabBar.
+				tabBar={(props) => (
+					<View style={{ backgroundColor: colors.surface }}>
+						<AudioBar />
+						<BottomTabBar {...props} />
+					</View>
+				)}
 				screenOptions={{
 					headerShown: false,
 					tabBarActiveTintColor: colors.accent,

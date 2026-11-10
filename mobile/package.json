@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

@@ -40,6 +40,14 @@ interface UseAudioQueueControlsOptions {
 	isSourceLoaded: (mediaId: number) => boolean;
 	loadSource: (media: Media, options: AudioSourceOptions) => void;
 	changeTrack: (next: AudioQueueState, play: boolean) => void;
+	/** Ручной seek/±10: отменяет поздний server-resume. */
+	markUserStarted: () => void;
+	/** Ручной retry после 401 снова разрешает server resume. */
+	resetResumeGuards: () => void;
+	/** Пользователь уже менял очередь/режимы: гидратация не должна их перетереть. */
+	markUserAction: () => void;
+	/** Синхронно обновить ref и state-намерение (pending-иконка). */
+	setDesiredPlaying: (value: boolean) => void;
 }
 
 // Адаптер к чистой политике: нативный плеер отдаёт playing/isBuffering.
@@ -56,9 +64,17 @@ function wasPlayingOnChange(
 	});
 }
 
+// Конец трека или позиция у самого конца: toggle должен перезапустить трек,
+// а не вызвать play() на уже завершившемся источнике.
+function isNearEnd(status: AudioStatus): boolean {
+	return (
+		status.didJustFinish ||
+		(status.duration > 0 && status.currentTime >= status.duration - 0.5)
+	);
+}
+
 export interface AudioControls {
 	playQueue: (items: Media[], startIndex?: number) => void;
-	playMedia: (media: Media) => void;
 	enqueue: (media: Media) => void;
 	toggle: () => void;
 	next: () => void;
@@ -90,6 +106,10 @@ export function useAudioQueueControls({
 	isSourceLoaded,
 	loadSource,
 	changeTrack,
+	markUserAction,
+	markUserStarted,
+	resetResumeGuards,
+	setDesiredPlaying,
 }: UseAudioQueueControlsOptions): AudioControls {
 	const current = currentMedia(queueState);
 
@@ -105,16 +125,12 @@ export function useAudioQueueControls({
 		[changeTrack, setPlayed],
 	);
 
-	const playMedia = useCallback(
-		(media: Media) => playQueue([media], 0),
-		[playQueue],
-	);
-
 	const enqueue = useCallback(
 		(media: Media) => {
+			markUserAction();
 			setQueueState((prev) => enqueueItems(prev, [media]));
 		},
-		[setQueueState],
+		[markUserAction, setQueueState],
 	);
 
 	const toggle = useCallback(() => {
@@ -129,19 +145,24 @@ export function useAudioQueueControls({
 				desiredPlaying: desiredPlayingRef.current,
 			})
 		) {
-			desiredPlayingRef.current = false;
+			setDesiredPlaying(false);
 			player.pause();
 			return;
 		}
-		desiredPlayingRef.current = true;
+		setDesiredPlaying(true);
+		// Загрузка уже идёт: apply прочитает актуальное намерение при
+		// завершении. Повторный loadSource только сбросил бы прогресс.
+		if (sourceLoading) {
+			return;
+		}
 		if (sourceFailed || !isSourceLoaded(current.id) || !player.isLoaded) {
+			// Ручной retry после неудачного 401-recover: новая generation
+			// получает право на fetchProgress/resume.
+			resetResumeGuards();
 			loadSource(current, { play: () => desiredPlayingRef.current });
 			return;
 		}
-		const nearEnd =
-			status.didJustFinish ||
-			(status.duration > 0 && status.currentTime >= status.duration - 0.5);
-		if (!nearEnd) {
+		if (!isNearEnd(status)) {
 			player.play();
 			return;
 		}
@@ -157,11 +178,11 @@ export function useAudioQueueControls({
 		isSourceLoaded,
 		loadSource,
 		player,
+		resetResumeGuards,
+		setDesiredPlaying,
 		sourceFailed,
 		sourceLoading,
-		status.currentTime,
-		status.didJustFinish,
-		status.duration,
+		status,
 	]);
 
 	const advance = useCallback(
@@ -172,7 +193,7 @@ export function useAudioQueueControls({
 				played,
 			});
 			if (target === null) {
-				desiredPlayingRef.current = false;
+				setDesiredPlaying(false);
 				player.pause();
 				return;
 			}
@@ -186,22 +207,22 @@ export function useAudioQueueControls({
 		},
 		[
 			changeTrack,
-			desiredPlayingRef,
 			played,
 			player,
 			queueState,
 			repeat,
+			setDesiredPlaying,
 			setPlayed,
 			shuffle,
 		],
 	);
-
-	const next = useCallback(() => {
+	const next = () => {
 		advance(wasPlayingOnChange(player, desiredPlayingRef, sourceLoading));
-	}, [advance, desiredPlayingRef, player, sourceLoading]);
+	};
 
 	const previous = useCallback(() => {
 		if (status.currentTime > 3) {
+			markUserStarted();
 			void player.seekTo(0).catch(() => {
 				// Нет загруженного источника — остаёмся на месте.
 			});
@@ -219,6 +240,7 @@ export function useAudioQueueControls({
 	}, [
 		changeTrack,
 		desiredPlayingRef,
+		markUserStarted,
 		player,
 		queueState,
 		repeat,
@@ -230,10 +252,12 @@ export function useAudioQueueControls({
 
 	const select = useCallback(
 		(index: number) => {
-			const nextState = selectIndex(queueState, index);
-			if (nextState === queueState) {
+			// Текущий трек не перезапускаем с 0: selectIndex всегда создаёт
+			// новый объект, поэтому сравнение по ссылке здесь не работает.
+			if (index === queueState.index) {
 				return;
 			}
+			const nextState = selectIndex(queueState, index);
 			setPlayed((prev) => new Set(prev).add(index));
 			changeTrack(nextState, true);
 		},
@@ -241,21 +265,23 @@ export function useAudioQueueControls({
 	);
 
 	const toggleShuffle = useCallback(() => {
+		markUserAction();
 		setShuffle((prev) => !prev);
-	}, [setShuffle]);
+	}, [markUserAction, setShuffle]);
 
 	const cycleRepeat = useCallback(() => {
+		markUserAction();
 		setRepeat((prev) =>
 			prev === "off" ? "all" : prev === "all" ? "one" : "off",
 		);
-	}, [setRepeat]);
+	}, [markUserAction, setRepeat]);
 
 	const finish = useCallback(() => {
 		// К концу трека status уже playing=false, но звук должен продолжиться:
 		// repeat one — с начала, иначе — следующим треком.
 		const resume = shouldResumeAfterTrackChange(player.playing, true);
 		if (repeat === "one") {
-			desiredPlayingRef.current = resume;
+			setDesiredPlaying(resume);
 			void (async () => {
 				await player.seekTo(0).catch(() => {
 					// Повтор с нуля не удался — остаёмся на паузе.
@@ -267,11 +293,10 @@ export function useAudioQueueControls({
 			return;
 		}
 		advance(resume);
-	}, [advance, desiredPlayingRef, player, repeat]);
+	}, [advance, player, repeat, setDesiredPlaying]);
 
 	return {
 		playQueue,
-		playMedia,
 		enqueue,
 		toggle,
 		next,

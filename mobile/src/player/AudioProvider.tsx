@@ -1,7 +1,6 @@
 import {
 	type AudioQueueState,
 	currentMedia,
-	emptyQueue,
 	type Media,
 	type RepeatMode,
 } from "@flux/shared";
@@ -17,17 +16,15 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
 import { useSession } from "../auth/session";
 import { t, useLanguage } from "../i18n";
 import { desiredAfterStatus } from "./audioPlaybackPolicy";
-import {
-	clearAudioQueue,
-	loadAudioQueue,
-	saveAudioQueue,
-} from "./audioQueueStorage";
+import { shouldPreemptResumeOn401 } from "./audioProgress";
+import { useAudioProgress } from "./useAudioProgress";
 import {
 	type AudioControls,
 	useAudioQueueControls,
@@ -36,34 +33,81 @@ import {
 	type AudioQueueEditing,
 	useAudioQueueEditing,
 } from "./useAudioQueueEditing";
+import { useAudioQueueState } from "./useAudioQueueState";
+import { useAudioRate } from "./useAudioRate";
+import { useAudioSeek } from "./useAudioSeek";
 import { useAudioSource } from "./useAudioSource";
 
 // 500 мс — дефолт expo-audio: мини-бару хватает, лишних перерисовок нет.
 const STATUS_UPDATE_INTERVAL_MS = 500;
 
-export interface AudioPlayerContextValue
-	extends AudioControls,
-		AudioQueueEditing {
+export interface AudioState {
 	queue: Media[];
 	index: number;
 	current: Media | null;
-	playing: boolean;
+	/** Играет или вот-вот заиграет: иконка не должна отставать на 500 мс. */
+	displayPlaying: boolean;
 	currentTime: number;
 	duration: number;
 	shuffle: boolean;
 	repeat: RepeatMode;
 	error: string | null;
-	seek: (seconds: number) => void;
+	loading: boolean;
+	buffering: boolean;
+	rate: number;
 }
 
-const AudioPlayerContext = createContext<AudioPlayerContextValue | null>(null);
+export interface AudioActions extends AudioControls, AudioQueueEditing {
+	seek: (seconds: number) => void;
+	cycleRate: () => void;
+}
 
-export function useAudioPlayer(): AudioPlayerContextValue {
-	const value = useContext(AudioPlayerContext);
+const AudioStateContext = createContext<AudioState | null>(null);
+const AudioActionsContext = createContext<AudioActions | null>(null);
+
+export function useAudioState(): AudioState {
+	const value = useContext(AudioStateContext);
 	if (value === null) {
-		throw new Error("useAudioPlayer must be used inside AudioProvider");
+		throw new Error("useAudioState must be used inside AudioProvider");
 	}
 	return value;
+}
+
+export function useAudioActions(): AudioActions {
+	const value = useContext(AudioActionsContext);
+	if (value === null) {
+		throw new Error("useAudioActions must be used inside AudioProvider");
+	}
+	return value;
+}
+
+// Actions-контекст должен иметь неизменную идентичность: методы читают
+// свежие замыкания из ref, а подписчики не ререндерятся от currentTime.
+function useStableAudioActions(actions: AudioActions): AudioActions {
+	const latest = useRef(actions);
+	useEffect(() => {
+		latest.current = actions;
+	}, [actions]);
+	return useMemo<AudioActions>(
+		() => ({
+			playQueue: (items, startIndex) =>
+				latest.current.playQueue(items, startIndex),
+			enqueue: (media) => latest.current.enqueue(media),
+			toggle: () => latest.current.toggle(),
+			next: () => latest.current.next(),
+			previous: () => latest.current.previous(),
+			select: (index) => latest.current.select(index),
+			toggleShuffle: () => latest.current.toggleShuffle(),
+			cycleRepeat: () => latest.current.cycleRepeat(),
+			finish: () => latest.current.finish(),
+			move: (from, to) => latest.current.move(from, to),
+			removeAt: (index) => latest.current.removeAt(index),
+			clear: () => latest.current.clear(),
+			seek: (seconds) => latest.current.seek(seconds),
+			cycleRate: () => latest.current.cycleRate(),
+		}),
+		[],
+	);
 }
 
 export function AudioProvider({ children }: { children: ReactNode }) {
@@ -83,50 +127,64 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		recover: recoverSource,
 		unload: unloadSource,
 		isLoaded: isSourceLoaded,
+		generation: sourceGeneration,
 	} = useAudioSource(player);
 	const desiredPlayingRef = useRef(false);
-
-	const [queueState, setQueueState] = useState<AudioQueueState>(emptyQueue);
-	const [played, setPlayed] = useState<ReadonlySet<number>>(new Set());
-	const [shuffle, setShuffle] = useState(false);
-	const [repeat, setRepeat] = useState<RepeatMode>("off");
-	const [hydrated, setHydrated] = useState(false);
+	const {
+		queueState,
+		setQueueState,
+		played,
+		setPlayed,
+		shuffle,
+		repeat,
+		setShuffle,
+		setRepeat,
+		hydrated,
+		markUserAction,
+	} = useAudioQueueState();
 
 	const current = currentMedia(queueState);
-
-	// Восстановление не запускает воспроизведение: источник подставится
-	// только когда пользователь нажмёт play или выберет другой трек.
-	useEffect(() => {
-		let active = true;
-		void loadAudioQueue().then((restored) => {
-			if (!active) {
-				return;
-			}
-			if (restored !== null) {
-				setQueueState(restored.queue);
-				setPlayed(restored.played);
-				setShuffle(restored.shuffle);
-				setRepeat(restored.repeat);
-			}
-			setHydrated(true);
-		});
-		return () => {
-			active = false;
-		};
+	const { rate, cycleRate } = useAudioRate(player);
+	const [desiredPlaying, setDesiredPlayingState] = useState(false);
+	// Ref нужен синхронно (in-flight load читает его при завершении), state —
+	// для pending-иконки: чтение ref в рендере React Compiler запрещает.
+	const setDesiredPlaying = useCallback((value: boolean) => {
+		desiredPlayingRef.current = value;
+		setDesiredPlayingState(value);
 	}, []);
+	// 401 уже восстановил позицию: серверный resume отключаем до смены
+	// трека/нового ручного запуска, не привязываясь к mediaId.
+	const [resumeDisabled, setResumeDisabled] = useState(false);
+	const resumePreemptedRef = useRef(false);
+	const resetResumeGuards = () => {
+		resumePreemptedRef.current = false;
+		setResumeDisabled(false);
+	};
+	const sourceReady =
+		current !== null && isSourceLoaded(current.id) && status.isLoaded;
+	const progress = useAudioProgress({
+		mediaId: current?.id ?? 0,
+		generation: sourceGeneration,
+		player,
+		sourceReady,
+		sourceLoading,
+		resumeDisabled,
+		resumePreemptedRef,
+	});
+	const { handleSeek, markUserStarted, resetUserStarted } = progress;
 
-	const changeTrack = useCallback(
-		(next: AudioQueueState, play: boolean) => {
-			const media = currentMedia(next);
-			if (media === null) {
-				return;
-			}
-			setQueueState(next);
-			desiredPlayingRef.current = play;
-			loadSource(media, { play: () => desiredPlayingRef.current });
-		},
-		[loadSource],
-	);
+	const changeTrack = (next: AudioQueueState, play: boolean) => {
+		const media = currentMedia(next);
+		if (media === null) {
+			return;
+		}
+		markUserAction();
+		resetResumeGuards();
+		resetUserStarted();
+		setQueueState(next);
+		setDesiredPlaying(play);
+		loadSource(media, { play: () => desiredPlayingRef.current });
+	};
 
 	const controls = useAudioQueueControls({
 		queueState,
@@ -145,6 +203,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		isSourceLoaded,
 		loadSource,
 		changeTrack,
+		markUserAction,
+		markUserStarted,
+		resetResumeGuards,
+		setDesiredPlaying,
 	});
 
 	const editing = useAudioQueueEditing({
@@ -154,20 +216,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		desiredPlayingRef,
 		changeTrack,
 		unloadSource,
+		markUserAction,
+		resetUserStarted,
+		setDesiredPlaying,
 	});
-
-	// Очередь/режимы пишутся одним ключом, пока очередь не пуста. Пустую
-	// очередь не храним: после clear рестарт не должен воскрешать трек.
-	useEffect(() => {
-		if (!hydrated) {
-			return;
-		}
-		if (queueState.items.length === 0) {
-			void clearAudioQueue();
-			return;
-		}
-		void saveAudioQueue({ queue: queueState, played, shuffle, repeat });
-	}, [hydrated, played, queueState, repeat, shuffle]);
 
 	// Внешняя пауза (шторка, наушники, потеря аудиофокуса) приходит только
 	// через status. Подтягиваем намерение по timeControlStatus: "paused" —
@@ -177,14 +229,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		if (status.didJustFinish) {
 			return;
 		}
-		desiredPlayingRef.current = desiredAfterStatus({
-			playing: status.playing,
-			loading: sourceLoading,
-			buffering: status.isBuffering,
-			timeControlStatus: status.timeControlStatus,
-			desiredPlaying: desiredPlayingRef.current,
-		});
+		setDesiredPlaying(
+			desiredAfterStatus({
+				playing: status.playing,
+				loading: sourceLoading,
+				buffering: status.isBuffering,
+				timeControlStatus: status.timeControlStatus,
+				desiredPlaying: desiredPlayingRef.current,
+			}),
+		);
 	}, [
+		setDesiredPlaying,
 		sourceLoading,
 		status.didJustFinish,
 		status.isBuffering,
@@ -205,7 +260,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
 	// Ошибка плеера (включая 401): один preflight в общий слой, затем
 	// повторная загрузка источника с актуальным Bearer.
-	const handlePlaybackError = useCallback(() => {
+	const handlePlaybackError = () => {
 		// Ошибка старого источника после смены трека не должна тратить
 		// единственный preflight нового.
 		if (current === null || !isSourceLoaded(current.id)) {
@@ -214,11 +269,20 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		const position = Number.isFinite(player.currentTime)
 			? player.currentTime
 			: 0;
+		// 401@0: ничего не проиграно — новая generation должна сделать
+		// fetchProgress и применить resume. 401@>0 восстанавливает позицию
+		// сама 401-ветка, server-resume уступает.
+		if (shouldPreemptResumeOn401(position)) {
+			resumePreemptedRef.current = true;
+			setResumeDisabled(true);
+		} else {
+			resetResumeGuards();
+		}
 		recoverSource(current, {
 			play: () => desiredPlayingRef.current,
 			position,
 		});
-	}, [current, isSourceLoaded, player, recoverSource]);
+	};
 
 	useEventListener(player, "playbackStatusUpdate", (event) => {
 		if (event.didJustFinish) {
@@ -239,40 +303,40 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		}
 	}, [clearQueue, hydrated, session.data]);
 
-	// seekTo оставлен в провайдере: полный плеер Task 13 использует его
-	// без обращений к нативному AudioPlayer из UI.
-	const seek = useCallback(
-		(seconds: number) => {
-			if (!Number.isFinite(seconds)) {
-				return;
-			}
-			void player.seekTo(Math.max(0, seconds)).catch(() => {
-				// Источник ещё не загружен: seek применится при следующем play.
-			});
-		},
-		[player],
-	);
+	const seek = useAudioSeek(player, handleSeek, markUserStarted);
+
+	const actions: AudioActions = {
+		...controls,
+		...editing,
+		seek,
+		cycleRate,
+	};
+	const stableActions = useStableAudioActions(actions);
 
 	const duration =
 		status.duration > 0 ? status.duration : (current?.duration ?? 0);
-	const value: AudioPlayerContextValue = {
-		...controls,
-		...editing,
+	const state: AudioState = {
 		queue: queueState.items,
 		index: queueState.index,
 		current,
-		playing: status.playing,
+		displayPlaying:
+			status.playing ||
+			(desiredPlaying && (sourceLoading || status.isBuffering)),
 		currentTime: status.currentTime,
 		duration,
 		shuffle,
 		repeat,
 		error: sourceFailed ? t("audio.player.error") : null,
-		seek,
+		loading: sourceLoading,
+		buffering: status.isBuffering,
+		rate,
 	};
 
 	return (
-		<AudioPlayerContext.Provider value={value}>
-			{children}
-		</AudioPlayerContext.Provider>
+		<AudioActionsContext.Provider value={stableActions}>
+			<AudioStateContext.Provider value={state}>
+				{children}
+			</AudioStateContext.Provider>
+		</AudioActionsContext.Provider>
 	);
 }

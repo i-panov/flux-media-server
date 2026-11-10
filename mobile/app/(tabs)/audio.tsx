@@ -4,15 +4,16 @@ import { useAudioList } from "../../src/api/media";
 import { MediaList } from "../../src/components/MediaList";
 import { Screen } from "../../src/components/Screen";
 import { t, useLanguage } from "../../src/i18n";
-import { AudioBar } from "../../src/player/AudioBar";
-import { useAudioPlayer } from "../../src/player/AudioProvider";
+import { useAudioActions } from "../../src/player/AudioProvider";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
 export default function AudioScreen() {
 	useLanguage();
 	const { colors } = useTheme();
 	const query = useAudioList();
-	const { playQueue } = useAudioPlayer();
+	// Только stable actions-контекст: вкладка не перерисовывается каждые
+	// 500 мс от currentTime мини-плеера.
+	const { playQueue } = useAudioActions();
 	// Очередь стартует из уже загруженных страниц списка: пользователь
 	// слышит порядок, который видит, а не весь каталог.
 	const items = useMemo(
@@ -34,9 +35,6 @@ export default function AudioScreen() {
 					playQueue(items, Math.max(startIndex, 0));
 				}}
 			/>
-			{/* Пока бар живёт на экране аудио; глобальный мини-бар над
-			    табами переносится в Task 13. */}
-			<AudioBar />
 		</Screen>
 	);
 }

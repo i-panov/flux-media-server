@@ -11,6 +11,8 @@ import {
 	type RefObject,
 	type SetStateAction,
 	useCallback,
+	useEffect,
+	useRef,
 } from "react";
 
 interface UseAudioQueueEditingOptions {
@@ -20,6 +22,11 @@ interface UseAudioQueueEditingOptions {
 	desiredPlayingRef: RefObject<boolean>;
 	changeTrack: (next: AudioQueueState, play: boolean) => void;
 	unloadSource: () => void;
+	/** Пользователь уже менял очередь: гидратация не должна её перетереть. */
+	markUserAction: () => void;
+	/** Сбросить userStarted при очистке очереди. */
+	resetUserStarted: () => void;
+	setDesiredPlaying: (value: boolean) => void;
 }
 
 export interface AudioQueueEditing {
@@ -37,51 +44,83 @@ export function useAudioQueueEditing({
 	desiredPlayingRef,
 	changeTrack,
 	unloadSource,
+	markUserAction,
+	resetUserStarted,
+	setDesiredPlaying,
 }: UseAudioQueueEditingOptions): AudioQueueEditing {
+	// Свежая очередь для составных действий: setQueueState функциональный,
+	// но changeTrack нужен готовый nextState. Ref обновляется и в updater,
+	// поэтому два быстрых remove не перезаписывают очередь старым снимком.
+	const queueRef = useRef(queueState);
+	useEffect(() => {
+		queueRef.current = queueState;
+	}, [queueState]);
+
 	const clear = useCallback(() => {
-		desiredPlayingRef.current = false;
+		markUserAction();
+		resetUserStarted();
+		setDesiredPlaying(false);
 		unloadSource();
+		queueRef.current = emptyQueue;
 		setQueueState(emptyQueue);
 		setPlayed(new Set());
-	}, [desiredPlayingRef, setPlayed, setQueueState, unloadSource]);
+	}, [
+		markUserAction,
+		resetUserStarted,
+		setDesiredPlaying,
+		setPlayed,
+		setQueueState,
+		unloadSource,
+	]);
 
 	const move = useCallback(
 		(from: number, to: number) => {
-			const length = queueState.items.length;
+			const length = queueRef.current.items.length;
 			if (from < 0 || from >= length || to < 0 || to >= length || from === to) {
 				return;
 			}
+			markUserAction();
 			// Functional updater: два быстрых move подряд не должны
 			// перезаписывать очередь устаревшим снимком.
-			setQueueState((prev) => moveTrack(prev, from, to));
+			setQueueState((prev) => {
+				const next = moveTrack(prev, from, to);
+				queueRef.current = next;
+				return next;
+			});
 			setPlayed((prev) => movePlayedIndices(prev, from, to));
 		},
-		[queueState.items.length, setPlayed, setQueueState],
+		[markUserAction, setPlayed, setQueueState],
 	);
 
 	const removeAt = useCallback(
 		(removeIndex: number) => {
-			if (removeIndex < 0 || removeIndex >= queueState.items.length) {
+			const current = queueRef.current;
+			if (removeIndex < 0 || removeIndex >= current.items.length) {
 				return;
 			}
-			if (queueState.items.length === 1) {
+			markUserAction();
+			if (current.items.length === 1) {
 				clear();
 				return;
 			}
+			const nextState = removeTrack(current, removeIndex);
+			queueRef.current = nextState;
+			setQueueState((prev) => {
+				const next = removeTrack(prev, removeIndex);
+				queueRef.current = next;
+				return next;
+			});
 			setPlayed((prev) => shiftPlayedIndices(prev, removeIndex));
-			const nextState = removeTrack(queueState, removeIndex);
-			if (removeIndex === queueState.index) {
+			if (removeIndex === current.index) {
 				// Текущий трек удалён: на его место встаёт следующий.
 				changeTrack(nextState, desiredPlayingRef.current);
-				return;
 			}
-			setQueueState(nextState);
 		},
 		[
 			changeTrack,
 			clear,
 			desiredPlayingRef,
-			queueState,
+			markUserAction,
 			setPlayed,
 			setQueueState,
 		],

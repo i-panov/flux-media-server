@@ -40,6 +40,16 @@ describe("audio playback toggle policy", () => {
 		).toBe(true);
 	});
 
+	it("первый play во время загрузки не превращается в паузу", () => {
+		// Пользователь нажал play, пока источник ещё грузится: это не отмена
+		// намерения, а его установка. In-flight apply прочитает desired из ref.
+		expect(
+			shouldPauseOnToggle(
+				toggleState({ loading: true, desiredPlaying: false }),
+			),
+		).toBe(false);
+	});
+
 	it("буферизация запрошенного воспроизведения тоже пауза", () => {
 		expect(
 			shouldPauseOnToggle(
