@@ -13,6 +13,11 @@ import {
 	View,
 } from "react-native";
 import {
+	type ExtractFailure,
+	type ExtractPhase,
+	useExtractAudio,
+} from "../../src/api/extract";
+import {
 	useFavoriteVideoIds,
 	useToggleVideoFavorite,
 } from "../../src/api/favorites";
@@ -117,6 +122,119 @@ function ActionButton({
 				{label}
 			</Text>
 		</Pressable>
+	);
+}
+
+function extractPhaseLabel(phase: ExtractPhase | null): string {
+	if (phase === "processing") {
+		return t("video.extractProcessing");
+	}
+	if (phase === "queued") {
+		return t("video.extractQueued");
+	}
+	return t("video.extractStarting");
+}
+
+function extractFailureLabel(failure: ExtractFailure): string {
+	switch (failure.kind) {
+		case "conflict":
+			return t("video.extractAlready");
+		case "unavailable":
+			return t("video.extractUnavailable");
+		case "queueFull":
+			return t("video.extractQueueFull");
+		default:
+			return t("video.extractError");
+	}
+}
+
+// Извлечение доступно только админу (backend requireAdmin). Компонент
+// монтируется в admin-ветке, поэтому хук не крутится у обычных зрителей.
+function ExtractAudioControl({ mediaId }: { mediaId: number }) {
+	useLanguage();
+	const { colors, spacing } = useTheme();
+	const extract = useExtractAudio(mediaId);
+	const cancelLabel = t("common.cancel");
+
+	const run = async () => {
+		const result = await extract.start();
+		if (result === null) {
+			// Ошибка уже лежит в extract.failure и отрисована под кнопкой.
+			return;
+		}
+		Alert.alert(
+			result.alreadyExtracted
+				? t("video.extractAlreadyTitle")
+				: t("video.extractDoneTitle"),
+			result.alreadyExtracted
+				? t("video.extractAlready")
+				: t("video.extractDone"),
+		);
+	};
+
+	const confirm = () => {
+		Alert.alert(t("video.extractTitle"), t("video.extractConfirm"), [
+			{ text: cancelLabel, style: "cancel" },
+			{
+				text: t("video.extractAction"),
+				onPress: () => {
+					void run();
+				},
+			},
+		]);
+	};
+
+	return (
+		<View
+			style={[styles.extractControl, { gap: spacing.sm }]}
+			testID="video-detail-extract-control"
+		>
+			<ActionButton
+				icon="musical-notes-outline"
+				label={
+					extract.isExtracting
+						? t("video.extractProcessing")
+						: t("video.extract")
+				}
+				onPress={confirm}
+				testID="video-detail-extract"
+				disabled={extract.isExtracting}
+			/>
+			{extract.isExtracting && (
+				<View
+					style={[styles.extractStatus, { gap: spacing.sm }]}
+					testID="video-detail-extract-status"
+				>
+					<ActivityIndicator size="small" color={colors.accent} />
+					<Text style={[styles.extractStatusText, { color: colors.textMuted }]}>
+						{extractPhaseLabel(extract.phase)}
+					</Text>
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel={cancelLabel}
+						onPress={() => {
+							void extract.cancel();
+						}}
+						testID="video-detail-extract-cancel"
+						hitSlop={4}
+						style={styles.inlineRetry}
+					>
+						<Text style={[styles.actionLabel, { color: colors.danger }]}>
+							{cancelLabel}
+						</Text>
+					</Pressable>
+				</View>
+			)}
+			{extract.failure !== null && !extract.isExtracting && (
+				<Text
+					accessibilityRole="alert"
+					testID="video-detail-extract-error"
+					style={[styles.extractError, { color: colors.danger }]}
+				>
+					{extractFailureLabel(extract.failure)}
+				</Text>
+			)}
+		</View>
 	);
 }
 
@@ -310,14 +428,17 @@ function VideoDetailContent() {
 					/>
 				)}
 				{session.data?.is_admin === true && (
-					<ActionButton
-						icon="trash-outline"
-						label={t("video.delete")}
-						onPress={confirmDelete}
-						testID="video-detail-delete"
-						disabled={removeMedia.isPending}
-						danger
-					/>
+					<>
+						<ExtractAudioControl mediaId={item.id} />
+						<ActionButton
+							icon="trash-outline"
+							label={t("video.delete")}
+							onPress={confirmDelete}
+							testID="video-detail-delete"
+							disabled={removeMedia.isPending}
+							danger
+						/>
+					</>
 				)}
 			</View>
 			{collectionSheetOpen && (
@@ -351,6 +472,15 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 8,
 	},
 	actions: { flexDirection: "row", flexWrap: "wrap" },
+	extractControl: { alignItems: "flex-start" },
+	extractStatus: {
+		flexDirection: "row",
+		alignItems: "center",
+		flexWrap: "wrap",
+		minHeight: 44,
+	},
+	extractStatusText: { fontSize: 14 },
+	extractError: { fontSize: 14 },
 	actionButton: {
 		flexDirection: "row",
 		alignItems: "center",
