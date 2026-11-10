@@ -556,9 +556,11 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// трек (200); статусы — той же формы, что у загрузок. Тяжёлый лимитер
 	// тот же, что у загрузок: ffmpeg жрёт CPU не меньше multipart-парсинга.
 	media.Post("/:id/extract", requireAdmin, extractRateLimiter, extractHandler.Extract)
-	media.Get("/extract/:id", requireAdmin, extractRateLimiter, extractHandler.ExtractStatus)
+	// Статус и готовый трек — частые чтения (поллинг раз в 1.5с), им
+	// нужен read-бюджет, а не строгий лимит запуска ffmpeg.
+	media.Get("/extract/:id", requireAdmin, readRateLimiter, extractHandler.ExtractStatus)
 	media.Delete("/extract/:id", requireAdmin, extractRateLimiter, extractHandler.CancelExtract)
-	media.Get("/:id/extracted", requireAdmin, extractRateLimiter, extractHandler.Extracted)
+	media.Get("/:id/extracted", requireAdmin, readRateLimiter, extractHandler.Extracted)
 	media.Post("/check-hash", mediaHandler.CheckHash)
 	media.Delete("/:id", requireAdmin, mediaHandler.Delete)
 	media.Get("/:id/stream", readRateLimiter, mediaHandler.Stream)
