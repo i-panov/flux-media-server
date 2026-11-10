@@ -1,8 +1,10 @@
 // Минимальный i18n для каркаса: без внешних зависимостей, выбор языка
 // по системной локали. Полноценный i18next — отдельный этап.
 import { useSyncExternalStore } from "react";
+import { collectionEn, collectionRu } from "./collections";
 
 const ru = {
+	...collectionRu,
 	"common.loading": "Загрузка…",
 	"common.retry": "Повторить",
 	"common.error": "Ошибка",
@@ -10,6 +12,7 @@ const ru = {
 	"common.cancel": "Отмена",
 	"common.close": "Закрыть",
 	"common.save": "Сохранить",
+	"common.create": "Создать",
 	"home.server": "Сервер",
 	"home.offline": "недоступен",
 	"home.logout": "Выйти",
@@ -67,7 +70,7 @@ const ru = {
 	"video.player.fullscreenError": "Не удалось открыть полноэкранный режим",
 	"video.player.pipError": "Не удалось включить картинку в картинке",
 	"collections.addTitle": "Добавить в коллекцию",
-	"collections.emptyForType": "Нет коллекций для видео",
+	"collections.emptyForType": "Нет коллекций этого типа",
 	"collections.loadError": "Не удалось загрузить коллекции",
 	"collections.addError": "Не удалось добавить в коллекцию",
 	"collections.duplicate": "Видео уже в коллекции",
@@ -149,7 +152,7 @@ const ru = {
 		"Заполните хотя бы одно поле или отмените редактирование.",
 	"audio.title": "Аудио",
 	"library.title": "Библиотека",
-	"library.hint": "Коллекции и избранное появятся здесь.",
+	"library.hint": "Артисты и коллекции собраны здесь.",
 	"library.collections": "Коллекции",
 	"library.favorites": "Избранное",
 	"library.soon": "Скоро",
@@ -194,6 +197,7 @@ const ru = {
 } as const;
 
 const en: Record<keyof typeof ru, string> = {
+	...collectionEn,
 	"common.loading": "Loading…",
 	"common.retry": "Retry",
 	"common.error": "Error",
@@ -201,6 +205,7 @@ const en: Record<keyof typeof ru, string> = {
 	"common.cancel": "Cancel",
 	"common.close": "Close",
 	"common.save": "Save",
+	"common.create": "Create",
 	"home.server": "Server",
 	"home.offline": "offline",
 	"home.logout": "Log out",
@@ -260,7 +265,7 @@ const en: Record<keyof typeof ru, string> = {
 	"video.player.fullscreenError": "Could not enter full screen",
 	"video.player.pipError": "Could not start Picture in Picture",
 	"collections.addTitle": "Add to collection",
-	"collections.emptyForType": "No collections for video",
+	"collections.emptyForType": "No collections of this type",
 	"collections.loadError": "Could not load collections",
 	"collections.addError": "Could not add to the collection",
 	"collections.duplicate": "The video is already in this collection",
@@ -342,7 +347,7 @@ const en: Record<keyof typeof ru, string> = {
 		"Fill in at least one field or cancel editing.",
 	"audio.title": "Audio",
 	"library.title": "Library",
-	"library.hint": "Collections and favorites will appear here.",
+	"library.hint": "Artists and collections are gathered here.",
 	"library.collections": "Collections",
 	"library.favorites": "Favorites",
 	"library.soon": "Soon",

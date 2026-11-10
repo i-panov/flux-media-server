@@ -1,4 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import type { Collection } from "@flux/shared";
+import { useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -11,31 +13,38 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+	type AddableCollectionType,
 	isAlreadyInCollection,
-	useAddVideoToCollection,
-	useVideoCollections,
+	useAddMediaToCollection,
+	useCollectionsByType,
 } from "../api/collections";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { CreateCollectionModal } from "./CreateCollectionModal";
 
 interface AddToCollectionSheetProps {
 	visible: boolean;
 	mediaId: number;
+	/** Тип коллекции совпадает с типом медиа: видео или аудио. */
+	type: AddableCollectionType;
 	onClose: () => void;
 }
 
-// Минимальный bottom sheet Task 7: только выбор существующей видеоколлекции.
-// Создание коллекции и переносы — Task 17, поэтому кнопки «создать» здесь нет.
+// Bottom sheet выбора коллекции нужного типа. Новую коллекцию можно
+// создать прямо здесь: после создания медиа сразу добавляется в неё, без
+// второго похода в детали.
 export function AddToCollectionSheet({
 	visible,
 	mediaId,
+	type,
 	onClose,
 }: AddToCollectionSheetProps) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
 	const insets = useSafeAreaInsets();
-	const collections = useVideoCollections();
-	const add = useAddVideoToCollection();
+	const collections = useCollectionsByType(type);
+	const add = useAddMediaToCollection();
+	const [createOpen, setCreateOpen] = useState(false);
 	const items = collections.data ?? [];
 
 	const choose = (collectionId: number) => {
@@ -53,6 +62,11 @@ export function AddToCollectionSheet({
 				},
 			},
 		);
+	};
+
+	const addToCreated = (collection: Collection) => {
+		setCreateOpen(false);
+		choose(collection.id);
 	};
 
 	return (
@@ -150,6 +164,26 @@ export function AddToCollectionSheet({
 
 					<Pressable
 						accessibilityRole="button"
+						accessibilityLabel={t("collections.create")}
+						onPress={() => setCreateOpen(true)}
+						testID="add-to-collection-create"
+						style={({ pressed }) => [
+							styles.create,
+							{
+								borderColor: colors.accent,
+								borderRadius: radii.sm,
+								paddingVertical: spacing.sm,
+							},
+							pressed && styles.pressed,
+						]}
+					>
+						<Ionicons name="add" size={18} color={colors.accent} />
+						<Text style={[styles.cancelLabel, { color: colors.accent }]}>
+							{t("collections.create")}
+						</Text>
+					</Pressable>
+					<Pressable
+						accessibilityRole="button"
 						accessibilityLabel={t("common.cancel")}
 						onPress={onClose}
 						testID="add-to-collection-cancel"
@@ -169,6 +203,14 @@ export function AddToCollectionSheet({
 					</Pressable>
 				</View>
 			</View>
+			{createOpen && (
+				<CreateCollectionModal
+					visible
+					fixedType={type}
+					onClose={() => setCreateOpen(false)}
+					onCreated={addToCreated}
+				/>
+			)}
 		</Modal>
 	);
 }
@@ -192,6 +234,14 @@ const styles = StyleSheet.create({
 		gap: 10,
 	},
 	collectionName: { fontSize: 15, fontWeight: "600" },
+	create: {
+		borderWidth: 1,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: 6,
+		minHeight: 44,
+	},
 	cancel: {
 		borderWidth: 1,
 		alignItems: "center",

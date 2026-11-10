@@ -1,21 +1,39 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { formatDuration, type Media } from "@flux/shared";
 import { router, useLocalSearchParams } from "expo-router";
+import { useMemo, useState } from "react";
 import {
 	ActivityIndicator,
 	FlatList,
-	Pressable,
+	RefreshControl,
 	StyleSheet,
 	Text,
 	View,
 } from "react-native";
-import { useCollectionItems, useCollections } from "../../src/api/collections";
+import {
+	isCollectionMissing,
+	useCollectionItems,
+	useCollections,
+} from "../../src/api/collections";
+import type { CollectionDialog } from "../../src/collections/dialog";
+import { collectionTypeLabel } from "../../src/collections/labels";
+import {
+	asMediaType,
+	collectionBreadcrumbs,
+	collectionChildren,
+} from "../../src/collections/tree";
+import { useCollectionItemActions } from "../../src/collections/useCollectionItemActions";
+import { useCollectionSelection } from "../../src/collections/useCollectionSelection";
 import { AuthGate } from "../../src/components/AuthGate";
+import { CollectionActionBar } from "../../src/components/CollectionActionBar";
+import { CollectionBackHeader } from "../../src/components/CollectionBackHeader";
+import { CollectionBreadcrumbs } from "../../src/components/CollectionBreadcrumbs";
+import { CollectionBulkBar } from "../../src/components/CollectionBulkBar";
+import { CollectionDialogs } from "../../src/components/CollectionDialogs";
+import { CollectionItemRow } from "../../src/components/CollectionItemRow";
+import { CollectionListHeader } from "../../src/components/CollectionListHeader";
+import { CollectionScreenState } from "../../src/components/CollectionScreenState";
 import { EmptyState } from "../../src/components/EmptyState";
-import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
 import { t, useLanguage } from "../../src/i18n";
-import { useAudioActions } from "../../src/player/AudioProvider";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
 const COLLECTION_ID_PATTERN = /^\d+$/;
@@ -31,12 +49,6 @@ function parseCollectionId(
 	return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-function typeLabel(type: string): string {
-	return type === "audio"
-		? t("collections.typeAudio")
-		: t("collections.typeVideo");
-}
-
 function closeCollection(type: string | undefined): void {
 	if (router.canGoBack()) {
 		router.back();
@@ -45,255 +57,217 @@ function closeCollection(type: string | undefined): void {
 	router.replace(type === "audio" ? "/audio" : "/video");
 }
 
-function Header({ title, type }: { title: string; type?: string }) {
-	const { colors, spacing } = useTheme();
-	return (
-		<View style={[styles.header, { gap: spacing.sm }]}>
-			<Pressable
-				accessibilityRole="button"
-				accessibilityLabel={t("common.back")}
-				onPress={() => closeCollection(type)}
-				testID="collection-detail-back"
-				hitSlop={8}
-				style={({ pressed }) => [
-					styles.headerButton,
-					pressed && styles.pressed,
-				]}
-			>
-				<Ionicons name="chevron-back" size={24} color={colors.text} />
-			</Pressable>
-			<Text
-				numberOfLines={1}
-				style={[styles.headerTitle, { color: colors.text }]}
-			>
-				{title}
-			</Text>
-			<View style={styles.headerButton} />
-		</View>
-	);
-}
-
-function CollectionItemRow({
-	item,
-	onPress,
-}: {
-	item: Media;
-	onPress: () => void;
-}) {
-	const { colors, spacing } = useTheme();
-	const artists = item.artists.map((artist) => artist.name).join(", ");
-	return (
-		<Pressable
-			accessibilityRole="button"
-			accessibilityLabel={item.title}
-			onPress={onPress}
-			testID={`collection-item-${item.id}`}
-			style={({ pressed }) => [
-				styles.row,
-				{
-					gap: spacing.md,
-					padding: spacing.md,
-					borderColor: colors.border,
-					backgroundColor: colors.surface,
-				},
-				pressed && styles.pressed,
-			]}
-		>
-			<View style={styles.rowInfo}>
-				<Text
-					numberOfLines={2}
-					style={[styles.rowTitle, { color: colors.text }]}
-				>
-					{item.title}
-				</Text>
-				{artists !== "" && (
-					<Text
-						numberOfLines={1}
-						style={[styles.rowMeta, { color: colors.textMuted }]}
-					>
-						{artists}
-					</Text>
-				)}
-			</View>
-			<Text style={[styles.rowMeta, { color: colors.textMuted }]}>
-				{formatDuration(item.duration)}
-			</Text>
-		</Pressable>
-	);
-}
-
 function CollectionContent({ collectionId }: { collectionId: number | null }) {
 	useLanguage();
-	const { colors } = useTheme();
+	const { colors, spacing } = useTheme();
 	const valid = collectionId !== null;
 	const collections = useCollections();
 	const items = useCollectionItems(collectionId ?? 0, valid);
-	const { playQueue } = useAudioActions();
-	const collection = (collections.data ?? []).find(
-		(entry) => entry.id === collectionId,
+	const media = useMemo(() => items.data ?? [], [items.data]);
+	const availableIds = useMemo(
+		() => new Set(media.map((item) => item.id)),
+		[media],
 	);
-	const type = collection?.type;
+	const selection = useCollectionSelection(availableIds);
+	const [dialog, setDialog] = useState<CollectionDialog>(null);
 
-	const header = (
-		<Header
-			title={collection?.name ?? t("collections.detailTitle")}
-			type={type}
-		/>
-	);
+	const all = collections.data ?? [];
+	const collection =
+		collectionId === null
+			? undefined
+			: all.find((entry) => entry.id === collectionId);
+	const actions = useCollectionItemActions({
+		collectionId: collection?.id ?? null,
+		media,
+		selection,
+		setDialog,
+	});
 
-	if (!valid || (collections.isError && collections.data === undefined)) {
+	if (!valid) {
 		return (
-			<Screen edges={["top", "bottom"]}>
-				{header}
-				{valid ? (
-					<ErrorState
-						title={t("collections.loadError")}
-						onRetry={() => void collections.refetch()}
-						testID="collection-detail-error"
-					/>
-				) : (
-					<EmptyState
-						icon="folder-open-outline"
-						title={t("collections.notFound")}
-						description={t("collections.notFoundHint")}
-						testID="collection-detail-not-found"
-					/>
-				)}
-			</Screen>
+			<CollectionScreenState
+				kind="notFound"
+				onBack={() => closeCollection(undefined)}
+			/>
+		);
+	}
+
+	if (collections.isError && collections.data === undefined) {
+		return (
+			<CollectionScreenState
+				kind="loadError"
+				onBack={() => closeCollection(undefined)}
+				onRetry={() => void collections.refetch()}
+			/>
 		);
 	}
 
 	if (collections.isPending) {
 		return (
-			<Screen edges={["top", "bottom"]}>
-				{header}
-				<View style={styles.center}>
-					<ActivityIndicator color={colors.accent} />
-				</View>
-			</Screen>
+			<CollectionScreenState
+				kind="loading"
+				onBack={() => closeCollection(undefined)}
+			/>
 		);
 	}
 
 	if (collection === undefined) {
 		return (
-			<Screen edges={["top", "bottom"]}>
-				{header}
-				<EmptyState
-					icon="folder-open-outline"
-					title={t("collections.notFound")}
-					description={t("collections.notFoundHint")}
-					testID="collection-detail-not-found"
-				/>
-			</Screen>
+			<CollectionScreenState
+				kind="notFound"
+				onBack={() => closeCollection(undefined)}
+			/>
 		);
 	}
 
-	// Счётчик прямой, без вложенных: он должен совпадать с элементами,
-	// которые реально перечислены на этом экране. Stats ряда показывает
-	// поддерево и помечен отдельным текстом.
+	const missing = isCollectionMissing(items.error);
+	if (missing || (items.isError && items.data === undefined)) {
+		return (
+			<CollectionScreenState
+				kind={missing ? "notFound" : "itemsError"}
+				title={collection.name}
+				onBack={() => closeCollection(collection.type)}
+				onRetry={missing ? undefined : () => void items.refetch()}
+			/>
+		);
+	}
+
+	const children = collectionChildren(all, collection.id);
+	const crumbs = collectionBreadcrumbs(all, collection.id);
+	const addableType = asMediaType(collection.type);
+	const canAddSubcollection = addableType !== null && addableType !== "image";
+	const typeLabel = collectionTypeLabel(collection.type);
 	const count = items.data?.length;
 	const subtitle =
 		count === undefined
-			? typeLabel(collection.type)
-			: `${typeLabel(collection.type)} · ${t("collections.itemCount", { count })}`;
+			? typeLabel
+			: `${typeLabel} · ${t("collections.itemCount", { count })}`;
 
-	const play = (item: Media) => {
-		if (item.type !== "audio") {
-			router.push(`/video/${item.id}`);
-			return;
-		}
-		const queue = items.data ?? [item];
-		const index = queue.findIndex((entry) => entry.id === item.id);
-		playQueue(queue, Math.max(index, 0));
-		router.push("/player");
-	};
-
-	if (items.isPending) {
-		return (
-			<Screen edges={["top", "bottom"]}>
-				{header}
-				<Text style={{ color: colors.textMuted }}>{subtitle}</Text>
-				<View style={styles.center}>
-					<ActivityIndicator color={colors.accent} />
-				</View>
-			</Screen>
-		);
-	}
-
-	if (items.isError && items.data === undefined) {
-		return (
-			<Screen edges={["top", "bottom"]}>
-				{header}
-				<ErrorState
-					title={t("collections.itemsError")}
-					onRetry={() => void items.refetch()}
-					testID="collection-items-error"
-				/>
-			</Screen>
-		);
-	}
-
-	const media = items.data ?? [];
 	return (
 		<Screen testID="collection-screen" edges={["top", "bottom"]}>
-			{header}
-			<Text style={[styles.subtitle, { color: colors.textMuted }]}>
-				{subtitle}
-			</Text>
+			<CollectionBackHeader
+				title={collection.name}
+				subtitle={subtitle}
+				onBack={() => closeCollection(collection.type)}
+			/>
+			<CollectionBreadcrumbs
+				crumbs={crumbs}
+				onPress={(id) => router.push(`/collections/${id}`)}
+			/>
+			<CollectionActionBar
+				canAddSubcollection={canAddSubcollection}
+				onAddSubcollection={() => setDialog({ kind: "create" })}
+				onRename={() => setDialog({ kind: "rename" })}
+				onMove={() => setDialog({ kind: "move" })}
+				onDelete={() => setDialog({ kind: "delete" })}
+			/>
 			<FlatList
 				testID="collection-items"
 				data={media}
 				keyExtractor={(item) => String(item.id)}
 				style={styles.fill}
-				contentContainerStyle={styles.list}
+				contentContainerStyle={
+					media.length === 0 ? styles.emptyList : styles.list
+				}
+				ListHeaderComponent={
+					<CollectionListHeader
+						collections={all}
+						subcollections={children}
+						selecting={selection.selecting}
+						itemsError={items.isError && items.data !== undefined}
+						hasItems={media.length > 0}
+						onSelectPress={() => {
+							if (selection.selecting) {
+								selection.exit();
+								return;
+							}
+							selection.begin();
+						}}
+						onRetryItems={() => void items.refetch()}
+					/>
+				}
 				ListEmptyComponent={
-					<EmptyState
-						icon="folder-open-outline"
-						title={t("collections.emptyItems")}
-						testID="collection-items-empty"
+					items.isPending ? (
+						<View style={[styles.center, { gap: spacing.sm }]}>
+							<ActivityIndicator color={colors.accent} />
+							<Text style={{ color: colors.textMuted }}>
+								{t("common.loading")}
+							</Text>
+						</View>
+					) : (
+						<EmptyState
+							icon="folder-open-outline"
+							title={t("collections.emptyItems")}
+							testID="collection-items-empty"
+						/>
+					)
+				}
+				refreshControl={
+					<RefreshControl
+						refreshing={collections.isRefetching || items.isRefetching}
+						onRefresh={() => {
+							void collections.refetch();
+							void items.refetch();
+						}}
+						tintColor={colors.accent}
 					/>
 				}
 				renderItem={({ item }) => (
-					<CollectionItemRow item={item} onPress={() => play(item)} />
+					<CollectionItemRow
+						item={item}
+						selecting={selection.selecting}
+						selected={selection.selected.has(item.id)}
+						onPress={() => actions.onItemPress(item)}
+						onLongPress={() => selection.start(item.id)}
+						onMove={() => actions.moveOne(item.id)}
+						onRemove={() => actions.removeOne(item)}
+					/>
 				)}
+			/>
+			{selection.selecting && (
+				<CollectionBulkBar
+					count={selection.selected.size}
+					busy={actions.bulkPending || selection.selected.size === 0}
+					onMove={() => {
+						if (selection.selected.size > 0) {
+							setDialog({
+								kind: "moveItems",
+								mediaIds: [...selection.selected],
+							});
+						}
+					}}
+					onRemove={actions.confirmBulkRemove}
+					onClear={selection.exit}
+				/>
+			)}
+			<CollectionDialogs
+				dialog={dialog}
+				collection={collection}
+				collections={all}
+				onClose={() => setDialog(null)}
+				onMoved={actions.handleMoved}
+				onDeleted={() => closeCollection(collection.type)}
 			/>
 		</Screen>
 	);
 }
 
-// Минимальный экран Task 16: заголовок, тип, счётчик и элементы. Полные
-// CRUD/bulk-операции и дерево появятся в Task 17, но маршрут уже рабочий.
 export default function CollectionScreen() {
 	const params = useLocalSearchParams<{ id?: string | string[] }>();
 	const collectionId = parseCollectionId(params.id);
 	return (
 		<AuthGate>
-			<CollectionContent collectionId={collectionId} />
+			<CollectionContent
+				key={collectionId ?? "invalid"}
+				collectionId={collectionId}
+			/>
 		</AuthGate>
 	);
 }
 
 const styles = StyleSheet.create({
-	header: { flexDirection: "row", alignItems: "center" },
-	headerButton: {
-		width: 44,
-		height: 44,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	headerTitle: { flex: 1, fontSize: 18, fontWeight: "700" },
-	subtitle: { fontSize: 13 },
 	fill: { flex: 1 },
 	list: { gap: 8, paddingBottom: 24 },
+	emptyList: { flexGrow: 1, gap: 8 },
 	center: { flex: 1, alignItems: "center", justifyContent: "center" },
-	row: {
-		flexDirection: "row",
-		alignItems: "center",
-		borderWidth: 1,
-		borderRadius: 10,
-	},
-	rowInfo: { flex: 1 },
-	rowTitle: { fontSize: 16, fontWeight: "600" },
-	rowMeta: { fontSize: 13 },
-	pressed: { opacity: 0.7 },
 });

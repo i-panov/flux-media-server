@@ -13,6 +13,7 @@ import {
 	useFavoriteAudioIds,
 	useToggleAudioFavorite,
 } from "../src/api/favorites";
+import { AddToCollectionSheet } from "../src/components/AddToCollectionSheet";
 import { ArtistLinks } from "../src/components/ArtistLinks";
 import { AuthGate } from "../src/components/AuthGate";
 import { EmptyState } from "../src/components/EmptyState";
@@ -59,7 +60,7 @@ export default function AudioPlayerScreen() {
 
 function AudioPlayerContent() {
 	useLanguage();
-	const { colors, spacing } = useTheme();
+	const { colors, radii, spacing } = useTheme();
 	const {
 		current,
 		queue,
@@ -86,6 +87,7 @@ function AudioPlayerContent() {
 	const favorites = useFavoriteAudioIds();
 	const toggleFavorite = useToggleAudioFavorite();
 	const [queueOpen, setQueueOpen] = useState(false);
+	const [collectionOpen, setCollectionOpen] = useState(false);
 
 	const closeButton = <CloseButton />;
 	if (current === null) {
@@ -184,6 +186,28 @@ function AudioPlayerContent() {
 					</Text>
 				)}
 			</View>
+			<Pressable
+				accessibilityRole="button"
+				accessibilityLabel={t("collections.addButton")}
+				onPress={() => setCollectionOpen(true)}
+				testID="audio-player-add-collection"
+				style={({ pressed }) => [
+					styles.collectionButton,
+					{
+						borderColor: colors.borderStrong,
+						backgroundColor: colors.surface,
+						borderRadius: radii.pill,
+						gap: spacing.xs,
+						paddingHorizontal: spacing.md,
+					},
+					pressed && styles.pressed,
+				]}
+			>
+				<Ionicons name="folder-open-outline" size={18} color={colors.accent} />
+				<Text style={[styles.collectionLabel, { color: colors.accent }]}>
+					{t("collections.addButton")}
+				</Text>
+			</Pressable>
 			<AudioPlayerControls
 				position={currentTime}
 				duration={duration}
@@ -203,6 +227,14 @@ function AudioPlayerContent() {
 				onToggleFavorite={onToggleFavorite}
 				onOpenQueue={() => setQueueOpen(true)}
 			/>
+			{collectionOpen && (
+				<AddToCollectionSheet
+					visible
+					mediaId={current.id}
+					type="audio"
+					onClose={() => setCollectionOpen(false)}
+				/>
+			)}
 			<AudioQueueSheet
 				visible={queueOpen}
 				onClose={() => setQueueOpen(false)}
@@ -231,5 +263,14 @@ const styles = StyleSheet.create({
 	metaRow: { flexDirection: "row", alignItems: "center" },
 	meta: { fontSize: 13, fontVariant: ["tabular-nums"] },
 	error: { fontSize: 14, textAlign: "center" },
+	collectionButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		alignSelf: "center",
+		minHeight: 44,
+		borderWidth: 1,
+	},
+	collectionLabel: { fontSize: 14, fontWeight: "600" },
 	pressed: { opacity: 0.7 },
 });

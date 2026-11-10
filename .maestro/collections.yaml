@@ -1,0 +1,260 @@
+# Коллекции: создание двух корневых коллекций, добавление видео через
+# детали, перенос элемента из одной коллекции в другую и удаление с
+# подтверждением статистики.
+#
+# Состояние сервера между прогонами не очищается, поэтому в начале
+# удаляем прежние коллекции с тестовыми именами. Это делает сценарий
+# повторяемым: имена «Maestro A» и «Maestro B» детерминированы.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть хотя бы одно видео (без него шаг добавления и
+#     проверка переноса невозможны).
+#
+# Запуск:
+#   maestro test .maestro/collections.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/collections.yaml
+appId: app.lib.flux
+name: "Collections: create, add, move, delete"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# Библиотека: чистим прежние тестовые коллекции через их экран.
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+
+- runFlow:
+    when:
+      visible: "Maestro A"
+    commands:
+      - repeat:
+          while:
+            visible: "Maestro A"
+          commands:
+            - tapOn: "Maestro A"
+            - extendedWaitUntil:
+                visible:
+                  id: "collection-screen"
+                timeout: 20000
+            - tapOn:
+                id: "collection-action-delete"
+            - extendedWaitUntil:
+                visible:
+                  id: "delete-collection-modal"
+                timeout: 10000
+            - tapOn:
+                id: "delete-collection-confirm"
+            - extendedWaitUntil:
+                visible:
+                  id: "library-screen"
+                timeout: 20000
+
+- runFlow:
+    when:
+      visible: "Maestro B"
+    commands:
+      - repeat:
+          while:
+            visible: "Maestro B"
+          commands:
+            - tapOn: "Maestro B"
+            - extendedWaitUntil:
+                visible:
+                  id: "collection-screen"
+                timeout: 20000
+            - tapOn:
+                id: "collection-action-delete"
+            - extendedWaitUntil:
+                visible:
+                  id: "delete-collection-modal"
+                timeout: 10000
+            - tapOn:
+                id: "delete-collection-confirm"
+            - extendedWaitUntil:
+                visible:
+                  id: "library-screen"
+                timeout: 20000
+
+# Создаём две коллекции. Тип по умолчанию — видео.
+- tapOn:
+    id: "library-create-collection"
+- assertVisible:
+    id: "collection-create-modal"
+- tapOn:
+    id: "collection-create-name"
+- inputText: "Maestro A"
+- hideKeyboard
+- tapOn:
+    id: "collection-create-submit"
+- scrollUntilVisible:
+    element:
+      text: "Maestro A"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "library-create-collection"
+- assertVisible:
+    id: "collection-create-modal"
+- tapOn:
+    id: "collection-create-name"
+- inputText: "Maestro B"
+- hideKeyboard
+- tapOn:
+    id: "collection-create-submit"
+- scrollUntilVisible:
+    element:
+      text: "Maestro B"
+    direction: DOWN
+    timeout: 10000
+
+# Добавляем первое видео в «Maestro A» через детали (Task 7 sheet).
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "media-row-.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "video-detail-add-collection"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "video-detail-add-collection"
+- extendedWaitUntil:
+    visible:
+      id: "add-to-collection-sheet"
+    timeout: 10000
+- tapOn: "Maestro A"
+- extendedWaitUntil:
+    notVisible:
+      id: "add-to-collection-sheet"
+    timeout: 10000
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "tab-video"
+    timeout: 10000
+
+# Открываем «Maestro A»: видео на месте. Переносим его в «Maestro B».
+- tapOn:
+    id: "tab-library"
+- scrollUntilVisible:
+    element:
+      text: "Maestro A"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Maestro A"
+- extendedWaitUntil:
+    visible:
+      id: "collection-screen"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "collection-item-.*"
+    timeout: 20000
+- tapOn:
+    id: "collection-item-move-.*"
+- extendedWaitUntil:
+    visible:
+      id: "move-items-modal"
+    timeout: 10000
+- tapOn: "Maestro B"
+- extendedWaitUntil:
+    notVisible:
+      id: "move-items-modal"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "collection-items-empty"
+    timeout: 20000
+
+# В «Maestro B» перенесённый элемент действительно есть.
+- tapOn:
+    id: "collection-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Maestro B"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Maestro B"
+- extendedWaitUntil:
+    visible:
+      id: "collection-screen"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "collection-item-.*"
+    timeout: 20000
+
+# Удаляем обе коллекции: статистика должна быть видна до подтверждения.
+- tapOn:
+    id: "collection-action-delete"
+- extendedWaitUntil:
+    visible:
+      id: "delete-collection-modal"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "delete-collection-stats"
+    timeout: 10000
+- tapOn:
+    id: "delete-collection-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+
+- tapOn: "Maestro A"
+- extendedWaitUntil:
+    visible:
+      id: "collection-screen"
+    timeout: 20000
+- tapOn:
+    id: "collection-action-delete"
+- extendedWaitUntil:
+    visible:
+      id: "delete-collection-modal"
+    timeout: 10000
+- tapOn:
+    id: "delete-collection-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: "Maestro A"
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: "Maestro B"
+    timeout: 20000

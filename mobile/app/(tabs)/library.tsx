@@ -1,94 +1,206 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import {
+	ActivityIndicator,
+	Pressable,
+	StyleSheet,
+	Text,
+	View,
+} from "react-native";
+import { useCollections } from "../../src/api/collections";
+import {
+	collectionChildren,
+	flattenCollectionTree,
+} from "../../src/collections/tree";
+import { CollectionTreeRow } from "../../src/components/CollectionTreeRow";
+import { CreateCollectionModal } from "../../src/components/CreateCollectionModal";
+import { EmptyState } from "../../src/components/EmptyState";
+import { ErrorState } from "../../src/components/ErrorState";
+import { InlineError } from "../../src/components/InlineError";
 import { Screen } from "../../src/components/Screen";
 import { t, useLanguage } from "../../src/i18n";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
+function toggleCollapsed(
+	collapsed: ReadonlySet<number>,
+	collectionId: number,
+): Set<number> {
+	const next = new Set(collapsed);
+	if (next.has(collectionId)) {
+		next.delete(collectionId);
+	} else {
+		next.add(collectionId);
+	}
+	return next;
+}
+
 export default function LibraryScreen() {
 	useLanguage();
-	const { colors, spacing } = useTheme();
-	// Артисты — рабочий маршрут; коллекции и избранное пока заглушки,
-	// которые станут ссылками в следующих задачах.
+	const { colors, radii, spacing } = useTheme();
+	const collections = useCollections();
+	const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+	const [createOpen, setCreateOpen] = useState(false);
+	const all = collections.data ?? [];
+	const nodes = flattenCollectionTree(all, undefined, collapsed);
+	const hasCachedData = collections.data !== undefined;
+
+	const openCreate = () => setCreateOpen(true);
+
 	return (
-		<Screen testID="library-screen">
+		<Screen scroll testID="library-screen">
 			<Text style={[styles.title, { color: colors.text }]}>
 				{t("library.title")}
 			</Text>
 			<Text style={[styles.hint, { color: colors.textMuted }]}>
 				{t("library.hint")}
 			</Text>
-			<View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+			<Pressable
+				accessibilityRole="button"
+				accessibilityLabel={t("artists.title")}
+				onPress={() => router.push("/artists")}
+				testID="library-artists"
+				style={({ pressed }) => [
+					styles.row,
+					{
+						padding: spacing.lg,
+						borderColor: colors.border,
+						backgroundColor: colors.surface,
+					},
+					pressed && styles.pressed,
+				]}
+			>
+				<View style={styles.rowLead}>
+					<Ionicons name="people-outline" size={20} color={colors.textMuted} />
+					<Text style={[styles.rowTitle, { color: colors.text }]}>
+						{t("artists.title")}
+					</Text>
+				</View>
+				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+			</Pressable>
+
+			<View style={[styles.sectionHeader, { gap: spacing.sm }]}>
+				<Text style={[styles.sectionTitle, { color: colors.text }]}>
+					{t("collections.title")}
+				</Text>
 				<Pressable
 					accessibilityRole="button"
-					accessibilityLabel={t("artists.title")}
-					onPress={() => router.push("/artists")}
-					testID="library-artists"
+					accessibilityLabel={t("collections.create")}
+					onPress={openCreate}
+					testID="library-create-collection"
+					hitSlop={4}
 					style={({ pressed }) => [
-						styles.row,
+						styles.createButton,
 						{
-							padding: spacing.lg,
-							borderColor: colors.border,
+							borderColor: colors.accent,
 							backgroundColor: colors.surface,
+							borderRadius: radii.pill,
+							gap: spacing.xs,
+							paddingHorizontal: spacing.md,
 						},
 						pressed && styles.pressed,
 					]}
 				>
-					<View style={styles.rowLead}>
-						<Ionicons
-							name="people-outline"
-							size={20}
-							color={colors.textMuted}
-						/>
-						<Text style={[styles.rowTitle, { color: colors.text }]}>
-							{t("artists.title")}
-						</Text>
-					</View>
-					<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-				</Pressable>
-				<Pressable
-					disabled
-					accessibilityRole="button"
-					accessibilityState={{ disabled: true }}
-					testID="library-collections"
-					style={[
-						styles.row,
-						{
-							padding: spacing.lg,
-							borderColor: colors.border,
-							backgroundColor: colors.surface,
-						},
-					]}
-				>
-					<Text style={[styles.rowTitle, { color: colors.text }]}>
-						{t("library.collections")}
-					</Text>
-					<Text style={[styles.soon, { color: colors.textMuted }]}>
-						{t("library.soon")}
-					</Text>
-				</Pressable>
-				<Pressable
-					disabled
-					accessibilityRole="button"
-					accessibilityState={{ disabled: true }}
-					testID="library-favorites"
-					style={[
-						styles.row,
-						{
-							padding: spacing.lg,
-							borderColor: colors.border,
-							backgroundColor: colors.surface,
-						},
-					]}
-				>
-					<Text style={[styles.rowTitle, { color: colors.text }]}>
-						{t("library.favorites")}
-					</Text>
-					<Text style={[styles.soon, { color: colors.textMuted }]}>
-						{t("library.soon")}
+					<Ionicons name="add" size={18} color={colors.accent} />
+					<Text style={[styles.createLabel, { color: colors.accent }]}>
+						{t("common.create")}
 					</Text>
 				</Pressable>
 			</View>
+
+			{collections.isError && hasCachedData && (
+				<InlineError
+					message={t("collections.loadError")}
+					onRetry={() => void collections.refetch()}
+					testID="library-collections-inline-error"
+				/>
+			)}
+
+			{collections.isPending ? (
+				<View
+					style={[styles.center, { gap: spacing.sm }]}
+					testID="library-collections-loading"
+				>
+					<ActivityIndicator color={colors.accent} />
+					<Text style={{ color: colors.textMuted }}>{t("common.loading")}</Text>
+				</View>
+			) : collections.isError && !hasCachedData ? (
+				<ErrorState
+					title={t("collections.loadError")}
+					onRetry={() => void collections.refetch()}
+					testID="library-collections-error"
+				/>
+			) : nodes.length === 0 ? (
+				<EmptyState
+					icon="folder-open-outline"
+					title={t("collections.empty")}
+					description={t("collections.emptyHint")}
+					actionLabel={t("collections.create")}
+					onActionPress={openCreate}
+					testID="library-collections-empty"
+				/>
+			) : (
+				<View
+					style={{ gap: spacing.xs }}
+					testID="library-collections"
+					accessibilityRole="list"
+				>
+					{nodes.map((node) => {
+						const hasChildren =
+							collectionChildren(all, node.collection.id).length > 0;
+						return (
+							<CollectionTreeRow
+								key={node.collection.id}
+								collection={node.collection}
+								depth={node.depth}
+								hasChildren={hasChildren}
+								expanded={!collapsed.has(node.collection.id)}
+								onToggle={() =>
+									setCollapsed((previous) =>
+										toggleCollapsed(previous, node.collection.id),
+									)
+								}
+								onPress={() =>
+									router.push(`/collections/${node.collection.id}`)
+								}
+							/>
+						);
+					})}
+				</View>
+			)}
+
+			<Pressable
+				disabled
+				accessibilityRole="button"
+				accessibilityState={{ disabled: true }}
+				testID="library-favorites"
+				style={[
+					styles.row,
+					{
+						padding: spacing.lg,
+						borderColor: colors.border,
+						backgroundColor: colors.surface,
+					},
+				]}
+			>
+				<View style={styles.rowLead}>
+					<Ionicons name="heart-outline" size={20} color={colors.textMuted} />
+					<Text style={[styles.rowTitle, { color: colors.text }]}>
+						{t("library.favorites")}
+					</Text>
+				</View>
+				<Text style={[styles.soon, { color: colors.textMuted }]}>
+					{t("library.soon")}
+				</Text>
+			</Pressable>
+
+			{createOpen && (
+				<CreateCollectionModal
+					visible
+					onClose={() => setCreateOpen(false)}
+					defaultType="video"
+				/>
+			)}
 		</Screen>
 	);
 }
@@ -106,5 +218,20 @@ const styles = StyleSheet.create({
 	rowLead: { flexDirection: "row", alignItems: "center", gap: 10 },
 	rowTitle: { fontSize: 16, fontWeight: "600" },
 	soon: { fontSize: 12 },
+	sectionHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		marginTop: 4,
+	},
+	sectionTitle: { fontSize: 18, fontWeight: "700" },
+	createButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		minHeight: 44,
+		borderWidth: 1,
+	},
+	createLabel: { fontSize: 14, fontWeight: "600" },
+	center: { alignItems: "center", justifyContent: "center", padding: 24 },
 	pressed: { opacity: 0.7 },
 });

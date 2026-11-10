@@ -452,6 +452,7 @@ function VideoDetailContent() {
 				<AddToCollectionSheet
 					visible
 					mediaId={item.id}
+					type="video"
 					onClose={() => setCollectionSheetOpen(false)}
 				/>
 			)}
