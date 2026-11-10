@@ -79,6 +79,30 @@ export default function LibraryScreen() {
 				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
 			</Pressable>
 
+			<Pressable
+				accessibilityRole="button"
+				accessibilityLabel={t("trash.title")}
+				onPress={() => router.push("/trash")}
+				testID="library-trash"
+				style={({ pressed }) => [
+					styles.row,
+					{
+						padding: spacing.lg,
+						borderColor: colors.border,
+						backgroundColor: colors.surface,
+					},
+					pressed && styles.pressed,
+				]}
+			>
+				<View style={styles.rowLead}>
+					<Ionicons name="trash-outline" size={20} color={colors.textMuted} />
+					<Text style={[styles.rowTitle, { color: colors.text }]}>
+						{t("trash.title")}
+					</Text>
+				</View>
+				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+			</Pressable>
+
 			<View style={[styles.sectionHeader, { gap: spacing.sm }]}>
 				<Text style={[styles.sectionTitle, { color: colors.text }]}>
 					{t("collections.title")}

@@ -26,6 +26,8 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 
+import { trashQueryKey } from "./trash";
+
 export const collectionsQueryKey = ["collections"] as const;
 
 /** Типы коллекций, в которые mobile умеет добавлять медиа. */
@@ -160,16 +162,24 @@ export function useRenameCollection() {
 	});
 }
 
+// Удалённая коллекция сразу должна появиться в корзине: без инвалидации
+// trash-кэш живёт до 30 секунд и Maestro/пользователь видят старый список.
+export function invalidateAfterCollectionDelete(
+	queryClient: QueryClient,
+	id: number,
+): void {
+	// Удалённой коллекции больше нет: выкидываем её items/stats,
+	// иначе фоновый рефетч вернёт 404 и оживит экран.
+	queryClient.removeQueries({ queryKey: collectionQueryKey(id) });
+	invalidateCollections(queryClient);
+	void queryClient.invalidateQueries({ queryKey: trashQueryKey });
+}
+
 export function useDeleteCollection() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: (id: number) => deleteCollection(id),
-		onSuccess: (_data, id) => {
-			// Удалённой коллекции больше нет: выкидываем её items/stats,
-			// иначе фоновый рефетч вернёт 404 и оживит экран.
-			queryClient.removeQueries({ queryKey: collectionQueryKey(id) });
-			invalidateCollections(queryClient);
-		},
+		onSuccess: (_data, id) => invalidateAfterCollectionDelete(queryClient, id),
 	});
 }
 

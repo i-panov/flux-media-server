@@ -1,0 +1,107 @@
+# Админская очистка корзины (отдельный flow: у не-админа кнопки нет).
+#
+# Setup уникален: создаём коллекцию, удаляем её и открываем корзину. Перед
+# очисткой assert trash-empty подтверждает, что вошедший пользователь —
+# администратор. После DELETE /trash проверяем исчезновение кнопки и своей
+# строки, но НЕ полагаемся на trash-empty-state: в корзине могут быть
+# чужие/старые записи, и пустое состояние — не контракт empty-операции.
+#
+# Предусловия те же, что у tabs.yaml, плюс пользователь должен быть админом.
+#
+# Запуск:
+#   maestro test .maestro/trash-admin.yaml
+appId: app.lib.flux
+name: "Trash: admin empty"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+- evalScript: ${output.trashAdminCollection = "Trash admin " + Date.now()}
+
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+
+- tapOn:
+    id: "library-create-collection"
+- assertVisible:
+    id: "collection-create-modal"
+- tapOn:
+    id: "collection-create-name"
+- inputText: ${output.trashAdminCollection}
+- hideKeyboard
+- tapOn:
+    id: "collection-create-submit"
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-create-modal"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: ${output.trashAdminCollection}
+    direction: DOWN
+    timeout: 10000
+- tapOn: ${output.trashAdminCollection}
+- extendedWaitUntil:
+    visible:
+      id: "collection-screen"
+    timeout: 20000
+- tapOn:
+    id: "collection-action-delete"
+- extendedWaitUntil:
+    visible:
+      id: "delete-collection-modal"
+    timeout: 10000
+- tapOn:
+    id: "delete-collection-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+
+- scrollUntilVisible:
+    element:
+      id: "library-trash"
+    direction: UP
+    timeout: 10000
+- tapOn:
+    id: "library-trash"
+- extendedWaitUntil:
+    visible:
+      id: "trash-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: ${output.trashAdminCollection}
+    direction: DOWN
+    timeout: 10000
+
+# Только админ видит кнопку; для остальных flow должен упасть здесь.
+- assertVisible:
+    id: "trash-empty"
+- tapOn:
+    id: "trash-empty"
+- extendedWaitUntil:
+    visible:
+      id: "trash-confirm-modal"
+    timeout: 10000
+- tapOn:
+    id: "trash-confirm-submit"
+- extendedWaitUntil:
+    notVisible:
+      id: "trash-empty"
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: ${output.trashAdminCollection}
+    timeout: 20000
+- assertVisible:
+    id: "trash-screen"

@@ -1,0 +1,172 @@
+# Корзина: детерминированный сценарий create → delete → restore.
+#
+# Каждый прогон создаёт коллекцию с уникальным именем, удаляет её (уходит
+# в корзину), открывает корзину и восстанавливает строку. Проверяем оба
+# конца операции: строка исчезла из корзины и коллекция снова видна в
+# библиотеке. В конце коллекция удаляется и вычищается из корзины через
+# purge — тест не копит живые данные.
+#
+# Восстановление медиа здесь не проверяется: у не-админа эти кнопки
+# скрыты, а детерминированно выбрать «своё» медиа нельзя. Это отдельное
+# admin-покрытие, а не acceptance этого flow.
+#
+# Сервер сортирует корзину по deleted_at DESC, поэтому только что
+# удалённая коллекция — первая строка; после восстановления проверяем
+# исчезновение именно её уникального имени.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора).
+#
+# Запуск:
+#   maestro test .maestro/trash.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/trash.yaml
+appId: app.lib.flux
+name: "Trash: create, delete, restore, purge"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+- evalScript: ${output.trashCollection = "Trash " + Date.now()}
+
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+
+# 1. Уникальная коллекция — единственный элемент, который мы контролируем.
+- tapOn:
+    id: "library-create-collection"
+- assertVisible:
+    id: "collection-create-modal"
+- tapOn:
+    id: "collection-create-name"
+- inputText: ${output.trashCollection}
+- hideKeyboard
+- tapOn:
+    id: "collection-create-submit"
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-create-modal"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: ${output.trashCollection}
+    direction: DOWN
+    timeout: 10000
+
+# 2. Удаляем её штатным delete collection flow — коллекция уходит в корзину.
+- tapOn: ${output.trashCollection}
+- extendedWaitUntil:
+    visible:
+      id: "collection-screen"
+    timeout: 20000
+- tapOn:
+    id: "collection-action-delete"
+- extendedWaitUntil:
+    visible:
+      id: "delete-collection-modal"
+    timeout: 10000
+- tapOn:
+    id: "delete-collection-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+
+# 3. Открываем корзину из библиотеки и находим свою строку.
+- scrollUntilVisible:
+    element:
+      id: "library-trash"
+    direction: UP
+    timeout: 10000
+- tapOn:
+    id: "library-trash"
+- extendedWaitUntil:
+    visible:
+      id: "trash-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: ${output.trashCollection}
+    direction: DOWN
+    timeout: 10000
+
+# 4. Restore без подтверждения. Первая collection-строка — наша
+# (сортировка deleted_at DESC); после неё проверяем именно имя.
+- tapOn:
+    id: "trash-collection-.*-restore"
+- extendedWaitUntil:
+    notVisible: ${output.trashCollection}
+    timeout: 20000
+
+# 5. Возвращаемся в библиотеку: коллекция должна появиться снова.
+- tapOn:
+    id: "trash-back"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: ${output.trashCollection}
+    direction: DOWN
+    timeout: 20000
+- assertVisible: ${output.trashCollection}
+
+# 6. Чистим за собой: удаляем снова и purge-им строку из корзины.
+- tapOn: ${output.trashCollection}
+- extendedWaitUntil:
+    visible:
+      id: "collection-screen"
+    timeout: 20000
+- tapOn:
+    id: "collection-action-delete"
+- extendedWaitUntil:
+    visible:
+      id: "delete-collection-modal"
+    timeout: 10000
+- tapOn:
+    id: "delete-collection-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "library-trash"
+    direction: UP
+    timeout: 10000
+- tapOn:
+    id: "library-trash"
+- extendedWaitUntil:
+    visible:
+      id: "trash-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: ${output.trashCollection}
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "trash-collection-.*-purge"
+- extendedWaitUntil:
+    visible:
+      id: "trash-confirm-modal"
+    timeout: 10000
+- tapOn:
+    id: "trash-confirm-submit"
+- extendedWaitUntil:
+    notVisible: ${output.trashCollection}
+    timeout: 20000
+- tapOn:
+    id: "trash-back"

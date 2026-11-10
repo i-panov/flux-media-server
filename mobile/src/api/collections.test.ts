@@ -1,6 +1,11 @@
 import { ApiError } from "@flux/shared";
-import { describe, expect, it } from "vitest";
-import { isAlreadyInCollection, isCollectionMissing } from "./collections";
+import { QueryClient } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
+import {
+	invalidateAfterCollectionDelete,
+	isAlreadyInCollection,
+	isCollectionMissing,
+} from "./collections";
 
 describe("isAlreadyInCollection", () => {
 	it("считает 409 дубликатом, а не сетевым сбоем", () => {
@@ -23,5 +28,19 @@ describe("isCollectionMissing", () => {
 		expect(isCollectionMissing(new ApiError(409, "duplicate"))).toBe(false);
 		expect(isCollectionMissing(new Error("network"))).toBe(false);
 		expect(isCollectionMissing(undefined)).toBe(false);
+	});
+});
+
+describe("invalidateAfterCollectionDelete", () => {
+	it("убирает кэш коллекции, список и корзину", () => {
+		const client = new QueryClient();
+		const remove = vi.spyOn(client, "removeQueries");
+		const invalidate = vi.spyOn(client, "invalidateQueries");
+
+		invalidateAfterCollectionDelete(client, 42);
+
+		expect(remove).toHaveBeenCalledWith({ queryKey: ["collections", 42] });
+		const keys = invalidate.mock.calls.map((call) => call[0]?.queryKey);
+		expect(keys).toEqual([["collections"], ["trash"]]);
 	});
 });
