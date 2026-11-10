@@ -1,0 +1,155 @@
+# Прогресс и resume: видео смотрят до ~30%, уходят и открывают снова.
+#
+# Maestro не умеет читать время из таймлайна, поэтому доказательство resume —
+# маркер `video-player-resumed`: он появляется только после того, как серверная
+# позиция применена к плееру. Позиция в 30% задаётся тапом по таймлайну
+# (point считается от ширины элемента), а не ожиданием реального времени.
+#
+# Предусловия те же, что у tabs.yaml и video-player.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть хотя бы одно видео длиннее нескольких секунд.
+#
+# Запуск:
+#   maestro test .maestro/video-progress.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/video-progress.yaml
+appId: app.lib.flux
+name: "Video progress: resume after reopen"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на настройках — открываем первое видео.
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "video-player-play-overlay"
+    timeout: 20000
+
+# Играем и уходим примерно на 30%: тап по таймлайну на 30% его ширины.
+- tapOn:
+    id: "video-player-play-overlay"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "playing"
+    timeout: 20000
+- tapOn:
+    id: "video-player-timeline"
+    point: "30%,50%"
+- tapOn:
+    id: "video-player-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "paused"
+    timeout: 5000
+- assertVisible:
+    id: "video-player-position"
+- assertNotVisible:
+    id: "video-player-error"
+
+# Назад к списку: unmount тоже сохраняет прогресс.
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+
+# Повторно открываем то же видео и ждём применения серверной позиции.
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "video-player-resumed"
+    timeout: 20000
+- assertVisible:
+    id: "video-player-play-overlay"
+- assertVisible:
+    id: "video-player-position"
+- assertNotVisible:
+    id: "video-player-error"
+
+# Play после resume не должен ломать плеер; затем уходим, не оставляя его поверх.
+- tapOn:
+    id: "video-player-play-overlay"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "playing"
+    timeout: 20000
+- tapOn:
+    id: "video-player-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-state"
+      text: "paused"
+    timeout: 5000
+
+# «Смотреть с начала»: DELETE прогресса, seek 0 и сброс resume-маркера.
+- assertVisible:
+    id: "video-player-restart"
+- tapOn:
+    id: "video-player-restart"
+- extendedWaitUntil:
+    visible:
+      id: "video-player-play-overlay"
+    timeout: 5000
+- assertNotVisible:
+    id: "video-player-resumed"
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+
+# После restart записи нет: повторное открытие не должно показать resume.
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "video-player-play-overlay"
+    timeout: 20000
+- assertNotVisible:
+    id: "video-player-resumed"
+- assertVisible:
+    id: "video-player-restart"
+- assertNotVisible:
+    id: "video-player-error"
+
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- assertVisible:
+    id: "tab-video"

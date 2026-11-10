@@ -77,6 +77,7 @@ interface PlayerControlsProps {
 	pipSupported: boolean;
 	onSeekTo: (seconds: number) => void;
 	onTogglePlayback: () => void;
+	onReset: () => void;
 	onCycleRate: () => void;
 	onFullscreen: () => void;
 	onPictureInPicture: () => void;
@@ -90,6 +91,7 @@ export function PlayerControls({
 	pipSupported,
 	onSeekTo,
 	onTogglePlayback,
+	onReset,
 	onCycleRate,
 	onFullscreen,
 	onPictureInPicture,
@@ -125,7 +127,10 @@ export function PlayerControls({
 	return (
 		<View style={[styles.controls, { gap: spacing.xs, padding: spacing.sm }]}>
 			<View style={[styles.timelineRow, { gap: spacing.sm }]}>
-				<Text style={[styles.time, { color: colors.onOverlay }]}>
+				<Text
+					testID="video-player-position"
+					style={[styles.time, { color: colors.onOverlay }]}
+				>
 					{formatTime(position)}
 				</Text>
 				<Pressable
@@ -199,6 +204,13 @@ export function PlayerControls({
 					onPress={() => seekByStep(SEEK_STEP_SECONDS)}
 				>
 					<Ionicons name="play-forward" size={22} color={colors.onOverlay} />
+				</ControlButton>
+				<ControlButton
+					label={t("video.player.restart")}
+					testID="video-player-restart"
+					onPress={onReset}
+				>
+					<Ionicons name="refresh" size={22} color={colors.onOverlay} />
 				</ControlButton>
 				<ControlButton
 					label={t("video.player.speed")}

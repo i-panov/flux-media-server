@@ -19,6 +19,7 @@ import {
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 import { PlayerControls } from "./PlayerControls";
+import { useVideoProgress } from "./useVideoProgress";
 import { useVideoSource } from "./useVideoSource";
 import { VideoPoster } from "./VideoPoster";
 import {
@@ -136,6 +137,7 @@ export function VideoPlayer({ media, title }: VideoPlayerProps) {
 	const [rate, setRate] = useState(1);
 	const [firstFrame, setFirstFrame] = useState(false);
 	const [hasStarted, setHasStarted] = useState(false);
+	const [recoveredFromError, setRecoveredFromError] = useState(false);
 	const [pipSupported] = useState(isPictureInPictureSupported);
 
 	const player = useVideoPlayer(null, (instance) => {
@@ -159,15 +161,50 @@ export function VideoPlayer({ media, title }: VideoPlayerProps) {
 		}
 	}, []);
 
+	const handlePositionRestored = useCallback((seconds: number) => {
+		// 401-ветка уже перемотала плеер на сохранённую позицию: серверный
+		// resume поверх неё не должен спорить за ту же секунду. Нулевая
+		// позиция — это не восстановление, resume с сервера уместен.
+		setPosition(seconds);
+		if (seconds > 0) {
+			setRecoveredFromError(true);
+		}
+	}, []);
+
 	// Источник/replaceAsync/401-ретрай вынесены в отдельный хук: компонент
 	// отвечает только за UI и нативные контролы.
 	const { sourceReady, failed, retry } = useVideoSource({
 		mediaId: media.id,
 		player,
 		onSourceReset: resetPlaybackState,
-		onPositionRestored: setPosition,
+		onPositionRestored: handlePositionRestored,
 		onPlaybackRestored: handlePlaybackRestored,
 	});
+
+	// Серверный resume — только после готовности источника и только если
+	// пользователь ещё не начал: 401-восстановление внутри useVideoSource
+	// остаётся главным и здесь не дублируется.
+	const {
+		resumed,
+		reset: resetProgress,
+		handleSeek,
+	} = useVideoProgress({
+		mediaId: media.id,
+		player,
+		sourceReady,
+		hasStarted,
+		resumeDisabled: recoveredFromError,
+		onPositionRestored: setPosition,
+	});
+
+	const resetPlayback = useCallback(() => {
+		// Сначала пауза: playingChange не должен успеть сохранить старую
+		// позицию после DELETE. Затем reset хука (seek 0 + DELETE + marker).
+		player.pause();
+		setHasStarted(false);
+		setPosition(0);
+		void resetProgress();
+	}, [player, resetProgress]);
 
 	useEventListener(player, "timeUpdate", ({ currentTime }) => {
 		setPosition(currentTime);
@@ -207,6 +244,8 @@ export function VideoPlayer({ media, title }: VideoPlayerProps) {
 		const next = clampSeek(seconds, 0, duration);
 		seekPlayer(player, next);
 		setPosition(next);
+		// Ручной возврат в 0 после playback удаляет серверный прогресс.
+		handleSeek(next);
 	};
 
 	const startPlayback = () => {
@@ -283,6 +322,23 @@ export function VideoPlayer({ media, title }: VideoPlayerProps) {
 				>
 					{isPlaying ? "playing" : "paused"}
 				</Text>
+				{/* Маркер для Maestro: resume применён (время читать неудобно). */}
+				{resumed && (
+					<Text
+						testID="video-player-resumed"
+						accessible={false}
+						pointerEvents="none"
+						style={[
+							styles.stateProbe,
+							{
+								backgroundColor: colors.playerChrome,
+								color: colors.playerChrome,
+							},
+						]}
+					>
+						resumed
+					</Text>
+				)}
 			</View>
 			{!failed && (
 				<PlayerControls
@@ -293,6 +349,7 @@ export function VideoPlayer({ media, title }: VideoPlayerProps) {
 					pipSupported={pipSupported}
 					onSeekTo={seekTo}
 					onTogglePlayback={togglePlayback}
+					onReset={resetPlayback}
 					onCycleRate={cycleRate}
 					onFullscreen={enterFullscreen}
 					onPictureInPicture={startPictureInPicture}
