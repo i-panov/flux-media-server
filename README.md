@@ -114,6 +114,8 @@ cd web && npm run test:e2e && npm run build && npm run size
   решения, ограничения и журнал коммитов.
 - [docs/mobile-parity-plan-2026-11-09.md](docs/mobile-parity-plan-2026-11-09.md)
   — план доведения mobile до паритета с Flutter.
+- [docs/mobile-parity-handoff-2026-11-10.md](docs/mobile-parity-handoff-2026-11-10.md)
+  — передача mobile-задач другому агенту: остатки, долги, правила.
 
 ## Лицензия
 
