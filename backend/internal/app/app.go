@@ -475,10 +475,10 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 
-	// Extract limiter — отдельный инстанс с тем же бюджетом: статусы
-	// опрашиваются раз в ~1.5с с клиента, и общий с upload бюджет
-	// съедался бы опросами. POST тяжёлый (ffmpeg), GET/DELETE лёгкие,
-	// но без лимита их можно дёргать в цикле.
+	// Extract limiter — отдельный инстанс с тем же бюджетом: им закрыты
+	// запуск ffmpeg (POST) и ручная отмена (DELETE). Статус опроса и
+	// готовый трек (GET) идут через read-лимитер: поллинг раз в ~1.5с
+	// съедал бы строгий бюджет запуска.
 	extractRateLimiter := limiter.New(limiter.Config{
 		Max:          cfg.RateLimiter.Max,
 		Expiration:   time.Duration(cfg.RateLimiter.Expiration) * time.Second,
