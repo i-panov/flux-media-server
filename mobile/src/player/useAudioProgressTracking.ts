@@ -2,6 +2,7 @@ import { deleteProgress, saveProgress } from "@flux/shared";
 import { useEventListener } from "expo";
 import type { AudioPlayer } from "expo-audio";
 import { useCallback, useEffect, useRef } from "react";
+import { useInvalidateContinueWatching } from "../api/progress";
 import {
 	buildProgressPayload,
 	RESET_POSITION_SECONDS,
@@ -32,6 +33,40 @@ export interface AudioProgressTracking {
 	onResumed: (target: number, duration: number) => void;
 }
 
+// PUT/DELETE сериализуем: иначе поздний PUT после reset воскресил бы
+// удалённую запись. После успеха чистим ряд «Продолжить».
+function chainProgressWrite(
+	chain: Promise<unknown>,
+	write: () => Promise<unknown>,
+	refresh: () => void,
+	onError?: () => void,
+): Promise<unknown> {
+	return chain
+		.then(write)
+		.then(refresh)
+		.catch(() => {
+			onError?.();
+		});
+}
+
+// Намерение пользователя (play/seek/выбор трека) живёт отдельным хуком:
+// он нужен и трекингу, и эффекту смены трека.
+function useUserStarted(): {
+	userStarted: () => boolean;
+	markUserStarted: () => void;
+	resetUserStarted: () => void;
+} {
+	const started = useRef(false);
+	const userStarted = useCallback(() => started.current, []);
+	const markUserStarted = useCallback(() => {
+		started.current = true;
+	}, []);
+	const resetUserStarted = useCallback(() => {
+		started.current = false;
+	}, []);
+	return { userStarted, markUserStarted, resetUserStarted };
+}
+
 // Сохранение аудиопрогресса: те же shared-функции и пороги, что у видео.
 // Пишем каждые 5 секунд воспроизведения, на паузе, при смене/выгрузке
 // трека и в конце; completed считает buildProgressPayload по порогу 90%.
@@ -41,9 +76,9 @@ export function useAudioProgressTracking({
 	sourceReady,
 	sourceLoading,
 }: UseAudioProgressTrackingOptions): AudioProgressTracking {
-	// Автоплей/выбор трека не считаются действием пользователя: только
-	// ручной seek/±10 выставляет этот ref.
-	const userStartedRef = useRef(false);
+	const refreshContinue = useInvalidateContinueWatching("audio");
+	// Автоплей/выбор трека не считаются действием пользователя.
+	const { userStarted, markUserStarted, resetUserStarted } = useUserStarted();
 	const trackedIdRef = useRef<number | null>(null);
 	const sourceReadyRef = useRef(sourceReady);
 	const sourceLoadingRef = useRef(sourceLoading);
@@ -87,31 +122,36 @@ export function useAudioProgressTracking({
 			lastSavedPosition.current = payload.position;
 			lastSavedAt.current = now;
 			resetSent.current = false;
-			writeChain.current = writeChain.current
-				.then(() => saveProgress(payload))
-				.catch(() => {
-					// Прогресс необязателен: следующий тик или pause попробует снова.
-				});
+			writeChain.current = chainProgressWrite(
+				writeChain.current,
+				() => saveProgress(payload),
+				refreshContinue,
+			);
 		},
-		[],
+		[refreshContinue],
 	);
 
-	const removeProgressFor = useCallback(async (trackId: number) => {
-		if (resetSent.current) {
-			return;
-		}
-		resetSent.current = true;
-		lastSavedPosition.current = 0;
-		lastSavedAt.current = Date.now();
-		const task = writeChain.current
-			.then(() => deleteProgress(trackId))
-			.catch(() => {
-				// Сеть не должна ломать плеер: запись удалится в следующий раз.
-				resetSent.current = false;
-			});
-		writeChain.current = task;
-		await task;
-	}, []);
+	const removeProgressFor = useCallback(
+		async (trackId: number) => {
+			if (resetSent.current) {
+				return;
+			}
+			resetSent.current = true;
+			lastSavedPosition.current = 0;
+			lastSavedAt.current = Date.now();
+			const task = chainProgressWrite(
+				writeChain.current,
+				() => deleteProgress(trackId),
+				refreshContinue,
+				() => {
+					resetSent.current = false;
+				},
+			);
+			writeChain.current = task;
+			await task;
+		},
+		[refreshContinue],
+	);
 
 	// Ноль после playback — reset (паритет с видео): DELETE, а не PUT 0.
 	const notePosition = useCallback(
@@ -214,10 +254,10 @@ export function useAudioProgressTracking({
 			wasPlaying.current = false;
 			wasAwayFromStart.current = false;
 			resetSent.current = false;
-			userStartedRef.current = false;
+			resetUserStarted();
 		}
 		trackedIdRef.current = mediaId;
-	}, [mediaId, persistFor]);
+	}, [mediaId, persistFor, resetUserStarted]);
 
 	// Уход с экрана/закрытие приложения: последняя измеренная позиция.
 	useEffect(() => {
@@ -230,24 +270,13 @@ export function useAudioProgressTracking({
 		};
 	}, [persistFor]);
 
-	const userStarted = useCallback(() => userStartedRef.current, []);
-	const markUserStarted = useCallback(() => {
-		userStartedRef.current = true;
-	}, []);
-	const resetUserStarted = useCallback(() => {
-		userStartedRef.current = false;
-	}, []);
-
 	const onResumed = useCallback(
 		(target: number, duration: number) => {
 			lastPosition.current = target;
 			wasAwayFromStart.current = true;
 			lastDuration.current = duration > 0 ? duration : lastDuration.current;
-			lastSavedPosition.current = buildProgressPayload(
-				mediaId,
-				target,
-				duration,
-			).position;
+			const payload = buildProgressPayload(mediaId, target, duration);
+			lastSavedPosition.current = payload.position;
 			lastSavedAt.current = Date.now();
 		},
 		[mediaId],

@@ -108,7 +108,7 @@ function AudioPlayerContent() {
 
 	const onToggleFavorite = () => {
 		toggleFavorite.mutate(
-			{ mediaId: current.id, favorite: isFavorite },
+			{ mediaId: current.id, favorite: isFavorite, media: current },
 			{ onError: () => Alert.alert(t("audio.player.favoriteError")) },
 		);
 	};

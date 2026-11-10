@@ -332,11 +332,12 @@ function VideoDetailContent() {
 	}
 	const artists = item.artists.map((artist) => artist.name).join(", ");
 	const isFavorite = favorites.data?.has(item.id) ?? false;
+	const favoriteBusy = favorites.isFetching || toggleFavorite.isPending;
 	const sourceUrl = item.source_url.trim();
 
 	const toggle = () => {
 		toggleFavorite.mutate(
-			{ mediaId: item.id, favorite: isFavorite },
+			{ mediaId: item.id, favorite: isFavorite, media: item },
 			{ onError: () => Alert.alert(t("video.favoriteError")) },
 		);
 	};
@@ -412,8 +413,10 @@ function VideoDetailContent() {
 					icon={isFavorite ? "heart" : "heart-outline"}
 					label={isFavorite ? t("media.unfavorite") : t("media.favorite")}
 					onPress={toggle}
-					testID="video-detail-favorite"
-					disabled={favorites.isFetching || toggleFavorite.isPending}
+					testID={`video-detail-favorite-${
+						favoriteBusy ? "disabled" : isFavorite ? "on" : "off"
+					}`}
+					disabled={favoriteBusy}
 					selected={isFavorite}
 					danger={isFavorite}
 				/>

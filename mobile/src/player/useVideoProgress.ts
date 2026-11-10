@@ -2,6 +2,7 @@ import { deleteProgress, fetchProgress, saveProgress } from "@flux/shared";
 import { useEventListener } from "expo";
 import type { VideoPlayer as NativeVideoPlayer } from "expo-video";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useInvalidateContinueWatching } from "../api/progress";
 import { seekPlayer } from "./videoControls";
 import {
 	buildProgressPayload,
@@ -60,6 +61,8 @@ export function useVideoProgress({
 	const wasAwayFromStart = useRef(false);
 	const resetSent = useRef(false);
 
+	const refreshContinue = useInvalidateContinueWatching("video");
+
 	useEffect(() => {
 		mountedRef.current = true;
 		return () => {
@@ -69,15 +72,9 @@ export function useVideoProgress({
 
 	useEffect(() => {
 		sourceReadyRef.current = sourceReady;
-	}, [sourceReady]);
-
-	useEffect(() => {
 		hasStartedRef.current = hasStarted;
-	}, [hasStarted]);
-
-	useEffect(() => {
 		resumeDisabledRef.current = resumeDisabled;
-	}, [resumeDisabled]);
+	}, [hasStarted, resumeDisabled, sourceReady]);
 
 	// Удаление прогресса: ручной reset или возврат в 0 после playback. force
 	// нужен кнопке «Смотреть с начала» — она удаляет даже свежий 0.
@@ -94,12 +91,13 @@ export function useVideoProgress({
 			}
 			try {
 				await deleteProgress(mediaId);
+				refreshContinue();
 			} catch {
 				// Сеть не должна ломать плеер: запись удалится при следующей попытке.
 				resetSent.current = false;
 			}
 		},
-		[mediaId],
+		[mediaId, refreshContinue],
 	);
 
 	// persist вызывается из нативных событий и cleanup: только refs, чтобы
@@ -126,11 +124,12 @@ export function useVideoProgress({
 			lastSavedAt.current = now;
 			// Новый PUT снова создаёт запись: следующий возврат в 0 её удалит.
 			resetSent.current = false;
-			void saveProgress(payload).catch(() => {
-				// Прогресс необязателен: следующий тик или pause попробует снова.
-			});
+			// Ошибка прогресса необязательна: следующий тик или pause повторит.
+			void saveProgress(payload)
+				.then(refreshContinue)
+				.catch(() => {});
 		},
-		[mediaId],
+		[mediaId, refreshContinue],
 	);
 
 	// Ноль после playback — reset (паритет с web): DELETE, а не PUT 0.

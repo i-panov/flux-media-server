@@ -1,0 +1,171 @@
+# Избранное: сердечко из деталей видео добавляет карточку в ряд, снятие
+# сердечка в ряду убирает её. Состояние сервера между прогонами не
+# очищается, поэтому сначала гасим все прежние избранные через сам ряд.
+#
+# Главный список теперь скрывает избранное, поэтому после его загрузки
+# первый media-row — гарантированно не избранный. Ряды живут в шапке
+# списка и могут сдвигать media-row ниже fold: к строке всегда идём
+# через scrollUntilVisible.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть хотя бы одно видео.
+#
+# Запуск:
+#   maestro test .maestro/favorites.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/favorites.yaml
+appId: app.lib.flux
+name: "Favorites: row appears and disappears"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# Главные видео. media-row может быть ниже рядов, поэтому скроллим к нему.
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "media-row-.*"
+    direction: DOWN
+    timeout: 20000
+
+# Открываем первое видео. Заодно дожидаемся загрузки favorites: кнопка
+# favorite появляется в on/off только после того, как запрос завершён
+# (disabled-состояние в этот момент не подходит).
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "video-detail-favorite-(on|off)"
+    direction: DOWN
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-favorite-(on|off)"
+    timeout: 20000
+
+# Для этого видео гарантируем off: повторный прогон не должен оставить
+# сердечко включённым и сломать проверку появления карточки.
+- runFlow:
+    when:
+      visible:
+        id: "video-detail-favorite-on"
+    commands:
+      - tapOn:
+          id: "video-detail-favorite-on"
+      - extendedWaitUntil:
+          visible:
+            id: "video-detail-favorite-off"
+          timeout: 10000
+- assertVisible:
+    id: "video-detail-favorite-off"
+
+# Возвращаемся на главные: favorites уже загружены, поэтому ряд избранного
+# либо детерминированно есть, либо его детерминированно нет.
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "tab-video"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+
+# Чистим прежние избранные через сердечки в ряду, пока ряд не исчезнет.
+- runFlow:
+    when:
+      visible:
+        id: "favorite-row"
+    commands:
+      - repeat:
+          while:
+            visible:
+              id: "favorite-card-.*-favorite-on"
+          commands:
+            - tapOn:
+                id: "favorite-card-.*-favorite-on"
+            - waitForAnimationToEnd:
+                timeout: 3000
+      - extendedWaitUntil:
+          notVisible:
+            id: "favorite-row"
+          timeout: 10000
+
+# Ставим сердечко первому видео (он точно не в избранном после очистки).
+- scrollUntilVisible:
+    element:
+      id: "media-row-.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "video-detail-favorite-(on|off)"
+    direction: DOWN
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-favorite-off"
+    timeout: 20000
+- tapOn:
+    id: "video-detail-favorite-off"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-favorite-on"
+    timeout: 10000
+
+# Назад на главные: карточка должна появиться в ряду избранного.
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- swipe:
+    direction: DOWN
+- swipe:
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      id: "favorite-row"
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: "favorite-card-.*-favorite-on"
+
+# Снятие сердечка в ряду убирает последнюю карточку и сам ряд.
+- tapOn:
+    id: "favorite-card-.*-favorite-on"
+- extendedWaitUntil:
+    notVisible:
+      id: "favorite-row"
+    timeout: 10000
+- assertNotVisible:
+    id: "favorite-row"

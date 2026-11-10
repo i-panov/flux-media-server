@@ -50,7 +50,7 @@ env:
       id: "video-detail-add-collection"
     direction: DOWN
 - assertVisible:
-    id: "video-detail-favorite"
+    id: "video-detail-favorite-(on|off|disabled)"
 
 # Кнопка источника рендерится только для http(s)-source_url; после скролла
 # к экшенам она уже в viewport, поэтому условие не пропускает её молча.

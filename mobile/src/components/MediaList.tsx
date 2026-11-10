@@ -4,6 +4,7 @@ import type {
 	InfiniteData,
 	UseInfiniteQueryResult,
 } from "@tanstack/react-query";
+import { type ReactElement, useEffect } from "react";
 import {
 	ActivityIndicator,
 	FlatList,
@@ -13,6 +14,7 @@ import {
 	View,
 } from "react-native";
 import { t, useLanguage } from "../i18n";
+import { excludeMediaIds } from "../media/visibleMedia";
 import { useTheme } from "../theme/ThemeProvider";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
@@ -31,6 +33,10 @@ interface MediaListProps {
 	errorTitle?: string;
 	errorTestID?: string;
 	testID?: string;
+	/** Ряды главных над списком: скроллятся вместе с ним, а не отдельно. */
+	ListHeaderComponent?: ReactElement;
+	/** Избранное, уже показанное рядом выше. undefined — ещё не загружено. */
+	excludedIds?: ReadonlySet<number>;
 }
 
 export function MediaList({
@@ -42,10 +48,29 @@ export function MediaList({
 	errorTitle,
 	errorTestID,
 	testID,
+	ListHeaderComponent,
+	excludedIds,
 }: MediaListProps) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
-	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+	const allItems = query.data?.pages.flatMap((page) => page.items) ?? [];
+	const items = excludeMediaIds(allItems, excludedIds);
+	// Если первые страницы целиком состоят из избранного, догружаем
+	// следующие, иначе основной список навсегда останется пустым.
+	const waitingForMore =
+		items.length === 0 && query.hasNextPage && !query.isError;
+	const fetchNextPage = query.fetchNextPage;
+
+	useEffect(() => {
+		if (
+			excludedIds === undefined ||
+			!waitingForMore ||
+			query.isFetchingNextPage
+		) {
+			return;
+		}
+		void fetchNextPage();
+	}, [excludedIds, fetchNextPage, query.isFetchingNextPage, waitingForMore]);
 
 	if (query.isPending) {
 		return (
@@ -75,12 +100,22 @@ export function MediaList({
 			contentContainerStyle={
 				items.length === 0 ? styles.emptyList : styles.list
 			}
+			ListHeaderComponent={ListHeaderComponent}
 			ListEmptyComponent={
-				<EmptyState
-					title={emptyTitle ?? t("media.empty")}
-					description={emptyDescription}
-					testID={emptyTestID}
-				/>
+				waitingForMore ? (
+					<View style={[styles.center, { gap: spacing.sm }]}>
+						<ActivityIndicator color={colors.accent} />
+						<Text style={{ color: colors.textMuted }}>
+							{t("common.loading")}
+						</Text>
+					</View>
+				) : (
+					<EmptyState
+						title={emptyTitle ?? t("media.empty")}
+						description={emptyDescription}
+						testID={emptyTestID}
+					/>
+				)
 			}
 			onEndReached={() => {
 				if (query.hasNextPage && !query.isFetchingNextPage) {

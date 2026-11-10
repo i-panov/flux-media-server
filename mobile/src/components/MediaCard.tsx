@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { clampProgress } from "./homeRows";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -27,6 +28,8 @@ export interface MediaCardProps {
 	subtitle?: string;
 	/** Длительность в секундах; 0 тоже валидное значение. */
 	duration?: number;
+	/** Доля просмотра/прослушивания 0..1 для полосы «Продолжить». */
+	progress?: number;
 	badge?: string;
 	variant?: MediaCardVariant;
 	imageSource?: MediaCardImageSource;
@@ -101,6 +104,7 @@ export function MediaCard({
 	title,
 	subtitle,
 	duration,
+	progress,
 	badge,
 	variant = "video",
 	imageSource,
@@ -198,6 +202,21 @@ export function MediaCard({
 						</Text>
 					</View>
 				)}
+				{progress !== undefined && (
+					<View
+						style={[styles.progressTrack, { backgroundColor: colors.overlay }]}
+					>
+						<View
+							style={[
+								styles.progressFill,
+								{
+									backgroundColor: colors.accent,
+									width: `${clampProgress(progress) * 100}%`,
+								},
+							]}
+						/>
+					</View>
+				)}
 			</View>
 			<View style={[styles.body, { padding: spacing.sm }]}>
 				<Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
@@ -257,7 +276,11 @@ export function MediaCard({
 							icon={isFavorite ? "heart" : "heart-outline"}
 							label={favoriteText}
 							onPress={onFavoritePress}
-							testID={testID === undefined ? undefined : `${testID}-favorite`}
+							testID={
+								testID === undefined
+									? undefined
+									: `${testID}-favorite-${isFavorite ? "on" : "off"}`
+							}
 							active={isFavorite}
 							selected={isFavorite}
 						/>
@@ -300,6 +323,14 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		paddingVertical: 2,
 	},
+	progressTrack: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		bottom: 0,
+		height: 4,
+	},
+	progressFill: { height: "100%" },
 	overlayText: { fontSize: 11, fontWeight: "600" },
 	body: { gap: 2 },
 	title: { fontSize: 14, fontWeight: "600" },
