@@ -81,7 +81,9 @@ export {
 	REFRESH_TOKEN_KEY,
 	resetApiConfig,
 } from "./api/transport";
+export * from "./core/audioQueue";
 export * from "./core/format";
+export * from "./core/lyricsSync";
 export * from "./core/media";
 export { createQueryClient } from "./query";
 export type { KeyValueStore } from "./storage";

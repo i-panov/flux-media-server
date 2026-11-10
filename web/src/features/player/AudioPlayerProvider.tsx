@@ -1,4 +1,10 @@
 import {
+	type AudioQueueState,
+	currentMedia,
+	emptyQueue,
+	type RepeatMode,
+} from "@flux/shared";
+import {
 	createContext,
 	type ReactNode,
 	useCallback,
@@ -13,12 +19,6 @@ import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
 import { useMediaProgress } from "../media/useMediaProgress";
 import { PLAYBACK_ERROR } from "./audioPlayback";
-import {
-	type AudioQueueState,
-	currentMedia,
-	emptyQueue,
-	type RepeatMode,
-} from "./audioQueue";
 import { HiddenAudio } from "./HiddenAudio";
 import { loadPersistedQueue, loadPersistedSettings } from "./playerPersistence";
 import { useAudioElementSync } from "./useAudioElementSync";

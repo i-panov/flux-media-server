@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Media } from "../../core/media";
 import {
 	type AudioQueueState,
 	emptyQueue,
@@ -13,6 +12,7 @@ import {
 	shiftPlayedIndices,
 	startQueue,
 } from "./audioQueue";
+import type { Media } from "./media";
 
 function media(id: number): Media {
 	return {

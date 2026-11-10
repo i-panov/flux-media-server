@@ -1,6 +1,6 @@
+import type { AudioQueueState, RepeatMode } from "@flux/shared";
 import { z } from "zod";
 import { mediaSchema } from "../../core/media";
-import type { AudioQueueState, RepeatMode } from "./audioQueue";
 
 // Очередь переживает перезагрузку страницы: треки, позиция в очереди,
 // история shuffle, громкость и режимы хранятся локально. Текущее время

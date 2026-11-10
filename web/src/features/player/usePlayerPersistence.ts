@@ -1,5 +1,5 @@
+import type { AudioQueueState, RepeatMode } from "@flux/shared";
 import { useEffect } from "react";
-import type { AudioQueueState, RepeatMode } from "./audioQueue";
 import { savePersistedQueue, savePersistedSettings } from "./playerPersistence";
 
 // Очередь (+история shuffle) и настройки — разными ключами и эффектами:

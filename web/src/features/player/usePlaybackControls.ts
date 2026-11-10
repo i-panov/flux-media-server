@@ -1,7 +1,3 @@
-import { type RefObject, useCallback, useState } from "react";
-import type { Media } from "../../core/media";
-import type { useMediaProgress } from "../media/useMediaProgress";
-import { playAudio } from "./audioPlayback";
 import {
 	type AudioQueueState,
 	currentMedia,
@@ -16,7 +12,11 @@ import {
 	selectIndex,
 	shiftPlayedIndices,
 	startQueue,
-} from "./audioQueue";
+} from "@flux/shared";
+import { type RefObject, useCallback, useState } from "react";
+import type { Media } from "../../core/media";
+import type { useMediaProgress } from "../media/useMediaProgress";
+import { playAudio } from "./audioPlayback";
 import { clearPersistedQueue } from "./playerPersistence";
 
 type Progress = Pick<ReturnType<typeof useMediaProgress>, "handlePause">;

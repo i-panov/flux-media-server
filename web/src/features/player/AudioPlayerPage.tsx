@@ -1,3 +1,4 @@
+import { parseSyncedLyrics } from "@flux/shared";
 import {
 	ActionIcon,
 	Alert,
@@ -34,7 +35,6 @@ import { formatDuration } from "../../core/format";
 import { clickNode, TVFocusScope, TVTab, useTVFocusable } from "../tv/tvFocus";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
-import { parseSyncedLyrics } from "./lyricsSync";
 import { QueueTab } from "./QueueTab";
 import { SyncedLyricsView } from "./SyncedLyricsView";
 import { useTVPlayerRemote } from "./tvPlayerRemote";

@@ -1,6 +1,6 @@
+import type { RepeatMode } from "@flux/shared";
 import { type RefObject, useCallback } from "react";
 import { playAudio } from "./audioPlayback";
-import type { RepeatMode } from "./audioQueue";
 
 // Конец трека: при повторе одного — тот же трек сначала, иначе
 // автопереход дальше по очереди. Позиция уже сохранена прогрессом выше.
