@@ -3,10 +3,12 @@
 import { useSyncExternalStore } from "react";
 import { collectionEn, collectionRu } from "./collections";
 import { trashEn, trashRu } from "./trash";
+import { uploadEn, uploadRu } from "./upload";
 
 const ru = {
 	...collectionRu,
 	...trashRu,
+	...uploadRu,
 	"common.loading": "Загрузка…",
 	"common.retry": "Повторить",
 	"common.error": "Ошибка",
@@ -201,6 +203,7 @@ const ru = {
 const en: Record<keyof typeof ru, string> = {
 	...collectionEn,
 	...trashEn,
+	...uploadEn,
 	"common.loading": "Loading…",
 	"common.retry": "Retry",
 	"common.error": "Error",

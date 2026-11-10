@@ -9,6 +9,7 @@ import {
 	View,
 } from "react-native";
 import { useCollections } from "../../src/api/collections";
+import { useSession } from "../../src/auth/session";
 import {
 	collectionChildren,
 	flattenCollectionTree,
@@ -35,10 +36,45 @@ function toggleCollapsed(
 	return next;
 }
 
+function LibraryUploadRow() {
+	const { colors, spacing } = useTheme();
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={t("upload.title")}
+			onPress={() => router.push("/upload")}
+			testID="library-upload"
+			style={({ pressed }) => [
+				styles.row,
+				{
+					padding: spacing.lg,
+					borderColor: colors.border,
+					backgroundColor: colors.surface,
+				},
+				pressed && styles.pressed,
+			]}
+		>
+			<View style={styles.rowLead}>
+				<Ionicons
+					name="cloud-upload-outline"
+					size={20}
+					color={colors.textMuted}
+				/>
+				<Text style={[styles.rowTitle, { color: colors.text }]}>
+					{t("upload.title")}
+				</Text>
+			</View>
+			<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+		</Pressable>
+	);
+}
+
 export default function LibraryScreen() {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
 	const collections = useCollections();
+	const session = useSession();
+	const isAdmin = session.data?.is_admin === true;
 	const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
 	const [createOpen, setCreateOpen] = useState(false);
 	const all = collections.data ?? [];
@@ -102,6 +138,8 @@ export default function LibraryScreen() {
 				</View>
 				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
 			</Pressable>
+
+			{isAdmin && <LibraryUploadRow />}
 
 			<View style={[styles.sectionHeader, { gap: spacing.sm }]}>
 				<Text style={[styles.sectionTitle, { color: colors.text }]}>

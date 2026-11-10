@@ -1,0 +1,70 @@
+# Загрузка: админская точка входа в библиотеке -> экран очереди.
+#
+# Что проверяется автоматически:
+#   * у администратора в библиотеке есть строка «Загрузка» (library-upload);
+#   * переход на /upload открывает экран с кнопкой выбора файлов и пустой
+#     очередью;
+#   * назад возвращает в библиотеку.
+#
+# Что НЕ автоматизируется: системный file picker (Android
+# ACTION_OPEN_DOCUMENT / iOS UIDocumentPicker) — это отдельное системное
+# окно вне дерева приложения. Maestro не умеет детерминированно выбрать в
+# нём конкретный файл, поэтому шаги «выбрать файл -> progress -> готово в
+# списке» проверяются вручную на устройстве. Фейковых assert на picker,
+# прогресс и готовый элемент здесь намеренно нет.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * пользователь maestro@example.com — администратор (первый
+#     зарегистрированный пользователь). Если база уже содержит других
+#     пользователей, строка library-upload не появится;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора).
+#
+# Запуск:
+#   maestro test .maestro/upload.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/upload.yaml
+appId: app.lib.flux
+name: "Upload: admin entry and queue screen"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на экране настроек.
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "library-upload"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "library-upload"
+- extendedWaitUntil:
+    visible:
+      id: "upload-screen"
+    timeout: 10000
+- assertVisible:
+    id: "upload-add"
+- assertVisible:
+    id: "upload-empty"
+- assertNotVisible:
+    id: "upload-admin-only"
+
+- tapOn:
+    id: "upload-back"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 10000
