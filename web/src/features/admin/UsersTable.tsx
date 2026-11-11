@@ -66,80 +66,85 @@ export function UsersTable({
 
 	return (
 		<>
-			<Table striped highlightOnHover>
-				<Table.Thead>
-					<Table.Tr>
-						<Table.Th>{t("admin.users.email")}</Table.Th>
-						<Table.Th>{t("admin.users.admin")}</Table.Th>
-						<Table.Th>{t("admin.users.created")}</Table.Th>
-						<Table.Th>{t("admin.users.actions")}</Table.Th>
-					</Table.Tr>
-				</Table.Thead>
-				<Table.Tbody>
-					{users.map((user) => {
-						const isSelf = currentUserId === user.id;
-						return (
-							<Table.Tr key={user.id}>
-								<Table.Td>
-									<Group gap="xs">
-										<Text fw={600} truncate maw={240}>
-											{user.email}
-										</Text>
-										{user.is_admin && (
-											<Badge variant="light" color="violet">
-												{t("settings.account.admin")}
-											</Badge>
+			<div className="admin-table-scroll">
+				<Table striped highlightOnHover>
+					<Table.Thead>
+						<Table.Tr>
+							<Table.Th>{t("admin.users.email")}</Table.Th>
+							<Table.Th>{t("admin.users.admin")}</Table.Th>
+							<Table.Th>{t("admin.users.created")}</Table.Th>
+							<Table.Th>{t("admin.users.actions")}</Table.Th>
+						</Table.Tr>
+					</Table.Thead>
+					<Table.Tbody>
+						{users.map((user) => {
+							const isSelf = currentUserId === user.id;
+							return (
+								<Table.Tr key={user.id}>
+									<Table.Td>
+										<Group gap="xs">
+											<Text fw={600} truncate maw={240}>
+												{user.email}
+											</Text>
+											{user.is_admin && (
+												<Badge variant="light" color="violet">
+													{t("settings.account.admin")}
+												</Badge>
+											)}
+										</Group>
+									</Table.Td>
+									<Table.Td>
+										{isSelf ? (
+											<Text size="sm" c="dimmed">
+												{t("common.emptyFallback")}
+											</Text>
+										) : (
+											<Switch
+												checked={user.is_admin}
+												disabled={setAdmin.isPending}
+												aria-label={t("admin.users.admin")}
+												onChange={(event) => {
+													setAdmin.mutate(
+														{
+															id: user.id,
+															isAdmin: event.currentTarget.checked,
+														},
+														{ onError: notifyError },
+													);
+												}}
+											/>
 										)}
-									</Group>
-								</Table.Td>
-								<Table.Td>
-									{isSelf ? (
+									</Table.Td>
+									<Table.Td>
 										<Text size="sm" c="dimmed">
-											{t("common.emptyFallback")}
+											{user.created_at}
 										</Text>
-									) : (
-										<Switch
-											checked={user.is_admin}
-											disabled={setAdmin.isPending}
-											aria-label={t("admin.users.admin")}
-											onChange={(event) => {
-												setAdmin.mutate(
-													{ id: user.id, isAdmin: event.currentTarget.checked },
-													{ onError: notifyError },
-												);
-											}}
-										/>
-									)}
-								</Table.Td>
-								<Table.Td>
-									<Text size="sm" c="dimmed">
-										{user.created_at}
-									</Text>
-								</Table.Td>
-								<Table.Td>
-									{isSelf ? (
-										<Text size="sm" c="dimmed">
-											{t("common.emptyFallback")}
-										</Text>
-									) : (
-										<Tooltip label={deleteLabel} withArrow>
-											<ActionIcon
-												variant="light"
-												color="red"
-												aria-label={deleteLabel}
-												loading={pendingId === user.id}
-												onClick={() => setConfirm(user)}
-											>
-												<Trash2 size={16} />
-											</ActionIcon>
-										</Tooltip>
-									)}
-								</Table.Td>
-							</Table.Tr>
-						);
-					})}
-				</Table.Tbody>
-			</Table>
+									</Table.Td>
+									<Table.Td>
+										{isSelf ? (
+											<Text size="sm" c="dimmed">
+												{t("common.emptyFallback")}
+											</Text>
+										) : (
+											<Tooltip label={deleteLabel} withArrow>
+												<ActionIcon
+													variant="light"
+													color="red"
+													aria-label={deleteLabel}
+													loading={pendingId === user.id}
+													onClick={() => setConfirm(user)}
+												>
+													<Trash2 size={16} />
+												</ActionIcon>
+											</Tooltip>
+										)}
+									</Table.Td>
+								</Table.Tr>
+							);
+						})}
+					</Table.Tbody>
+				</Table>
+			</div>
 			<Modal
 				opened={confirm !== null}
 				onClose={() => setConfirm(null)}

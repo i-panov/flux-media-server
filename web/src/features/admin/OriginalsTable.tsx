@@ -130,66 +130,68 @@ export function OriginalsTable({ items }: { items: OriginalItem[] }) {
 
 	return (
 		<>
-			<Table striped highlightOnHover>
-				<Table.Thead>
-					<Table.Tr>
-						<Table.Th>{t("admin.originals.name")}</Table.Th>
-						<Table.Th>{t("admin.originals.size")}</Table.Th>
-						<Table.Th>{t("admin.originals.views")}</Table.Th>
-						<Table.Th>{t("admin.originals.status")}</Table.Th>
-						<Table.Th>{t("admin.originals.actions")}</Table.Th>
-					</Table.Tr>
-				</Table.Thead>
-				<Table.Tbody>
-					{sorted.map((item) => (
-						<Table.Tr key={item.name}>
-							<Table.Td>
-								<Text fw={600} truncate maw={260}>
-									{item.name}
-								</Text>
-								<Text size="xs" c="dimmed">
-									{item.modified}
-								</Text>
-							</Table.Td>
-							<Table.Td>
-								<Text size="sm">{formatBytes(item.size_bytes)}</Text>
-							</Table.Td>
-							<Table.Td>
-								<Text size="sm">{item.views}</Text>
-							</Table.Td>
-							<Table.Td>
-								<Text size="sm">{statusLabel(item.status, t)}</Text>
-							</Table.Td>
-							<Table.Td>
-								<Group gap="xs">
-									{capabilities.canDownload && (
-										<Tooltip label={downloadLabel} withArrow>
+			<div className="admin-table-scroll">
+				<Table striped highlightOnHover>
+					<Table.Thead>
+						<Table.Tr>
+							<Table.Th>{t("admin.originals.name")}</Table.Th>
+							<Table.Th>{t("admin.originals.size")}</Table.Th>
+							<Table.Th>{t("admin.originals.views")}</Table.Th>
+							<Table.Th>{t("admin.originals.status")}</Table.Th>
+							<Table.Th>{t("admin.originals.actions")}</Table.Th>
+						</Table.Tr>
+					</Table.Thead>
+					<Table.Tbody>
+						{sorted.map((item) => (
+							<Table.Tr key={item.name}>
+								<Table.Td>
+									<Text fw={600} truncate maw={260}>
+										{item.name}
+									</Text>
+									<Text size="xs" c="dimmed">
+										{item.modified}
+									</Text>
+								</Table.Td>
+								<Table.Td>
+									<Text size="sm">{formatBytes(item.size_bytes)}</Text>
+								</Table.Td>
+								<Table.Td>
+									<Text size="sm">{item.views}</Text>
+								</Table.Td>
+								<Table.Td>
+									<Text size="sm">{statusLabel(item.status, t)}</Text>
+								</Table.Td>
+								<Table.Td>
+									<Group gap="xs">
+										{capabilities.canDownload && (
+											<Tooltip label={downloadLabel} withArrow>
+												<ActionIcon
+													variant="light"
+													aria-label={downloadLabel}
+													loading={pending === item.name}
+													onClick={() => handleDownload(item.name)}
+												>
+													<Download size={16} />
+												</ActionIcon>
+											</Tooltip>
+										)}
+										<Tooltip label={deleteLabel} withArrow>
 											<ActionIcon
 												variant="light"
-												aria-label={downloadLabel}
-												loading={pending === item.name}
-												onClick={() => handleDownload(item.name)}
+												color="red"
+												aria-label={deleteLabel}
+												onClick={() => setConfirm(item.name)}
 											>
-												<Download size={16} />
+												<Trash2 size={16} />
 											</ActionIcon>
 										</Tooltip>
-									)}
-									<Tooltip label={deleteLabel} withArrow>
-										<ActionIcon
-											variant="light"
-											color="red"
-											aria-label={deleteLabel}
-											onClick={() => setConfirm(item.name)}
-										>
-											<Trash2 size={16} />
-										</ActionIcon>
-									</Tooltip>
-								</Group>
-							</Table.Td>
-						</Table.Tr>
-					))}
-				</Table.Tbody>
-			</Table>
+									</Group>
+								</Table.Td>
+							</Table.Tr>
+						))}
+					</Table.Tbody>
+				</Table>
+			</div>
 			<Modal
 				opened={confirm !== null}
 				onClose={() => setConfirm(null)}

@@ -80,10 +80,10 @@ body {
 }
 
 /* Mantine ActionIcon задаёт position: relative вне @layer, поэтому
-   tailwind-класс .absolute на кнопках поверх карточки проигрывает и
-   кнопка встаёт в поток под карточкой. Явно возвращаем оверлеям
-   абсолютное позиционирование. */
-.media-card > .absolute {
+   tailwind-класс .absolute на кнопках-оверлеях проигрывает и кнопка
+   встаёт в поток под карточкой. Это касается не только VideoCard, но и
+   CollectionCard/ContinueWatching. */
+.mantine-ActionIcon-root.absolute {
 	position: absolute;
 }
 
@@ -96,6 +96,15 @@ body {
 .media-card:focus-within,
 .media-row:focus-within {
 	content-visibility: visible;
+}
+
+/* Таблицы админки на узком экране: не ломаем колонки, даём горизонтальный скролл. */
+.admin-table-scroll {
+	overflow-x: auto;
+}
+
+.admin-table-scroll table {
+	min-width: 640px;
 }
 
 /* Видео-OSD ТВ-режима: лежит поверх <video> внутри общего контейнера.
