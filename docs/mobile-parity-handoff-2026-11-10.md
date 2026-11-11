@@ -4,7 +4,7 @@
 **План:** [mobile-parity-plan-2026-11-09.md](mobile-parity-plan-2026-11-09.md).
 **Статус:** исторический снимок от 2026-11-10. Актуальное состояние —
 в разделе 0: Tasks 1–24 и поиск/сортировка списков (0.1.31) выполнены,
-остался Task 25 (релиз и device-smoke).
+остался device-smoke в Task 25 (APK уже собран).
 
 Этот файл — самодостаточное ТЗ для другого агента: текущее состояние, правила
 работы, оставшиеся задачи, известные долги и подводные камни.
@@ -55,7 +55,7 @@ workflow.
 реализованы в 0.1.31 — `useVideoList(q, sort)`/
 `useAudioList(q, sort)`, `MediaSearchBar`, debounce 300 мс, asc/desc,
 очистка и отдельные пустые состояния. В библиотеке остаётся Task 25:
-релиз, dogfood APK arm64 и device-smoke.
+device-smoke; dogfood APK arm64 уже собран.
 
 ### Актуальные известные ограничения
 
@@ -522,7 +522,7 @@ realtime-проверка на устройстве не выполнялась 
 ### Task 25 — релиз
 
 - [x] `version:sync`, versionCode 49, lockfile.
-- [ ] Dogfood APK arm64 — заблокировано: нет Android SDK/NDK.
+- [x] Dogfood APK arm64 — собран `0.1.31`/49, ~33 МБ, `arm64-v8a`.
 - [ ] Smoke на устройстве: login, video, audio background/lock, offline —
   заблокировано: нет устройства/эмулятора.
 - [x] Известные ограничения записаны (release notes 0.1.31).
@@ -678,7 +678,7 @@ cd backend && go test ./internal/... -count=1
 
 DoD **функционально закрыт**: поиск/сортировка списков вошли в 0.1.31,
 пункты Tasks 1–24 реализованы. Формально чекбоксы не отмечать до Task 25:
-dogfood-сборка и device-smoke ещё не выполнены.
+dogfood-сборка выполнена, device-smoke ещё нет.
 
 - [ ] Видео: список/поиск/детали/плеер (play/pause/seek/±10/скорость/
       fullscreen/PiP), resume, source, favorite, коллекции, extract, offline.
@@ -690,7 +690,7 @@ dogfood-сборка и device-smoke ещё не выполнены.
 - [ ] Метаданные/обложка/удаление; admin-only.
 - [ ] Offline: download/play/удаление/лимит/экспорт.
 - [ ] ru/en, light/dark/system, ошибки/пустые состояния.
-- [ ] Maestro flows + CI + dogfood APK.
+- [x] Dogfood APK arm64; Maestro flows + CI — нет.
 - [ ] Документация (README, AGENTS, plan, handoff) актуальна.
 
 ---
@@ -705,5 +705,5 @@ dogfood-сборка и device-smoke ещё не выполнены.
 5. Прогнать `.maestro/tabs.yaml`, `.maestro/theme.yaml` и
    `.maestro/search.yaml` на эмуляторе или устройстве; не выдавать
    структурную проверку YAML за прогон.
-6. Собрать dogfood APK arm64 и пройти device-smoke: login, video,
+6. Пройти device-smoke на собранном APK: login, video,
    audio background/lock, offline, поиск/сортировка.

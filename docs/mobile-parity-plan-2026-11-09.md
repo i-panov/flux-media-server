@@ -18,7 +18,7 @@ expo-document-picker, expo-image-picker, AsyncStorage, Vitest, Maestro.
 
 **Статус (2026-11-11):** Tasks 1–24 реализованы; поиск и сортировка
 списков видео/аудио закрыты в mobile 0.1.31. Функциональный DoD паритета
-закрыт, но формально остаётся Task 25 (релиз, dogfood APK и device-smoke).
+закрыт; dogfood APK собран, формально остаётся device-smoke в Task 25.
 Maestro-сценарии лежат в `.maestro/`, но в окружении разработки не
 запускались (нет maestro/adb/эмулятора): проверка YAML — не прогон. Ручной
 workflow `.github/workflows/mobile-e2e.yml` тоже добавлен черновиком и не
@@ -57,7 +57,7 @@ workflow `.github/workflows/mobile-e2e.yml` тоже добавлен черно
 списков видео/аудио — закрыт в mobile 0.1.31: `useVideoList(q, sort)` и
 `useAudioList(q, sort)`, `MediaSearchBar`, debounce 300 мс и отдельные
 пустые состояния. Формально DoD остаётся открытым только из-за Task 25
-(device-smoke/dogfood), а не из-за отсутствующей функциональности.
+(device-smoke), а не из-за отсутствующей функциональности.
 
 ## 1. Решения и зависимости
 
@@ -443,7 +443,7 @@ web imports; mobile tests.
 #### Task 25: релиз
 
 - [x] `version:sync`, versionCode 49.
-- [ ] Dogfood APK arm64 — заблокировано: нет Android SDK/NDK.
+- [x] Dogfood APK arm64 — собран `0.1.31`/49, ~33 МБ, только `arm64-v8a`.
 - [ ] Smoke на устройстве: login, video, audio background, offline —
   заблокировано: нет устройства/эмулятора.
 - [x] Записать известные ограничения (Expo Go без background).
@@ -468,7 +468,7 @@ web imports; mobile tests.
 
 Критерии закрыты функционально: поиск/сортировка списков вошли в 0.1.31,
 остальные функции реализованы в Tasks 1–24. Формально чекбоксы не отмечены,
-пока Task 25 не подтвердит device-smoke и dogfood-сборку.
+пока Task 25 не подтвердит device-smoke.
 
 - [ ] Видео: список, поиск, детали, play/pause/seek/speed/fullscreen/PiP,
       resume, source link, favorite, коллекции, extract, offline.
@@ -480,7 +480,7 @@ web imports; mobile tests.
 - [ ] Метаданные/обложка/удаление; admin-кнопки только админу.
 - [ ] Offline: download, play из файла, удаление, лимит кеша, экспорт.
 - [ ] ru/en, light/dark/system, ошибки/пустые состояния.
-- [ ] Maestro-сценарии и CI-сборка; dogfood APK.
+- [x] Dogfood APK arm64; Maestro-сценарии и CI-сборка — ещё нет.
 
 ## 6. Риски и меры
 
