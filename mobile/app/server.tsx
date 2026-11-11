@@ -132,15 +132,17 @@ export default function ServerScreen() {
 	return (
 		<Screen scroll edges={["top", "bottom"]} testID="server-screen">
 			<View style={styles.header}>
-				<Pressable
-					onPress={goBack}
-					accessibilityRole="button"
-					accessibilityLabel={t("common.back")}
-					hitSlop={8}
-					style={styles.backButton}
-				>
-					<Text style={[styles.back, { color: colors.text }]}>‹</Text>
-				</Pressable>
+				{configured && (
+					<Pressable
+						onPress={goBack}
+						accessibilityRole="button"
+						accessibilityLabel={t("common.back")}
+						hitSlop={8}
+						style={styles.backButton}
+					>
+						<Text style={[styles.back, { color: colors.text }]}>‹</Text>
+					</Pressable>
+				)}
 				<Text style={[styles.title, { color: colors.text }]}>
 					{t("server.title")}
 				</Text>
