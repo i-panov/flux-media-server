@@ -41,7 +41,7 @@ Android TV/QR — впереди.
 | backend | 1.0.30 | API, auth, upload/transcode/extract, trash, collections |
 | shared | 0.1.8 | media, favorites, collections, progress, lyrics, audioQueue |
 | web | 0.1.36 | функционально полный web-клиент; TV P1/P2 закрыты, включая OSD видео и правки ревью; реальный ТВ не проверялся |
-| mobile | 0.1.31 / 49 | Tasks 1–24 и поиск/сортировка закрыты, Task 25 не начат |
+| mobile | 0.1.32 / 50 | Tasks 1–24 и поиск/сортировка закрыты; APK собран, ждёт device-smoke |
 
 Mobile-долги, которые нужно закрыть до ТВ:
 

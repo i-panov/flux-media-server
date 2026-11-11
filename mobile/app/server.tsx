@@ -1,6 +1,5 @@
 import {
 	ACCESS_TOKEN_KEY,
-	configureApi,
 	getApiConfig,
 	REFRESH_TOKEN_KEY,
 	useHealthQuery,
@@ -9,7 +8,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { normalizeServerUrl, SERVER_URL_KEY } from "../src/api/setup";
+import {
+	applyServerUrl,
+	isServerConfigured,
+	normalizeServerUrl,
+	SERVER_URL_KEY,
+} from "../src/api/setup";
 import { emitLocalReset } from "../src/auth/reset";
 import { markSessionSignedOut, sessionQueryKey } from "../src/auth/session";
 import { Screen } from "../src/components/Screen";
@@ -22,7 +26,8 @@ import { useTheme } from "../src/theme/ThemeProvider";
 export default function ServerScreen() {
 	useLanguage();
 	const { colors } = useTheme();
-	const health = useHealthQuery();
+	const [configured, setConfigured] = useState(isServerConfigured);
+	const health = useHealthQuery(configured);
 	const queryClient = useQueryClient();
 	const [draft, setDraft] = useState(() => getApiConfig().baseUrl);
 	const [appliedUrl, setAppliedUrl] = useState(() => getApiConfig().baseUrl);
@@ -35,8 +40,10 @@ export default function ServerScreen() {
 		backendStatus = t("common.loading");
 	} else if (health.isError) {
 		backendStatus = t("home.offline");
-	} else {
+	} else if (configured) {
 		backendStatus = `${health.data.status} · ${health.data.version}`;
+	} else {
+		backendStatus = t("server.notConfigured");
 	}
 
 	const goBack = () => {
@@ -82,7 +89,8 @@ export default function ServerScreen() {
 				tokensDeleted = true;
 			}
 			await secureStore.set(SERVER_URL_KEY, normalized);
-			configureApi({ baseUrl: normalized });
+			applyServerUrl(normalized);
+			setConfigured(true);
 			setAppliedUrl(normalized);
 			setDraft(normalized);
 			setError(null);

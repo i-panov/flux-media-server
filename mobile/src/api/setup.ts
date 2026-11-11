@@ -1,43 +1,49 @@
 import { configureApi, createTokenTransport } from "@flux/shared";
 import { secureStore } from "../storage/secureStore";
+import { normalizeServerUrl } from "./serverUrl";
 
 export const SERVER_URL_KEY = "flux.server_url";
 
-// LAN-адрес машины для Expo Go и эмуляторов задаётся переменной окружения,
-// дефолт — локальный бэкенд разработчика (порт по AGENTS.md).
-const DEFAULT_BASE_URL =
-	(process.env.EXPO_PUBLIC_API_BASE as string | undefined) ??
-	"http://localhost:8080/api";
+export { normalizeServerUrl };
 
-const TRAILING_SLASHES = /\/+$/;
+// Адрес из окружения — только для разработки/Expo Go. Без сохранённого
+// или заданного адреса приложение не стучится на localhost: корень
+// уводит на /server, где поле пустое.
+const ENV_BASE_URL = normalizeServerUrl(
+	(process.env.EXPO_PUBLIC_API_BASE as string | undefined) ?? "",
+);
 
-// Нормализация адреса из поля ввода: пробелы и хвостовые слэши режутся,
-// принимается только http(s). Невалидному вводу соответствует null.
-export function normalizeServerUrl(value: string): string | null {
-	const normalized = value.trim().replace(TRAILING_SLASHES, "");
-	if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
-		return null;
-	}
-	if (normalized === "http://" || normalized === "https://") {
-		return null;
-	}
-	return normalized;
-}
+let serverConfigured = ENV_BASE_URL !== null;
 
 // Импортируется один раз из app/_layout.tsx до любых запросов.
 configureApi({
-	baseUrl: DEFAULT_BASE_URL,
+	baseUrl: ENV_BASE_URL ?? "",
 	transport: createTokenTransport(secureStore),
 });
 
+export function isServerConfigured(): boolean {
+	return serverConfigured;
+}
+
+export function applyServerUrl(baseUrl: string): void {
+	configureApi({ baseUrl });
+	serverConfigured = true;
+}
+
 // Подхватывает сохранённый в настройках адрес до первого рендера.
 // Ошибка чтения хранилища — остаёмся на дефолте первого кадра.
-export async function initApiConfig(): Promise<void> {
+export async function initApiConfig(): Promise<boolean> {
 	try {
 		const saved = await secureStore.get(SERVER_URL_KEY);
 		const normalized = saved === null ? null : normalizeServerUrl(saved);
-		configureApi({ baseUrl: normalized ?? DEFAULT_BASE_URL });
+		if (normalized !== null) {
+			applyServerUrl(normalized);
+			return true;
+		}
 	} catch {
-		configureApi({ baseUrl: DEFAULT_BASE_URL });
+		// Хранилище недоступно — остаёмся без адреса и открываем /server.
 	}
+	configureApi({ baseUrl: ENV_BASE_URL ?? "" });
+	serverConfigured = ENV_BASE_URL !== null;
+	return serverConfigured;
 }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- ru/en-словари держим рядом для проверки паритета ключей. */
 // Минимальный i18n для каркаса: без внешних зависимостей, выбор языка
 // по системной локали. Полноценный i18next — отдельный этап.
 import { useSyncExternalStore } from "react";
@@ -205,7 +206,8 @@ export const ru = {
 	"settings.save": "Сохранить",
 	"settings.saving": "Сохранение…",
 	"settings.saved": "Адрес сохранён",
-	"settings.invalidUrl": "Адрес должен начинаться с http:// или https://",
+	"settings.invalidUrl":
+		"Введите адрес сервера, например flux.example.com или https://host/api",
 	"settings.saveError": "Не удалось сохранить адрес",
 	"settings.version": "Версия приложения",
 	"settings.language": "Язык",
@@ -224,7 +226,9 @@ export const ru = {
 	"settings.loggingOut": "Выходим…",
 	"settings.logoutError": "Не удалось выйти. Повторите попытку.",
 	"server.title": "Сервер",
-	"server.hint": "Адрес сервера можно задать до входа.",
+	"server.hint":
+		"Адрес сервера можно задать до входа. Схему и /api добавим автоматически.",
+	"server.notConfigured": "Сервер не настроен",
 	"server.open": "Настроить сервер",
 } as const;
 
@@ -428,7 +432,8 @@ export const en: Record<keyof typeof ru, string> = {
 	"settings.save": "Save",
 	"settings.saving": "Saving…",
 	"settings.saved": "URL saved",
-	"settings.invalidUrl": "URL must start with http:// or https://",
+	"settings.invalidUrl":
+		"Enter a server address, e.g. flux.example.com or https://host/api",
 	"settings.saveError": "Could not save URL",
 	"settings.version": "App version",
 	"settings.language": "Language",
@@ -446,7 +451,9 @@ export const en: Record<keyof typeof ru, string> = {
 	"settings.loggingOut": "Signing out…",
 	"settings.logoutError": "Could not log out. Try again.",
 	"server.title": "Server",
-	"server.hint": "You can set the server URL before signing in.",
+	"server.hint":
+		"You can set the server URL before signing in. We add the scheme and /api automatically.",
+	"server.notConfigured": "Server is not configured",
 	"server.open": "Configure server",
 };
 

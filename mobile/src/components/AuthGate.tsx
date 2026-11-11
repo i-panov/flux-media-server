@@ -7,6 +7,7 @@ import {
 	Text,
 	View,
 } from "react-native";
+import { isServerConfigured } from "../api/setup";
 import { useSession } from "../auth/session";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
@@ -14,7 +15,11 @@ import { useTheme } from "../theme/ThemeProvider";
 export function AuthGate({ children }: { children: ReactNode }) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
-	const session = useSession();
+	const configured = isServerConfigured();
+	const session = useSession(configured);
+	if (!configured) {
+		return <Redirect href="/server" />;
+	}
 	if (session.isPending) {
 		return (
 			<View

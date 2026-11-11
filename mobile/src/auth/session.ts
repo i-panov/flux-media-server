@@ -54,6 +54,6 @@ export function sessionQueryOptions() {
 	});
 }
 
-export function useSession() {
-	return useQuery(sessionQueryOptions());
+export function useSession(enabled = true) {
+	return useQuery({ ...sessionQueryOptions(), enabled });
 }

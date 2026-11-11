@@ -16,7 +16,7 @@
 **Кодовая база:** коммит `feat(mobile): поиск и сортировка списков`.
 **Task 24:** коммит `chore(mobile): e2e, CI и документация` — база перед
 search/sort. **Версии:** backend `1.0.29`, shared `0.1.8`, web `0.1.31`,
-mobile `0.1.31`, versionCode `49`.
+mobile `0.1.32`, versionCode `50`.
 
 Tasks 1–23 реализованы и закоммичены. Компактная карта коммитов (подробные
 описания и приёмка — в разделах 2 и 4):
@@ -521,12 +521,12 @@ realtime-проверка на устройстве не выполнялась 
 
 ### Task 25 — релиз
 
-- [x] `version:sync`, versionCode 49, lockfile.
-- [x] Dogfood APK arm64 — собран `0.1.31`/49, ~33 МБ, `arm64-v8a`.
+- [x] `version:sync`, versionCode 50, lockfile.
+- [x] Dogfood APK arm64 — собран `0.1.32`/50, ~33 МБ, `arm64-v8a`.
 - [ ] Smoke на устройстве: login, video, audio background/lock, offline —
   заблокировано: нет устройства/эмулятора.
-- [x] Известные ограничения записаны (release notes 0.1.31).
-- [x] Commit `chore(mobile): релиз 0.1.31`.
+- [x] Известные ограничения записаны (release notes 0.1.32).
+- [x] Commit `fix(mobile): адрес сервера и первый запуск`.
 
 ---
 
@@ -629,7 +629,7 @@ realtime-проверка на устройстве не выполнялась 
 - backend `1.0.29`;
 - web `0.1.31`;
 - shared `0.1.8`;
-- mobile `0.1.31`, versionCode 49.
+- mobile `0.1.32`, versionCode 50.
 
 **Долг снимка 2026-11-10 снят:** shared поднят до `0.1.8`, web и mobile
 пинят `0.1.8`; `package-lock.json` обновлён. Task 24 — docs/CI-коммит без

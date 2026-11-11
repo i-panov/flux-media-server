@@ -14,11 +14,12 @@ async function fetchHealth(signal: AbortSignal): Promise<HealthSnapshot> {
 	};
 }
 
-export function useHealthQuery() {
+export function useHealthQuery(enabled = true) {
 	return useQuery({
 		queryKey: ["health"],
 		queryFn: ({ signal }) => fetchHealth(signal),
 		retry: false,
 		refetchOnWindowFocus: false,
+		enabled,
 	});
 }
