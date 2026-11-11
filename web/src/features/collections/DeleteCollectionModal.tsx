@@ -2,7 +2,7 @@ import { Group, Modal, Stack, Text } from "@mantine/core";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useCollectionStats, useDeleteCollection } from "../../api/collections";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 import { useCollectionError } from "./useCollectionError";
 
 export function DeleteCollectionModal({
@@ -41,14 +41,14 @@ export function DeleteCollectionModal({
 					</Text>
 				)}
 				<Group justify="flex-end">
-					<TVModalButton
+					<TVButton
 						focusKey="delete-collection-cancel"
 						variant="default"
 						onClick={onClose}
 					>
 						{t("collections.cancel")}
-					</TVModalButton>
-					<TVModalButton
+					</TVButton>
+					<TVButton
 						focusKey="delete-collection-confirm"
 						color="red"
 						loading={remove.isPending}
@@ -63,7 +63,7 @@ export function DeleteCollectionModal({
 						}}
 					>
 						{t("collections.delete")}
-					</TVModalButton>
+					</TVButton>
 				</Group>
 			</Stack>
 		</Modal>

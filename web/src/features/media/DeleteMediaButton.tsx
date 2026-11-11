@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useDeleteMedia } from "../../api/media";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 
 // Удаление медиа в корзину (только админ, вызывается из MediaAdminActions
 // или строк списков): подтверждение как во Flutter, после успеха —
@@ -85,21 +85,21 @@ export function DeleteMediaButton({
 						</Text>
 					)}
 					<Group justify="flex-end">
-						<TVModalButton
+						<TVButton
 							focusKey="delete-media-cancel"
 							variant="default"
 							onClick={() => setOpened(false)}
 						>
 							{t("collections.cancel")}
-						</TVModalButton>
-						<TVModalButton
+						</TVButton>
+						<TVButton
 							focusKey="delete-media-confirm"
 							color="red"
 							loading={remove.isPending}
 							onClick={submit}
 						>
 							{deleteLabel}
-						</TVModalButton>
+						</TVButton>
 					</Group>
 				</Stack>
 			</Modal>

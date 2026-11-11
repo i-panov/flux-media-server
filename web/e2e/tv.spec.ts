@@ -3,6 +3,7 @@ import { stubEmptyLibraryMeta } from "./stubs";
 import { stubAuthedSession, stubVideoApi, videoItem } from "./video-fixtures";
 
 const VIDEO_LIST_PATTERN = /\/video(\?|$)/;
+const HOME_PATTERN = /\/$/;
 const PLAYER_PATTERN = /\/player(\?|$)/;
 const AUDIO_LIST_PATTERN = /\/audio(\?|$)/;
 const VIDEO_DETAIL_ID_PATTERN = /\/video\/2(\?|$)/;
@@ -52,14 +53,22 @@ function silentWav(seconds = 60): Buffer {
 	return buffer;
 }
 
-async function stubVideoDetail(page: Page, id: number, title: string) {
-	await page.route(`**/api/media/${id}`, (route) =>
-		route.fulfill({
+async function stubVideoDetail(
+	page: Page,
+	id: number,
+	title: string,
+	delayMs = 0,
+) {
+	await page.route(`**/api/media/${id}`, async (route) => {
+		if (delayMs > 0) {
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+		}
+		await route.fulfill({
 			status: 200,
 			contentType: "application/json",
 			body: JSON.stringify(videoItem(id, title)),
-		}),
-	);
+		});
+	});
 	await page.route(`**/api/media/${id}/subs`, (route) =>
 		route.fulfill({
 			status: 200,
@@ -150,6 +159,30 @@ async function stubAudioForTV(page: Page) {
 	);
 }
 
+async function stubSettings(page: Page) {
+	await page.route("**/api/auth/me", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				id: 1,
+				email: "user@example.com",
+				is_admin: false,
+			}),
+		}),
+	);
+	await stubEmptyLibraryMeta(page);
+	await page.route(
+		(url) => url.pathname === "/api/health",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ status: "ok", version: "9.9.9" }),
+			}),
+	);
+}
+
 function activeElementText(page: Page): Promise<string> {
 	return page.evaluate(() => document.activeElement?.textContent ?? "");
 }
@@ -158,26 +191,74 @@ function activeElementTag(page: Page): Promise<string> {
 	return page.evaluate(() => document.activeElement?.tagName ?? "");
 }
 
-test("ТВ: стрелки ходят между карточками, Enter открывает, Back возвращается", async ({
-	page,
-}) => {
+function activeFocusKey(page: Page): Promise<string> {
+	return page.evaluate(
+		() => document.activeElement?.getAttribute("data-tv-focus-key") ?? "",
+	);
+}
+
+async function pressUntilFocusKey(
+	page: Page,
+	key: string,
+	matches: (value: string) => boolean,
+	attempts = 8,
+): Promise<string> {
+	for (let index = 0; index < attempts; index += 1) {
+		const current = await activeFocusKey(page);
+		if (matches(current)) {
+			return current;
+		}
+		await page.keyboard.press(key);
+		await page.waitForTimeout(60);
+	}
+	const current = await activeFocusKey(page);
+	if (matches(current)) {
+		return current;
+	}
+	throw new Error(`фокус не дошёл до цели, последний ключ: ${current}`);
+}
+
+async function focusVideoNav(page: Page): Promise<void> {
+	for (let index = 0; index < 5; index += 1) {
+		if ((await activeFocusKey(page)) === "nav-desktop-video") {
+			return;
+		}
+		await page.keyboard.press("ArrowDown");
+		await page.waitForTimeout(60);
+	}
+	throw new Error(
+		`не нашли пункт «Видео», последний ключ: ${await activeFocusKey(page)}`,
+	);
+}
+
+test("ТВ: с главной по навбару в раздел, карточка, Back", async ({ page }) => {
 	await stubAuthedSession(page);
 	await stubVideoApi(page);
 	await stubVideoDetail(page, 2, "Второй фильм");
 
-	await page.goto("/video?tv=1");
-	await expect(page.getByText("Первый фильм", { exact: true })).toBeVisible();
+	await page.goto("/?tv=1");
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Flux" }),
+	).toBeVisible();
 	await expect(
 		page.evaluate(() =>
 			document.getElementById("root")?.classList.contains("tv-mode"),
 		),
 	).resolves.toBe(true);
+	// На главной без действий route-focus ставит фокус на первый пункт навбара.
+	await expect.poll(() => activeFocusKey(page)).toBe("nav-desktop-home");
 
-	// Смена роута ставит фокус на первую карточку.
+	// Только клавиши: ArrowDown ведёт по навбару, Enter — переход.
+	await focusVideoNav(page);
+	await page.keyboard.press("Enter");
+	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
 	await expect.poll(() => activeElementText(page)).toContain("Первый фильм");
+	// Read-only: кнопки загрузки в ТВ нет.
+	await expect(
+		page.getByRole("button", { name: "Загрузить видео" }),
+	).toHaveCount(0);
 
 	await page.keyboard.press("ArrowRight");
-	// Фокус ушёл на соседнюю карточку.
 	await expect.poll(() => activeElementText(page)).toContain("Второй фильм");
 
 	await page.keyboard.press("Enter");
@@ -185,11 +266,67 @@ test("ТВ: стрелки ходят между карточками, Enter о�
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Второй фильм" }),
 	).toBeVisible();
+	// Read-only: добавление в коллекцию и правка скрыты.
+	await expect(page.getByRole("button", { name: "В коллекцию" })).toHaveCount(
+		0,
+	);
 
 	// Back пульта — назад к списку.
 	await page.keyboard.press("Escape");
 	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
 	await expect(page.getByText("Первый фильм", { exact: true })).toBeVisible();
+});
+
+test("ТВ: read-only маршруты /upload и /trash заблокированы", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+
+	await page.goto("/upload?tv=1");
+	await expect(page).toHaveURL(HOME_PATTERN);
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Flux" }),
+	).toBeVisible();
+
+	await page.goto("/trash?tv=1");
+	await expect(page).toHaveURL(HOME_PATTERN);
+});
+
+test("ТВ: Back закрывает Select, история не меняется", async ({ page }) => {
+	await stubSettings(page);
+
+	await page.goto("/settings?tv=1");
+	await expect.poll(() => activeFocusKey(page)).toBe("settings-language");
+
+	await page.keyboard.press("Enter");
+	await expect(page.getByRole("listbox")).toBeVisible();
+	const url = page.url();
+
+	// Пультовый GoBack (Tizen/LG шлют коды, а не Escape).
+	await page.evaluate(() => {
+		window.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "GoBack", bubbles: true }),
+		);
+	});
+	await expect(page.getByRole("listbox")).toBeHidden();
+	expect(page.url()).toBe(url);
+	// Ссылки на корзину в ТВ-настройках нет.
+	await expect(page.getByRole("link", { name: "Корзина" })).toHaveCount(0);
+});
+
+test("ТВ: детали с задержкой API получают фокус на скелетоне и контенте", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+	await stubVideoDetail(page, 2, "Второй фильм", 1200);
+
+	await page.goto("/video/2?tv=1");
+	await expect.poll(() => activeFocusKey(page)).toBe("video-detail-loading");
+
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Второй фильм" }),
+	).toBeVisible();
+	await expect.poll(() => activeFocusKey(page)).toBe("video-detail-back");
 });
 
 test("ТВ: плеер с пульта — стрелки сикают и меняют громкость", async ({
@@ -198,7 +335,11 @@ test("ТВ: плеер с пульта — стрелки сикают и мен
 	await stubAudioForTV(page);
 
 	await page.goto("/audio?tv=1");
-	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await expect.poll(() => activeFocusKey(page)).toContain("audio-row-1-");
+	await pressUntilFocusKey(page, "ArrowRight", (key) =>
+		key.startsWith("audio-play-"),
+	);
+	await page.keyboard.press("Enter");
 	await expect(page).toHaveURL(PLAYER_PATTERN);
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),

@@ -20,7 +20,7 @@ import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteArtistsSection } from "../favorites/FavoriteArtistsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
-import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { AudioTrackRow } from "./AudioTrackRow";
 
@@ -34,6 +34,18 @@ export function AudioPage() {
 	// ТВ-режим: корень — spatial-секция, строки внутри — цели навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("audio-page");
+	const { targetRef: searchRef } = useTVFocusable<HTMLInputElement>(
+		"audio-search",
+		undefined,
+		undefined,
+		{ secondary: true },
+	);
+	const { targetRef: sortRef } = useTVFocusable<HTMLDivElement>(
+		"audio-sort",
+		() => setSort((prev) => (prev === "asc" ? "desc" : "asc")),
+		undefined,
+		{ secondary: true },
+	);
 
 	const list = useAudioList(debounced, undefined, true, sort);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
@@ -46,6 +58,7 @@ export function AudioPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="audio-page"
 		>
 			<Group justify="space-between" align="center" wrap="wrap">
@@ -56,6 +69,7 @@ export function AudioPage() {
 			</Group>
 			<Group gap="sm" wrap="wrap">
 				<TextInput
+					ref={searchRef}
 					placeholder={t("audio.search")}
 					aria-label={t("audio.search")}
 					value={query}
@@ -64,15 +78,17 @@ export function AudioPage() {
 					}}
 					w={{ base: "100%", sm: 320 }}
 				/>
-				<SegmentedControl
-					size="xs"
-					value={sort}
-					onChange={(value) => setSort(value === "asc" ? "asc" : "desc")}
-					data={[
-						{ value: "desc", label: t("common.newest") },
-						{ value: "asc", label: t("common.oldest") },
-					]}
-				/>
+				<div ref={sortRef} tabIndex={tvMode ? -1 : undefined}>
+					<SegmentedControl
+						size="xs"
+						value={sort}
+						onChange={(value) => setSort(value === "asc" ? "asc" : "desc")}
+						data={[
+							{ value: "desc", label: t("common.newest") },
+							{ value: "asc", label: t("common.oldest") },
+						]}
+					/>
+				</div>
 			</Group>
 			{/* При поиске секции не нужны: они не фильтруются.
 			Блока продолжения здесь нет: недослушанный трек поднимается
@@ -119,7 +135,7 @@ export function AudioPage() {
 									player.playQueue(visibleItems, index);
 									void navigate({ to: "/player" });
 								}}
-								showDelete={isAdmin}
+								showDelete={isAdmin && !tvMode}
 								isCurrent={player.current?.id === media.id}
 								isPlaying={player.playing}
 							/>
@@ -140,7 +156,8 @@ export function AudioPage() {
 						</Alert>
 					) : (
 						list.hasNextPage && (
-							<Button
+							<TVButton
+								focusKey="audio-load-more"
 								variant="light"
 								w="fit-content"
 								loading={list.isFetchingNextPage}
@@ -149,7 +166,7 @@ export function AudioPage() {
 								}}
 							>
 								{t("audio.loadMore")}
-							</Button>
+							</TVButton>
 						)
 					)}
 				</TVFocusScope>

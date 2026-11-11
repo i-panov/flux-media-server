@@ -1,4 +1,5 @@
 import { SimpleGrid, Skeleton, Stack } from "@mantine/core";
+import { useTVFocusable } from "../features/tv/tvFocus";
 
 const GRID_SKELETON_COUNT = 12;
 
@@ -15,8 +16,18 @@ export function CardGridSkeletons({
 	square?: boolean;
 	textLines?: 0 | 1 | 2;
 }) {
+	// Скелетон — тоже цель пульта: пока данные грузятся (в т.ч. 1-2 с),
+	// фокус должен быть на чём-то, а после подмены route-focus переедет
+	// на первую карточку.
+	const { targetRef, tvMode } =
+		useTVFocusable<HTMLDivElement>("content-skeleton");
 	return (
-		<SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }} spacing="md">
+		<SimpleGrid
+			ref={targetRef}
+			tabIndex={tvMode ? -1 : undefined}
+			cols={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+			spacing="md"
+		>
 			{Array.from({ length: count }, (_, index) =>
 				square ? (
 					// Скелетоны без данных: индекс — стабильный

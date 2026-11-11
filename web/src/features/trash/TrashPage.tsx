@@ -24,9 +24,9 @@ import { useTrash, useTrashActions } from "../../api/trash";
 import { isMediaType, MEDIA_TYPE_LABEL_KEYS } from "../../components/mediaType";
 import type { Media } from "../../core/media";
 import {
+	TVButton,
 	TVFocusScope,
 	TVModalAutoFocus,
-	TVModalButton,
 	useTVFocusable,
 } from "../tv/tvFocus";
 
@@ -211,6 +211,7 @@ export function TrashPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="trash-page"
 		>
 			<TVFocusScope focusKey="trash-page">
@@ -322,14 +323,14 @@ export function TrashPage() {
 				<Stack gap="md">
 					<Text size="sm">{t("trash.emptyConfirm")}</Text>
 					<Group justify="flex-end">
-						<TVModalButton
+						<TVButton
 							focusKey="empty-trash-cancel"
 							variant="default"
 							onClick={() => setEmptyOpened(false)}
 						>
 							{t("collections.cancel")}
-						</TVModalButton>
-						<TVModalButton
+						</TVButton>
+						<TVButton
 							focusKey="empty-trash-confirm"
 							color="red"
 							loading={actions.emptyTrash.isPending}
@@ -341,7 +342,7 @@ export function TrashPage() {
 							}}
 						>
 							{t("trash.emptyAction")}
-						</TVModalButton>
+						</TVButton>
 					</Group>
 				</Stack>
 			</Modal>

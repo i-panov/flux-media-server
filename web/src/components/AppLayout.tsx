@@ -27,6 +27,9 @@ import { useSession } from "../api/session";
 import { useLogout } from "../features/auth/useLogout";
 import { AudioMiniPlayer } from "../features/player/AudioMiniPlayer";
 import { useMiniPlayerVisible } from "../features/player/useMiniPlayerVisible";
+import { TVEnableBanner } from "../features/tv/TVEnableBanner";
+import { clickNode, useTVFocusable } from "../features/tv/tvFocus";
+import { useTVMode } from "../features/tv/useTVMode";
 
 type NavTo = "/" | "/video" | "/audio" | "/memes" | "/settings" | "/admin";
 
@@ -61,11 +64,21 @@ const desktopNavClass =
 const desktopNavActiveClass =
 	"bg-[var(--mantine-color-default-hover)] text-[var(--mantine-color-text)]";
 
+function navFocusKey(prefix: string, to: NavTo): string {
+	return `${prefix}-${to === "/" ? "home" : to.slice(1)}`;
+}
+
 function DesktopNavItem({ item }: { item: NavItemConfig }) {
 	const { t } = useTranslation();
 	const Icon = item.icon;
+	// ТВ-режим: пункт навбара — spatial-цель, Enter повторяет переход.
+	const { targetRef } = useTVFocusable<HTMLAnchorElement>(
+		navFocusKey("nav-desktop", item.to),
+		clickNode,
+	);
 	return (
 		<Link
+			ref={targetRef}
 			to={item.to}
 			className={desktopNavClass}
 			activeProps={{ className: desktopNavActiveClass }}
@@ -80,8 +93,14 @@ function DesktopNavItem({ item }: { item: NavItemConfig }) {
 function MobileNavItem({ item }: { item: NavItemConfig }) {
 	const { t } = useTranslation();
 	const Icon = item.icon;
+	// Ключ с префиксом mobile: навбар и футер одновременно в DOM.
+	const { targetRef } = useTVFocusable<HTMLAnchorElement>(
+		navFocusKey("nav-mobile", item.to),
+		clickNode,
+	);
 	return (
 		<Link
+			ref={targetRef}
 			to={item.to}
 			className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium text-[var(--mantine-color-dimmed)]"
 			activeProps={{
@@ -96,8 +115,13 @@ function MobileNavItem({ item }: { item: NavItemConfig }) {
 }
 
 function Brand() {
+	const { targetRef } = useTVFocusable<HTMLAnchorElement>(
+		"nav-brand",
+		clickNode,
+	);
 	return (
 		<Link
+			ref={targetRef}
 			to="/"
 			className="flex items-center gap-2 no-underline [color:inherit]"
 		>
@@ -113,6 +137,10 @@ function Brand() {
 
 function ThemeToggle() {
 	const { t } = useTranslation();
+	const { targetRef } = useTVFocusable<HTMLButtonElement>(
+		"header-theme",
+		clickNode,
+	);
 	const { setColorScheme } = useMantineColorScheme();
 	const computed = useComputedColorScheme("dark", {
 		getInitialValueInEffect: true,
@@ -121,6 +149,7 @@ function ThemeToggle() {
 	return (
 		<Tooltip label={t("theme.toggle")} withArrow>
 			<ActionIcon
+				ref={targetRef}
 				variant="default"
 				size="lg"
 				aria-label={t("theme.toggle")}
@@ -137,10 +166,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
 	const { data: session } = useSession();
 	const { logout, isPending: logoutPending } = useLogout();
 	const miniPlayerVisible = useMiniPlayerVisible();
+	const { tvMode } = useTVMode();
+	const { targetRef: logoutRef } = useTVFocusable<HTMLButtonElement>(
+		"header-logout",
+		clickNode,
+	);
 
 	const logoutButton = (
 		<Tooltip label={t("auth.logout")} withArrow>
 			<ActionIcon
+				ref={logoutRef}
 				variant="default"
 				size="lg"
 				aria-label={t("auth.logout")}
@@ -154,7 +189,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
 	const authed = session != null;
 	const isAdmin = session?.is_admin === true;
-	const desktopExtra: NavItemConfig[] = isAdmin ? [ADMIN_NAV] : [];
+	// В ТВ админ-раздел только для чтения: ссылку не показываем.
+	const desktopExtra: NavItemConfig[] = isAdmin && !tvMode ? [ADMIN_NAV] : [];
 	// Конфиг навбара задаёт отступ Main даже когда самой панели нет:
 	// на /login без сессии 240 px слева сдвигали карточку входа.
 	const navbar = authed
@@ -233,6 +269,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 					px={{ base: "md", sm: "lg", xl: "xl" }}
 					py={{ base: "md", md: "lg", xl: "xl" }}
 				>
+					<TVEnableBanner />
 					{children}
 				</Container>
 			</AppShell.Main>

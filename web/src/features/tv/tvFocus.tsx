@@ -1,4 +1,6 @@
 import {
+	ActionIcon,
+	type ActionIconProps,
 	Button,
 	type ButtonProps,
 	Tabs,
@@ -16,6 +18,10 @@ import {
 	type RefObject,
 	useEffect,
 } from "react";
+import {
+	TV_FOCUS_KEY_ATTRIBUTE,
+	TV_FOCUS_SECONDARY_ATTRIBUTE,
+} from "./tvAttributes";
 import { useTVMode } from "./useTVMode";
 
 // Клик по первой ссылке внутри узла: карточки ведут на детали через
@@ -39,13 +45,15 @@ export function clickNode(node: HTMLElement | null): void {
 export function useTVFocusable<T extends HTMLElement>(
 	focusKey: string,
 	onEnterPress?: (node: T | null) => void,
-	onArrowPress?: () => boolean,
+	onArrowPress?: (direction: string) => boolean,
+	options?: { secondary?: boolean },
 ): {
 	targetRef: RefObject<T | null>;
 	tvMode: boolean;
 	focused: boolean;
 } {
 	const { tvMode } = useTVMode();
+	const secondary = options?.secondary === true;
 	const { ref, focused } = useFocusable<object, T>({
 		focusKey,
 		focusable: tvMode,
@@ -58,10 +66,30 @@ export function useTVFocusable<T extends HTMLElement>(
 		onArrowPress:
 			onArrowPress === undefined
 				? undefined
-				: () => {
-						return onArrowPress();
+				: (direction: string) => {
+						return onArrowPress(direction);
 					},
 	});
+	// data-tv-focus-key — точка поиска для route-focus: после смены роута
+	// хук ждёт появления контента (скелетон → карточки) и ведёт фокус
+	// по этим атрибутам, а не по одному таймауту.
+	useEffect(() => {
+		const node = ref.current;
+		if (node === null) {
+			return;
+		}
+		if (tvMode) {
+			node.setAttribute(TV_FOCUS_KEY_ATTRIBUTE, focusKey);
+			node.toggleAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE, secondary);
+		} else {
+			node.removeAttribute(TV_FOCUS_KEY_ATTRIBUTE);
+			node.removeAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE);
+		}
+		return () => {
+			node.removeAttribute(TV_FOCUS_KEY_ATTRIBUTE);
+			node.removeAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE);
+		};
+	}, [focusKey, tvMode, secondary, ref]);
 	return { targetRef: ref, tvMode, focused };
 }
 
@@ -80,13 +108,33 @@ export function TVFocusScope({
 	);
 }
 
-// Кнопка модалки, доступная с пульта. В обычном режиме — обычная Button.
-export function TVModalButton({
+// Кнопка, доступная с пульта: Enter повторяет клик. В обычном режиме —
+// обычная Button с тем же поведением.
+export function TVButton({
 	focusKey,
 	...props
 }: ButtonProps & ComponentPropsWithoutRef<"button"> & { focusKey: string }) {
 	const { targetRef } = useTVFocusable<HTMLButtonElement>(focusKey, clickNode);
 	return <Button ref={targetRef} {...props} />;
+}
+
+// ActionIcon с пультом: избранное, play, retry и прочие компактные действия.
+export function TVActionIcon({
+	focusKey,
+	secondary = false,
+	...props
+}: ActionIconProps &
+	ComponentPropsWithoutRef<"button"> & {
+		focusKey: string;
+		secondary?: boolean;
+	}) {
+	const { targetRef } = useTVFocusable<HTMLButtonElement>(
+		focusKey,
+		clickNode,
+		undefined,
+		{ secondary },
+	);
+	return <ActionIcon ref={targetRef} {...props} />;
 }
 
 // Таб плеера: стрелки переключают табы нативно (scoped keydown Mantine),

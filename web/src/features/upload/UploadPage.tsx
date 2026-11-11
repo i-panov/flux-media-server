@@ -115,6 +115,7 @@ export function UploadPage() {
 			w="100%"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="upload-page"
 		>
 			<TVFocusScope focusKey="upload-page">

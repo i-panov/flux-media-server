@@ -35,9 +35,18 @@ function AudioPlayActions({
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const player = useAudioPlayer();
+	const { targetRef: playRef } = useTVFocusable<HTMLButtonElement>(
+		`audio-play-detail-${item.id}`,
+		clickNode,
+	);
+	const { targetRef: openRef } = useTVFocusable<HTMLButtonElement>(
+		`audio-open-detail-${item.id}`,
+		clickNode,
+	);
 	return (
 		<Group gap="xs">
 			<Button
+				ref={playRef}
 				leftSection={
 					isCurrent && player.playing ? (
 						<Pause size={16} />
@@ -57,6 +66,7 @@ function AudioPlayActions({
 			</Button>
 			{isCurrent && (
 				<Button
+					ref={openRef}
 					variant="light"
 					onClick={() => void navigate({ to: "/player" })}
 				>
@@ -78,6 +88,11 @@ export function AudioDetailPage() {
 	// ТВ-режим: секция и кнопка назад — точки входа spatial-навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("audio-detail");
+	// Скелетон — отдельная цель: после загрузки route-focus переедет
+	// на кнопку «Назад»/play, не дожидаясь фиксированного таймаута.
+	const { targetRef: tvLoadingRef } = useTVFocusable<HTMLDivElement>(
+		"audio-detail-loading",
+	);
 	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
 		"audio-detail-back",
 		clickNode,
@@ -93,7 +108,7 @@ export function AudioDetailPage() {
 
 	if (!valid) {
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Alert color="red" variant="light">
 					{t("audio.notFound")}
 				</Alert>
@@ -106,7 +121,13 @@ export function AudioDetailPage() {
 
 	if (media.isPending) {
 		return (
-			<Group align="flex-start" gap="lg" wrap="wrap">
+			<Group
+				ref={tvLoadingRef}
+				tabIndex={tvMode ? -1 : undefined}
+				align="flex-start"
+				gap="lg"
+				wrap="wrap"
+			>
 				<Skeleton height={240} width={240} radius="md" />
 				<Stack gap="sm" className="min-w-0 flex-1">
 					<Skeleton height={28} width="50%" radius="sm" />
@@ -121,7 +142,7 @@ export function AudioDetailPage() {
 		const notFound =
 			media.error instanceof ApiError && media.error.status === 404;
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Alert
 					color="red"
 					variant="light"
@@ -162,6 +183,7 @@ export function AudioDetailPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="audio-detail"
 		>
 			<TVFocusScope focusKey="audio-detail">
@@ -169,6 +191,7 @@ export function AudioDetailPage() {
 					variant="subtle"
 					w="fit-content"
 					ref={tvBackRef}
+					data-tv-focus-key="audio-detail-back"
 					onClick={goBack}
 				>
 					{backLabel}

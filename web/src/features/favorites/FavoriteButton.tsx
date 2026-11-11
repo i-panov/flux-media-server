@@ -1,10 +1,11 @@
-import { ActionIcon } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { Heart } from "lucide-react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { useFavoriteIds, useToggleFavorite } from "../../api/favorites";
 import type { MediaType } from "../../core/media";
+import { TVActionIcon } from "../tv/tvFocus";
 
 export function FavoriteButton({
 	mediaId,
@@ -16,12 +17,15 @@ export function FavoriteButton({
 	className?: string;
 }) {
 	const { t } = useTranslation();
+	const instanceKey = useId().replaceAll(":", "");
 	const ids = useFavoriteIds(type);
 	const toggle = useToggleFavorite(type);
 	const active = ids.data?.has(mediaId) ?? false;
 	const label = active ? t("favorites.remove") : t("favorites.add");
 	return (
-		<ActionIcon
+		<TVActionIcon
+			focusKey={`favorite-${type}-${mediaId}-${instanceKey}`}
+			secondary
 			variant="filled"
 			color={active ? "red" : "dark"}
 			radius="xl"
@@ -47,6 +51,6 @@ export function FavoriteButton({
 			}}
 		>
 			<Heart size={18} fill={active ? "currentColor" : "none"} />
-		</ActionIcon>
+		</TVActionIcon>
 	);
 }

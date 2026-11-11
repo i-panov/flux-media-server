@@ -43,8 +43,41 @@ export function isModalOpen(): boolean {
 	return document.querySelector(MODAL_SELECTOR) !== null;
 }
 
+// Пультовые коды 461/10009/GoBack/BrowserBack не превращаются браузером
+// в Escape, поэтому Mantine их не видит. Синтезируем Escape на активном
+// элементе (у Select обработчик висит на input) — верхний слой закроется
+// своим штатным путём и вернёт фокус, история не трогается.
+function synthesizeEscape(overlay: Element): void {
+	const active = document.activeElement;
+	const target = active instanceof HTMLElement ? active : overlay;
+	const escapeEvent = new KeyboardEvent("keydown", {
+		key: "Escape",
+		code: "Escape",
+		bubbles: true,
+		cancelable: true,
+	});
+	Object.defineProperty(escapeEvent, "keyCode", { get: () => 27 });
+	Object.defineProperty(escapeEvent, "which", { get: () => 27 });
+	target.dispatchEvent(escapeEvent);
+}
+
+function isRemoteOnlyBackKey(
+	event: Pick<KeyboardEvent, "key" | "keyCode">,
+): boolean {
+	return (
+		event.key !== "Backspace" &&
+		event.key !== "Escape" &&
+		event.keyCode !== 8 &&
+		event.keyCode !== 27
+	);
+}
+
 // Возвращает true, если клавиша обработана как «Назад». Не трогаем ввод
-// текста и открытые модалки: у Mantine Modal свой Escape и FocusTrap.
+// текста. Открытый overlay (модалка/меню/select) закрываем синтетическим
+// Escape: для настоящего Escape его обработает сам Mantine, для кодов
+// пульта без этого Назад уходил бы в историю под открытым слоем.
+// Исключение — пультовый Назад при фокусе в поле Select: это не набор
+// текста, а команда закрыть верхний слой; Backspace по-прежнему правит текст.
 export function handleTVBackKey(
 	event: KeyboardEvent,
 	goBack: () => void,
@@ -52,11 +85,22 @@ export function handleTVBackKey(
 	if (!isBackKey(event)) {
 		return false;
 	}
+	const overlay = document.querySelector(MODAL_SELECTOR);
 	if (isEditableTarget(event.target)) {
+		if (overlay !== null && isRemoteOnlyBackKey(event)) {
+			event.preventDefault();
+			synthesizeEscape(overlay);
+			return true;
+		}
 		return false;
 	}
-	if (isModalOpen()) {
-		return false;
+	if (overlay !== null) {
+		if (event.key === "Escape" && event.keyCode === 27) {
+			return false;
+		}
+		event.preventDefault();
+		synthesizeEscape(overlay);
+		return true;
 	}
 	event.preventDefault();
 	goBack();

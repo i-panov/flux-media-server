@@ -2,7 +2,7 @@ import { Group, Modal, Stack, TextInput } from "@mantine/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type Collection, useRenameCollection } from "../../api/collections";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 import { useCollectionError } from "./useCollectionError";
 
 export function RenameCollectionModal({
@@ -34,14 +34,14 @@ export function RenameCollectionModal({
 					onChange={(event) => setName(event.currentTarget.value)}
 				/>
 				<Group justify="flex-end">
-					<TVModalButton
+					<TVButton
 						focusKey="rename-collection-cancel"
 						variant="default"
 						onClick={onClose}
 					>
 						{t("collections.cancel")}
-					</TVModalButton>
-					<TVModalButton
+					</TVButton>
+					<TVButton
 						focusKey="rename-collection-save"
 						loading={rename.isPending}
 						disabled={name.trim() === ""}
@@ -53,7 +53,7 @@ export function RenameCollectionModal({
 						}}
 					>
 						{t("collections.save")}
-					</TVModalButton>
+					</TVButton>
 				</Group>
 			</Stack>
 		</Modal>

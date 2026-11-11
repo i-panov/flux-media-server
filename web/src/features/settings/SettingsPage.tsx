@@ -54,18 +54,31 @@ export function SettingsPage() {
 	const { data, isError, isFetching, refetch } = useHealthQuery();
 	const { data: session } = useSession();
 	const { logout, isPending: logoutPending } = useLogout();
-	const { tvMode, setTVMode } = useTVMode();
+	const { tvMode, setTVMode, capabilities } = useTVMode();
 	const currentLang = pickLang(i18n.language);
 	// ТВ-режим: корень страницы — spatial-секция, карточки внутри —
 	// контент секции.
 	const { targetRef: tvRef, tvMode: tvSectionMode } =
 		useTVFocusable<HTMLDivElement>("settings-page");
+	// Select языка — единственный overlay в read-only ТВ, на нём проверяется
+	// пультовый Назад: закрыть список, не уходя из настроек.
+	const { targetRef: languageRef } = useTVFocusable<HTMLDivElement>(
+		"settings-language",
+		(node) => {
+			// Обёртка, а не сам input: Mantine Select останавливает Enter
+			// на readOnly-инпуте, и spatial-обработчик его не получает.
+			const input = node?.querySelector<HTMLInputElement>('[role="combobox"]');
+			input?.focus();
+			input?.click();
+		},
+	);
 
 	return (
 		<Stack
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvSectionMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="settings-page"
 		>
 			<TVFocusScope focusKey="settings-page">
@@ -100,21 +113,23 @@ export function SettingsPage() {
 					</SettingsCard>
 
 					<SettingsCard title={t("settings.language.title")}>
-						<Select
-							label={t("settings.language.label")}
-							value={currentLang}
-							onChange={(value) => {
-								if (value !== null) {
-									void i18n.changeLanguage(value);
-								}
-							}}
-							data={SUPPORTED_LANGS.map((value) => ({
-								value,
-								label: languageNames[value],
-							}))}
-							allowDeselect={false}
-							w={{ base: "100%", sm: 280 }}
-						/>
+						<div ref={languageRef} tabIndex={tvSectionMode ? -1 : undefined}>
+							<Select
+								label={t("settings.language.label")}
+								value={currentLang}
+								onChange={(value) => {
+									if (value !== null) {
+										void i18n.changeLanguage(value);
+									}
+								}}
+								data={SUPPORTED_LANGS.map((value) => ({
+									value,
+									label: languageNames[value],
+								}))}
+								allowDeselect={false}
+								w={{ base: "100%", sm: 280 }}
+							/>
+						</div>
 					</SettingsCard>
 
 					<SettingsCard title={t("settings.account.title")}>
@@ -139,15 +154,17 @@ export function SettingsPage() {
 							>
 								{t("settings.account.logout")}
 							</Button>
-							<Button
-								component={Link}
-								to="/trash"
-								variant="light"
-								leftSection={<Trash2 size={16} />}
-								w="fit-content"
-							>
-								{t("settings.trash")}
-							</Button>
+							{capabilities.canManageTrash && (
+								<Button
+									component={Link}
+									to="/trash"
+									variant="light"
+									leftSection={<Trash2 size={16} />}
+									w="fit-content"
+								>
+									{t("settings.trash")}
+								</Button>
+							)}
 						</Stack>
 					</SettingsCard>
 

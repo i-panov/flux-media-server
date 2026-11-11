@@ -16,7 +16,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
-import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { MemeCard } from "./MemeCard";
 
@@ -27,6 +27,12 @@ export function MemesPage() {
 	// ТВ-режим: корень — spatial-секция, плитки внутри — цели навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("memes-page");
+	const { targetRef: searchRef } = useTVFocusable<HTMLInputElement>(
+		"memes-search",
+		undefined,
+		undefined,
+		{ secondary: true },
+	);
 
 	const list = useImageList(debounced);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
@@ -37,6 +43,7 @@ export function MemesPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="memes-page"
 		>
 			<Group justify="space-between" align="center" wrap="wrap">
@@ -46,6 +53,7 @@ export function MemesPage() {
 				<UploadButton type="image" />
 			</Group>
 			<TextInput
+				ref={searchRef}
 				placeholder={t("memes.search")}
 				aria-label={t("memes.search")}
 				value={query}
@@ -98,7 +106,8 @@ export function MemesPage() {
 						</Alert>
 					) : (
 						list.hasNextPage && (
-							<Button
+							<TVButton
+								focusKey="memes-load-more"
 								variant="light"
 								w="fit-content"
 								loading={list.isFetchingNextPage}
@@ -107,7 +116,7 @@ export function MemesPage() {
 								}}
 							>
 								{t("memes.loadMore")}
-							</Button>
+							</TVButton>
 						)
 					)}
 				</TVFocusScope>

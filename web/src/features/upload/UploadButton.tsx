@@ -4,6 +4,7 @@ import { Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "../../api/session";
 import type { UploadType } from "../../api/upload";
+import { useTVMode } from "../tv/useTVMode";
 
 // Кнопка загрузки в шапке раздела. Админ-проверка дублирует серверную:
 // обычный пользователь не должен видеть недоступное действие.
@@ -11,7 +12,8 @@ export function UploadButton({ type }: { type: UploadType }) {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const session = useSession();
-	if (session.data?.is_admin !== true) {
+	const { tvMode } = useTVMode();
+	if (tvMode || session.data?.is_admin !== true) {
 		return null;
 	}
 	return (

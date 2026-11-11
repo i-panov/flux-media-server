@@ -96,6 +96,12 @@ export function VideoDetailPage() {
 	// ТВ-режим: секция и кнопка назад — точки входа spatial-навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("video-detail");
+	// Отдельный ключ у скелетона: когда данные придут, route-focus увидит
+	// новый корень и переведёт фокус на кнопку/плеер, а не оставит его
+	// на исчезнувшем узле.
+	const { targetRef: tvLoadingRef } = useTVFocusable<HTMLDivElement>(
+		"video-detail-loading",
+	);
 	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
 		"video-detail-back",
 		clickNode,
@@ -136,7 +142,7 @@ export function VideoDetailPage() {
 
 	if (!valid) {
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Alert color="red" variant="light">
 					{t("video.notFound")}
 				</Alert>
@@ -149,7 +155,7 @@ export function VideoDetailPage() {
 
 	if (media.isPending) {
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Skeleton height={360} radius="md" />
 				<Skeleton height={28} width="50%" radius="sm" />
 				<Skeleton height={16} width="80%" radius="sm" />
@@ -161,7 +167,7 @@ export function VideoDetailPage() {
 		const notFound =
 			media.error instanceof ApiError && media.error.status === 404;
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Alert
 					color="red"
 					variant="light"
@@ -195,6 +201,7 @@ export function VideoDetailPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="video-detail"
 		>
 			<TVFocusScope focusKey="video-detail">
@@ -202,6 +209,7 @@ export function VideoDetailPage() {
 					variant="subtle"
 					w="fit-content"
 					ref={tvBackRef}
+					data-tv-focus-key="video-detail-back"
 					onClick={goBack}
 				>
 					{backLabel}

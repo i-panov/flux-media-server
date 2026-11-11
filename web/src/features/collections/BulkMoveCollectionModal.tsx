@@ -5,7 +5,7 @@ import {
 	useCollections,
 } from "../../api/collections";
 import type { MediaType } from "../../core/media";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 import { CollectionPickList } from "./CollectionPickList";
 import { useCollectionError } from "./useCollectionError";
 
@@ -76,13 +76,13 @@ export function BulkMoveCollectionModal({
 					/>
 				)}
 				<Group justify="flex-end">
-					<TVModalButton
+					<TVButton
 						focusKey="bulk-move-cancel"
 						variant="default"
 						onClick={onClose}
 					>
 						{t("collections.cancel")}
-					</TVModalButton>
+					</TVButton>
 				</Group>
 			</Stack>
 		</Modal>

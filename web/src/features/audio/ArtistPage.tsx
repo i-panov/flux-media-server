@@ -23,9 +23,9 @@ import type { Media } from "../../core/media";
 import { ChangeCoverButton } from "../media/ChangeCoverButton";
 import { EditMetadataModal } from "../media/EditMetadataModal";
 import {
+	TVButton,
 	TVFocusScope,
 	TVModalAutoFocus,
-	TVModalButton,
 	useTVFocusable,
 } from "../tv/tvFocus";
 
@@ -125,21 +125,21 @@ function RenameArtistModal({
 					</Text>
 				)}
 				<Group justify="flex-end">
-					<TVModalButton
+					<TVButton
 						focusKey="rename-artist-cancel"
 						variant="default"
 						onClick={onClose}
 					>
 						{t("collections.cancel")}
-					</TVModalButton>
-					<TVModalButton
+					</TVButton>
+					<TVButton
 						focusKey="rename-artist-save"
 						loading={rename.isPending}
 						disabled={name.trim() === "" || rename.isPending}
 						onClick={submit}
 					>
 						{t("collections.save")}
-					</TVModalButton>
+					</TVButton>
 				</Group>
 			</Stack>
 		</Modal>
@@ -239,6 +239,7 @@ export function ArtistPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="artist-page"
 		>
 			<TVFocusScope focusKey="artist-page">

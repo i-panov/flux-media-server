@@ -52,6 +52,9 @@ export function MemeDetailPage() {
 	// ТВ-режим: секция и кнопка назад — точки входа spatial-навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("meme-detail");
+	const { targetRef: tvLoadingRef } = useTVFocusable<HTMLDivElement>(
+		"meme-detail-loading",
+	);
 	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
 		"meme-detail-back",
 		clickNode,
@@ -66,7 +69,7 @@ export function MemeDetailPage() {
 
 	if (!valid) {
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Alert color="red" variant="light">
 					{t("memes.notFound")}
 				</Alert>
@@ -79,7 +82,12 @@ export function MemeDetailPage() {
 
 	if (media.isPending) {
 		return (
-			<Stack gap="md" align="center">
+			<Stack
+				ref={tvLoadingRef}
+				tabIndex={tvMode ? -1 : undefined}
+				gap="md"
+				align="center"
+			>
 				<Skeleton height={320} width="100%" radius="md" />
 				<Skeleton height={28} width="40%" radius="sm" />
 			</Stack>
@@ -90,7 +98,12 @@ export function MemeDetailPage() {
 		const notFound =
 			media.error instanceof ApiError && media.error.status === 404;
 		return (
-			<Stack gap="md" align="center">
+			<Stack
+				ref={tvLoadingRef}
+				tabIndex={tvMode ? -1 : undefined}
+				gap="md"
+				align="center"
+			>
 				<Alert
 					color="red"
 					variant="light"
@@ -126,11 +139,17 @@ export function MemeDetailPage() {
 			align="center"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="meme-detail"
 		>
 			<TVFocusScope focusKey="meme-detail">
 				<Group w="100%" justify="space-between">
-					<Button variant="subtle" ref={tvBackRef} onClick={goBack}>
+					<Button
+						variant="subtle"
+						ref={tvBackRef}
+						data-tv-focus-key="meme-detail-back"
+						onClick={goBack}
+					>
 						{backLabel}
 					</Button>
 					<Group gap="xs">

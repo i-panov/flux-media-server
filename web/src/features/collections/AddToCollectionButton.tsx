@@ -3,6 +3,7 @@ import { FolderPlus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MediaType } from "../../core/media";
+import { useTVMode } from "../tv/useTVMode";
 import { AddToCollectionModal } from "./AddToCollectionModal";
 
 export function AddToCollectionButton({
@@ -13,7 +14,11 @@ export function AddToCollectionButton({
 	type: MediaType;
 }) {
 	const { t } = useTranslation();
+	const { tvMode } = useTVMode();
 	const [opened, setOpened] = useState(false);
+	if (tvMode) {
+		return null;
+	}
 	return (
 		<>
 			<Button

@@ -14,6 +14,7 @@ export function CollectionCard({
 	onMove,
 	selected = false,
 	onToggle,
+	readOnly = false,
 }: {
 	media: Media;
 	type: MediaType;
@@ -21,6 +22,7 @@ export function CollectionCard({
 	onMove: () => void;
 	selected?: boolean;
 	onToggle?: () => void;
+	readOnly?: boolean;
 }) {
 	const { t } = useTranslation();
 	const { targetRef: selectRef, tvMode } = useTVFocusable<HTMLDivElement>(
@@ -29,7 +31,7 @@ export function CollectionCard({
 	);
 	return (
 		<div className="relative">
-			{onToggle !== undefined && (
+			{!readOnly && onToggle !== undefined && (
 				<div
 					ref={selectRef}
 					tabIndex={tvMode ? -1 : undefined}
@@ -49,31 +51,35 @@ export function CollectionCard({
 			) : (
 				<MemeCard media={media} />
 			)}
-			<Tooltip label={t("collections.removeItem")} withArrow>
-				<ActionIcon
-					variant="filled"
-					color="red"
-					size="lg"
-					radius="xl"
-					aria-label={t("collections.removeItem")}
-					className="absolute bottom-2 left-2 z-10"
-					onClick={onRemove}
-				>
-					<X size={18} />
-				</ActionIcon>
-			</Tooltip>
-			<Tooltip label={t("collections.moveItem")} withArrow>
-				<ActionIcon
-					variant="filled"
-					size="lg"
-					radius="xl"
-					aria-label={t("collections.moveItem")}
-					className="absolute bottom-2 right-2 z-10"
-					onClick={onMove}
-				>
-					<FolderInput size={18} />
-				</ActionIcon>
-			</Tooltip>
+			{!readOnly && (
+				<>
+					<Tooltip label={t("collections.removeItem")} withArrow>
+						<ActionIcon
+							variant="filled"
+							color="red"
+							size="lg"
+							radius="xl"
+							aria-label={t("collections.removeItem")}
+							className="absolute bottom-2 left-2 z-10"
+							onClick={onRemove}
+						>
+							<X size={18} />
+						</ActionIcon>
+					</Tooltip>
+					<Tooltip label={t("collections.moveItem")} withArrow>
+						<ActionIcon
+							variant="filled"
+							size="lg"
+							radius="xl"
+							aria-label={t("collections.moveItem")}
+							className="absolute bottom-2 right-2 z-10"
+							onClick={onMove}
+						>
+							<FolderInput size={18} />
+						</ActionIcon>
+					</Tooltip>
+				</>
+			)}
 		</div>
 	);
 }

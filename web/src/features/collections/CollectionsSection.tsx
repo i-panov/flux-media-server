@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type Collection, useCollections } from "../../api/collections";
 import type { MediaType } from "../../core/media";
+import { useTVMode } from "../tv/useTVMode";
 import { CollectionTile } from "./CollectionTile";
 import { CreateCollectionModal } from "./CreateCollectionModal";
 
@@ -33,6 +34,7 @@ function rootCollections(
 
 export function CollectionsSection({ type }: { type: MediaType }) {
 	const { t } = useTranslation();
+	const { tvMode } = useTVMode();
 	const [createOpened, setCreateOpened] = useState(false);
 	const collections = useCollections();
 	const roots = rootCollections(collections.data ?? [], type);
@@ -48,14 +50,16 @@ export function CollectionsSection({ type }: { type: MediaType }) {
 						{t("collections.title")}
 					</Title>
 				</Group>
-				<ActionIcon
-					variant="light"
-					aria-label={t("collections.create")}
-					title={t("collections.create")}
-					onClick={() => setCreateOpened(true)}
-				>
-					<Plus size={18} />
-				</ActionIcon>
+				{!tvMode && (
+					<ActionIcon
+						variant="light"
+						aria-label={t("collections.create")}
+						title={t("collections.create")}
+						onClick={() => setCreateOpened(true)}
+					>
+						<Plus size={18} />
+					</ActionIcon>
+				)}
 			</Group>
 			{collections.isError ? (
 				<Alert color="red" variant="light" title={t("collections.loadError")}>
@@ -87,11 +91,13 @@ export function CollectionsSection({ type }: { type: MediaType }) {
 					))}
 				</SimpleGrid>
 			)}
-			<CreateCollectionModal
-				opened={createOpened}
-				type={type}
-				onClose={() => setCreateOpened(false)}
-			/>
+			{!tvMode && (
+				<CreateCollectionModal
+					opened={createOpened}
+					type={type}
+					onClose={() => setCreateOpened(false)}
+				/>
+			)}
 		</Stack>
 	);
 }

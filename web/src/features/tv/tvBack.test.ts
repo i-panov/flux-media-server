@@ -133,17 +133,82 @@ describe("handleTVBackKey", () => {
 		expect(preventDefault).toHaveBeenCalledTimes(1);
 	});
 
-	it("открытое меню (CollectionHeader) обрабатывает Назад само", () => {
+	it("открытое меню закрывается пультовым Назад, история не трогается", () => {
 		// Menu.Dropdown рендерит role="menu" в портале — как в CollectionHeader.
 		const menu = document.createElement("div");
 		menu.setAttribute("role", "menu");
 		menu.className = "mantine-Popover-dropdown";
 		document.body.appendChild(menu);
+		const escapeSpy = vi.fn();
+		window.addEventListener("keydown", escapeSpy);
 		const goBack = vi.fn();
 		const { event, preventDefault } = stubEvent({
 			key: "GoBack",
 			keyCode: 461,
 			target: document.body,
+		});
+
+		expect(handleTVBackKey(event, goBack)).toBe(true);
+		expect(goBack).not.toHaveBeenCalled();
+		expect(preventDefault).toHaveBeenCalledTimes(1);
+		expect(escapeSpy).toHaveBeenCalledTimes(1);
+		const synthesized = escapeSpy.mock.calls[0]?.[0] as KeyboardEvent;
+		expect(synthesized.key).toBe("Escape");
+		window.removeEventListener("keydown", escapeSpy);
+	});
+
+	it("открытая модалка закрывается кодом Tizen (10009)", () => {
+		const modal = document.createElement("div");
+		modal.setAttribute("role", "dialog");
+		document.body.appendChild(modal);
+		const escapeSpy = vi.fn();
+		window.addEventListener("keydown", escapeSpy);
+		const goBack = vi.fn();
+		const { event, preventDefault } = stubEvent({
+			key: "Unidentified",
+			keyCode: 10009,
+			target: document.body,
+		});
+
+		expect(handleTVBackKey(event, goBack)).toBe(true);
+		expect(goBack).not.toHaveBeenCalled();
+		expect(preventDefault).toHaveBeenCalledTimes(1);
+		expect(escapeSpy).toHaveBeenCalledTimes(1);
+		window.removeEventListener("keydown", escapeSpy);
+	});
+
+	it("пультовый Назад в поле Select закрывает слой", () => {
+		const listbox = document.createElement("div");
+		listbox.setAttribute("role", "listbox");
+		document.body.appendChild(listbox);
+		const field = document.createElement("input");
+		document.body.appendChild(field);
+		const escapeSpy = vi.fn();
+		window.addEventListener("keydown", escapeSpy);
+		const goBack = vi.fn();
+		const { event } = stubEvent({
+			key: "GoBack",
+			keyCode: 461,
+			target: field,
+		});
+
+		expect(handleTVBackKey(event, goBack)).toBe(true);
+		expect(goBack).not.toHaveBeenCalled();
+		expect(escapeSpy).toHaveBeenCalledTimes(1);
+		window.removeEventListener("keydown", escapeSpy);
+	});
+
+	it("Backspace в поле Select остаётся правкой текста", () => {
+		const listbox = document.createElement("div");
+		listbox.setAttribute("role", "listbox");
+		document.body.appendChild(listbox);
+		const field = document.createElement("input");
+		document.body.appendChild(field);
+		const goBack = vi.fn();
+		const { event, preventDefault } = stubEvent({
+			key: "Backspace",
+			keyCode: 8,
+			target: field,
 		});
 
 		expect(handleTVBackKey(event, goBack)).toBe(false);

@@ -16,7 +16,7 @@ import { useAddToCollection } from "../../api/collections";
 import type { CoreFetcher, MediaType } from "../../core/media";
 import { fetchMediaList } from "../../core/media";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 import { useCollectionError } from "./useCollectionError";
 
 const PICKER_PAGE_SIZE = 50;
@@ -134,7 +134,7 @@ export function AddMediaToCollectionModal({
 								<Text size="sm" truncate>
 									{media.title}
 								</Text>
-								<TVModalButton
+								<TVButton
 									focusKey={`add-media-${media.id}`}
 									size="xs"
 									variant="light"
@@ -148,7 +148,7 @@ export function AddMediaToCollectionModal({
 									}}
 								>
 									{t("collections.add")}
-								</TVModalButton>
+								</TVButton>
 							</Group>
 						))}
 						{list.isFetchNextPageError ? (

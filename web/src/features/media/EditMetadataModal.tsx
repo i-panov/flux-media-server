@@ -15,7 +15,7 @@ import { useMediaArtists, useUpdateMetadata } from "../../api/metadata";
 import { parseFilename } from "../../core/format";
 import type { Media } from "../../core/media";
 import { useCollectionError } from "../collections/useCollectionError";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 
 const YEAR_PATTERN = /^\d{4}$/;
 const MIN_YEAR = 1888;
@@ -61,21 +61,21 @@ function MetadataFormActions({
 	const { t } = useTranslation();
 	return (
 		<Group justify="flex-end">
-			<TVModalButton
+			<TVButton
 				focusKey="edit-metadata-cancel"
 				variant="default"
 				onClick={onClose}
 			>
 				{t("collections.cancel")}
-			</TVModalButton>
-			<TVModalButton
+			</TVButton>
+			<TVButton
 				focusKey="edit-metadata-save"
 				loading={pending}
 				disabled={!canSave}
 				onClick={onSubmit}
 			>
 				{t("collections.save")}
-			</TVModalButton>
+			</TVButton>
 		</Group>
 	);
 }

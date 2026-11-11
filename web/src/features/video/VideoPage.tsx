@@ -18,7 +18,7 @@ import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
-import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { VideoCard } from "./VideoCard";
 
@@ -31,6 +31,18 @@ export function VideoPage() {
 	// (вёрстка не меняется), карточки внутри — цели навигации.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("video-page");
+	const { targetRef: searchRef } = useTVFocusable<HTMLInputElement>(
+		"video-search",
+		undefined,
+		undefined,
+		{ secondary: true },
+	);
+	const { targetRef: sortRef } = useTVFocusable<HTMLDivElement>(
+		"video-sort",
+		() => setSort((prev) => (prev === "asc" ? "desc" : "asc")),
+		undefined,
+		{ secondary: true },
+	);
 
 	const list = useVideoList(debounced, sort);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
@@ -41,6 +53,7 @@ export function VideoPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="video-page"
 		>
 			<Group justify="space-between" align="center" wrap="wrap">
@@ -51,6 +64,7 @@ export function VideoPage() {
 			</Group>
 			<Group gap="sm" wrap="wrap">
 				<TextInput
+					ref={searchRef}
 					placeholder={t("video.search")}
 					aria-label={t("video.search")}
 					value={query}
@@ -59,15 +73,17 @@ export function VideoPage() {
 					}}
 					w={{ base: "100%", sm: 320 }}
 				/>
-				<SegmentedControl
-					size="xs"
-					value={sort}
-					onChange={(value) => setSort(value === "asc" ? "asc" : "desc")}
-					data={[
-						{ value: "desc", label: t("common.newest") },
-						{ value: "asc", label: t("common.oldest") },
-					]}
-				/>
+				<div ref={sortRef} tabIndex={tvMode ? -1 : undefined}>
+					<SegmentedControl
+						size="xs"
+						value={sort}
+						onChange={(value) => setSort(value === "asc" ? "asc" : "desc")}
+						data={[
+							{ value: "desc", label: t("common.newest") },
+							{ value: "asc", label: t("common.oldest") },
+						]}
+					/>
+				</div>
 			</Group>
 			{/* При поиске ряды продолжения не нужны: они не фильтруются. */}
 			{debounced === "" && <ContinueWatching limit={1} />}
@@ -120,7 +136,8 @@ export function VideoPage() {
 						</Alert>
 					) : (
 						list.hasNextPage && (
-							<Button
+							<TVButton
+								focusKey="video-load-more"
 								variant="light"
 								w="fit-content"
 								loading={list.isFetchingNextPage}
@@ -129,7 +146,7 @@ export function VideoPage() {
 								}}
 							>
 								{t("video.loadMore")}
-							</Button>
+							</TVButton>
 						)
 					)}
 				</TVFocusScope>

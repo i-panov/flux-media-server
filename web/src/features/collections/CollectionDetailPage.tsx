@@ -43,6 +43,7 @@ function CollectionMediaGrid({
 	onMove,
 	selected,
 	onToggle,
+	readOnly,
 }: {
 	items: Media[];
 	type: MediaType;
@@ -53,6 +54,7 @@ function CollectionMediaGrid({
 	onMove: (mediaId: number) => void;
 	selected: ReadonlySet<number>;
 	onToggle: (mediaId: number) => void;
+	readOnly: boolean;
 }) {
 	const { t } = useTranslation();
 	if (isPending) {
@@ -85,6 +87,7 @@ function CollectionMediaGrid({
 					onMove={() => onMove(media.id)}
 					selected={selected.has(media.id)}
 					onToggle={() => onToggle(media.id)}
+					readOnly={readOnly}
 				/>
 			))}
 		</SimpleGrid>
@@ -104,6 +107,7 @@ function toggleSelected(
 	return next;
 }
 
+// eslint-disable-next-line max-lines-per-function -- страница держит хуки и проводку модалок вместе.
 export function CollectionDetailPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
@@ -123,6 +127,9 @@ export function CollectionDetailPage() {
 		useCollectionSelection(collectionId);
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("collection-detail");
+	const { targetRef: tvLoadingRef } = useTVFocusable<HTMLDivElement>(
+		"collection-detail-loading",
+	);
 
 	const collection = (collections.data ?? []).find(
 		(item) => item.id === collectionId,
@@ -153,7 +160,7 @@ export function CollectionDetailPage() {
 
 	if (collections.isPending) {
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Skeleton height={32} width="40%" radius="sm" />
 				<Skeleton height={240} radius="md" />
 			</Stack>
@@ -186,6 +193,7 @@ export function CollectionDetailPage() {
 			gap="lg"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="collection-detail"
 		>
 			<TVFocusScope focusKey="collection-detail">
@@ -199,6 +207,7 @@ export function CollectionDetailPage() {
 					onRename={() => setRenameOpened(true)}
 					onMove={() => setMoveOpened(true)}
 					onDelete={() => setDeleteOpened(true)}
+					readOnly={tvMode}
 				/>
 
 				{children.length > 0 && (
@@ -217,12 +226,14 @@ export function CollectionDetailPage() {
 					</Stack>
 				)}
 
-				<CollectionBulkBar
-					collectionId={collectionId}
-					selectedIds={selectedIds}
-					onMove={() => setBulkMoveOpened(true)}
-					onClear={() => setSelectedIds(new Set())}
-				/>
+				{!tvMode && (
+					<CollectionBulkBar
+						collectionId={collectionId}
+						selectedIds={selectedIds}
+						onMove={() => setBulkMoveOpened(true)}
+						onClear={() => setSelectedIds(new Set())}
+					/>
+				)}
 				<CollectionMediaGrid
 					items={mediaItems}
 					type={type}
@@ -242,71 +253,76 @@ export function CollectionDetailPage() {
 					onToggle={(mediaId) =>
 						setSelectedIds((prev) => toggleSelected(prev, mediaId))
 					}
+					readOnly={tvMode}
 				/>
 			</TVFocusScope>
 
-			<RenameCollectionModal
-				key={`${collection.id}-${renameOpened}`}
-				collection={collection}
-				opened={renameOpened}
-				onClose={() => setRenameOpened(false)}
-			/>
-			<AddMediaToCollectionModal
-				opened={addOpened}
-				collectionId={collectionId}
-				type={type}
-				existingIds={new Set(mediaItems.map((media) => media.id))}
-				onClose={() => setAddOpened(false)}
-			/>
-			{bulkMoveOpened && (
-				<BulkMoveCollectionModal
-					opened
-					sourceId={collectionId}
-					type={type}
-					mediaIds={[...selectedIds]}
-					onClose={() => setBulkMoveOpened(false)}
-					onMoved={(result) => {
-						setBulkMoveOpened(false);
-						setSelectedIds(new Set());
-						if (result.skipped.length > 0) {
-							notifications.show({
-								color: "yellow",
-								message: t("collections.bulkSkipped", {
-									count: result.skipped.length,
-								}),
-							});
-						}
-					}}
-				/>
+			{!tvMode && (
+				<>
+					<RenameCollectionModal
+						key={`${collection.id}-${renameOpened}`}
+						collection={collection}
+						opened={renameOpened}
+						onClose={() => setRenameOpened(false)}
+					/>
+					<AddMediaToCollectionModal
+						opened={addOpened}
+						collectionId={collectionId}
+						type={type}
+						existingIds={new Set(mediaItems.map((media) => media.id))}
+						onClose={() => setAddOpened(false)}
+					/>
+					{bulkMoveOpened && (
+						<BulkMoveCollectionModal
+							opened
+							sourceId={collectionId}
+							type={type}
+							mediaIds={[...selectedIds]}
+							onClose={() => setBulkMoveOpened(false)}
+							onMoved={(result) => {
+								setBulkMoveOpened(false);
+								setSelectedIds(new Set());
+								if (result.skipped.length > 0) {
+									notifications.show({
+										color: "yellow",
+										message: t("collections.bulkSkipped", {
+											count: result.skipped.length,
+										}),
+									});
+								}
+							}}
+						/>
+					)}
+					{moveMediaId !== null && (
+						<MoveToCollectionModal
+							opened
+							sourceId={collectionId}
+							mediaId={moveMediaId}
+							type={type}
+							onClose={() => setMoveMediaId(null)}
+						/>
+					)}
+					{moveOpened && (
+						<MoveCollectionModal
+							opened
+							sourceId={collectionId}
+							type={type}
+							excludeIds={moveExcluded}
+							onMoved={() => {
+								setMoveOpened(false);
+								void navigate({ to: backPath });
+							}}
+							onClose={() => setMoveOpened(false)}
+						/>
+					)}
+					<DeleteCollectionModal
+						collectionId={collectionId}
+						opened={deleteOpened}
+						backPath={backPath}
+						onClose={() => setDeleteOpened(false)}
+					/>
+				</>
 			)}
-			{moveMediaId !== null && (
-				<MoveToCollectionModal
-					opened
-					sourceId={collectionId}
-					mediaId={moveMediaId}
-					type={type}
-					onClose={() => setMoveMediaId(null)}
-				/>
-			)}
-			{moveOpened && (
-				<MoveCollectionModal
-					opened
-					sourceId={collectionId}
-					type={type}
-					excludeIds={moveExcluded}
-					onMoved={() => {
-						setMoveOpened(false);
-						void navigate({ to: backPath });
-					}}
-					onClose={() => setMoveOpened(false)}
-				/>
-			)}
-			<DeleteCollectionModal
-				collectionId={collectionId}
-				opened={deleteOpened}
-				backPath={backPath}
-				onClose={() => setDeleteOpened(false)}
-			/>
 		</Stack>
 	);
 }

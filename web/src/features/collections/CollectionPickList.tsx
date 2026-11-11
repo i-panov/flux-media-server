@@ -3,7 +3,7 @@ import { FolderInput, FolderUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Collection } from "../../api/collections";
 import type { MediaType } from "../../core/media";
-import { TVModalButton } from "../tv/tvFocus";
+import { TVButton } from "../tv/tvFocus";
 
 // Общий список выбора коллекции: тот же тип, без исключённых
 // (себя и потомков — иначе переезд замкнёт цикл, сервер тоже проверяет).
@@ -45,7 +45,7 @@ export function CollectionPickList({
 	return (
 		<Stack gap="sm">
 			{allowRoot && (
-				<TVModalButton
+				<TVButton
 					focusKey="collection-pick-root"
 					variant="light"
 					justify="flex-start"
@@ -54,10 +54,10 @@ export function CollectionPickList({
 					onClick={() => onPick(null)}
 				>
 					{t("collections.moveToRoot")}
-				</TVModalButton>
+				</TVButton>
 			)}
 			{matching.map((collection) => (
-				<TVModalButton
+				<TVButton
 					key={collection.id}
 					focusKey={`collection-pick-${collection.id}`}
 					variant="light"
@@ -67,7 +67,7 @@ export function CollectionPickList({
 					onClick={() => onPick(collection.id)}
 				>
 					{collection.name}
-				</TVModalButton>
+				</TVButton>
 			))}
 		</Stack>
 	);

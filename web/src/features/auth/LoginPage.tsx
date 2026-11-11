@@ -98,6 +98,7 @@ export function LoginPage() {
 			py={{ base: "xl", md: 96, xl: 120 }}
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="login-page"
 		>
 			<TVFocusScope focusKey="login-page">

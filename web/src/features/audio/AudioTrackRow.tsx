@@ -1,4 +1,5 @@
 import { ActionIcon, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { Link } from "@tanstack/react-router";
 import { Music, Pause, Play, RotateCw } from "lucide-react";
 import { useId } from "react";
@@ -8,7 +9,7 @@ import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { DeleteMediaButton } from "../media/DeleteMediaButton";
-import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
+import { clickFirstLink, clickNode, useTVFocusable } from "../tv/tvFocus";
 
 // Плоская строка трека для раздела аудио (как во Flutter): обложка,
 // название, исполнители, длительность и действия в один ряд —
@@ -32,9 +33,26 @@ export function AudioTrackRow({
 	// Кнопка play внутри остаётся нативной (Tab/мышь).
 	// Суффикс useId: тот же трек бывает сразу в списке и избранном.
 	const instanceKey = useId().replaceAll(":", "");
+	const rowFocusKey = `audio-row-${media.id}-${instanceKey}`;
+	const playFocusKey = `audio-play-${media.id}-${instanceKey}`;
 	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
-		`audio-row-${media.id}-${instanceKey}`,
+		rowFocusKey,
 		clickFirstLink,
+		(direction) => {
+			// Play лежит поверх широкой строки; обычная геометрия не видит
+			// его справа, поэтому уводим фокус явно.
+			if (direction === "right") {
+				void setFocus(playFocusKey);
+				return false;
+			}
+			return true;
+		},
+	);
+	const { targetRef: playRef } = useTVFocusable<HTMLButtonElement>(
+		playFocusKey,
+		clickNode,
+		undefined,
+		{ secondary: true },
 	);
 	// Обложки может не быть (mp3 без тегов): сразу плейсхолдер, без <img src="">.
 	const hasCover = media.cover_url !== "" && !reload.failed;
@@ -99,6 +117,7 @@ export function AudioTrackRow({
 						withArrow
 					>
 						<ActionIcon
+							ref={playRef}
 							variant="filled"
 							radius="xl"
 							size="lg"

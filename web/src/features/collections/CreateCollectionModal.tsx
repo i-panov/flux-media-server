@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { useCreateCollection } from "../../api/collections";
 import type { MediaType } from "../../core/media";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 
 export function CreateCollectionModal({
 	opened,
@@ -68,21 +68,21 @@ export function CreateCollectionModal({
 					}}
 				/>
 				<Group justify="flex-end">
-					<TVModalButton
+					<TVButton
 						focusKey="create-collection-cancel"
 						variant="default"
 						onClick={close}
 					>
 						{t("collections.cancel")}
-					</TVModalButton>
-					<TVModalButton
+					</TVButton>
+					<TVButton
 						focusKey="create-collection-create"
 						onClick={submit}
 						loading={create.isPending}
 						disabled={name.trim() === ""}
 					>
 						{t("collections.create")}
-					</TVModalButton>
+					</TVButton>
 				</Group>
 				{create.isError && (
 					<Text c="red" size="sm">

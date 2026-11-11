@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
+import { useTVMode } from "../tv/useTVMode";
 import { ExtractAudioSection } from "../video/ExtractAudioSection";
 import { ChangeCoverButton } from "./ChangeCoverButton";
 import { DeleteMediaButton } from "./DeleteMediaButton";
@@ -23,9 +24,12 @@ export function MediaAdminActions({
 }) {
 	const { t } = useTranslation();
 	const session = useSession();
+	const { tvMode } = useTVMode();
 	const [editOpened, setEditOpened] = useState(false);
 
-	if (session.data?.is_admin !== true) {
+	// ТВ — read-only: правка метаданных, обложка, удаление и extract
+	// недоступны даже админу.
+	if (tvMode || session.data?.is_admin !== true) {
 		return null;
 	}
 

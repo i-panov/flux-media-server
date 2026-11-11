@@ -331,5 +331,8 @@
 	"common.newest": "Newest",
 	"common.oldest": "Oldest",
 	"video.all": "All videos",
-	"audio.all": "All tracks"
+	"audio.all": "All tracks",
+	"tv.hint.title": "Looks like a TV",
+	"tv.hint.body": "Enable TV mode with remote control? The interface becomes read-only.",
+	"tv.hint.enable": "Enable TV mode"
 }

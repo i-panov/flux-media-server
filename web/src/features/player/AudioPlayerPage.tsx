@@ -386,6 +386,7 @@ export function AudioPlayerPage() {
 			w="100%"
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
+			data-tv-page-root="true"
 			data-tv-focus-key="player-page"
 		>
 			<TVFocusScope focusKey="player-page">

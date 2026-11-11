@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAddToCollection, useCollections } from "../../api/collections";
 import type { MediaType } from "../../core/media";
-import { TVModalAutoFocus, TVModalButton } from "../tv/tvFocus";
+import { TVButton, TVModalAutoFocus } from "../tv/tvFocus";
 import { CreateCollectionModal } from "./CreateCollectionModal";
 import { useCollectionError } from "./useCollectionError";
 
@@ -72,7 +72,7 @@ export function AddToCollectionModal({
 						</Text>
 					) : (
 						matching.map((collection) => (
-							<TVModalButton
+							<TVButton
 								key={collection.id}
 								focusKey={`add-to-collection-${collection.id}`}
 								variant="light"
@@ -87,25 +87,25 @@ export function AddToCollectionModal({
 								}}
 							>
 								{collection.name}
-							</TVModalButton>
+							</TVButton>
 						))
 					)}
 					<Group justify="flex-end">
-						<TVModalButton
+						<TVButton
 							focusKey="add-to-collection-cancel"
 							variant="default"
 							onClick={onClose}
 						>
 							{t("collections.cancel")}
-						</TVModalButton>
-						<TVModalButton
+						</TVButton>
+						<TVButton
 							focusKey="add-to-collection-create"
 							variant="light"
 							leftSection={<FolderPlus size={16} />}
 							onClick={() => setCreateOpened(true)}
 						>
 							{t("collections.create")}
-						</TVModalButton>
+						</TVButton>
 					</Group>
 					{add.isError && (
 						<Text size="sm" c="red">
