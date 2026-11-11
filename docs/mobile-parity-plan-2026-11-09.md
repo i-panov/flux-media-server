@@ -442,10 +442,12 @@ web imports; mobile tests.
 
 #### Task 25: релиз
 
-- [ ] `version:sync`, versionCode, dogfood APK arm64.
-- [ ] Smoke на устройстве: login, video, audio background, offline.
-- [ ] Записать известные ограничения (Expo Go без background).
-- [ ] Commit: `chore(mobile): релиз <version>`.
+- [x] `version:sync`, versionCode 49.
+- [ ] Dogfood APK arm64 — заблокировано: нет Android SDK/NDK.
+- [ ] Smoke на устройстве: login, video, audio background, offline —
+  заблокировано: нет устройства/эмулятора.
+- [x] Записать известные ограничения (Expo Go без background).
+- [x] Commit: `chore(mobile): релиз 0.1.31`.
 
 ---
 

@@ -521,10 +521,12 @@ realtime-проверка на устройстве не выполнялась 
 
 ### Task 25 — релиз
 
-- `version:sync`, versionCode, dogfood APK arm64.
-- Smoke на устройстве: login, video, audio background/lock, offline.
-- Записать известные ограничения (Expo Go без background, splash).
-- Commit `chore(mobile): релиз <version>`.
+- [x] `version:sync`, versionCode 49, lockfile.
+- [ ] Dogfood APK arm64 — заблокировано: нет Android SDK/NDK.
+- [ ] Smoke на устройстве: login, video, audio background/lock, offline —
+  заблокировано: нет устройства/эмулятора.
+- [x] Известные ограничения записаны (release notes 0.1.31).
+- [x] Commit `chore(mobile): релиз 0.1.31`.
 
 ---
 

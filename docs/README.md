@@ -11,7 +11,7 @@
 | [review-2026-11-09.md](review-2026-11-09.md) | итоговый отчёт | ревью, закрытые находки, осознанные ограничения, журнал коммитов |
 | [mobile-parity-plan-2026-11-09.md](mobile-parity-plan-2026-11-09.md) | Tasks 1–24 + поиск/сортировка (0.1.31); DoD открыт из-за Task 25 | дорожная карта mobile до паритета с Flutter: фазы, файлы, тесты, риски |
 | [mobile-parity-handoff-2026-11-10.md](mobile-parity-handoff-2026-11-10.md) | исторический снимок + статус | состояние на 2026-11-10, фактический статус, поиск/сортировка закрыты в 0.1.31, остался Task 25 |
-| [mobile-release-notes-2026-11-11.md](mobile-release-notes-2026-11-11.md) | актуальный | что вошло в mobile 0.1.31, версии и известные ограничения |
+| [mobile-release-notes-2026-11-11.md](mobile-release-notes-2026-11-11.md) | актуальный | mobile 0.1.31: версия зафиксирована, APK/device-smoke ждут окружения |
 | [tv-roadmap-2026-11-11.md](tv-roadmap-2026-11-11.md) | план | Android TV, web-TV, read-only, QR/device-code, Fire TV; поиск/сортировка mobile закрыты в 0.1.31 |
 | `superpowers/` | локальный архив | старые планы и спеки, **не коммитятся** (`.gitignore`) |
 
