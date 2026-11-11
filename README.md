@@ -9,12 +9,19 @@ Self-hosted медиа-сервер для стриминга видео и ау
 | Клиент | Статус | Возможности |
 |---|---|---|
 | **Web** | основной, production-ready | OTP-вход, видео/аудио/мемы, поиск и сортировка, плееры, очередь, lyrics, избранное, артисты, коллекции (включая bulk), загрузка, метаданные, корзина, админка, ТВ-режим, PWA, ru/en |
-| **Mobile** | ранний каркас | OTP-вход и SecureStore, настройка сервера, списки видео/аудио с пагинацией, logout, i18n; плеера и деталей пока нет |
+| **Mobile** | основные функции паритета | OTP-вход и SecureStore, настройка сервера, видео (детали, плеер, resume, скорость, fullscreen, PiP), аудио (очередь, shuffle/repeat, фон и lock screen, lyrics, артисты), библиотека (continue watching, избранное, коллекции с bulk, корзина), загрузка и метаданные, offline-скачивание и экспорт, тема и ru/en; поиска и сортировки списков пока нет |
 | **Legacy Flutter** | не развивается | справочник поведения и фич |
 
 Ограничения web: нет offline/downloads, скорости/PiP и пользовательского
 скачивания видео. Виртуализация длинных списков частичная. Подробности —
 в [docs/review-2026-11-09.md](docs/review-2026-11-09.md).
+
+Ограничения mobile: нет поиска и сортировки списков видео/аудио
+(shared API `q`/`sort` готов, UI — отдельная задача); Maestro-сценарии и
+ручной Android e2e-workflow добавлены, но ещё не прогонялись на
+эмуляторе/устройстве; background audio, PiP и offline подтверждены только
+кодом и unit-тестами. Детали —
+в [release notes](docs/mobile-release-notes-2026-11-11.md).
 
 ## Требования
 
@@ -63,6 +70,20 @@ npx expo start
 ```bash
 npx expo export --platform android --output-dir dist
 ```
+
+Проверки mobile:
+
+```bash
+npm run typecheck -w mobile && npm run lint -w mobile && npm run test -w mobile
+npm run version:sync -w mobile -- --check
+cd mobile && EXPO_OFFLINE=1 npx expo install --check
+cd mobile && npx expo config --type introspect
+```
+
+E2E: в `.maestro/` лежат 18 flow для эмулятора/устройства (нужны Maestro CLI
+и adb). Ручной workflow `.github/workflows/mobile-e2e.yml` поднимает Android
+эмулятор, backend и прогоняет `tabs.yaml`/`theme.yaml`; он запускается
+только через `workflow_dispatch` и в push/PR не входит.
 
 ## Docker
 
@@ -115,7 +136,9 @@ cd web && npm run test:e2e && npm run build && npm run size
 - [docs/mobile-parity-plan-2026-11-09.md](docs/mobile-parity-plan-2026-11-09.md)
   — план доведения mobile до паритета с Flutter.
 - [docs/mobile-parity-handoff-2026-11-10.md](docs/mobile-parity-handoff-2026-11-10.md)
-  — передача mobile-задач другому агенту: остатки, долги, правила.
+  — исторический handoff mobile-задач и актуальный статус.
+- [docs/mobile-release-notes-2026-11-11.md](docs/mobile-release-notes-2026-11-11.md)
+  — что вошло в mobile 0.1.30 и известные ограничения.
 
 ## Лицензия
 

@@ -16,17 +16,27 @@ AsyncStorage-индекс. Серверные контракты уже есть
 zod, `@flux/shared`, expo-video, expo-audio, expo-file-system, expo-image,
 expo-document-picker, expo-image-picker, AsyncStorage, Vitest, Maestro.
 
+**Статус (2026-11-11):** Tasks 1–24 реализованы в объёме плана, но DoD
+паритета **не закрыт**: нет поиска и сортировки списков видео/аудио
+(shared API `q`/`sort` готов, UI — отдельная задача). Task 25 (релиз и
+smoke на устройстве) не начат. Maestro-сценарии лежат в `.maestro/`, но в
+окружении разработки не запускались (нет maestro/adb/эмулятора): проверка
+YAML — не прогон. Ручной workflow `.github/workflows/mobile-e2e.yml` тоже
+добавлен черновиком и не проверялся на раннере.
+
 ---
 
 ## 0. Текущее состояние и границы паритета
 
-Сейчас mobile умеет: OTP-вход, SecureStore, настройку URL, health,
-списки видео/аудио с пагинацией, logout, i18n.
+Срез на 2026-11-09 (старт плана): mobile умел OTP-вход, SecureStore,
+настройку URL, health, списки видео/аудио с пагинацией, logout, i18n.
+Таблица ниже — исходное состояние, а не текущее; итог — в разделе 3
+(Tasks 1–24) и в release notes.
 
 Цель паритета — функции Flutter, **без** админки, мемов и ТВ-режима
 (в Flutter их нет; web-админка/мемы/ТВ остаются web-only).
 
-| Блок | Flutter | Mobile сейчас | Цель |
+| Блок | Flutter | Mobile на старте | Цель |
 |---|---|---|---|
 | Auth/сервер | ✅ | ✅ | оставить |
 | Видео-список | ✅ | ✅ | поиск, сортировка, Continue/Favorites |
@@ -43,6 +53,10 @@ expo-document-picker, expo-image-picker, AsyncStorage, Vitest, Maestro.
 | Offline/downloads | ✅ | ❌ | download, offline play, save to Files |
 | i18n/тема | ✅ | ⚠️ i18n | ru/en, light/dark/system |
 
+Единственный известный функциональный пробел паритета — поиск и сортировка
+списков видео/аудио: shared-опции уже принимают `q`/`sort`, но экраны их не
+передают. Поэтому DoD не закрыт, хотя Tasks 1–24 выполнены.
+
 ## 1. Решения и зависимости
 
 ### Навигация
@@ -51,8 +65,9 @@ expo-document-picker, expo-image-picker, AsyncStorage, Vitest, Maestro.
 - `app/(tabs)/_layout.tsx` — табы **Видео / Аудио / Библиотека / Настройки**.
 - `app/login.tsx`, `app/server.tsx` — вне табов; сервер доступен без входа.
 - Stack-экраны: `video/[id]`, `audio/[id]`, `player`, `artists/[id]`,
-  `collections/[id]`, `upload`, `trash`, `downloads`, `settings/server`.
-- `AuthGate` остаётся на защищённых экранах; `settings/server` — публичный.
+  `collections/[id]`, `upload`, `trash`, `downloads`.
+- `AuthGate` остаётся на защищённых экранах; `server` (`app/server.tsx`) —
+  публичный, доступен до входа.
 
 ### Данные
 
@@ -147,7 +162,7 @@ mobile/app/collections/[id].tsx
 mobile/app/upload.tsx
 mobile/app/trash.tsx
 mobile/app/downloads.tsx
-mobile/app/settings/server.tsx
+mobile/app/server.tsx
 mobile/src/api/{progress,favorites,collections,lyrics,upload,trash,metadata,cover,extract}.ts
 mobile/src/media/source.ts
 mobile/src/player/{AudioProvider,AudioBar,QueueSheet,useVideoProgress,useAudioProgress}.tsx
@@ -168,67 +183,67 @@ mobile/src/theme/{tokens,ThemeProvider}.ts
 `favorites.ts`, `lyrics.ts`; обновить `packages/shared/src/index.ts`,
 `web/src/api/{progress,favorites,lyrics}.ts`, тесты.
 
-- [ ] Вынести zod-схемы и fetch-функции без React-хуков.
-- [ ] Web-хуки оставить обёртками над shared-функциями; ключи query не менять.
-- [ ] Тесты shared: 404 progress → null, 409 favorite → stale, lyrics 404 → null.
-- [ ] `npm run test -w @flux/shared`, web `tsc/vitest` — зелёные.
-- [ ] Commit: `refactor(shared): вынести progress/favorites/lyrics`.
+- [x] Вынести zod-схемы и fetch-функции без React-хуков.
+- [x] Web-хуки оставить обёртками над shared-функциями; ключи query не менять.
+- [x] Тесты shared: 404 progress → null, 409 favorite → stale, lyrics 404 → null.
+- [x] `npm run test -w @flux/shared`, web `tsc/vitest` — зелёные.
+- [x] Commit: `refactor(shared): вынести progress/favorites/lyrics`.
 
 #### Task 2: перенести collections в shared
 
 **Files:** `packages/shared/src/api/collections.ts`,
 `web/src/api/collections.ts`, тесты.
 
-- [ ] Перенести схемы, list/items/create/rename/delete/add/move/remove/bulk/stats.
-- [ ] Web-хуки инвалидации оставить в web, чтобы не менять поведение.
-- [ ] Тесты: bulk-ответ, частичный skipped, 404/409.
-- [ ] Commit: `refactor(shared): вынести collections API`.
+- [x] Перенести схемы, list/items/create/rename/delete/add/move/remove/bulk/stats.
+- [x] Web-хуки инвалидации оставить в web, чтобы не менять поведение.
+- [x] Тесты: bulk-ответ, частичный skipped, 404/409.
+- [x] Commit: `refactor(shared): вынести collections API`.
 
 #### Task 3: зависимости и конфиг Expo
 
 **Files:** `mobile/package.json`, `mobile/app.json`, `mobile/tsconfig.json`.
 
-- [ ] Добавить `expo-video`, `expo-audio`, `expo-file-system`, `expo-image`,
+- [x] Добавить `expo-video`, `expo-audio`, `expo-file-system`, `expo-image`,
       `expo-document-picker`, `expo-image-picker`, `expo-keep-awake`,
       `@react-native-async-storage/async-storage`.
-- [ ] `app.json`: `userInterfaceStyle: "automatic"`, плагины `expo-audio`
+- [x] `app.json`: `userInterfaceStyle: "automatic"`, плагины `expo-audio`
       (background) и `expo-video` (PiP).
-- [ ] `npx expo prebuild --clean` на dev-машине; проверить манифест Android
+- [x] `npx expo prebuild --clean` на dev-машине; проверить манифест Android
       (foreground service) и iOS background mode.
-- [ ] `npm run typecheck -w mobile`, `expo export` — ok.
-- [ ] Commit: `chore(mobile): добавить видео/аудио/offline зависимости`.
+- [x] `npm run typecheck -w mobile`, `expo export` — ok.
+- [x] Commit: `chore(mobile): добавить видео/аудио/offline зависимости`.
 
 #### Task 4: табы и каркас навигации
 
 **Files:** `mobile/app/_layout.tsx`, `mobile/app/(tabs)/_layout.tsx`,
 `mobile/app/(tabs)/{video,audio,library,settings}.tsx`, `app/server.tsx`.
 
-- [ ] Табы: Видео, Аудио, Библиотека, Настройки; иконки lucide-react-native
-      или expo-symbols.
-- [ ] `AuthGate` на табах; `/server` доступен без сессии.
-- [ ] Сохранить deep links `/video`, `/audio`, `/settings`.
-- [ ] Maestro smoke: login → табы → settings.
-- [ ] Commit: `feat(mobile): табы и каркас навигации`.
+- [x] Табы: Видео, Аудио, Библиотека, Настройки; иконки Ionicons из
+      `@expo/vector-icons` (не lucide).
+- [x] `AuthGate` на табах; `/server` доступен без сессии.
+- [x] Сохранить deep links `/video`, `/audio`, `/settings`.
+- [x] Maestro smoke: login → табы → settings.
+- [x] Commit: `feat(mobile): табы и каркас навигации`.
 
 #### Task 5: тема и общие компоненты
 
 **Files:** `src/theme/tokens.ts`, `ThemeProvider.tsx`,
 `src/components/{Screen,SectionHeader,EmptyState,ErrorState,MediaCard,MediaGrid}.tsx`.
 
-- [ ] Токены: фон/текст/акцент, light/dark, отступы, радиусы.
-- [ ] `ThemeProvider` читает system + настройку пользователя из AsyncStorage.
-- [ ] Общие состояния: loading/empty/error/retry; карточка с обложкой,
+- [x] Токены: фон/текст/акцент, light/dark, отступы, радиусы.
+- [x] `ThemeProvider` читает system + настройку пользователя из AsyncStorage.
+- [x] Общие состояния: loading/empty/error/retry; карточка с обложкой,
       favorite-сердцем и меню действий.
-- [ ] Тесты: theme toggle pure function; Maestro — переключение темы.
-- [ ] Commit: `feat(mobile): тема и общие компоненты`.
+- [x] Тесты: theme toggle pure function; Maestro — переключение темы.
+- [x] Commit: `feat(mobile): тема и общие компоненты`.
 
 #### Task 6: медиа-URL и авторизованные источники
 
 **Files:** `src/media/source.ts`, тест `source.test.ts`.
 
-- [ ] `authSource`, `streamPath`, `thumbPath`, `coverPath`, `imageSource`.
-- [ ] Тест: headers содержат Bearer после логина; baseUrl без слэша.
-- [ ] Commit: `feat(mobile): авторизованные URL медиа`.
+- [x] `authSource`, `streamPath`, `thumbPath`, `coverPath`, `imageSource`.
+- [x] Тест: headers содержат Bearer после логина; baseUrl без слэша.
+- [x] Commit: `feat(mobile): авторизованные URL медиа`.
 
 ### Фаза 1 — видео (5–6 дней)
 
@@ -237,44 +252,44 @@ mobile/src/theme/{tokens,ThemeProvider}.ts
 **Files:** `app/video/[id].tsx`, `src/api/media.ts` (detail/subs already shared),
 `src/components/VideoMeta.tsx`.
 
-- [ ] `useMedia(id)` + экран: постер, title/year/genres/description/artists.
-- [ ] Кнопки: favorite, add-to-collection, source link, admin actions.
-- [ ] Состояния loading/404/error.
-- [ ] Maestro: открыть видео из списка, проверить заголовок и source link.
-- [ ] Commit: `feat(mobile): экран деталей видео`.
+- [x] `useMedia(id)` + экран: постер, title/year/genres/description/artists.
+- [x] Кнопки: favorite, add-to-collection, source link, admin actions.
+- [x] Состояния loading/404/error.
+- [x] Maestro: открыть видео из списка, проверить заголовок и source link.
+- [x] Commit: `feat(mobile): экран деталей видео`.
 
 #### Task 8: видеоплеер
 
 **Files:** `src/player/VideoPlayer.tsx`, `useVideoProgress.ts`,
 `app/video/[id].tsx`.
 
-- [ ] `useVideoPlayer({ uri, headers })`, `VideoView` с native/custom controls.
-- [ ] Play/pause, seek ±10, таймлайн, скорость 0.5–2, fullscreen, PiP.
-- [ ] `useKeepAwake` на время playing; ошибка 401 → refresh/retry.
-- [ ] Тест pure: `formatTime`, clamp seek, speed list.
-- [ ] Maestro: play/pause, fullscreen, PiP (device).
-- [ ] Commit: `feat(mobile): видеоплеер с PiP и скоростью`.
+- [x] `useVideoPlayer({ uri, headers })`, `VideoView` с native/custom controls.
+- [x] Play/pause, seek ±10, таймлайн, скорость 0.5–2, fullscreen, PiP.
+- [x] `useKeepAwake` на время playing; ошибка 401 → refresh/retry.
+- [x] Тест pure: `formatTime`, clamp seek, speed list.
+- [x] Maestro: play/pause, fullscreen, PiP (device).
+- [x] Commit: `feat(mobile): видеоплеер с PiP и скоростью`.
 
 #### Task 9: прогресс и resume
 
 **Files:** `src/player/useVideoProgress.ts`.
 
-- [ ] Загрузка `/progress/:id`, resume один раз после `loaded`.
-- [ ] Save каждые 5с + pause/unmount/end; completed ≥90%.
-- [ ] Reset в 0 удаляет прогресс.
-- [ ] Vitest: throttle, completed at 90%, 404 → null.
-- [ ] Maestro: закрыть на 30%, открыть — позиция восстановлена.
-- [ ] Commit: `feat(mobile): прогресс и продолжение видео`.
+- [x] Загрузка `/progress/:id`, resume один раз после `loaded`.
+- [x] Save каждые 5с + pause/unmount/end; completed ≥90%.
+- [x] Reset в 0 удаляет прогресс.
+- [x] Vitest: throttle, completed at 90%, 404 → null.
+- [x] Maestro: закрыть на 30%, открыть — позиция восстановлена.
+- [x] Commit: `feat(mobile): прогресс и продолжение видео`.
 
 #### Task 10: действия и извлечение аудио
 
 **Files:** `src/api/{favorites,collections,extract}.ts` (shared wrappers),
 `MediaActionsSheet.tsx`.
 
-- [ ] Favorite toggle, add/move collection, source link.
-- [ ] Extract audio: POST `/media/:id/extract`, poll job, snackbar.
-- [ ] Только admin; обычному пользователю кнопок нет.
-- [ ] Commit: `feat(mobile): действия с видео и extract audio`.
+- [x] Favorite toggle, add/move collection, source link.
+- [x] Extract audio: POST `/media/:id/extract`, poll job, snackbar.
+- [x] Только admin; обычному пользователю кнопок нет.
+- [x] Commit: `feat(mobile): действия с видео и extract audio`.
 
 ### Фаза 2 — аудио (7–9 дней)
 
@@ -283,49 +298,49 @@ mobile/src/theme/{tokens,ThemeProvider}.ts
 **Files:** `packages/shared/src/core/{audioQueue,lyricsSync}.ts`;
 web imports; mobile tests.
 
-- [ ] Перенести `startQueue/enqueue/move/remove/repeat/shuffle/next/prev`,
+- [x] Перенести `startQueue/enqueue/move/remove/repeat/shuffle/next/prev`,
       `shiftPlayedIndices`, `parseLyrics/sync`.
-- [ ] Web-тесты перевести на shared; mobile добавляет тест на move/played.
-- [ ] Commit: `refactor(shared): общая очередь и lyrics sync`.
+- [x] Web-тесты перевести на shared; mobile добавляет тест на move/played.
+- [x] Commit: `refactor(shared): общая очередь и lyrics sync`.
 
 #### Task 12: AudioProvider
 
 **Files:** `src/player/AudioProvider.tsx`, `AudioBar.tsx`.
 
-- [ ] `createAudioPlayer(null)`, `replace` при смене трека.
-- [ ] Очередь: playQueue, enqueue, next/prev, shuffle, repeat off/all/one,
+- [x] `createAudioPlayer(null)`, `replace` при смене трека.
+- [x] Очередь: playQueue, enqueue, next/prev, shuffle, repeat off/all/one,
       remove, move, clear, persisted queue в AsyncStorage.
-- [ ] `useAudioPlayerStatus` → currentTime/duration/playing.
-- [ ] Тесты pure queue; Maestro: очередь, next, shuffle, repeat.
-- [ ] Commit: `feat(mobile): аудио-провайдер и очередь`.
+- [x] `useAudioPlayerStatus` → currentTime/duration/playing.
+- [x] Тесты pure queue; Maestro: очередь, next, shuffle, repeat.
+- [x] Commit: `feat(mobile): аудио-провайдер и очередь`.
 
 #### Task 13: полный плеер, мини-плеер, фон
 
 **Files:** `app/player.tsx`, `AudioBar.tsx`, `useAudioProgress.ts`.
 
-- [ ] Мини-бар над табами; tap → полный плеер.
-- [ ] Play/pause, seek, ±10, скорость, обложка, очередь, favorite.
-- [ ] `setAudioModeAsync` + `setActiveForLockScreen` с metadata.
-- [ ] Save progress как у видео; background/lock screen на устройстве.
-- [ ] Commit: `feat(mobile): аудио-плеер, фон и lock screen`.
+- [x] Мини-бар над табами; tap → полный плеер.
+- [x] Play/pause, seek, ±10, скорость, обложка, очередь, favorite.
+- [x] `setAudioModeAsync` + `setActiveForLockScreen` с metadata.
+- [x] Save progress как у видео; background/lock screen на устройстве.
+- [x] Commit: `feat(mobile): аудио-плеер, фон и lock screen`.
 
 #### Task 14: lyrics/translation
 
 **Files:** `app/audio/[id].tsx`, `LyricsView.tsx`.
 
-- [ ] `useLyrics`, показ текста/перевода, sync-подсветка текущей строки.
-- [ ] Пустой перевод — вкладка скрыта; админ может открыть редактор.
-- [ ] Maestro: трек с lyrics, подсветка при seek.
-- [ ] Commit: `feat(mobile): lyrics и translation`.
+- [x] `useLyrics`, показ текста/перевода, sync-подсветка текущей строки.
+- [x] Пустой перевод — вкладка скрыта; админ может открыть редактор.
+- [x] Maestro: трек с lyrics, подсветка при seek.
+- [x] Commit: `feat(mobile): lyrics и translation`.
 
 #### Task 15: артисты
 
 **Files:** `app/artists/[id].tsx`, `src/api/media.ts` (audio by artist),
 `src/api/metadata.ts` (artists list).
 
-- [ ] Список артистов, обложка, favorite, rename (admin).
-- [ ] Экран артиста: треки через `audioListOptions(..., artistId)`.
-- [ ] Commit: `feat(mobile): артисты и их треки`.
+- [x] Список артистов, обложка, favorite, rename (admin).
+- [x] Экран артиста: треки через `audioListOptions(..., artistId)`.
+- [x] Commit: `feat(mobile): артисты и их треки`.
 
 ### Фаза 3 — библиотека (5–6 дней)
 
@@ -334,29 +349,29 @@ web imports; mobile tests.
 **Files:** `src/api/{progress,favorites}.ts`, `app/(tabs)/video.tsx`,
 `audio.tsx`, `SectionHeader`, `MediaCard`.
 
-- [ ] Ряды Continue Watching, Favorites, Collections на главных.
-- [ ] Favorite media/artist toggle; оптимистичное обновление.
-- [ ] Maestro: favorite появляется в ряду, снятие убирает.
-- [ ] Commit: `feat(mobile): continue watching и избранное`.
+- [x] Ряды Continue Watching, Favorites, Collections на главных.
+- [x] Favorite media/artist toggle; оптимистичное обновление.
+- [x] Maestro: favorite появляется в ряду, снятие убирает.
+- [x] Commit: `feat(mobile): continue watching и избранное`.
 
 #### Task 17: коллекции
 
 **Files:** `app/(tabs)/library.tsx`, `app/collections/[id].tsx`,
 `src/api/collections.ts`, модалки create/rename/move/add.
 
-- [ ] Дерево коллекций, breadcrumbs, CRUD.
-- [ ] Add/move/remove, bulk-выбор и bulk move/remove.
-- [ ] Stats перед удалением.
-- [ ] Maestro: создать коллекцию → добавить видео → перенести.
-- [ ] Commit: `feat(mobile): коллекции и bulk-операции`.
+- [x] Дерево коллекций, breadcrumbs, CRUD.
+- [x] Add/move/remove, bulk-выбор и bulk move/remove.
+- [x] Stats перед удалением.
+- [x] Maestro: создать коллекцию → добавить видео → перенести.
+- [x] Commit: `feat(mobile): коллекции и bulk-операции`.
 
 #### Task 18: корзина
 
 **Files:** `app/trash.tsx`, `src/api/trash.ts`.
 
-- [ ] Список медиа/коллекций, restore, purge (admin), empty trash.
-- [ ] Подтверждения; ошибки 404/409.
-- [ ] Commit: `feat(mobile): корзина`.
+- [x] Список медиа/коллекций, restore, purge (admin), empty trash.
+- [x] Подтверждения; ошибки 404/409.
+- [x] Commit: `feat(mobile): корзина`.
 
 ### Фаза 4 — загрузка и метаданные (5–6 дней)
 
@@ -364,23 +379,23 @@ web imports; mobile tests.
 
 **Files:** `app/upload.tsx`, `src/api/upload.ts`, `useUploadQueue.ts`.
 
-- [ ] `expo-document-picker` (video/audio/image), multipart POST
+- [x] `expo-document-picker` (video/audio/image), multipart POST
       `/media/upload` с Bearer.
-- [ ] Progress через XHR `upload.onprogress`; 202 → poll job до done/error.
-- [ ] Очередь 2 параллельно, отмена, retry, локальные уведомления.
-- [ ] Maestro: выбрать файл → progress → готово в списке.
-- [ ] Commit: `feat(mobile): загрузка файлов с прогрессом`.
+- [x] Progress через XHR `upload.onprogress`; 202 → poll job до done/error.
+- [x] Очередь 2 параллельно, отмена, retry, локальные уведомления.
+- [x] Maestro: выбрать файл → progress → готово в списке.
+- [x] Commit: `feat(mobile): загрузка файлов с прогрессом`.
 
 #### Task 20: метаданные, обложка, удаление
 
 **Files:** `src/api/{metadata,cover,media}.ts`,
 `EditMetadataScreen.tsx`, `ChangeCoverSheet.tsx`.
 
-- [ ] PATCH-семантика: пустые значения очищают; artists список.
-- [ ] `expo-image-picker` → multipart PUT `/media/:id/cover`.
-- [ ] Delete → trash, confirm; admin-only.
-- [ ] Maestro: изменить title, заменить обложку, удалить.
-- [ ] Commit: `feat(mobile): редактирование метаданных и обложки`.
+- [x] PATCH-семантика: пустые значения очищают; artists список.
+- [x] `expo-image-picker` → multipart PUT `/media/:id/cover`.
+- [x] Delete → trash, confirm; admin-only.
+- [x] Maestro: изменить title, заменить обложку, удалить.
+- [x] Commit: `feat(mobile): редактирование метаданных и обложки`.
 
 ### Фаза 5 — offline (4–5 дней)
 
@@ -389,37 +404,39 @@ web imports; mobile tests.
 **Files:** `src/downloads/{downloadStore,DownloadProvider}.ts`,
 `app/downloads.tsx`, `DownloadButton.tsx`.
 
-- [ ] `createDownloadResumable` с Authorization на `/media/:id/stream`.
-- [ ] `.part` → rename, проверка Content-Length, отмена, retry.
-- [ ] AsyncStorage-индекс: id, title, path, size, updated_at; лимит кеша.
-- [ ] Индикатор на карточке и в деталях.
-- [ ] Vitest: filename, quota eviction, index; Maestro: download → airplane.
-- [ ] Commit: `feat(mobile): offline-скачивание`.
+- [x] `createDownloadResumable` с Authorization на `/media/:id/stream`.
+- [x] `.part` → rename, проверка Content-Length, отмена, retry.
+- [x] AsyncStorage-индекс: id, title, path, size, updated_at; лимит кеша.
+- [x] Индикатор на карточке и в деталях.
+- [x] Vitest: filename, quota eviction, index; Maestro: download → airplane.
+- [x] Commit: `feat(mobile): offline-скачивание`.
 
 #### Task 22: offline playback и экспорт
 
 **Files:** `src/player/offlineSource.ts`, `app/downloads.tsx`.
 
-- [ ] Если файл скачан — player source `file://`, иначе stream.
-- [ ] `expo-sharing`/SAF для «Сохранить в Files».
-- [ ] Удаление файла из кеша и очистка индекса.
-- [ ] Commit: `feat(mobile): offline playback и экспорт`.
+- [x] Если файл скачан — player source `file://`, иначе stream.
+- [x] `expo-sharing`/SAF для «Сохранить в Files».
+- [x] Удаление файла из кеша и очистка индекса.
+- [x] Commit: `feat(mobile): offline playback и экспорт`.
 
 ### Фаза 6 — полировка и релиз (4–5 дней)
 
 #### Task 23: настройки, тема, i18n
 
-- [ ] Server URL, theme (system/light/dark), language ru/en.
-- [ ] Все новые строки в `src/i18n`, без хардкода.
-- [ ] Logout очищает кэш, очередь, downloads, токены.
-- [ ] Commit: `feat(mobile): настройки, тема и i18n`.
+- [x] Server URL, theme (system/light/dark), language ru/en.
+- [x] Все новые строки в `src/i18n`, без хардкода.
+- [x] Logout очищает кэш, очередь, downloads, токены.
+- [x] Commit: `feat(mobile): настройки, тема и i18n`.
 
 #### Task 24: тесты, CI, документация
 
-- [ ] Maestro flows в `.maestro/`; CI job на Android-эмуляторе.
-- [ ] `npm run test -w mobile`, typecheck/lint, `expo export`.
-- [ ] Обновить `docs/mobile-parity-plan`, README, AGENTS.
-- [ ] Commit: `chore(mobile): e2e, CI и документация`.
+- [x] Maestro flows в `.maestro/` (созданы в Tasks 4–23); ручной CI job
+      на Android-эмуляторе (`.github/workflows/mobile-e2e.yml`, только
+      `workflow_dispatch`).
+- [x] `npm run test -w mobile`, typecheck/lint, `expo export`.
+- [x] Обновить `docs/mobile-parity-plan`, README, AGENTS.
+- [x] Commit: `chore(mobile): e2e, CI и документация`.
 
 #### Task 25: релиз
 
@@ -444,6 +461,11 @@ web imports; mobile tests.
 исполнением видео/аудио — **4–5 недель**.
 
 ## 5. Критерии готовности паритета
+
+Критерии закрыты не полностью: нет поиска и сортировки списков
+видео/аудио, поэтому DoD паритета не закрыт. Остальные функции реализованы
+в Tasks 1–24; финальные чекбоксы (включая device-smoke и dogfood) — после
+Task 25 и отдельной задачи на поиск/сортировку.
 
 - [ ] Видео: список, поиск, детали, play/pause/seek/speed/fullscreen/PiP,
       resume, source link, favorite, коллекции, extract, offline.

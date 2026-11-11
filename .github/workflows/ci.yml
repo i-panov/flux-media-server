@@ -79,6 +79,18 @@ jobs:
         run: npm run lint -w mobile
       - name: Test mobile
         run: npm run test -w mobile
+      # EXPO_OFFLINE обязателен: online-проверка сверяется с последним
+      # bundledNativeModules SDK и флагает уже установленные пакеты как
+      # устаревшие; offline использует версию из node_modules/expo и
+      # детерминирована в CI.
+      - name: Check Expo dependency versions
+        working-directory: mobile
+        env:
+          EXPO_OFFLINE: '1'
+        run: npx expo install --check
+      - name: Validate Expo config and plugins
+        working-directory: mobile
+        run: npx expo config --type introspect > /dev/null
       - name: Check mobile version
         run: npm run version:sync -w mobile -- --check
       - name: Smoke export mobile

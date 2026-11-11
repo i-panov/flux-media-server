@@ -1,11 +1,83 @@
 # Mobile Parity — handoff / всё, что осталось
 
-**Дата снимка:** 2026-11-10. **HEAD:** `8ec88b8`. **Ветка:** `master`.
+**Дата снимка:** 2026-11-10. **HEAD снимка:** `8ec88b8`. **Ветка:** `master`.
 **План:** [mobile-parity-plan-2026-11-09.md](mobile-parity-plan-2026-11-09.md).
-**Статус:** Tasks 1–7 приняты; Tasks 8–25 не начаты. Рабочее дерево чистое.
+**Статус:** исторический снимок от 2026-11-10. Актуальное состояние —
+в разделе 0: Tasks 1–24 выполнены, остался Task 25 (релиз) и отдельный
+пробел паритета — поиск/сортировка списков.
 
 Этот файл — самодостаточное ТЗ для другого агента: текущее состояние, правила
 работы, оставшиеся задачи, известные долги и подводные камни.
+
+---
+
+## 0. Актуальный статус на 2026-11-11
+
+**Кодовая база:** `2c4d776` (`feat(mobile): настройки, тема и i18n`).
+**Task 24:** коммит `chore(mobile): e2e, CI и документация` — текущая
+вершина `master`. **Версии:** backend `1.0.29`, shared `0.1.8`,
+web `0.1.31`, mobile `0.1.30`, versionCode `48`.
+
+Tasks 1–23 реализованы и закоммичены. Компактная карта коммитов (подробные
+описания и приёмка — в разделах 2 и 4):
+
+| Task | Коммит | Итог |
+|---|---|---|
+| 1–7 | `d6ce4e3` … `8ec88b8` | shared API, зависимости, табы, тема, медиа-URL, детали видео |
+| 8 | `52956e7` | видеоплеер: play/pause, seek, скорость, fullscreen, PiP, wakelock |
+| 9 | `cdad7eb` | прогресс и resume видео (throttle, completed ≥90%, reset) |
+| 10 | `e4de91f` | действия видео и extract audio (только admin) |
+| 11 | `1c9754b` | shared audioQueue/lyricsSync |
+| 12 | `1f14fc8` | AudioProvider, очередь, shuffle/repeat, persisted queue |
+| 13 | `ffdc3e2` | полный/мини-аудиоплеер, background, lock screen |
+| 14 | `d4f8e94` | lyrics/translation и sync-подсветка |
+| 15 | `5da91f4` | артисты: список, треки, favorite, rename |
+| 16 | `662eef3` | continue watching и избранное |
+| 17 | `e4f121d` | коллекции, вложенность, bulk |
+| 18 | `b43fc68` | корзина: restore/purge/empty |
+| 19 | `d9ef437` | загрузка файлов: picker, очередь, progress, retry |
+| 20 | `8fb570e` | метаданные, обложка, удаление |
+| 21 | `351ab7f` | offline-скачивание и индекс |
+| 22 | `8e2edf6` | offline playback и экспорт |
+| 23 | `2c4d776` | настройки, тема, i18n, logout-reset |
+
+**Task 24 (этот коммит):** CI-обвязка для 18 Maestro flow, которые были
+созданы в Tasks 4–23: ручной `.github/workflows/mobile-e2e.yml` (Android
+emulator + Metro + Maestro), проверки `expo install --check` и
+`expo config --type introspect` в CI, обновлённые plan/handoff/README/AGENTS
+и release notes. Проверки Task 24: typecheck, lint, 33 файла / 346 тестов,
+`expo export`, `version:sync --check` (0.1.30/48), YAML-парсинг всех flow и
+workflow.
+
+**Пробел паритета:** поиск и сортировка списков видео/аудио не реализованы
+в UI. Shared API уже принимает `q`/`sort` (`videoListOptions`,
+`audioListOptions`), но экраны передают только пустой запрос и дефолт.
+DoD паритета поэтому **не закрыт**; это отдельная задача, не входившая в
+Tasks 1–23.
+
+**Осталось:** Task 25 — релиз (`version:sync`, versionCode, dogfood APK
+arm64, device-smoke) и отдельная задача на поиск/сортировку списков.
+Tasks 8–23 в разделе 4 отмечены `✅` и оставлены как исторический контекст.
+
+### Актуальные известные ограничения
+
+- **Нет поиска и сортировки списков:** shared API `q`/`sort` готов, но в
+  табах видео/аудио нет полей ввода и переключателя; DoD паритета открыт.
+- **Maestro не запускался:** в окружении разработки нет maestro, adb,
+  эмулятора и KVM. Все flow проверены только парсингом YAML. Утверждать,
+  что сценарий «прошёл», нельзя.
+- **`mobile-e2e.yml` не проверен на раннере:** job ручной
+  (`workflow_dispatch`), в push/PR не входит; возможны правки образа,
+  AVD, KVM и таймаутов Maestro.
+- **Нет system notifications для upload:** прогресс и «готово» видны только
+  на открытом экране загрузок, уведомлений в шторке нет.
+- **Нет artwork на lock screen:** обложка требует Bearer-заголовков,
+  которые система не отправит; metadata содержит title/artist/album.
+- **iOS-края не проверены на устройстве:** Keychain переживает
+  `clearState`, PiP/background audio требуют dev/release build,
+  security-scoped URL для upload и audio session — зона риска.
+- **Device smoke не выполнен:** background audio, PiP, offline и
+  lock screen проверены статически/юнит-тестами, не на железе.
 
 ---
 
@@ -66,7 +138,7 @@ mobile/src/components/             Screen/MediaList/MediaCard/MediaGrid/...
 .maestro/                          tabs, tabs-error-recovery, theme, video-detail
 ```
 
-### Проверки, которые сейчас зелёные
+### Проверки на момент снимка (2026-11-10)
 
 ```bash
 npm run typecheck -w mobile
@@ -102,12 +174,16 @@ Shared: `npm run test -w @flux/shared` — 96 тестов. Web не менял�
 
 ---
 
-## 4. Оставшиеся задачи (8–25)
+## 4. Оставшиеся задачи (24–25) и пробел паритета
+
+> Tasks 8–23 выполнены (см. раздел 0); их описания ниже сохранены как
+> исторический контекст. Task 24 закрыт текущим коммитом; актуальны
+> Task 25, релиз и отдельная задача на поиск/сортировку списков.
 
 Формат: цель → файлы → что сделать → приёмка/тесты. Все задачи делать
 TDD/с тестами, где возможно; после каждой — commit, отчёт, review.
 
-### Task 8 — видеоплеер
+### Task 8 ✅ — видеоплеер
 
 **Цель:** проигрывать видео в приложении, не только показывать постер.
 
@@ -139,7 +215,7 @@ TDD/с тестами, где возможно; после каждой — comm
 
 ---
 
-### Task 9 — прогресс и resume видео
+### Task 9 ✅ — прогресс и resume видео
 
 **Цель:** продолжить просмотр с сохранённой позиции.
 
@@ -165,7 +241,7 @@ end как 0; длительность из player, а не из media; при �
 
 ---
 
-### Task 10 — действия видео и extract audio
+### Task 10 ✅ — действия видео и extract audio
 
 **Цель:** favorite/add-to-collection/source/extract уже частично есть;
 добавить extract и вынести действия в sheet.
@@ -188,7 +264,7 @@ end как 0; длительность из player, а не из media; при �
 
 ---
 
-### Task 11 — shared audioQueue/lyricsSync
+### Task 11 ✅ — shared audioQueue/lyricsSync
 
 **Цель:** не дублировать очередь и парсер lyrics между web/mobile.
 
@@ -206,7 +282,7 @@ end как 0; длительность из player, а не из media; при �
 
 ---
 
-### Task 12 — AudioProvider и очередь
+### Task 12 ✅ — AudioProvider и очередь
 
 **Цель:** фоновый аудиоплеер с очередью.
 
@@ -231,7 +307,7 @@ service; iOS audio session.
 
 ---
 
-### Task 13 — полный аудиоплеер, мини-плеер, фон
+### Task 13 ✅ — полный аудиоплеер, мини-плеер, фон
 
 **Files:** `mobile/app/player.tsx`, `AudioBar.tsx`,
 `mobile/src/player/useAudioProgress.ts`.
@@ -247,7 +323,7 @@ service; iOS audio session.
 
 ---
 
-### Task 14 — lyrics/translation
+### Task 14 ✅ — lyrics/translation
 
 **Files:** `mobile/app/audio/[id].tsx`, `LyricsView.tsx`.
 
@@ -261,7 +337,7 @@ service; iOS audio session.
 
 ---
 
-### Task 15 — артисты
+### Task 15 ✅ — артисты
 
 **Files:** `mobile/app/artists/[id].tsx`, `src/api/media.ts`,
 `src/api/metadata.ts` (artists list/rename).
@@ -275,7 +351,7 @@ service; iOS audio session.
 
 ---
 
-### Task 16 — Continue Watching / Favorites
+### Task 16 ✅ — Continue Watching / Favorites
 
 **Files:** `mobile/src/api/progress.ts` (shared wrappers),
 `src/api/favorites.ts`, `app/(tabs)/video.tsx`, `audio.tsx`,
@@ -294,7 +370,7 @@ service; iOS audio session.
 
 ---
 
-### Task 17 — коллекции UI/bulk
+### Task 17 ✅ — коллекции UI/bulk
 
 **Files:** `app/(tabs)/library.tsx`, `app/collections/[id].tsx`,
 `src/api/collections.ts`, модалки create/rename/move/add.
@@ -310,7 +386,7 @@ service; iOS audio session.
 
 ---
 
-### Task 18 — корзина
+### Task 18 ✅ — корзина
 
 **Files:** `app/trash.tsx`, `src/api/trash.ts`.
 
@@ -323,7 +399,7 @@ service; iOS audio session.
 
 ---
 
-### Task 19 — загрузка файлов
+### Task 19 ✅ — загрузка файлов
 
 **Files:** `app/upload.tsx`, `src/api/upload.ts`, `useUploadQueue.ts`.
 
@@ -343,7 +419,7 @@ service; iOS audio session.
 
 ---
 
-### Task 20 — метаданные, обложка, удаление
+### Task 20 ✅ — метаданные, обложка, удаление
 
 **Files:** `src/api/metadata.ts`, `src/api/cover.ts`,
 `EditMetadataScreen.tsx`, `ChangeCoverSheet.tsx`.
@@ -359,7 +435,7 @@ service; iOS audio session.
 
 ---
 
-### Task 21 — менеджер скачиваний
+### Task 21 ✅ — менеджер скачиваний
 
 **Files:** `src/downloads/downloadStore.ts`, `DownloadProvider.tsx`,
 `app/downloads.tsx`, `DownloadButton.tsx`.
@@ -377,7 +453,7 @@ service; iOS audio session.
 
 ---
 
-### Task 22 — offline playback и экспорт
+### Task 22 ✅ — offline playback и экспорт
 
 **Files:** `src/player/offlineSource.ts`, `app/downloads.tsx`.
 
@@ -390,9 +466,9 @@ service; iOS audio session.
 
 ---
 
-### Task 23 — настройки, тема, i18n
+### Task 23 ✅ — настройки, тема, i18n
 
-**Files:** settings/server/login/i18n.
+**Files:** `app/server.tsx`, login и i18n; публичная настройка — `/server`.
 
 **Сделать:**
 - Server URL, theme (system/light/dark), language ru/en — уже частично есть;
@@ -405,7 +481,11 @@ service; iOS audio session.
 
 ---
 
-### Task 24 — тесты, CI, документация
+### Task 24 ✅ — тесты, CI, документация
+
+**Итог:** 18 flow в `.maestro/`, ручной `.github/workflows/mobile-e2e.yml`,
+config-проверки в `ci.yml`, обновлённые plan/handoff/README/AGENTS и
+release notes. Maestro и e2e-workflow не запускались (см. раздел 0).
 
 **Сделать:**
 - Maestro flows в `.maestro/`; CI job Android emulator (Maestro CLI).
@@ -419,6 +499,26 @@ service; iOS audio session.
 
 ---
 
+### Пробел паритета — поиск и сортировка списков
+
+**Цель:** закрыть единственный известный функциональный разрыв с Flutter.
+
+**Files:** `mobile/app/(tabs)/video.tsx`, `audio.tsx`,
+`mobile/src/api/media.ts`, `mobile/src/components/MediaList.tsx`,
+`mobile/src/i18n/index.ts`, новый debounce/controls-компонент.
+
+**Сделать:**
+- `useVideoList(q, sort)` и `useAudioList(q, sort)` пробросить в
+  `videoListOptions`/`audioListOptions` (shared уже поддерживает).
+- TextInput поиска с debounce, переключатель asc/desc, скрытие home-рядов
+  при активном поиске, пустое состояние «ничего не найдено».
+- Тесты на чистые хелперы (toggle sort, нормализация запроса); version bump
+  mobile patch + `version:sync`.
+
+**Приёмка:** поиск/сортировка работают в обоих табах; DoD закрыт.
+
+---
+
 ### Task 25 — релиз
 
 - `version:sync`, versionCode, dogfood APK arm64.
@@ -428,7 +528,10 @@ service; iOS audio session.
 
 ---
 
-## 5. Известные P3-долги (не блокируют Tasks 8–25, но не забыть)
+## 5. Известные P3-долги (исторический снимок)
+
+Список ниже — долги, зафиксированные при приёмке Tasks 1–7. Часть закрыта
+в Tasks 8–23; он оставлен как история и не является блокером Task 25.
 
 ### После Task 1
 - Дубли shared/web тестов progress/favorites; web-тесты не проверяют
@@ -440,7 +543,7 @@ service; iOS audio session.
 - `saveLyrics` всегда `clear:true`/`source:"user"` по умолчанию; сделать
   параметром.
 - Нет тестов rethrow progress/lyrics, stale-total favorites.
-- Версия shared не бампнута (0.1.7).
+- Версия shared не бампнута (0.1.7). **Закрыто:** shared `0.1.8`.
 
 ### После Task 2
 - Основные happy-path тесты bulk неполные (без всех 4 ключей); dedicated
@@ -451,12 +554,12 @@ service; iOS audio session.
 - `Collection.type` — `z.string()`, а create принимает `MediaType`; нужен
   guard/isMediaType.
 - Bulk-add теперь есть, но `added`-тест/схема согласованы.
-- Версия shared не бампнута.
+- Версия shared не бампнута. **Закрыто:** shared `0.1.8`.
 
 ### После Task 3
 - Локальный `mobile/android` устарел; нужен prebuild.
 - CI не проверяет config plugins (`expo install --check`,
-  `expo config --type introspect`).
+  `expo config --type introspect`). **Закрыто в Task 24.**
 - `CAMERA` может появиться из AAR image-picker; решить
   `cameraPermission:false`, если камера не нужна.
 - `expo-image` plugin без props — no-op.
@@ -520,19 +623,15 @@ service; iOS audio session.
 
 ## 6. Версии и процесс
 
-Текущие:
-- backend `1.0.28`;
-- web `0.1.30`;
-- shared `0.1.7`;
-- mobile `0.1.14`, versionCode 32.
+Текущие (2026-11-11):
+- backend `1.0.29`;
+- web `0.1.31`;
+- shared `0.1.8`;
+- mobile `0.1.30`, versionCode 48.
 
-**Долг:** Tasks 1/2 меняли shared, но shared остался `0.1.7`; web/mobile
-пинят `0.1.7`. По AGENTS нужно:
-- bump shared patch (0.1.8), обновить `web/package.json`,
-  `mobile/package.json`, `package-lock.json`;
-- bump web patch, если менялся web (пока нет);
-- bump mobile patch на каждый коммит + `version:sync`.
-Сделать это отдельным `chore` перед релизом или при следующем изменении shared.
+**Долг снимка 2026-11-10 снят:** shared поднят до `0.1.8`, web и mobile
+пинят `0.1.8`; `package-lock.json` обновлён. Task 24 — docs/CI-коммит без
+изменения кода и версий, поэтому mobile остаётся `0.1.30`/48.
 
 Правило версий: каждый коммит, затрагивающий backend/web/mobile/shared,
 поднимает patch; mobile `versionCode` — через `npm run version:sync`,
@@ -547,8 +646,14 @@ CI проверяет `--check`.
 npm run typecheck -w mobile
 npm run lint -w mobile
 npm run test -w mobile
-cd mobile && npx expo export --platform android --output-dir dist
 npm run version:sync -w mobile -- --check
+cd mobile && EXPO_OFFLINE=1 npx expo install --check
+cd mobile && npx expo config --type introspect
+cd mobile && npx expo export --platform android --output-dir dist
+
+# Maestro (нужны maestro, adb и эмулятор/устройство)
+maestro test .maestro/tabs.yaml
+maestro test .maestro/theme.yaml
 
 # shared
 npm run typecheck -w @flux/shared
@@ -569,6 +674,10 @@ cd backend && go test ./internal/... -count=1
 
 ## 8. Definition of Done для паритета
 
+DoD **не закрыт**: функциональные пункты Tasks 1–24 реализованы, но нет
+поиска/сортировки списков, а device-smoke и dogfood-сборка ещё не сделаны.
+Чекбоксы ниже не отмечать до закрытия обоих пунктов.
+
 - [ ] Видео: список/поиск/детали/плеер (play/pause/seek/±10/скорость/
       fullscreen/PiP), resume, source, favorite, коллекции, extract, offline.
 - [ ] Аудио: список/артисты/полный+мини-плеер/очередь (shuffle/repeat/
@@ -584,12 +693,16 @@ cd backend && go test ./internal/... -count=1
 
 ---
 
-## 9. Что проверить перед продолжением
+## 9. Что проверить перед Task 25
 
-1. `git status` — чисто; HEAD `8ec88b8`.
-2. `npm run test -w mobile` — 25 тестов.
-3. `npm run version:sync -w mobile -- --check` — 0.1.14/32.
-4. Открыть `docs/mobile-parity-plan-2026-11-09.md` Task 8 и начать с
-   `VideoPlayer`/`useVideoProgress`.
-5. Сразу создать `.maestro` сценарий для плеера после реализации, но не
-   выдавать структурную проверку за прогон.
+1. `git status` — чисто; HEAD — коммит Task 24
+   `chore(mobile): e2e, CI и документация`.
+2. `npm run typecheck -w mobile && npm run lint -w mobile && npm run test -w mobile`.
+3. `npm run version:sync -w mobile -- --check` — 0.1.30/48.
+4. `cd mobile && EXPO_OFFLINE=1 npx expo install --check && npx expo config --type introspect`.
+5. Прогнать `.maestro/tabs.yaml` и `.maestro/theme.yaml` на эмуляторе или
+   устройстве; не выдавать структурную проверку YAML за прогон.
+6. Собрать dogfood APK arm64 и пройти device-smoke: login, video,
+   audio background/lock, offline.
+7. Закрыть пробел паритета — поиск/сортировку списков — отдельной задачей
+   до отметки DoD.

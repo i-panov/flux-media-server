@@ -82,16 +82,32 @@ cd mobile
 npx expo start                 # Expo Go / эмулятор
 npm run typecheck
 npm run lint
-npm run test                   # Vitest, i18n
+npm run test                   # Vitest: pure-логика, i18n, download index
 npm run version:sync           # package.json → app.json + version-code
 npm run version:sync -- --check
+EXPO_OFFLINE=1 npx expo install --check
+npx expo config --type introspect
 npx expo export --platform android --output-dir dist
+maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулятор/устройство
 ```
 
-- `android/` и `ios/` генерируются и в git не входят.
-- OTP-вход через SecureStore; публичная настройка сервера — `/server`
-  (доступна до входа), таб Settings защищён.
+- `android/` и `ios/` генерируются (`expo prebuild`) и в git не входят.
+- Сессия (access/refresh) — только SecureStore; OTP-вход; `AuthGate`
+  защищает табы, публичная настройка сервера — `/server` (`app/server.tsx`,
+  доступна до входа). Logout очищает query cache, очередь, downloads,
+  токены и persisted state.
 - Анализаторы: biome (extends web) + `eslint-config-expo` + sonarjs.
+- `@flux/shared` — единственный источник API/очереди/lyrics-логики;
+  не дублировать fetch-контракты в mobile.
+- Поиск и сортировка списков видео/аудио пока не реализованы в UI:
+  shared `videoListOptions`/`audioListOptions` уже принимают `q` и `sort`,
+  но экраны их не передают. Это известный пробел паритета.
+- Maestro: 18 flow в `.maestro/` (tabs, theme, video, audio, lyrics,
+  artists, collections, favorites, trash, upload, metadata, downloads).
+  Ручной workflow `.github/workflows/mobile-e2e.yml` поднимает Android
+  emulator, backend и прогоняет `tabs.yaml`/`theme.yaml`; в push/PR не
+  входит (`workflow_dispatch`). CI `shared-mobile` проверяет
+  `expo install --check` и `expo config --type introspect`.
 - Dogfood-APK (arm64, ~30 МБ вместо ~92 МБ universal):
   `EXPO_PUBLIC_API_BASE=<url> ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a ./gradlew assembleRelease`
   из `mobile/android` (JDK 17 + `local.properties` с SDK/NDK локально).
@@ -128,11 +144,22 @@ npx expo export --platform android --output-dir dist
 ### Mobile (`mobile/`)
 
 - `app/` — expo-router: `(tabs)/{video,audio,library,settings}`, `index`,
-  `login`, `server`.
-- `src/auth/` — сессия, logout, `AuthGate`.
-- `src/api/` — shared `CoreFetcher` + query-хуки.
-- `src/i18n/` — ru/en, реактивный `useLanguage`.
-- `src/components/` — `AuthGate`, `MediaList`.
+  `login`, `server`, `video/[id]`, `audio/[id]`, `player`,
+  `artists/{index,[id]}`, `collections/[id]`, `upload`, `trash`,
+  `downloads`, `media/[id]/edit`.
+- `src/auth/` — сессия, logout, `SessionResetProvider`, `AuthGate`.
+- `src/api/` — shared `CoreFetcher` + query-хуки: media, favorites,
+  collections, progress, lyrics, upload, trash, metadata, cover, extract.
+- `src/media/` — `authSource`/`imageSource`, `useAuthImageSource`.
+- `src/player/` — `AudioProvider`, `AudioBar`, `VideoPlayer`, очередь,
+  прогресс, offline-source.
+- `src/downloads/` — `DownloadProvider`, индекс, лимит кеша, экспорт.
+- `src/collections/`, `src/artists/`, `src/upload/`, `src/lyrics/` —
+  доменная логика и чистые хелперы.
+- `src/theme/` — токены и `ThemeProvider`; `src/i18n/` — ru/en.
+- `src/components/` — общие экраны, карточки, диалоги, состояния.
+- `.maestro/` — UI-flow; `.github/workflows/mobile-e2e.yml` — ручной
+  Android emulator прогон (в push/PR не входит).
 
 ### Shared (`packages/shared/src/`)
 
@@ -148,8 +175,10 @@ npx expo export --platform android --output-dir dist
 - Ошибки API: `response.Error`; ошибки репозитория мапятся `repoError`.
 - Web-запросы — только через `apiFetch`/`apiFetchBlob`; сырой `fetch` в
   компонентах запрещён (кроме транспорта).
-- Mobile-токены — только SecureStore; `AuthGate` защищает табы (включая
-  Settings), публичная настройка сервера — `/server`.
+- Mobile-токены (access/refresh) — только SecureStore; `AuthGate` защищает
+  табы (включая Settings), публичная настройка сервера — `/server`.
+- Mobile-запросы — через shared `apiFetch`/`CoreFetcher`; очередь, progress
+  и lyrics-логика не дублируются в mobile.
 - Shared не импортирует React/DOM/RN; платформенные различия — через
   `AuthTransport`/`KeyValueStore`.
 
@@ -186,9 +215,12 @@ npx expo export --platform android --output-dir dist
 (cd web && npm run typecheck && npm run lint && npm run test && npm run lint:deadcode)
 npm run test -w @flux/shared
 npm run typecheck -w mobile && npm run lint -w mobile && npm run test -w mobile
+(cd mobile && EXPO_OFFLINE=1 npx expo install --check && npx expo config --type introspect)
 ```
 
-E2E и production build — перед крупными изменениями web.
+E2E и production build — перед крупными изменениями web. Mobile E2E —
+ручной workflow `mobile-e2e.yml`; Maestro-flow требуют эмулятора/устройства
+и в обычный CI не входят.
 
 ## Документация
 
@@ -196,3 +228,7 @@ E2E и production build — перед крупными изменениями w
 - `AGENTS.md` — этот файл.
 - `docs/README.md` — индекс документов.
 - `docs/review-2026-11-09.md` — итоговый отчёт ревью и журнал.
+- `docs/mobile-parity-plan-2026-11-09.md` — план паритета mobile.
+- `docs/mobile-parity-handoff-2026-11-10.md` — исторический handoff и
+  актуальный статус mobile.
+- `docs/mobile-release-notes-2026-11-11.md` — release notes mobile 0.1.30.

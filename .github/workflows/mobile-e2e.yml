@@ -1,0 +1,232 @@
+# Ручной e2e-прогон mobile на Android-эмуляторе.
+#
+# ВАЖНО: этот workflow добавлен вместе с Task 24, но в сессии разработки
+# НЕ запускался: локально нет maestro, adb, эмулятора и KVM. Считайте его
+# черновиком — возможны правки (версия образа, профиль AVD, таймауты
+# Maestro, доступность KVM на раннере). Он намеренно не подключён к
+# push/pull_request и запускается только вручную через workflow_dispatch.
+#
+# Debug-APK не содержит JS-бандл: приложение тянет его с Metro на хосте.
+# Поэтому job поднимает `expo start`, ждёт packager-status:running и делает
+# `adb reverse tcp:8081 tcp:8081` перед запуском.
+#
+# Покрытие намеренно узкое: tabs.yaml (публичный /server -> OTP-вход ->
+# табы -> настройки) и theme.yaml (system/light/dark + persistence).
+# Медиа-зависимые flow (video/audio/collections/upload/downloads) требуют
+# подготовленной библиотеки и здесь не запускаются.
+
+name: Mobile E2E (manual Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      maestro_version:
+        description: 'Maestro CLI version (empty = installer default)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maestro-android:
+    name: Android emulator + Maestro smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Установщик Maestro читает MAESTRO_VERSION; пустое значение — latest.
+      MAESTRO_VERSION: ${{ inputs.maestro_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install backend build deps
+        run: sudo apt-get update && sudo apt-get install -y gcc libc6-dev
+
+      # CGO обязателен: SQLite-драйвер mattn/go-sqlite3.
+      - name: Build backend binary
+        working-directory: backend
+        run: CGO_ENABLED=1 go build -o flux-server ./cmd/server
+
+      # Конфиг и данные — во временном каталоге раннера, чтобы не
+      # засорять рабочее дерево. debug + allow_unknown_email возвращают
+      # OTP в ответе, поэтому Maestro может войти без SMTP.
+      - name: Prepare backend config
+        run: |
+          E2E_DIR="$RUNNER_TEMP/flux-e2e"
+          mkdir -p "$E2E_DIR/thumbnails" "$E2E_DIR/video" "$E2E_DIR/audio" \
+            "$E2E_DIR/images" "$E2E_DIR/originals" "$E2E_DIR/tmp"
+          cat > "$E2E_DIR/config.yaml" <<YAML
+          server:
+            host: "0.0.0.0"
+            port: 8080
+            env: "dev"
+            debug: true
+            cors_origins: "*"
+            cookie_secure: false
+          database:
+            path: "$E2E_DIR/flux.db"
+          auth:
+            jwt_secret: "e2e-only-jwt-secret-0123456789-abcdefghij"
+            allow_unknown_email: true
+            allowed_emails: []
+            smtp:
+              host: ""
+              port: 0
+              username: ""
+              password: ""
+              from: ""
+              require_tls: false
+          scanner:
+            enabled: false
+            watch_enabled: false
+          rate_limiter:
+            max: 120
+            expiration: 60
+            read_max: 1200
+            read_expiration: 60
+          media:
+            thumbnail_path: "$E2E_DIR/thumbnails"
+            video_path: "$E2E_DIR/video"
+            audio_path: "$E2E_DIR/audio"
+            image_path: "$E2E_DIR/images"
+          storage:
+            originals_dir: "$E2E_DIR/originals"
+            temp_dir: "$E2E_DIR/tmp"
+          YAML
+          echo "E2E_DIR=$E2E_DIR" >> "$GITHUB_ENV"
+
+      - name: Expo prebuild (Android)
+        working-directory: mobile
+        env:
+          CI: '1'
+          EXPO_NO_TELEMETRY: '1'
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build debug APK (x86_64)
+        working-directory: mobile/android
+        env:
+          ORG_GRADLE_PROJECT_reactNativeArchitectures: x86_64
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Run backend, Metro and Maestro on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: >-
+            -no-window -no-snapshot -gpu swiftshader_indirect -noaudio
+            -no-boot-anim -camera-back none -camera-front none
+          script: |
+            set -euo pipefail
+
+            # Backend и Metro стартуют в этом же step, что и тесты: не
+            # полагаемся на то, что фоновые процессы переживут границу
+            # step'ов, и гарантированно останавливаем их в trap.
+            nohup ./backend/flux-server -config "$E2E_DIR/config.yaml" \
+              > "$E2E_DIR/server.log" 2>&1 &
+            SERVER_PID=$!
+
+            # Debug-APK без JS-бандла: Metro обязан быть доступен.
+            # --localhost + adb reverse = приложение видит 127.0.0.1:8081.
+            setsid env CI=1 EXPO_NO_TELEMETRY=1 \
+              bash -c 'cd mobile && exec npx expo start --localhost --port 8081' \
+              > "$E2E_DIR/metro.log" 2>&1 &
+            METRO_PID=$!
+
+            copy_artifacts() {
+              cp -R "$HOME/.maestro/tests" "$E2E_DIR/maestro-tests" \
+                2>/dev/null || true
+            }
+            cleanup() {
+              copy_artifacts
+              kill "$SERVER_PID" 2>/dev/null || true
+              kill -- -"$METRO_PID" 2>/dev/null || kill "$METRO_PID" \
+                2>/dev/null || true
+            }
+            trap cleanup EXIT
+
+            READY=0
+            for _ in $(seq 1 60); do
+              if curl -fsS http://127.0.0.1:8080/api/health > /dev/null; then
+                READY=1
+                break
+              fi
+              sleep 1
+            done
+            if [ "$READY" != "1" ]; then
+              echo "Backend did not become healthy" >&2
+              cat "$E2E_DIR/server.log" >&2
+              exit 1
+            fi
+            curl -fsS http://127.0.0.1:8080/api/health
+
+            METRO_READY=0
+            for _ in $(seq 1 120); do
+              if curl -fsS http://127.0.0.1:8081/status 2>/dev/null \
+                | grep -q 'packager-status:running'; then
+                METRO_READY=1
+                break
+              fi
+              sleep 1
+            done
+            if [ "$METRO_READY" != "1" ]; then
+              echo "Metro did not start" >&2
+              cat "$E2E_DIR/metro.log" >&2
+              exit 1
+            fi
+            curl -fsS http://127.0.0.1:8081/status
+
+            adb reverse tcp:8081 tcp:8081
+            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+            # Первый запуск прогревает debug-бандл; Maestro дальше делает
+            # launchApp с clearState.
+            adb shell am start -n app.lib.flux/.MainActivity
+            sleep 10
+
+            # Пустой input = installer default; значение задаётся через
+            # workflow_dispatch, чтобы иметь возможность зафиксировать версию.
+            curl -Ls "https://get.maestro.mobile.dev" | bash
+            export PATH="$HOME/.maestro/bin:$PATH"
+            maestro --version
+
+            # Эмулятор видит хост как 10.0.2.2. tabs.yaml использует этот
+            # адрес по умолчанию, явный -e фиксирует контракт.
+            maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/tabs.yaml
+            maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/theme.yaml
+
+      - name: Upload backend, Metro and Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-e2e-artifacts
+          path: ${{ runner.temp }}/flux-e2e/
+          if-no-files-found: ignore
