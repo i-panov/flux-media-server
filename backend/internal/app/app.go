@@ -14,7 +14,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/valyala/fasthttp"
 
@@ -373,7 +372,21 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	})
 	fiberApp.Use(fiberrecover.New())
 	fiberApp.Use(middleware.SecurityHeaders())
-	fiberApp.Use(logger.New())
+
+	// Доверенные прокси парсим один раз: X-Forwarded-For принимаем
+	// только от них, иначе клиент подделает IP и обойдёт лимитер.
+	// Нужно и лимитерам, и access-логгеру — поэтому вычисляем до них.
+	trustedProxies := parseTrustedProxies(cfg.Server.TrustedProxies)
+	clientKey := func(c *fiber.Ctx) string {
+		return getClientIP(c, trustedProxies)
+	}
+
+	// Свой access-логгер вместо middleware/logger: тот пишет c.IP(), то есть
+	// IP прокси (шлюз docker-бриджа), потому что EnableTrustedProxyCheck не
+	// включён — доверять X-Forwarded-For целиком нельзя (Fiber берёт самый
+	// левый адрес, который клиент подставляет сам). Здесь IP берётся через
+	// getClientIP, формат строки сохранён как у Fiber.
+	fiberApp.Use(requestLogger(clientKey))
 
 	// Per-route лимиты тела: fasthttp буферизует тело запроса целиком ДО
 	// вызова хендлеров (в памяти, O(size) на соединение — см. комментарий
@@ -442,13 +455,6 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 			"version": version,
 		})
 	})
-
-	// Доверенные прокси парсим один раз: X-Forwarded-For принимаем
-	// только от них, иначе клиент подделает IP и обойдёт лимитер.
-	trustedProxies := parseTrustedProxies(cfg.Server.TrustedProxies)
-	clientKey := func(c *fiber.Ctx) string {
-		return getClientIP(c, trustedProxies)
-	}
 
 	// Auth rate limiter — parameters from config.
 	authRateLimiter := limiter.New(limiter.Config{
@@ -740,7 +746,34 @@ func (a *App) Listen() error {
 	return a.Fiber.Listen(fmt.Sprintf("%s:%d", host, port))
 }
 
-// getClientIP возвращает IP клиента для rate limiter. X-Forwarded-For /
+// requestLogger — access-лог в формате middleware/logger Fiber, но IP берётся
+// через getClientIP, то есть с учётом trusted_proxies. Пишем напрямую в
+// stdout: log.Printf добавил бы свой префикс даты к уже готовой строке.
+func requestLogger(clientIP func(*fiber.Ctx) string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		start := time.Now()
+		err := c.Next()
+		stop := time.Now()
+
+		msg := "-"
+		if err != nil {
+			msg = err.Error()
+		}
+		fmt.Fprintf(os.Stdout, "%s | %d | %13v | %s | %s | %s | %s\n",
+			stop.Format("15:04:05"),
+			c.Response().StatusCode(),
+			stop.Sub(start),
+			clientIP(c),
+			c.Method(),
+			c.Path(),
+			msg,
+		)
+		return err
+	}
+}
+
+// getClientIP возвращает IP клиента для rate limiter и access-лога.
+// X-Forwarded-For /
 // X-Real-IP принимаются только если непосредственный peer входит в
 // trusted_proxies: иначе клиент подделает IP и получит уникальный ключ
 // на каждый запрос. Пустой список — заголовки игнорируются.
