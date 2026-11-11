@@ -596,3 +596,28 @@ func TestGetClientIPUntrustedProxyIgnoresHeader(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "192.0.2.5", string(body))
 }
+
+func TestRequestLoggerUsesTrustedProxyClientIP(t *testing.T) {
+	var buf bytes.Buffer
+	trusted := parseTrustedProxies("10.0.0.0/8")
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Context().SetRemoteAddr(&net.TCPAddr{IP: net.ParseIP("10.1.2.3")})
+		c.Request().Header.Set("X-Forwarded-For", "203.0.113.9, 10.1.2.3")
+		return c.Next()
+	})
+	app.Use(requestLogger(&buf, func(c *fiber.Ctx) string {
+		return getClientIP(c, trusted)
+	}))
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/", nil))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	logLine := buf.String()
+	assert.Contains(t, logLine, "203.0.113.9")
+	assert.NotContains(t, logLine, "10.1.2.3")
+	assert.Contains(t, logLine, "| GET | / | -")
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -396,7 +397,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// включён — доверять X-Forwarded-For целиком нельзя (Fiber берёт самый
 	// левый адрес, который клиент подставляет сам). Здесь IP берётся через
 	// getClientIP, формат строки сохранён как у Fiber.
-	fiberApp.Use(requestLogger(clientKey))
+	fiberApp.Use(requestLogger(os.Stdout, clientKey))
 
 	// Per-route лимиты тела: fasthttp буферизует тело запроса целиком ДО
 	// вызова хендлеров (в памяти, O(size) на соединение — см. комментарий
@@ -760,7 +761,7 @@ func (a *App) Listen() error {
 // requestLogger — access-лог в формате middleware/logger Fiber, но IP берётся
 // через getClientIP, то есть с учётом trusted_proxies. Пишем напрямую в
 // stdout: log.Printf добавил бы свой префикс даты к уже готовой строке.
-func requestLogger(clientIP func(*fiber.Ctx) string) fiber.Handler {
+func requestLogger(out io.Writer, clientIP func(*fiber.Ctx) string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		start := time.Now()
 		err := c.Next()
@@ -770,7 +771,7 @@ func requestLogger(clientIP func(*fiber.Ctx) string) fiber.Handler {
 		if err != nil {
 			msg = err.Error()
 		}
-		fmt.Fprintf(os.Stdout, "%s | %d | %13v | %s | %s | %s | %s\n",
+		fmt.Fprintf(out, "%s | %d | %13v | %s | %s | %s | %s\n",
 			stop.Format("15:04:05"),
 			c.Response().StatusCode(),
 			stop.Sub(start),
