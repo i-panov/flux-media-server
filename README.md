@@ -139,6 +139,8 @@ cd web && npm run test:e2e && npm run build && npm run size
   — исторический handoff mobile-задач и актуальный статус.
 - [docs/mobile-release-notes-2026-11-11.md](docs/mobile-release-notes-2026-11-11.md)
   — что вошло в mobile 0.1.30 и известные ограничения.
+- [docs/tv-roadmap-2026-11-11.md](docs/tv-roadmap-2026-11-11.md)
+  — Android TV, web-TV, read-only, QR-вход и порядок работ.
 
 ## Лицензия
 
