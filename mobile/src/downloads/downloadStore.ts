@@ -413,6 +413,33 @@ export function removeDownloadEntry(
 	return entries.filter((entry) => entry.mediaId !== mediaId);
 }
 
+export interface DownloadRemovalPlan {
+	/** null — записи не было; индекс и файл не трогаем. */
+	readonly entry: DownloadEntry | null;
+	readonly next: DownloadEntry[];
+	/** null — unsafe filename в битом индексе; запись всё равно удаляем. */
+	readonly path: string | null;
+}
+
+// Удаление готового файла: сначала считаем новый индекс и путь, затем
+// вызывающий синхронно persist-ит индекс и лишь после этого удаляет файл.
+// Ошибка файловой системы не должна оставлять запись в индексе.
+export function planDownloadRemoval(
+	entries: readonly DownloadEntry[],
+	mediaId: number,
+	documentDirectory: string | null,
+): DownloadRemovalPlan {
+	const entry = findDownloadEntry(entries, mediaId);
+	if (entry === null) {
+		return { entry: null, next: [...entries], path: null };
+	}
+	return {
+		entry,
+		next: removeDownloadEntry(entries, mediaId),
+		path: downloadFilePath(documentDirectory, entry.filename),
+	};
+}
+
 export function findDownloadEntry(
 	entries: readonly DownloadEntry[],
 	mediaId: number,

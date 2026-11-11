@@ -20,6 +20,7 @@ import {
 	parseContentRange,
 	parseDownloadIndex,
 	partPathFor,
+	planDownloadRemoval,
 	removeDownloadEntry,
 	resolveDownloadedPath,
 	serializeDownloadIndex,
@@ -35,6 +36,7 @@ const SERVER = "https://srv.example/api";
 const SERVER_A = "https://a/api";
 const SERVER_B = "https://b/api";
 const MEDIA_7 = "media-7.mp4";
+const UNSAFE_NAME = "../evil.mp4";
 
 function entry(
 	mediaId: number,
@@ -105,7 +107,7 @@ describe("downloadFileName", () => {
 			"file:///documents/downloads/media-7.mp4",
 		);
 		expect(downloadFilePath(null, MEDIA_7)).toBeNull();
-		expect(downloadFilePath(DOCS, "../evil.mp4")).toBeNull();
+		expect(downloadFilePath(DOCS, UNSAFE_NAME)).toBeNull();
 		expect(downloadFilePath(DOCS, "a/b.mp4")).toBeNull();
 		expect(partPathFor("file:///downloads/media-7.mp4")).toBe(
 			"file:///downloads/media-7.mp4.part",
@@ -238,7 +240,7 @@ describe("download index", () => {
 				server: SERVER,
 				items: [
 					entry(1, 10, 100),
-					{ ...entry(2, 20, 200), filename: "../evil.mp4" },
+					{ ...entry(2, 20, 200), filename: UNSAFE_NAME },
 					{ ...entry(3, 20, 200), size: -1 },
 					{ ...entry(4, 20, 200), type: "document" },
 					{ ...entry(1, 99, 300), title: "Новая версия" },
@@ -281,6 +283,31 @@ describe("download index", () => {
 		expect(
 			removeDownloadEntry(replaced, 2).map((item) => item.mediaId),
 		).toEqual([1]);
+	});
+
+	it("планирует удаление записи и файла, не мутируя исходный индекс", () => {
+		const initial = [entry(1, 10, 100), entry(2, 20, 200)];
+		const plan = planDownloadRemoval(initial, 1, DOCS_ROOT);
+		expect(plan.entry?.mediaId).toBe(1);
+		expect(plan.next.map((item) => item.mediaId)).toEqual([2]);
+		expect(plan.path).toBe("file:///docs/downloads/media-1.mp4");
+		expect(initial.map((item) => item.mediaId)).toEqual([1, 2]);
+	});
+
+	it("без записи не планирует удаление файла", () => {
+		const initial = [entry(1, 10, 100)];
+		const plan = planDownloadRemoval(initial, 9, DOCS_ROOT);
+		expect(plan.entry).toBeNull();
+		expect(plan.next.map((item) => item.mediaId)).toEqual([1]);
+		expect(plan.path).toBeNull();
+	});
+
+	it("удаляет запись даже при небезопасном имени в битом индексе", () => {
+		const broken = { ...entry(1, 10, 100), filename: UNSAFE_NAME };
+		const plan = planDownloadRemoval([broken], 1, DOCS_ROOT);
+		expect(plan.entry?.mediaId).toBe(1);
+		expect(plan.next).toEqual([]);
+		expect(plan.path).toBeNull();
 	});
 });
 

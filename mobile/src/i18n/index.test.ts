@@ -26,4 +26,18 @@ describe("mobile i18n", () => {
 		expect(t("metadata.edit")).toBe("Edit");
 		expect(t("cover.change")).toBe("Change cover");
 	});
+
+	it("включает нейтральный заголовок экспорта и имя файла в a11y", () => {
+		setLanguage("ru");
+		expect(t("downloads.exportDialog")).toBe("Поделиться файлом");
+		expect(t("downloads.exportItem", { title: "Фильм" })).toBe(
+			"Экспорт: Фильм",
+		);
+		expect(t("downloads.deleteItem", { title: "Фильм" })).toBe(
+			"Удалить: Фильм",
+		);
+		setLanguage("en");
+		expect(t("downloads.exportDialog")).toBe("Share file");
+		expect(t("downloads.exportItem", { title: "Movie" })).toBe("Export: Movie");
+	});
 });

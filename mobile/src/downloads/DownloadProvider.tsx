@@ -21,9 +21,9 @@ import {
 	DOWNLOAD_INDEX_KEY,
 	type DownloadEntry,
 	type DownloadFailure,
-	downloadFilePath,
+	type DownloadRemovalPlan,
 	findDownloadEntry,
-	removeDownloadEntry,
+	planDownloadRemoval,
 	resolveDownloadedPath,
 	serializeDownloadIndex,
 } from "./downloadStore";
@@ -179,6 +179,23 @@ function disposeTask(
 
 interface MutableRef<T> {
 	current: T;
+}
+
+// Индекс и persist — до удаления файла: ошибка FS не должна оставлять
+// запись, указывающую на уже удалённый файл.
+function applyDownloadRemoval(
+	plan: DownloadRemovalPlan,
+	setEntries: (entries: DownloadEntry[]) => void,
+	persist: (entries: readonly DownloadEntry[]) => void,
+): void {
+	if (plan.entry === null) {
+		return;
+	}
+	setEntries(plan.next);
+	persist(plan.next);
+	if (plan.path !== null) {
+		void removeFile(plan.path);
+	}
 }
 
 interface DownloadHydrationOptions {
@@ -392,25 +409,27 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 
 	const remove = useCallback(
 		(mediaId: number) => {
+			// Пока идёт повторная загрузка, удалять готовую запись нельзя:
+			// commit мог бы воскресить её после удаления. UI блокирует кнопку,
+			// это вторая линия защиты для вызовов вне экрана.
+			const downloading = activeRef.current.some((item) => {
+				return item.media.id === mediaId && item.status === "downloading";
+			});
+			if (downloading) {
+				return;
+			}
 			bumpToken(mediaId);
 			const task = tasksRef.current.get(mediaId);
 			tasksRef.current.delete(mediaId);
 			const partPath = partPathsRef.current.get(mediaId);
 			partPathsRef.current.delete(mediaId);
 			removeActive(mediaId);
-			const entry = findDownloadEntry(entriesRef.current, mediaId);
-			if (entry !== null) {
-				const next = removeDownloadEntry(entriesRef.current, mediaId);
-				const path = downloadFilePath(
-					FileSystem.documentDirectory,
-					entry.filename,
-				);
-				setEntries(next);
-				persist(next);
-				if (path !== null) {
-					void removeFile(path);
-				}
-			}
+			const plan = planDownloadRemoval(
+				entriesRef.current,
+				mediaId,
+				FileSystem.documentDirectory,
+			);
+			applyDownloadRemoval(plan, setEntries, persist);
 			disposeTask(task, partPath);
 		},
 		[bumpToken, persist, removeActive, setEntries],

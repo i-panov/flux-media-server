@@ -15,7 +15,8 @@ export const downloadsRu = {
 	"downloads.cancel": "Отменить",
 	"downloads.delete": "Удалить",
 	"downloads.deleteTitle": "Удалить файл?",
-	"downloads.deleteConfirm": "Файл будет удалён с устройства.",
+	"downloads.deleteConfirm":
+		"Файл будет удалён с устройства. Идущее воспроизведение может прерваться.",
 	"downloads.errorNetwork":
 		"Не удалось скачать файл. Проверьте сеть и повторите.",
 	"downloads.errorStatus": "Сервер отклонил скачивание.",
@@ -34,6 +35,22 @@ export const downloadsRu = {
 	"downloads.typeImage": "Изображение",
 	"downloads.progressLabel": "Прогресс скачивания",
 	"downloads.back": "Назад",
+	"downloads.export": "Экспорт",
+	"downloads.exportItem": "Экспорт: {{title}}",
+	"downloads.deleteItem": "Удалить: {{title}}",
+	// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
+	"downloads.exportHint": "Откроется системное меню «Поделиться»",
+	"downloads.exportDialog": "Поделиться файлом",
+	"downloads.exportUnavailableTitle": "Экспорт недоступен",
+	"downloads.exportUnavailable":
+		// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
+		"Системное меню «Поделиться» недоступно на этом устройстве.",
+	"downloads.exportMissingTitle": "Файл не найден",
+	"downloads.exportMissing":
+		"Файла нет на устройстве. Удалите запись и скачайте заново.",
+	"downloads.exportErrorTitle": "Не удалось экспортировать",
+	"downloads.exportError":
+		"Не удалось открыть системное меню. Попробуйте ещё раз.",
 } as const;
 
 export const downloadsEn: Record<keyof typeof downloadsRu, string> = {
@@ -50,7 +67,8 @@ export const downloadsEn: Record<keyof typeof downloadsRu, string> = {
 	"downloads.cancel": "Cancel",
 	"downloads.delete": "Delete",
 	"downloads.deleteTitle": "Delete file?",
-	"downloads.deleteConfirm": "The file will be removed from the device.",
+	"downloads.deleteConfirm":
+		"The file will be removed from the device. Playback in progress may be interrupted.",
 	"downloads.errorNetwork":
 		"Could not download the file. Check your network and retry.",
 	"downloads.errorStatus": "The server rejected the download.",
@@ -69,4 +87,17 @@ export const downloadsEn: Record<keyof typeof downloadsRu, string> = {
 	"downloads.typeImage": "Image",
 	"downloads.progressLabel": "Download progress",
 	"downloads.back": "Back",
+	"downloads.export": "Export",
+	"downloads.exportItem": "Export: {{title}}",
+	"downloads.deleteItem": "Delete: {{title}}",
+	"downloads.exportHint": "Opens the system share sheet",
+	"downloads.exportDialog": "Share file",
+	"downloads.exportUnavailableTitle": "Export unavailable",
+	"downloads.exportUnavailable":
+		"The system share sheet is not available on this device.",
+	"downloads.exportMissingTitle": "File not found",
+	"downloads.exportMissing":
+		"The file is no longer on the device. Delete the entry and download it again.",
+	"downloads.exportErrorTitle": "Could not export",
+	"downloads.exportError": "The share sheet could not be opened. Try again.",
 };

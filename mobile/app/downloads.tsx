@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { MediaType } from "@flux/shared";
+import * as FileSystem from "expo-file-system/legacy";
 import { router } from "expo-router";
+import { useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -22,6 +24,8 @@ import type {
 	DownloadEntry,
 	DownloadFailure,
 } from "../src/downloads/downloadStore";
+import { exportDownload } from "../src/downloads/exportDownload";
+import type { DownloadExportFailure } from "../src/downloads/exportStore";
 import { t, useLanguage } from "../src/i18n";
 import { useTheme } from "../src/theme/ThemeProvider";
 
@@ -47,6 +51,29 @@ function downloadFailureLabel(failure: DownloadFailure | null): string {
 			return t("downloads.errorNetwork");
 		default:
 			return t("downloads.errorUnknown");
+	}
+}
+
+function exportFailureAlert(failure: DownloadExportFailure): {
+	title: string;
+	message: string;
+} {
+	switch (failure) {
+		case "unavailable":
+			return {
+				title: t("downloads.exportUnavailableTitle"),
+				message: t("downloads.exportUnavailable"),
+			};
+		case "missing":
+			return {
+				title: t("downloads.exportMissingTitle"),
+				message: t("downloads.exportMissing"),
+			};
+		default:
+			return {
+				title: t("downloads.exportErrorTitle"),
+				message: t("downloads.exportError"),
+			};
 	}
 }
 
@@ -227,10 +254,29 @@ function ActiveRow({ item }: { item: ActiveDownload }) {
 	);
 }
 
-function EntryRow({ entry }: { entry: DownloadEntry }) {
+interface EntryRowProps {
+	readonly entry: DownloadEntry;
+	readonly downloading: boolean;
+	readonly exporting: boolean;
+	/** Один share sheet на экран: остальные кнопки экспорта ждут. */
+	readonly exportBusy: boolean;
+	readonly onExport: (entry: DownloadEntry) => void;
+}
+
+function EntryRow({
+	entry,
+	downloading,
+	exporting,
+	exportBusy,
+	onExport,
+}: EntryRowProps) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
 	const { remove } = useDownloadActions();
+	const exportDisabled = exportBusy || downloading;
+	// Пока идёт повторная загрузка, удаление старой записи гонялось бы с
+	// commit; пользователь сначала отменяет загрузку в активной строке.
+	const deleteDisabled = exporting || downloading;
 
 	const confirmDelete = () => {
 		Alert.alert(t("downloads.deleteTitle"), t("downloads.deleteConfirm"), [
@@ -273,19 +319,49 @@ function EntryRow({ entry }: { entry: DownloadEntry }) {
 					{mediaTypeLabel(entry.type)} · {formatFileSize(entry.size)}
 				</Text>
 			</View>
-			<Pressable
-				accessibilityRole="button"
-				accessibilityLabel={t("downloads.delete")}
-				onPress={confirmDelete}
-				testID={`download-delete-${entry.mediaId}`}
-				hitSlop={8}
-				style={({ pressed }) => [
-					styles.actionButton,
-					pressed && styles.pressed,
-				]}
-			>
-				<Ionicons name="trash-outline" size={20} color={colors.danger} />
-			</Pressable>
+			<View style={[styles.rowActions, { gap: spacing.xs }]}>
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("downloads.exportItem", {
+						title: entry.title,
+					})}
+					accessibilityHint={t("downloads.exportHint")}
+					accessibilityState={{ disabled: exportDisabled, busy: exporting }}
+					disabled={exportDisabled}
+					onPress={() => onExport(entry)}
+					testID={`download-export-${entry.mediaId}`}
+					hitSlop={8}
+					style={({ pressed }) => [
+						styles.actionButton,
+						pressed && styles.pressed,
+						exportDisabled && styles.disabled,
+					]}
+				>
+					{exporting ? (
+						<ActivityIndicator size="small" color={colors.accent} />
+					) : (
+						<Ionicons name="share-outline" size={20} color={colors.accent} />
+					)}
+				</Pressable>
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("downloads.deleteItem", {
+						title: entry.title,
+					})}
+					accessibilityState={{ disabled: deleteDisabled }}
+					disabled={deleteDisabled}
+					onPress={confirmDelete}
+					testID={`download-delete-${entry.mediaId}`}
+					hitSlop={8}
+					style={({ pressed }) => [
+						styles.actionButton,
+						pressed && styles.pressed,
+						deleteDisabled && styles.disabled,
+					]}
+				>
+					<Ionicons name="trash-outline" size={20} color={colors.danger} />
+				</Pressable>
+			</View>
 		</View>
 	);
 }
@@ -294,8 +370,42 @@ function DownloadsContent() {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const { entries, active } = useDownloadState();
+	const [exportingId, setExportingId] = useState<number | null>(null);
+	// Ref, а не только state: два быстрых нажатия до ререндера не должны
+	// открыть два share sheet одновременно.
+	const exportBusyRef = useRef(false);
 	const totalBytes = entries.reduce((sum, entry) => sum + entry.size, 0);
 	const empty = entries.length === 0 && active.length === 0;
+	const downloadingIds = new Set(
+		active
+			.filter((item) => item.status === "downloading")
+			.map((item) => item.media.id),
+	);
+
+	const handleExport = async (entry: DownloadEntry) => {
+		if (exportBusyRef.current) {
+			return;
+		}
+		exportBusyRef.current = true;
+		setExportingId(entry.mediaId);
+		try {
+			const failure = await exportDownload(
+				entry,
+				FileSystem.documentDirectory,
+				FileSystem.cacheDirectory,
+				t("downloads.exportDialog"),
+			);
+			if (failure !== null) {
+				const alert = exportFailureAlert(failure);
+				Alert.alert(alert.title, alert.message);
+			}
+		} catch {
+			Alert.alert(t("downloads.exportErrorTitle"), t("downloads.exportError"));
+		} finally {
+			exportBusyRef.current = false;
+			setExportingId(null);
+		}
+	};
 
 	return (
 		<Screen scroll testID="downloads-screen">
@@ -330,7 +440,14 @@ function DownloadsContent() {
 						{t("downloads.doneTitle")}
 					</Text>
 					{entries.map((entry) => (
-						<EntryRow key={entry.mediaId} entry={entry} />
+						<EntryRow
+							key={entry.mediaId}
+							entry={entry}
+							downloading={downloadingIds.has(entry.mediaId)}
+							exporting={exportingId === entry.mediaId}
+							exportBusy={exportingId !== null}
+							onExport={handleExport}
+						/>
 					))}
 				</View>
 			)}
@@ -391,4 +508,5 @@ const styles = StyleSheet.create({
 	progressFill: { height: "100%" },
 	progressSpinner: { width: "100%", height: 4 },
 	pressed: { opacity: 0.7 },
+	disabled: { opacity: 0.4 },
 });

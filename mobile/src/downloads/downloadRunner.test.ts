@@ -27,6 +27,7 @@ const state = vi.hoisted(() => {
 		fs,
 		children,
 		deleted: [] as string[],
+		deleteRejects: false,
 		moved: [] as { from: string; to: string }[],
 		cancelCalls: 0,
 		authCalls: [] as string[],
@@ -54,6 +55,9 @@ vi.mock("expo-file-system/legacy", () => ({
 		return Promise.resolve();
 	},
 	deleteAsync: (path: string) => {
+		if (state.deleteRejects) {
+			return Promise.reject(new Error("fs"));
+		}
 		state.deleted.push(path);
 		state.fs.delete(path);
 		state.children.delete(path);
@@ -110,7 +114,9 @@ vi.mock("../media/source", () => ({
 	streamPath: (id: number) => `/media/${id}/stream`,
 }));
 
-const { hydrateDownloads, runDownload } = await import("./downloadRunner");
+const { hydrateDownloads, removeFile, runDownload } = await import(
+	"./downloadRunner"
+);
 
 const DOCUMENT_DIRECTORY = "file:///docs/";
 const DOWNLOADS_DIRECTORY = "file:///docs/downloads/";
@@ -237,6 +243,7 @@ beforeEach(() => {
 	state.fs.clear();
 	state.children.clear();
 	state.deleted = [];
+	state.deleteRejects = false;
 	state.moved = [];
 	state.cancelCalls = 0;
 	state.authCalls = [];
@@ -350,6 +357,26 @@ describe("runDownload", () => {
 		expect(calls.failures).toEqual(["timeout"]);
 		expect(state.cancelCalls).toBeGreaterThan(0);
 		expect(state.moved).toHaveLength(0);
+	});
+});
+
+describe("removeFile", () => {
+	it("удаляет файл идемпотентно", async () => {
+		const path = `${DOWNLOADS_DIRECTORY}media-1.mp4`;
+		seedFile(path, 100);
+
+		await removeFile(path);
+
+		expect(state.deleted).toContain(path);
+	});
+
+	it("проглатывает ошибку удаления: индекс уже очищен вызывающим", async () => {
+		state.deleteRejects = true;
+
+		await expect(
+			removeFile(`${DOWNLOADS_DIRECTORY}media-1.mp4`),
+		).resolves.toBeUndefined();
+		expect(state.deleted).toEqual([]);
 	});
 });
 
