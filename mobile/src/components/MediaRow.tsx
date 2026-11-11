@@ -41,11 +41,10 @@ function RowCard({
 }) {
 	const { spacing } = useTheme();
 	// Cover есть не у всех записей: миниатюра — дешёвый fallback, а
-	// битую картинку MediaCard заменит заглушкой.
-	const path =
-		item.media.cover_url === ""
-			? thumbPath(item.media.id)
-			: coverPath(item.media.id);
+	// битую картинку MediaCard заменит заглушкой. Обложка меняется по тому
+	// же URL, поэтому кеш для неё отключён.
+	const hasCover = item.media.cover_url !== "";
+	const path = hasCover ? coverPath(item.media.id) : thumbPath(item.media.id);
 	const source = useAuthImageSource(path);
 	const artists = item.media.artists.map((artist) => artist.name).join(", ");
 
@@ -57,6 +56,7 @@ function RowCard({
 			progress={item.progress}
 			variant={variantOf(item.media)}
 			imageSource={source}
+			imageCachePolicy={hasCover ? "none" : "memory-disk"}
 			isFavorite={item.isFavorite}
 			onPress={onPress}
 			onFavoritePress={onFavoritePress}

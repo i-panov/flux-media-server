@@ -52,6 +52,12 @@ function AppShell({
 			<AudioProvider>
 				<Stack screenOptions={{ headerShown: false }}>
 					<Stack.Screen name="(tabs)" />
+					{/* Свайп-назад iOS не должен обходить confirm о несохранённых
+					    правках в редакторе метаданных. */}
+					<Stack.Screen
+						name="media/[id]/edit"
+						options={{ gestureEnabled: false, headerShown: false }}
+					/>
 					<Stack.Screen
 						name="player"
 						options={{ presentation: "modal", headerShown: false }}

@@ -24,7 +24,8 @@ export function AudioCover({
 	useLanguage();
 	const { colors, radii } = useTheme();
 	const thumbnail = thumbPath(media.id);
-	const preferred = media.cover_url === "" ? thumbnail : coverPath(media.id);
+	const hasCover = media.cover_url !== "";
+	const preferred = hasCover ? coverPath(media.id) : thumbnail;
 	// Fallback привязан к id: смена трека сама возвращает preferred, без
 	// setState в эффекте (и лишнего каскадного рендера).
 	const [fallback, setFallback] = useState<{ id: number; path: string } | null>(
@@ -87,6 +88,7 @@ export function AudioCover({
 					source={source}
 					style={StyleSheet.absoluteFill}
 					contentFit="cover"
+					cachePolicy={path === thumbnail ? "memory-disk" : "none"}
 					transition={150}
 					accessibilityIgnoresInvertColors
 					onError={() => {

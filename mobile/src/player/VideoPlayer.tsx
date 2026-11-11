@@ -36,6 +36,8 @@ const KEEP_AWAKE_TAG = "flux-video-player";
 interface VideoPlayerProps {
 	media: Media;
 	title?: string;
+	/** Версия обложки: после загрузки новой постер перезагружается. */
+	coverVersion?: number;
 }
 
 // Отдельный компонент, потому что useKeepAwake нельзя вызывать условно:
@@ -128,7 +130,11 @@ function ErrorOverlay({ onRetry }: { onRetry: () => void }) {
 	);
 }
 
-export function VideoPlayer({ media, title }: VideoPlayerProps) {
+export function VideoPlayer({
+	media,
+	title,
+	coverVersion = 0,
+}: VideoPlayerProps) {
 	useLanguage();
 	const { colors, radii } = useTheme();
 	const viewRef = useRef<VideoView | null>(null);
@@ -302,7 +308,9 @@ export function VideoPlayer({ media, title }: VideoPlayerProps) {
 					accessibilityLabel={title ?? media.title}
 					onFirstFrameRender={() => setFirstFrame(true)}
 				/>
-				{!firstFrame && !failed && <VideoPoster key={media.id} media={media} />}
+				{!firstFrame && !failed && (
+					<VideoPoster media={media} coverVersion={coverVersion} />
+				)}
 				{!hasStarted && !failed && (
 					<PlayOverlay sourceReady={sourceReady} onPlay={startPlayback} />
 				)}

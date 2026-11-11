@@ -1,0 +1,104 @@
+# Метаданные и обложка (admin-only). Flow открывает редактор заголовка,
+# sheet обложки (без picker — это системный UI, Maestro его не
+# автоматизирует) и проверяет admin-кнопку удаления без подтверждения.
+#
+# Предусловия те же, что у tabs.yaml, плюс вошедший пользователь должен быть
+# администратором: у обычного зрителя кнопок video-detail-edit/cover нет, и
+# flow упадёт на scrollUntilVisible — это ожидаемо.
+#
+# Запуск:
+#   maestro test .maestro/metadata.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/metadata.yaml
+appId: app.lib.flux
+name: "Metadata: edit title, cover entry"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на экране настроек — уходим на видео.
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+
+# Админ-действия могут быть ниже fold.
+- scrollUntilVisible:
+    element:
+      id: "video-detail-edit"
+    direction: DOWN
+    timeout: 10000
+
+# Обложка: открываем sheet и закрываем его, не выбирая файл. Системный
+# image picker Maestro не автоматизирует — загрузку проверяем вручную.
+- scrollUntilVisible:
+    element:
+      id: "video-detail-cover"
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: "video-detail-cover"
+- tapOn:
+    id: "video-detail-cover"
+- extendedWaitUntil:
+    visible:
+      id: "change-cover-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "change-cover-sheet"
+- tapOn:
+    id: "change-cover-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "change-cover-sheet"
+    timeout: 10000
+
+- evalScript: ${output.metadataTitle = "Maestro metadata " + Date.now()}
+
+# Редактор: меняем title и сохраняем.
+- tapOn:
+    id: "video-detail-edit"
+- extendedWaitUntil:
+    visible:
+      id: "metadata-edit-screen"
+    timeout: 20000
+- tapOn:
+    id: "metadata-field-title"
+- eraseText: 120
+- inputText: ${output.metadataTitle}
+- hideKeyboard
+- tapOn:
+    id: "metadata-save"
+
+# Сохранение возвращает на детали, где уже новый title.
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+- assertVisible: ${output.metadataTitle}
+- assertVisible:
+    id: "video-detail-screen"
+
+# Удаление: кнопка админская и уже покрыта video-detail/trash-flow. Native
+# Alert не имеет testID, а подтверждение уничтожило бы фикстуру, поэтому
+# здесь только проверяем наличие кнопки и намеренно её не нажимаем.
+- scrollUntilVisible:
+    element:
+      id: "video-detail-delete"
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: "video-detail-delete"

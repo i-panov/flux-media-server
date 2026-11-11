@@ -17,4 +17,13 @@ describe("mobile i18n", () => {
 	it("неизвестный ключ не ломает рендер", () => {
 		expect(t("common.loading")).not.toBe("");
 	});
+
+	it("включает строки метаданных и обложки", () => {
+		setLanguage("ru");
+		expect(t("metadata.edit")).toBe("Редактировать");
+		expect(t("cover.change")).toBe("Заменить обложку");
+		setLanguage("en");
+		expect(t("metadata.edit")).toBe("Edit");
+		expect(t("cover.change")).toBe("Change cover");
+	});
 });

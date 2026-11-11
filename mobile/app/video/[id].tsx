@@ -25,6 +25,7 @@ import { useDeleteMedia, useMedia } from "../../src/api/media";
 import { useSession } from "../../src/auth/session";
 import { AddToCollectionSheet } from "../../src/components/AddToCollectionSheet";
 import { AuthGate } from "../../src/components/AuthGate";
+import { ChangeCoverSheet } from "../../src/components/ChangeCoverSheet";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
@@ -291,6 +292,10 @@ function VideoDetailContent() {
 	const toggleFavorite = useToggleVideoFavorite();
 	const removeMedia = useDeleteMedia();
 	const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
+	const [coverSheetOpen, setCoverSheetOpen] = useState(false);
+	// После PUT обложки URL не меняется, поэтому постер получает версию и
+	// перезагружает картинку в обход кэша expo-image.
+	const [coverVersion, setCoverVersion] = useState(0);
 
 	if (!valid) {
 		return <NotFoundScreen />;
@@ -367,7 +372,7 @@ function VideoDetailContent() {
 	return (
 		<Screen scroll testID="video-detail-screen">
 			<BackButton />
-			<VideoPlayer key={item.id} media={item} />
+			<VideoPlayer key={item.id} media={item} coverVersion={coverVersion} />
 			<View style={{ gap: spacing.xs }}>
 				<Text
 					testID="video-detail-title"
@@ -438,6 +443,18 @@ function VideoDetailContent() {
 					<>
 						<ExtractAudioControl mediaId={item.id} />
 						<ActionButton
+							icon="create-outline"
+							label={t("metadata.edit")}
+							onPress={() => router.push(`/media/${item.id}/edit`)}
+							testID="video-detail-edit"
+						/>
+						<ActionButton
+							icon="image-outline"
+							label={t("cover.change")}
+							onPress={() => setCoverSheetOpen(true)}
+							testID="video-detail-cover"
+						/>
+						<ActionButton
 							icon="trash-outline"
 							label={t("video.delete")}
 							onPress={confirmDelete}
@@ -454,6 +471,14 @@ function VideoDetailContent() {
 					mediaId={item.id}
 					type="video"
 					onClose={() => setCollectionSheetOpen(false)}
+				/>
+			)}
+			{coverSheetOpen && (
+				<ChangeCoverSheet
+					visible
+					media={item}
+					onClose={() => setCoverSheetOpen(false)}
+					onUploaded={() => setCoverVersion((current) => current + 1)}
 				/>
 			)}
 		</Screen>

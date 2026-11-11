@@ -1,9 +1,221 @@
-import { apiFetch, type CoreFetcher } from "@flux/shared";
+import {
+	apiFetch,
+	type CoreFetcher,
+	type Media,
+	mediaSchema,
+} from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Справочник артистов живёт отдельно от медиа: GET /artists отдаёт только
 // id/имя/обложку, а треки артиста запрашиваются через artist_id.
 const fetcher: CoreFetcher = (path, init) => apiFetch(path, init);
+
+export interface MetadataInput {
+	title: string;
+	artists: string[];
+	album?: string;
+	genre?: string;
+	year?: number;
+	description?: string;
+	sourceUrl?: string;
+}
+
+// Черновик редактора: все поля — строки, чтобы TextInput не терял ввод
+// (пустой год и «0» различаются до валидации).
+export interface MetadataDraft {
+	title: string;
+	artists: string[];
+	album: string;
+	genre: string;
+	year: string;
+	description: string;
+	sourceUrl: string;
+}
+
+export interface MetadataValidation {
+	title: boolean;
+	year: boolean;
+	sourceUrl: boolean;
+}
+
+export const MIN_METADATA_YEAR = 1888;
+export const MAX_SOURCE_URL_LENGTH = 2048;
+const MAX_YEAR_OFFSET = 2;
+const YEAR_PATTERN = /^\d{4}$/;
+const USERINFO_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*@/i;
+const INVALID_PERCENT_PATTERN = /%(?![0-9A-Fa-f]{2})/;
+
+export function metadataDraftFromMedia(media: Media): MetadataDraft {
+	return {
+		title: media.title,
+		artists: media.artists.map((artist) => artist.name),
+		album: media.album,
+		genre: media.genre,
+		year: media.year > 0 ? String(media.year) : "",
+		description: media.description,
+		sourceUrl: media.source_url,
+	};
+}
+
+// Имена артистов — отдельные поля, поэтому запятая внутри имени
+// ("Tyler, The Creator") не считается разделителем. Только trim, пустые
+// значения и точные дубликаты: backend resolveArtists сам схлопывает
+// регистр, а портить ввод пользователя редактор не должен.
+export function normalizeArtistNames(names: readonly string[]): string[] {
+	const seen = new Set<string>();
+	const artists: string[] = [];
+	for (const raw of names) {
+		const name = raw.trim();
+		if (name === "" || seen.has(name)) {
+			continue;
+		}
+		seen.add(name);
+		artists.push(name);
+	}
+	return artists;
+}
+
+// null — невалидный год. Пустая строка и «0» — осознанная очистка (0):
+// backend принимает 0 как «год неизвестен».
+export function parseYearInput(
+	value: string,
+	currentYear = new Date().getFullYear(),
+): number | null {
+	const trimmed = value.trim();
+	if (trimmed === "" || trimmed === "0") {
+		return 0;
+	}
+	if (!YEAR_PATTERN.test(trimmed)) {
+		return null;
+	}
+	const year = Number(trimmed);
+	if (year < MIN_METADATA_YEAR || year > currentYear + MAX_YEAR_OFFSET) {
+		return null;
+	}
+	return year;
+}
+
+// Пустая ссылка валидна (очистка); непустая должна быть полным http(s)-URL.
+// Повторяем ограничения backend.NormalizeSourceURL: длина, наличие хоста и
+// запрет credentials (иначе 400 прилетел бы только после сохранения).
+export function isValidSourceUrl(value: string): boolean {
+	const trimmed = value.trim();
+	if (trimmed === "") {
+		return true;
+	}
+	if (trimmed.length > MAX_SOURCE_URL_LENGTH) {
+		return false;
+	}
+	try {
+		const url = new URL(trimmed);
+		return (
+			(url.protocol === "http:" || url.protocol === "https:") &&
+			url.hostname !== "" &&
+			// URL в JS отбрасывает пустой userinfo (http://@host), а backend
+			// отклоняет любой userinfo — проверяем исходную authority.
+			!USERINFO_PATTERN.test(trimmed) &&
+			!INVALID_PERCENT_PATTERN.test(trimmed)
+		);
+	} catch {
+		return false;
+	}
+}
+
+export function validateMetadataDraft(
+	draft: MetadataDraft,
+	currentYear = new Date().getFullYear(),
+): MetadataValidation {
+	return {
+		title: draft.title.trim() !== "",
+		year: parseYearInput(draft.year, currentYear) !== null,
+		sourceUrl: isValidSourceUrl(draft.sourceUrl),
+	};
+}
+
+export function buildMetadataInput(draft: MetadataDraft): MetadataInput {
+	return {
+		title: draft.title.trim(),
+		artists: normalizeArtistNames(draft.artists),
+		album: draft.album.trim(),
+		genre: draft.genre.trim(),
+		// Валидацию делает validateMetadataDraft: сюда невалидный год
+		// попасть не должен, поэтому null трактуется как очистка.
+		year: parseYearInput(draft.year) ?? 0,
+		description: draft.description.trim(),
+		sourceUrl: draft.sourceUrl.trim(),
+	};
+}
+
+function draftSignature(draft: MetadataDraft): string {
+	return JSON.stringify([
+		draft.title.trim(),
+		normalizeArtistNames(draft.artists),
+		draft.album.trim(),
+		draft.genre.trim(),
+		draft.year.trim(),
+		draft.description.trim(),
+		draft.sourceUrl.trim(),
+	]);
+}
+
+export function isMetadataDraftDirty(
+	initial: MetadataDraft,
+	current: MetadataDraft,
+): boolean {
+	return draftSignature(initial) !== draftSignature(current);
+}
+
+// PUT с PATCH-семантикой: undefined — поле не трогать, пустая строка/0 —
+// очистить. Редактор mobile всегда присылает все поля текущими значениями,
+// поэтому очистка работает, а чужие поля остаются нетронутыми.
+export async function updateMetadata(
+	mediaId: number,
+	input: MetadataInput,
+): Promise<Media> {
+	const body: Record<string, unknown> = {
+		title: input.title,
+		artists: input.artists,
+	};
+	if (input.album !== undefined) {
+		body.album = input.album;
+	}
+	if (input.genre !== undefined) {
+		body.genre = input.genre;
+	}
+	if (input.year !== undefined) {
+		body.year = input.year;
+	}
+	if (input.description !== undefined) {
+		body.description = input.description;
+	}
+	if (input.sourceUrl !== undefined) {
+		body.source_url = input.sourceUrl;
+	}
+	const response = await apiFetch<unknown>(`/metadata/${mediaId}`, {
+		method: "PUT",
+		body: JSON.stringify(body),
+	});
+	return mediaSchema.parse(response);
+}
+
+export function useUpdateMetadata(mediaId: number) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: MetadataInput) => updateMetadata(mediaId, input),
+		onSuccess: (media) => {
+			// Детали обновляются сразу, списки и подборки — после refetch:
+			// название могли поменять в любом месте библиотеки. Артисты
+			// могли создаться/исчезнуть, поэтому их справочник тоже
+			// сбрасываем.
+			queryClient.setQueryData(["media", media.id], media);
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["artists"] });
+			void queryClient.invalidateQueries({ queryKey: ["favorites"] });
+			void queryClient.invalidateQueries({ queryKey: ["collections"] });
+			void queryClient.invalidateQueries({ queryKey: ["progress"] });
+		},
+	});
+}
 
 export interface ArtistEntry {
 	id: number;

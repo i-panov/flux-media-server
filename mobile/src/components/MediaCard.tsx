@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { formatDuration } from "@flux/shared";
-import { Image, type ImageSource } from "expo-image";
+import { Image, type ImageProps, type ImageSource } from "expo-image";
 import type { ComponentProps } from "react";
 import {
 	Pressable,
@@ -33,6 +33,11 @@ export interface MediaCardProps {
 	badge?: string;
 	variant?: MediaCardVariant;
 	imageSource?: MediaCardImageSource;
+	/**
+	 * Обложки живут по неизменному URL, поэтому им нужен cachePolicy="none",
+	 * чтобы после PUT не показывать старую картинку из кеша expo-image.
+	 */
+	imageCachePolicy?: ImageProps["cachePolicy"];
 	aspectRatio?: number;
 	isFavorite?: boolean;
 	onPress?: () => void;
@@ -108,6 +113,7 @@ export function MediaCard({
 	badge,
 	variant = "video",
 	imageSource,
+	imageCachePolicy,
 	aspectRatio = 16 / 9,
 	isFavorite = false,
 	onPress,
@@ -159,6 +165,7 @@ export function MediaCard({
 						source={image}
 						style={StyleSheet.absoluteFill}
 						contentFit="cover"
+						cachePolicy={imageCachePolicy}
 						transition={150}
 						accessibilityIgnoresInvertColors
 					/>

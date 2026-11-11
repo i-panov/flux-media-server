@@ -2,6 +2,7 @@
 // по системной локали. Полноценный i18next — отдельный этап.
 import { useSyncExternalStore } from "react";
 import { collectionEn, collectionRu } from "./collections";
+import { metadataEn, metadataRu } from "./metadata";
 import { trashEn, trashRu } from "./trash";
 import { uploadEn, uploadRu } from "./upload";
 
@@ -9,6 +10,7 @@ const ru = {
 	...collectionRu,
 	...trashRu,
 	...uploadRu,
+	...metadataRu,
 	"common.loading": "Загрузка…",
 	"common.retry": "Повторить",
 	"common.error": "Ошибка",
@@ -204,6 +206,7 @@ const en: Record<keyof typeof ru, string> = {
 	...collectionEn,
 	...trashEn,
 	...uploadEn,
+	...metadataEn,
 	"common.loading": "Loading…",
 	"common.retry": "Retry",
 	"common.error": "Error",

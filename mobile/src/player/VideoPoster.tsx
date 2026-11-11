@@ -9,21 +9,36 @@ import { useTheme } from "../theme/ThemeProvider";
 // Постер берёт авторизованный source из imageSource: media.cover_url уже
 // содержит /api и без заголовков отдал бы 401. Cover используем, только
 // если он реально есть, иначе — thumbnail.
-export function VideoPoster({ media }: { media: Media }) {
+export function VideoPoster({
+	media,
+	coverVersion = 0,
+}: {
+	media: Media;
+	/** Меняется после загрузки новой обложки: URI получает cache-buster. */
+	coverVersion?: number;
+}) {
 	const { colors } = useTheme();
 	// Cover есть не у всех видео, а файл cover мог быть удалён отдельно:
 	// при ошибке загрузки откатываемся на thumbnail.
 	const thumbnail = thumbPath(media.id);
-	const [path, setPath] = useState(
-		media.cover_url === "" ? thumbnail : coverPath(media.id),
-	);
+	const cover =
+		coverVersion === 0
+			? coverPath(media.id)
+			: `${coverPath(media.id)}?v=${coverVersion}`;
+	const preferred = media.cover_url === "" ? thumbnail : cover;
+	// Cover и thumbnail могут отсутствовать/биться: fallback привязан к
+	// preferred, поэтому смена версии обложки сама возвращает новый путь.
+	const [fallback, setFallback] = useState<{
+		preferred: string;
+		path: string;
+	} | null>(null);
+	const path = fallback?.preferred === preferred ? fallback.path : preferred;
 	const [loaded, setLoaded] = useState<{
 		path: string;
 		source: Awaited<ReturnType<typeof imageSource>>;
 	} | null>(null);
-	// Оба варианта (cover и thumbnail) могут отсутствовать/биться: тогда
-	// показываем заглушку, а не пустую surface-плашку с broken image.
-	const [failed, setFailed] = useState(false);
+	const [failedPath, setFailedPath] = useState<string | null>(null);
+	const failed = failedPath === path;
 
 	useEffect(() => {
 		let active = true;
@@ -70,15 +85,15 @@ export function VideoPoster({ media }: { media: Media }) {
 					source={source}
 					style={StyleSheet.absoluteFill}
 					contentFit="cover"
+					cachePolicy={path === thumbnail ? "memory-disk" : "none"}
 					transition={150}
 					accessibilityIgnoresInvertColors
 					onError={() => {
 						if (path !== thumbnail) {
-							setFailed(false);
-							setPath(thumbnail);
+							setFallback({ preferred, path: thumbnail });
 							return;
 						}
-						setFailed(true);
+						setFailedPath(path);
 					}}
 				/>
 			)}
