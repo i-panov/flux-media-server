@@ -76,6 +76,11 @@ type RateLimiterConfig struct {
 	Expiration     int64 `yaml:"expiration"` // in seconds
 	ReadMax        int   `yaml:"read_max"`
 	ReadExpiration int64 `yaml:"read_expiration"` // in seconds
+	// UploadMax/UploadExpiration — отдельный бюджет массовых загрузок:
+	// 10/мин на пачку мемов не хватает, при этом auth/extract остаются
+	// строгими. 0 — взять Max × 30.
+	UploadMax        int   `yaml:"upload_max"`
+	UploadExpiration int64 `yaml:"upload_expiration"` // in seconds
 }
 
 // Дефолты read-бюджета: используются в Load и в app.New (тесты обходят

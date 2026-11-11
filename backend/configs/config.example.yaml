@@ -70,6 +70,9 @@ rate_limiter:
   # десятки range-запросов, общий бюджет 10/мин его бы душил.
   read_max: 600
   read_expiration: 60  # seconds
+  # Массовая загрузка: отдельный бюджет. 0 — max × 12.
+  upload_max: 300
+  upload_expiration: 60  # seconds
 
 media:
   thumbnail_path: "./data/thumbnails"

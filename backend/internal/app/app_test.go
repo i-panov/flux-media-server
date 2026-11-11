@@ -491,7 +491,7 @@ func TestUploadRateLimiter(t *testing.T) {
 			MaxOTPEntries:     1000,
 			AllowUnknownEmail: true,
 		},
-		RateLimiter: config.RateLimiterConfig{Max: 2, Expiration: 60},
+		RateLimiter: config.RateLimiterConfig{Max: 2, Expiration: 60, UploadMax: 2, UploadExpiration: 60},
 		Media:       config.MediaConfig{VideoPath: t.TempDir() + "/video", AudioPath: t.TempDir() + "/audio"},
 	}
 	application, err := New(cfg, "test")

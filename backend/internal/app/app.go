@@ -481,10 +481,26 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	// Upload limiter — upload-запросы тяжёлые (multipart-тело), их
 	// нужно лимитировать отдельно от auth-роутов.
+	uploadMax := cfg.RateLimiter.UploadMax
+	if uploadMax <= 0 {
+		uploadMax = cfg.RateLimiter.Max * 30
+	}
+	uploadExpiration := cfg.RateLimiter.UploadExpiration
+	if uploadExpiration <= 0 {
+		uploadExpiration = cfg.RateLimiter.Expiration
+	}
+	// Ключ по пользователю, а не по IP: несколько админов за одним NAT
+	// не должны делить бюджет, а IP легко меняется.
+	uploadKey := func(c *fiber.Ctx) string {
+		if id, ok := middleware.GetUserID(c); ok {
+			return fmt.Sprintf("user:%d", id)
+		}
+		return clientKey(c)
+	}
 	uploadRateLimiter := limiter.New(limiter.Config{
-		Max:          cfg.RateLimiter.Max,
-		Expiration:   time.Duration(cfg.RateLimiter.Expiration) * time.Second,
-		KeyGenerator: clientKey,
+		Max:          uploadMax,
+		Expiration:   time.Duration(uploadExpiration) * time.Second,
+		KeyGenerator: uploadKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Rate limit exceeded, please try again later",
