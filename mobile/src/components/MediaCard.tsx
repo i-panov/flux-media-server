@@ -18,6 +18,11 @@ type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
 export type MediaCardVariant = "video" | "audio";
 
+export interface MediaDownloadState {
+	readonly status: "downloading" | "downloaded" | "error";
+	readonly progress: number | null;
+}
+
 // До Task 6 (авторизованные медиа-URL) карточка принимает готовый source:
 // строку URL или объект expo-image с headers. Без source показывается
 // заглушка, поэтому компонент не зависит от формы Media.
@@ -40,6 +45,8 @@ export interface MediaCardProps {
 	imageCachePolicy?: ImageProps["cachePolicy"];
 	aspectRatio?: number;
 	isFavorite?: boolean;
+	/** Офлайн-скачивание: checkmark/прогресс поверх обложки. */
+	download?: MediaDownloadState;
 	onPress?: () => void;
 	onLongPress?: () => void;
 	onFavoritePress?: () => void;
@@ -105,6 +112,60 @@ function CardAction({
 	);
 }
 
+function DownloadBadge({
+	download,
+	testID,
+}: {
+	download: MediaDownloadState;
+	testID?: string;
+}) {
+	useLanguage();
+	const { colors, radii, spacing } = useTheme();
+	const label =
+		download.status === "downloaded"
+			? t("downloads.downloaded")
+			: download.status === "error"
+				? t("downloads.errorUnknown")
+				: t("downloads.downloading");
+	return (
+		<View
+			testID={
+				testID === undefined
+					? undefined
+					: `${testID}-download-${download.status}`
+			}
+			accessibilityLabel={label}
+			style={[
+				styles.downloadBadge,
+				{
+					backgroundColor: colors.overlay,
+					borderRadius: radii.sm,
+					left: spacing.sm,
+					bottom: spacing.sm,
+					paddingHorizontal: spacing.sm,
+				},
+			]}
+		>
+			<Ionicons
+				name={
+					download.status === "downloaded"
+						? "checkmark-circle"
+						: download.status === "error"
+							? "alert-circle-outline"
+							: "arrow-down-circle-outline"
+				}
+				size={13}
+				color={colors.onOverlay}
+			/>
+			{download.status === "downloading" && download.progress !== null && (
+				<Text style={[styles.overlayText, { color: colors.onOverlay }]}>
+					{`${Math.round(download.progress * 100)}%`}
+				</Text>
+			)}
+		</View>
+	);
+}
+
 export function MediaCard({
 	title,
 	subtitle,
@@ -116,6 +177,7 @@ export function MediaCard({
 	imageCachePolicy,
 	aspectRatio = 16 / 9,
 	isFavorite = false,
+	download,
 	onPress,
 	onLongPress,
 	onFavoritePress,
@@ -133,9 +195,7 @@ export function MediaCard({
 		onFavoritePress !== undefined || onMenuPress !== undefined;
 	const favoriteText =
 		favoriteLabel ?? (isFavorite ? t("media.unfavorite") : t("media.favorite"));
-	const menuText = menuLabel ?? t("media.actions");
-	// Содержимое одинаково для интерактивной и статичной карточки: у
-	// неинтерактивной не должно быть disabled-состояния для скринридера.
+	// Содержимое одинаково для интерактивной и статичной карточки.
 	const cardContent = (
 		<>
 			<View
@@ -208,6 +268,9 @@ export function MediaCard({
 							{formatDuration(duration)}
 						</Text>
 					</View>
+				)}
+				{download !== undefined && (
+					<DownloadBadge download={download} testID={testID} />
 				)}
 				{progress !== undefined && (
 					<View
@@ -295,7 +358,7 @@ export function MediaCard({
 					{onMenuPress !== undefined && (
 						<CardAction
 							icon="ellipsis-horizontal"
-							label={menuText}
+							label={menuLabel ?? t("media.actions")}
 							onPress={onMenuPress}
 							testID={testID === undefined ? undefined : `${testID}-menu`}
 						/>
@@ -328,6 +391,13 @@ const styles = StyleSheet.create({
 	},
 	duration: {
 		position: "absolute",
+		paddingVertical: 2,
+	},
+	downloadBadge: {
+		position: "absolute",
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 2,
 		paddingVertical: 2,
 	},
 	progressTrack: {

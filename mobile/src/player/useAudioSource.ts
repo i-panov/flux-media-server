@@ -2,7 +2,7 @@ import { apiFetch, type Media } from "@flux/shared";
 import { useEventListener } from "expo";
 import type { AudioMetadata, AudioPlayer, AudioStatus } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { authSource, streamPath } from "../media/source";
+import { type AuthSource, authSource, streamPath } from "../media/source";
 
 export interface AudioSourceOptions {
 	/**
@@ -72,6 +72,23 @@ async function trySeek(
 	}
 }
 
+// Локальный файл имеет приоритет над сетью; резолвер принимает mediaId,
+// потому что current в changeTrack ещё указывает на предыдущий трек.
+async function audioSourceFor(
+	mediaId: number,
+	getDownloadedPath: (mediaId: number) => string | null,
+): Promise<AuthSource | null> {
+	const downloadedPath = getDownloadedPath(mediaId);
+	if (downloadedPath !== null) {
+		return { uri: downloadedPath, headers: {} };
+	}
+	try {
+		return await authSource(streamPath(mediaId));
+	} catch {
+		return null;
+	}
+}
+
 function playIfWanted(player: AudioPlayer, wanted: () => boolean): void {
 	try {
 		if (wanted()) {
@@ -82,10 +99,12 @@ function playIfWanted(player: AudioPlayer, wanted: () => boolean): void {
 	}
 }
 
-// Источник аудио живёт отдельно от очереди: authSource перечитывает токен,
-// replace меняет трек, а 401 обрабатывается одним preflight-запросом.
-// Плеер создаётся пустым снаружи, поэтому здесь нет нативного конструктора.
-export function useAudioSource(player: AudioPlayer): AudioSourceController {
+// Источник аудио живёт отдельно от очереди: replace меняет трек, а 401
+// обрабатывается одним preflight-запросом.
+export function useAudioSource(
+	player: AudioPlayer,
+	getDownloadedPath: (mediaId: number) => string | null = () => null,
+): AudioSourceController {
 	const [failed, setFailed] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [generation, setGeneration] = useState(0);
@@ -94,8 +113,7 @@ export function useAudioSource(player: AudioPlayer): AudioSourceController {
 	const loadedIdRef = useRef<number | null>(null);
 	const retriedForRef = useRef<number | null>(null);
 	const recoveringRef = useRef(false);
-	// replace() может отклонить seek до загрузки: 401-позицию довозим,
-	// когда плеер сообщит isLoaded, а не теряем насовсем.
+	// replace() может отклонить seek до загрузки: 401-позицию довозим позже.
 	const pendingSeekRef = useRef<PendingSeek | null>(null);
 
 	useEffect(() => {
@@ -129,17 +147,13 @@ export function useAudioSource(player: AudioPlayer): AudioSourceController {
 			}
 			setFailed(false);
 			setLoading(true);
-			let source: Awaited<ReturnType<typeof authSource>>;
-			try {
-				source = await authSource(streamPath(media.id));
-			} catch {
-				if (mountedRef.current && token === tokenRef.current) {
-					setFailed(true);
-					setLoading(false);
-				}
+			const source = await audioSourceFor(media.id, getDownloadedPath);
+			if (!mountedRef.current || token !== tokenRef.current) {
 				return;
 			}
-			if (!mountedRef.current || token !== tokenRef.current) {
+			if (source === null) {
+				setFailed(true);
+				setLoading(false);
 				return;
 			}
 			try {
@@ -177,7 +191,7 @@ export function useAudioSource(player: AudioPlayer): AudioSourceController {
 				playIfWanted(player, options.play);
 			}
 		},
-		[player],
+		[getDownloadedPath, player],
 	);
 
 	// Flush pending seek после loading=false: если ждать только status,

@@ -2,6 +2,7 @@ import { apiFetch } from "@flux/shared";
 import { useEventListener } from "expo";
 import type { VideoPlayer as NativeVideoPlayer } from "expo-video";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDownloadedPath } from "../downloads/DownloadProvider";
 import { type AuthSource, authSource, streamPath } from "../media/source";
 import { clampSeek, seekPlayer, updatePlaybackRate } from "./videoControls";
 
@@ -46,9 +47,20 @@ export function useVideoSource({
 	const resumeRef = useRef<ResumeState | null>(null);
 	// Новый loadSource отменяет результат предыдущего (retry/смена медиа).
 	const loadToken = useRef(0);
+	const downloadedPath = useDownloadedPath(mediaId);
+	// Ref, а не зависимость loadSource: завершение скачивания во время
+	// playback не должно перезагружать уже играющий источник.
+	const downloadedPathRef = useRef(downloadedPath);
+	// Какой источник реально ушёл в player: нужен, чтобы не перезагружать
+	// уже играющий локальный файл и поймать позднюю гидратацию индекса.
+	const appliedPathRef = useRef<string | null>(null);
 	const [sourceReady, setSourceReady] = useState(false);
 	const [sourceFailed, setSourceFailed] = useState(false);
 	const [playerFailed, setPlayerFailed] = useState(false);
+
+	useEffect(() => {
+		downloadedPathRef.current = downloadedPath;
+	}, [downloadedPath]);
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -97,9 +109,15 @@ export function useVideoSource({
 
 	const loadSource = useCallback(async () => {
 		const token = ++loadToken.current;
-		// authSource перечитывает SecureStore: после refresh токена запрос
-		// уходит уже с новым Bearer.
-		const next = await authSource(streamPath(mediaId)).catch(() => null);
+		// Скачанный файл играем напрямую с диска: офлайн-режим и отсутствие
+		// сетевых заголовков. Иначе authSource перечитывает SecureStore:
+		// после refresh токена запрос уходит с новым Bearer.
+		const localPath = downloadedPathRef.current;
+		appliedPathRef.current = localPath;
+		const next =
+			localPath === null
+				? await authSource(streamPath(mediaId)).catch(() => null)
+				: { uri: localPath, headers: {} };
 		if (!mountedRef.current || token !== loadToken.current) {
 			return;
 		}
@@ -120,11 +138,23 @@ export function useVideoSource({
 	}, [loadSource]);
 
 	useEffect(() => {
-		// loadSource обновляет состояние только после await authSource/replaceAsync;
-		// правило видит функцию целиком и предполагает синхронный setState.
-		// eslint-disable-next-line react-hooks/set-state-in-effect
 		void loadSource();
 	}, [loadSource]);
+
+	// Офлайн-старт: индекс мог прочитаться после первой сетевой попытки.
+	// Переключаемся на файл, только пока playback не начался, — иначе
+	// завершение скачивания рвало бы уже идущий просмотр.
+	useEffect(() => {
+		if (
+			downloadedPath === null ||
+			downloadedPath === appliedPathRef.current ||
+			sourceReady ||
+			player.playing
+		) {
+			return;
+		}
+		reloadSource();
+	}, [downloadedPath, player, reloadSource, sourceReady]);
 
 	const retry = useCallback(() => {
 		retriedFor.current = null;

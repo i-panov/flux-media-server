@@ -21,6 +21,7 @@ import {
 	useState,
 } from "react";
 import { useSession } from "../auth/session";
+import { useDownloadedPathResolver } from "../downloads/DownloadProvider";
 import { t, useLanguage } from "../i18n";
 import { desiredAfterStatus } from "./audioPlaybackPolicy";
 import { shouldPreemptResumeOn401 } from "./audioProgress";
@@ -135,15 +136,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		[],
 	);
 	const status = useAudioPlayerStatus(player);
-	const {
-		failed: sourceFailed,
-		loading: sourceLoading,
-		load: loadSource,
-		recover: recoverSource,
-		unload: unloadSource,
-		isLoaded: isSourceLoaded,
-		generation: sourceGeneration,
-	} = useAudioSource(player);
 	const desiredPlayingRef = useRef(false);
 	const {
 		queueState,
@@ -159,6 +151,16 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 	} = useAudioQueueState();
 
 	const current = currentMedia(queueState);
+	const getDownloadedPath = useDownloadedPathResolver();
+	const {
+		failed: sourceFailed,
+		loading: sourceLoading,
+		load: loadSource,
+		recover: recoverSource,
+		unload: unloadSource,
+		isLoaded: isSourceLoaded,
+		generation: sourceGeneration,
+	} = useAudioSource(player, getDownloadedPath);
 	const { rate, cycleRate } = useAudioRate(player);
 	const [desiredPlaying, setDesiredPlayingState] = useState(false);
 	// Ref нужен синхронно (in-flight load читает его при завершении), state —

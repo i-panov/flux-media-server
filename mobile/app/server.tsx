@@ -12,6 +12,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { normalizeServerUrl, SERVER_URL_KEY } from "../src/api/setup";
 import { sessionQueryKey } from "../src/auth/session";
 import { Screen } from "../src/components/Screen";
+import { useDownloadActions } from "../src/downloads/DownloadProvider";
 import { t, useLanguage } from "../src/i18n";
 import { secureStore } from "../src/storage/secureStore";
 import { useTheme } from "../src/theme/ThemeProvider";
@@ -23,6 +24,7 @@ export default function ServerScreen() {
 	const { colors } = useTheme();
 	const health = useHealthQuery();
 	const queryClient = useQueryClient();
+	const { clearAll: clearDownloads } = useDownloadActions();
 	const [draft, setDraft] = useState(() => getApiConfig().baseUrl);
 	const [appliedUrl, setAppliedUrl] = useState(() => getApiConfig().baseUrl);
 	const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,10 @@ export default function ServerScreen() {
 			}
 			await secureStore.set(SERVER_URL_KEY, normalized);
 			configureApi({ baseUrl: normalized });
+			if (changed) {
+				// Файлы принадлежат прежнему origin: индекс и кеш не переносим.
+				clearDownloads();
+			}
 			setAppliedUrl(normalized);
 			setDraft(normalized);
 			setError(null);

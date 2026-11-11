@@ -17,6 +17,7 @@ import {
 	MediaCard,
 	type MediaCardImageSource,
 	type MediaCardVariant,
+	type MediaDownloadState,
 } from "./MediaCard";
 import { resolveMediaGridState } from "./mediaGridState";
 
@@ -31,6 +32,7 @@ export interface MediaGridItem {
 	imageSource?: MediaCardImageSource;
 	isFavorite?: boolean;
 	variant?: MediaCardVariant;
+	download?: MediaDownloadState;
 }
 
 export interface MediaGridProps<T extends MediaGridItem> {
@@ -140,6 +142,7 @@ export function MediaGrid<T extends MediaGridItem>({
 						variant={item.variant}
 						imageSource={item.imageSource}
 						isFavorite={item.isFavorite}
+						download={item.download}
 						onPress={
 							onPressItem === undefined ? undefined : () => onPressItem(item)
 						}

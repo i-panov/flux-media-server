@@ -26,6 +26,7 @@ import { useSession } from "../../src/auth/session";
 import { AddToCollectionSheet } from "../../src/components/AddToCollectionSheet";
 import { AuthGate } from "../../src/components/AuthGate";
 import { ChangeCoverSheet } from "../../src/components/ChangeCoverSheet";
+import { DownloadButton } from "../../src/components/DownloadButton";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
@@ -425,6 +426,7 @@ function VideoDetailContent() {
 					selected={isFavorite}
 					danger={isFavorite}
 				/>
+				<DownloadButton media={item} testID="video-detail-download" />
 				<ActionButton
 					icon="folder-open-outline"
 					label={t("video.addToCollection")}

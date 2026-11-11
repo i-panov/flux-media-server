@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Media, MediaList as MediaListData } from "@flux/shared";
 import { formatDuration } from "@flux/shared";
 import type {
@@ -13,6 +14,7 @@ import {
 	Text,
 	View,
 } from "react-native";
+import { useDownloadIndicator } from "../downloads/DownloadProvider";
 import { t, useLanguage } from "../i18n";
 import { excludeMediaIds } from "../media/visibleMedia";
 import { useTheme } from "../theme/ThemeProvider";
@@ -21,6 +23,50 @@ import { ErrorState } from "./ErrorState";
 import { ListFooter } from "./ListFooter";
 
 type MediaListQuery = UseInfiniteQueryResult<InfiniteData<MediaListData>>;
+
+function RowDownloadIndicator({ mediaId }: { mediaId: number }) {
+	const { colors } = useTheme();
+	const indicator = useDownloadIndicator(mediaId);
+	if (indicator === null) {
+		return null;
+	}
+	return (
+		<View
+			testID={`media-row-${mediaId}-download-${indicator.status}`}
+			accessibilityLabel={
+				indicator.status === "downloaded"
+					? t("downloads.downloaded")
+					: indicator.status === "error"
+						? t("downloads.errorUnknown")
+						: t("downloads.downloading")
+			}
+			style={styles.download}
+		>
+			<Ionicons
+				name={
+					indicator.status === "downloaded"
+						? "checkmark-circle"
+						: indicator.status === "error"
+							? "alert-circle-outline"
+							: "arrow-down-circle-outline"
+				}
+				size={16}
+				color={
+					indicator.status === "error"
+						? colors.danger
+						: indicator.status === "downloaded"
+							? colors.accent
+							: colors.textMuted
+				}
+			/>
+			{indicator.status === "downloading" && indicator.progress !== null && (
+				<Text style={[styles.muted, { color: colors.textMuted }]}>
+					{`${Math.round(indicator.progress * 100)}%`}
+				</Text>
+			)}
+		</View>
+	);
+}
 
 interface MediaListProps {
 	query: MediaListQuery;
@@ -167,6 +213,7 @@ export function MediaList({
 							{item.artists.map((artist) => artist.name).join(", ")}
 						</Text>
 					</View>
+					<RowDownloadIndicator mediaId={item.id} />
 					<Text style={[styles.muted, { color: colors.textMuted }]}>
 						{formatDuration(item.duration)}
 					</Text>
@@ -188,6 +235,7 @@ const styles = StyleSheet.create({
 		borderRadius: 10,
 	},
 	info: { flex: 1 },
+	download: { flexDirection: "row", alignItems: "center", gap: 2 },
 	title: { fontSize: 16, fontWeight: "600" },
 	muted: { fontSize: 13 },
 	pressed: { opacity: 0.7 },

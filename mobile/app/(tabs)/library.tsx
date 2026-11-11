@@ -20,6 +20,7 @@ import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { InlineError } from "../../src/components/InlineError";
 import { Screen } from "../../src/components/Screen";
+import { useDownloadState } from "../../src/downloads/DownloadProvider";
 import { t, useLanguage } from "../../src/i18n";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
@@ -34,6 +35,54 @@ function toggleCollapsed(
 		next.add(collectionId);
 	}
 	return next;
+}
+
+function LibraryDownloadsRow() {
+	const { colors, spacing } = useTheme();
+	const { entries, active } = useDownloadState();
+	const activeCount = active.filter(
+		(item) => item.status === "downloading",
+	).length;
+	const count = entries.length + activeCount;
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={t("downloads.title")}
+			onPress={() => router.push("/downloads")}
+			testID="library-downloads"
+			style={({ pressed }) => [
+				styles.row,
+				{
+					padding: spacing.lg,
+					borderColor: colors.border,
+					backgroundColor: colors.surface,
+				},
+				pressed && styles.pressed,
+			]}
+		>
+			<View style={styles.rowLead}>
+				<Ionicons
+					name="cloud-download-outline"
+					size={20}
+					color={colors.textMuted}
+				/>
+				<Text style={[styles.rowTitle, { color: colors.text }]}>
+					{t("downloads.title")}
+				</Text>
+			</View>
+			<View style={styles.rowLead}>
+				{count > 0 && (
+					<Text
+						testID="library-downloads-count"
+						style={[styles.soon, { color: colors.accent }]}
+					>
+						{t("downloads.entryCount", { count })}
+					</Text>
+				)}
+				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+			</View>
+		</Pressable>
+	);
 }
 
 function LibraryUploadRow() {
@@ -138,6 +187,8 @@ export default function LibraryScreen() {
 				</View>
 				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
 			</Pressable>
+
+			<LibraryDownloadsRow />
 
 			{isAdmin && <LibraryUploadRow />}
 

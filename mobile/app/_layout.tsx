@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 // Импорт ради побочного эффекта (дефолт configureApi) и initApiConfig:
 // модуль должен выполниться до любых запросов.
 import { initApiConfig } from "../src/api/setup";
+import { DownloadProvider } from "../src/downloads/DownloadProvider";
 import { AudioProvider } from "../src/player/AudioProvider";
 import { ThemeProvider, useTheme } from "../src/theme/ThemeProvider";
 
@@ -49,23 +50,26 @@ function AppShell({
 	}
 	return (
 		<QueryClientProvider client={client}>
-			<AudioProvider>
-				<Stack screenOptions={{ headerShown: false }}>
-					<Stack.Screen name="(tabs)" />
-					{/* Свайп-назад iOS не должен обходить confirm о несохранённых
-					    правках в редакторе метаданных. */}
-					<Stack.Screen
-						name="media/[id]/edit"
-						options={{ gestureEnabled: false, headerShown: false }}
-					/>
-					<Stack.Screen
-						name="player"
-						options={{ presentation: "modal", headerShown: false }}
-					/>
-					<Stack.Screen name="login" />
-					<Stack.Screen name="server" />
-				</Stack>
-			</AudioProvider>
+			<DownloadProvider>
+				<AudioProvider>
+					<Stack screenOptions={{ headerShown: false }}>
+						<Stack.Screen name="(tabs)" />
+						{/* Свайп-назад iOS не должен обходить confirm о несохранённых
+						    правках в редакторе метаданных. */}
+						<Stack.Screen
+							name="media/[id]/edit"
+							options={{ gestureEnabled: false, headerShown: false }}
+						/>
+						<Stack.Screen
+							name="player"
+							options={{ presentation: "modal", headerShown: false }}
+						/>
+						<Stack.Screen name="login" />
+						<Stack.Screen name="server" />
+						<Stack.Screen name="downloads" />
+					</Stack>
+				</AudioProvider>
+			</DownloadProvider>
 		</QueryClientProvider>
 	);
 }

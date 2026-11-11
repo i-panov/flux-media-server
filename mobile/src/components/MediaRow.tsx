@@ -1,5 +1,6 @@
 import type { Media } from "@flux/shared";
 import { FlatList, StyleSheet, View } from "react-native";
+import { useDownloadIndicator } from "../downloads/DownloadProvider";
 import { coverPath, thumbPath } from "../media/source";
 import { useAuthImageSource } from "../media/useAuthImageSource";
 import { useTheme } from "../theme/ThemeProvider";
@@ -46,6 +47,7 @@ function RowCard({
 	const hasCover = item.media.cover_url !== "";
 	const path = hasCover ? coverPath(item.media.id) : thumbPath(item.media.id);
 	const source = useAuthImageSource(path);
+	const download = useDownloadIndicator(item.media.id);
 	const artists = item.media.artists.map((artist) => artist.name).join(", ");
 
 	return (
@@ -58,6 +60,7 @@ function RowCard({
 			imageSource={source}
 			imageCachePolicy={hasCover ? "none" : "memory-disk"}
 			isFavorite={item.isFavorite}
+			download={download ?? undefined}
 			onPress={onPress}
 			onFavoritePress={onFavoritePress}
 			testID={item.testID}

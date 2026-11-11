@@ -1,0 +1,121 @@
+# Скачивание: детали видео -> кнопка «Скачать» -> прогресс -> завершено ->
+# раздел «Скачивания» в библиотеке.
+#
+# Что проверяется автоматически:
+#   * кнопка скачивания есть в деталях видео и проходит состояния
+#     idle -> downloading -> downloaded (testID меняется вместе с состоянием);
+#   * после завершения запись видна на экране /downloads;
+#   * экран доступен из библиотеки (library-downloads) и переживает
+#     повторный запуск сценария (если файл уже скачан, шаг скачивания
+#     пропускается по условию).
+#
+# Что НЕ автоматизируется: авиарежим. Maestro не умеет надёжно включать
+# системный airplane mode на обеих платформах, поэтому офлайн-проверка
+# выполняется вручную:
+#   1. пройти этот flow до экрана /downloads;
+#   2. включить авиарежим (Android: шторка -> Airplane mode; iOS:
+#      Пункт управления -> самолёт);
+#   3. вернуться в детали скачанного видео: playback идёт с локального
+#      file://-пути, сетевые запросы прогресса лишь логируются;
+#   4. выключить авиарежим и удалить файл кнопкой на /downloads.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * пользователь maestro@example.com — администратор (первый
+#     зарегистрированный пользователь);
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть хотя бы одно видео.
+#
+# Запуск:
+#   maestro test .maestro/downloads.yaml
+#   maestro test -e SERVER_URL=http://10.0.2.2:8080/api .maestro/downloads.yaml
+appId: app.lib.flux
+name: "Downloads: video -> offline entry"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# tabs.yaml заканчивается на экране настроек — уходим на видео.
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+
+- tapOn:
+    id: "media-row-.*"
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-title"
+    timeout: 20000
+
+# Кнопка ниже плеера и метаданных: до неё нужно доскроллить.
+- scrollUntilVisible:
+    element:
+      id: "video-detail-download-.*"
+    direction: DOWN
+    timeout: 10000
+
+# Если файл уже был скачан прошлым прогоном, кнопка сразу в состоянии downloaded.
+- runFlow:
+    when:
+      visible:
+        id: "video-detail-download-idle"
+    commands:
+      - tapOn:
+          id: "video-detail-download-idle"
+
+- extendedWaitUntil:
+    visible:
+      id: "video-detail-download-downloaded"
+    timeout: 60000
+- assertVisible:
+    id: "video-detail-download-downloaded"
+
+# После возврата у строки видео есть отметка скачивания.
+- tapOn:
+    id: "video-detail-back"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*"
+    timeout: 20000
+# Индикатор в строке списка: media-row-<id>-download-downloaded.
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*-download-downloaded"
+    timeout: 10000
+- assertVisible:
+    id: "media-row-.*-download-downloaded"
+
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "library-downloads"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "library-downloads"
+
+- extendedWaitUntil:
+    visible:
+      id: "downloads-screen"
+    timeout: 10000
+- assertVisible:
+    id: "downloads-list"
+- assertVisible:
+    id: "download-item-.*"
+- assertVisible:
+    id: "downloads-summary"

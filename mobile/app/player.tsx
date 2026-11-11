@@ -16,6 +16,7 @@ import {
 import { AddToCollectionSheet } from "../src/components/AddToCollectionSheet";
 import { ArtistLinks } from "../src/components/ArtistLinks";
 import { AuthGate } from "../src/components/AuthGate";
+import { DownloadButton } from "../src/components/DownloadButton";
 import { EmptyState } from "../src/components/EmptyState";
 import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
@@ -186,6 +187,7 @@ function AudioPlayerContent() {
 					</Text>
 				)}
 			</View>
+			<DownloadButton media={current} testID="audio-player-download" />
 			<Pressable
 				accessibilityRole="button"
 				accessibilityLabel={t("collections.addButton")}
