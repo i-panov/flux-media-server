@@ -100,9 +100,39 @@ Web-долги:
 
 ---
 
-## 4. Фаза 1 — web-TV и read-only профиль
+## 4. Фаза 1 — добить web-версию
 
-### 4.1. Детект ТВ
+До ТВ-адаптации нужно закрыть обычный web-клиент, иначе ТВ будет строиться
+поверх незакрытых web-долгов.
+
+### 4.1. Что осталось по web
+
+- Закрыть оставшиеся P3 из [review-2026-11-09.md](review-2026-11-09.md)
+  (то, что не входило в mobile-паритет).
+- Регрессия всех сценариев: OTP-вход, видео, аудио, плеер, прогресс,
+  избранное, коллекции, артисты, загрузка, метаданные/обложки, корзина,
+  админка, настройки, поиск/сортировка.
+- Проверить, что web и mobile используют один shared-контракт без
+  расхождений (favorites, collections, progress, lyrics, queue).
+- Прогнать полный web-гейт: `typecheck`, `lint`, `lint:deadcode`, `test`,
+  `build`, `size`, Playwright e2e.
+- Отдельно проверить PWA/service worker и поведение при обновлении версии.
+- Зафиксировать известные ограничения web (offline/downloads не
+  поддерживаются осознанно) в README/release notes.
+
+### 4.2. Приёмка
+
+- Все перечисленные сценарии проходят на desktop и в мобильном браузере.
+- Нет открытых P1/P2 по web; P3 либо закрыты, либо явно приняты.
+- `npm run build`, `npm run test`, `npm run test:e2e`, `npm run size` —
+  зелёные.
+- После этого переходим к web-TV, не смешивая обычные web-фиксы с ТВ-кодом.
+
+---
+
+## 5. Фаза 2 — web-TV и read-only профиль
+
+### 5.1. Детект ТВ
 
 Разрешение — только вспомогательный сигнал. Нужна эвристика + override.
 
@@ -130,7 +160,7 @@ Web-долги:
 Нельзя блокировать 4K-десктоп: если профиль неоднозначен — обычный режим,
 пользователь включает ТВ-режим вручную.
 
-### 4.2. Capability-модель
+### 5.2. Capability-модель
 
 ```ts
 interface ClientCapabilities {
@@ -165,7 +195,7 @@ interface ClientCapabilities {
 Скрытие должно быть и в UI, и в route guard (не монтировать экран), но
 серверные права остаются источником истины.
 
-### 4.3. ТВ-навигация в web
+### 5.3. ТВ-навигация в web
 
 - Пространственная навигация: стрелки, Enter, Back.
 - Начальный фокус на первом ряду/кнопке; восстановление фокуса при возврате.
@@ -182,7 +212,7 @@ interface ClientCapabilities {
 - Back/Escape/Backspace — назад (зависит от платформы);
 - media keys — play/pause, если браузер отдаёт.
 
-### 4.4. Web-only ТВ
+### 5.4. Web-only ТВ
 
 Приоритет — **VidaaOS (Hisense)**, затем Tizen/webOS.
 
@@ -196,14 +226,14 @@ interface ClientCapabilities {
 
 ---
 
-## 5. Фаза 2 — QR/device-code авторизация
+## 6. Фаза 3 — QR/device-code авторизация
 
-### 5.1. Зачем
+### 6.1. Зачем
 
 OTP пультом — плохой UX: email, код, раскладка. ТВ должен показывать QR и
 короткий код, а подтверждение происходит на уже залогиненном устройстве.
 
-### 5.2. Flow
+### 6.2. Flow
 
 1. ТВ: `POST /auth/device/code` → `{device_code, user_code, verification_uri, expires_in, interval}`.
 2. ТВ показывает QR (`verification_uri?code=...`) и `user_code`.
@@ -213,7 +243,7 @@ OTP пультом — плохой UX: email, код, раскладка. ТВ 
 5. ТВ опрашивает `POST /auth/device/token` с `device_code` (не `user_code`).
 6. После approval ТВ получает access/refresh, сохраняет сессию.
 
-### 5.3. Требования безопасности
+### 6.3. Требования безопасности
 
 - `device_code` — случайный, хранится только хешем; `user_code` — короткий,
   человекочитаемый, одноразовый.
@@ -225,14 +255,14 @@ OTP пультом — плохой UX: email, код, раскладка. ТВ 
 - Отзыв сессии устройства в настройках.
 - Не логировать коды/токены.
 
-### 5.4. Клиенты
+### 6.4. Клиенты
 
 - **TV (native/web):** экран QR + код, polling, ошибки/истечение, повтор.
 - **Web:** `/activate` — подтверждение, выбор «это мой ТВ», success.
 - **Mobile:** deep link/экран подтверждения, если QR открыт на телефоне.
 - **Настройки:** список активных устройств, отзыв.
 
-### 5.5. Токены
+### 6.5. Токены
 
 - Native: SecureStore (access/refresh).
 - Web: httpOnly cookies, SameSite, secure; TV-браузер должен их сохранять.
@@ -240,7 +270,7 @@ OTP пультом — плохой UX: email, код, раскладка. ТВ 
   не хранить refresh в localStorage без необходимости.
 - Ротация refresh, обработка 401 как в остальных клиентах.
 
-### 5.6. Приёмка
+### 6.6. Приёмка
 
 - вход на ТВ без клавиатуры;
 - истечение кода, повторная попытка;
@@ -251,9 +281,9 @@ OTP пультом — плохой UX: email, код, раскладка. ТВ 
 
 ---
 
-## 6. Фаза 3 — Android TV (native)
+## 7. Фаза 4 — Android TV (native)
 
-### 6.1. Сборка
+### 7.1. Сборка
 
 - `react-native` → `react-native-tvos` версии, совпадающей с RN 0.88
   (на момент проверки линия 0.88 была RC — проверить stable).
@@ -264,7 +294,7 @@ OTP пультом — плохой UX: email, код, раскладка. ТВ 
   собирались из одного кода.
 - APK/AAB, Play Console TV track.
 
-### 6.2. Архитектура
+### 7.2. Архитектура
 
 - `Platform.isTV` + capability-профиль.
 - Отдельная TV-группа экранов или адаптивные компоненты; текущие табы и
@@ -274,14 +304,14 @@ OTP пультом — плохой UX: email, код, раскладка. ТВ 
 - Оставить: библиотека, поиск, сортировка, плеер, прогресс, избранное,
   коллекции (просмотр), QR-вход.
 
-### 6.3. Фокус и пульт
+### 7.3. Фокус и пульт
 
 - D-pad, Enter, Back; начальный и восстановленный фокус.
 - `TVFocusGuideView`, `hasTVPreferredFocus`, обработка TV-событий.
 - Крупные карточки, горизонтальные ряды, 10-foot UI, overscan.
 - Плеер: OSD, play/pause, seek ±10, back, автопереход.
 
-### 6.4. Ограничения Expo на TV
+### 7.4. Ограничения Expo на TV
 
 Поддерживаются (по Expo TV docs): Video, Audio, Image, FileSystem,
 SecureStore, AsyncStorage, KeepAwake, SystemUI, SplashScreen, Reanimated,
@@ -295,7 +325,7 @@ SafeArea, Constants и др.
   заглушки);
 - offline-downloads на TV не нужны.
 
-### 6.5. Приёмка
+### 7.5. Приёмка
 
 - сборка и установка на Android TV emulator;
 - реальный ТВ/приставка (пульт, back, фокус);
@@ -306,7 +336,7 @@ SafeArea, Constants и др.
 
 ---
 
-## 7. Фаза 4 — Fire TV
+## 8. Фаза 5 — Fire TV
 
 - Fire OS — Android-подобная система Amazon, без Google Play.
 - Тот же Android TV APK в большинстве случаев подходит; проверить Fire OS
@@ -320,25 +350,27 @@ SafeArea, Constants и др.
 
 ---
 
-## 8. Порядок работ
+## 9. Порядок работ
 
 1. Mobile: финальное ревью Task 24.
 2. Mobile: поиск/сортировка + версия 0.1.31.
 3. Mobile: Task 25 release + smoke.
-4. Web: TV-детект, capability-слой, read-only, навигация, OSD.
-5. Web-TV: VidaaOS (приоритет), затем Tizen/webOS.
-6. QR/device-code: backend + shared + web + mobile.
-7. Android TV: форк, сборка, TV-UI, read-only, QR.
-8. Fire TV: проверка и Amazon Appstore.
-9. Опционально: Apple TV, Vega — только при необходимости.
+4. Web: добить обычную версию и закрыть P1/P2/P3-долги.
+5. Web-TV: TV-детект, capability-слой, read-only, навигация, OSD.
+6. Web-TV: VidaaOS (приоритет), затем Tizen/webOS.
+7. QR/device-code: backend + shared + web + mobile.
+8. Android TV: форк, сборка, TV-UI, read-only, QR.
+9. Fire TV: проверка и Amazon Appstore.
+10. Опционально: Apple TV, Vega — только при необходимости.
 
 ---
 
-## 9. Оценка (агентская, не человеко-дни)
+## 10. Оценка (агентская, не человеко-дни)
 
 | Этап | Часы агента |
 |---|---:|
 | Mobile Task 24 review + search/sort + release | 10–20 |
+| Web: закрыть обычные долги и прогнать полный гейт | 8–16 |
 | Web TV-детект/capabilities/read-only | 8–16 |
 | Web TV-навигация/фокус/OSD | 10–20 |
 | QR/device-code (backend+web+mobile+TV) | 8–16 |
@@ -351,7 +383,7 @@ SafeArea, Constants и др.
 
 ---
 
-## 10. Риски
+## 11. Риски
 
 1. **Версия RN TV-форка** может не совпадать с Expo SDK 58/RN 0.88.
 2. **Нет Android SDK/эмулятора** в текущем окружении — сборка/проверка
@@ -367,9 +399,10 @@ SafeArea, Constants и др.
 
 ---
 
-## 11. Definition of Done для ТВ
+## 12. Definition of Done для ТВ
 
 - [ ] Mobile закрыт: Task 24 review, search/sort, Task 25.
+- [ ] Web закрыт: обычные P1/P2/P3, полный гейт, регрессия сценариев.
 - [ ] Web TV-профиль: детект + override, read-only, навигация, OSD.
 - [ ] QR/device-code вход работает на web-TV и native TV.
 - [ ] Android TV APK/AAB собирается, проходит Play TV checklist.
