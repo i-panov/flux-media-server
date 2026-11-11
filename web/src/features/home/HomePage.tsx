@@ -6,8 +6,9 @@ import { NextCard } from "../../components/NextCard";
 import { ContinueWatching } from "../media/ContinueWatching";
 import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 
-// На главной хватает превью: полные списки живут в разделах «Видео» и «Аудио».
-const CONTINUE_PREVIEW_LIMIT = 6;
+// «Продолжить просмотр» — только последняя незавершённая запись,
+// а не история просмотров. Полные списки живут в разделах.
+const CONTINUE_PREVIEW_LIMIT = 1;
 
 export function HomePage() {
 	const { t } = useTranslation();

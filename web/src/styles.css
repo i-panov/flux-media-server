@@ -79,6 +79,14 @@ body {
 	contain-intrinsic-size: auto 200px;
 }
 
+/* Mantine ActionIcon задаёт position: relative вне @layer, поэтому
+   tailwind-класс .absolute на кнопках поверх карточки проигрывает и
+   кнопка встаёт в поток под карточкой. Явно возвращаем оверлеям
+   абсолютное позиционирование. */
+.media-card > .absolute {
+	position: absolute;
+}
+
 .media-row {
 	content-visibility: auto;
 	contain-intrinsic-size: auto 72px;

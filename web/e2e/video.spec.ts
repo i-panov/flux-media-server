@@ -472,3 +472,56 @@ test("видео: сохранённая позиция восстанавлив
 		)
 		.toBe(1200);
 });
+
+test("видео: кнопки поверх карточки не раздувают её и не уезжают вниз", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+	await stubVideoApi(page);
+	await page.goto("/video");
+
+	const card = page.locator(".media-card").first();
+	await expect(card).toBeVisible();
+	const favorite = card.getByRole("button", { name: "Добавить в избранное" });
+	await expect(favorite).toHaveCSS("position", "absolute");
+
+	const cardBox = await card.boundingBox();
+	const buttonBox = await favorite.boundingBox();
+	expect(cardBox).not.toBeNull();
+	expect(buttonBox).not.toBeNull();
+	if (!cardBox || !buttonBox) return;
+	// Кнопка внутри карточки, а не отдельной строкой под ней.
+	expect(buttonBox.y).toBeGreaterThanOrEqual(cardBox.y);
+	expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(
+		cardBox.y + cardBox.height,
+	);
+});
+
+test("главная: «Продолжить просмотр» показывает только последнюю запись", async ({
+	page,
+}) => {
+	await stubAuthedSession(page);
+	await page.route(
+		(url) => url.pathname === "/api/progress",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					items: [
+						progressItem(1, videoItem(1, "Первый фильм"), 1200),
+						progressItem(2, videoItem(2, "Второй фильм"), 1200),
+					],
+					total: 2,
+					limit: 20,
+					offset: 0,
+				}),
+			}),
+	);
+	await page.goto("/");
+
+	await expect(
+		page.getByRole("heading", { name: "Продолжить просмотр" }),
+	).toBeVisible();
+	await expect(page.getByRole("link", { name: /Осталось/ })).toHaveCount(1);
+});

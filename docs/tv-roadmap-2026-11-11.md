@@ -1,6 +1,6 @@
 # TV Roadmap — Android TV, web-TV и QR-вход
 
-**Дата:** 2026-11-11. **Статус:** план; web-TV P1/P2 закрыты в web 0.1.34,
+**Дата:** 2026-11-11. **Статус:** план; web-TV P1/P2 закрыты в web 0.1.35,
 включая OSD видео и правки по ревью; реальный ТВ не проверялся.
 Android TV/QR — впереди.
 **Базовый HEAD:** `5e41973` (mobile Task 24, без финального ревью).
@@ -40,7 +40,7 @@ Android TV/QR — впереди.
 |---|---|---|
 | backend | 1.0.29 | API, auth, upload/transcode/extract, trash, collections |
 | shared | 0.1.8 | media, favorites, collections, progress, lyrics, audioQueue |
-| web | 0.1.34 | функционально полный web-клиент; TV P1/P2 закрыты, включая OSD видео и правки ревью; реальный ТВ не проверялся |
+| web | 0.1.35 | функционально полный web-клиент; TV P1/P2 закрыты, включая OSD видео и правки ревью; реальный ТВ не проверялся |
 | mobile | 0.1.31 / 49 | Tasks 1–24 и поиск/сортировка закрыты, Task 25 не начат |
 
 Mobile-долги, которые нужно закрыть до ТВ:
@@ -54,7 +54,7 @@ Mobile-долги, которые нужно закрыть до ТВ:
 
 Web-долги:
 
-- TV-режим доведён в 0.1.34: фокус, пульт, read-only, OSD видео;
+- TV-режим доведён в 0.1.34–0.1.35: фокус, пульт, read-only, OSD видео;
 - остались overscan и проверка на реальном ТВ;
 - часть P3-замечаний ревью;
 - VidaaOS/браузер Hisense не проверялся.
@@ -209,7 +209,7 @@ interface ClientCapabilities {
 - `scrollIntoView` с отступами; без hover-only эффектов.
 - Модалки/меню: focus trap, Escape/Back, возврат фокуса.
 - Плеер: OSD с пульта, play/pause, seek ±10, fullscreen, back —
-  ✅ web 0.1.34 (video OSD, автоскрытие, media-клавиши).
+  ✅ web 0.1.35 (video OSD, автоскрытие, media-клавиши).
 - 16:9, базовая 1920×1080, overscan ~5%.
 - Крупные элементы, читаемые с 3 метров.
 
@@ -412,7 +412,7 @@ SafeArea, Constants и др.
 - [ ] Mobile закрыт: Task 24 review, поиск/сортировка (0.1.31), Task 25.
 - [ ] Web закрыт: обычные P1/P2/P3, полный гейт, регрессия сценариев.
 - [x] Web TV-профиль: детект + override, read-only, навигация, OSD
-      (web 0.1.34; реальный ТВ не проверялся).
+      (web 0.1.35; реальный ТВ не проверялся).
 - [ ] QR/device-code вход работает на web-TV и native TV.
 - [ ] Android TV APK/AAB собирается, проходит Play TV checklist.
 - [ ] Read-only: write-экраны недоступны, прогресс/избранное работают.
