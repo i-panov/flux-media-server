@@ -36,14 +36,14 @@ export default function ServerScreen() {
 	const [saving, setSaving] = useState(false);
 
 	let backendStatus: string;
-	if (health.isPending) {
+	if (!configured) {
+		backendStatus = t("server.notConfigured");
+	} else if (health.isPending) {
 		backendStatus = t("common.loading");
 	} else if (health.isError) {
 		backendStatus = t("home.offline");
-	} else if (configured) {
-		backendStatus = `${health.data.status} · ${health.data.version}`;
 	} else {
-		backendStatus = t("server.notConfigured");
+		backendStatus = `${health.data.status} · ${health.data.version}`;
 	}
 
 	const goBack = () => {
