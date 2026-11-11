@@ -103,6 +103,7 @@ backend `1.0.30`, web `0.1.36`.
 - [x] Известные ограничения записаны (ниже).
 - [x] Коммит `feat(mobile): мемы и TV-каркас`.
 - [x] Dogfood APK arm64 — собран (`0.1.33`/51, ~33 МБ, `arm64-v8a`).
+- [x] TV AAB arm64 — собран (`0.1.33`/51, ~27 МБ).
 - [ ] Device-smoke (login, video, audio background/lock, offline) —
   заблокировано: нет устройства/эмулятора.
 - [ ] Maestro/e2e-прогон — заблокировано: нет maestro/adb/эмулятора.
