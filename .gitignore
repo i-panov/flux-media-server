@@ -27,3 +27,6 @@ mobile/.gradle-home/
 
 # Local Android Maven artifact cache
 mobile/.m2/
+
+# Local dogfood APK artifacts
+mobile/.artifacts/
