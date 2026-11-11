@@ -157,6 +157,9 @@ export function AdminPage() {
 					<Title order={2} size="h4">
 						{t("admin.users.title")}
 					</Title>
+					<Text size="sm" c="dimmed">
+						{t("admin.users.hint")}
+					</Text>
 					{users.isPending ? (
 						<Skeleton height={160} radius="md" />
 					) : users.isError ? (

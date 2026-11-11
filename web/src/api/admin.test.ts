@@ -7,6 +7,7 @@ import {
 	listOriginals,
 	listUsers,
 	retryTranscode,
+	setAutoCleanup,
 	setUserAdmin,
 } from "./admin";
 
@@ -22,7 +23,7 @@ function emptyResponse(status = 204): Response {
 }
 
 const storageBody = {
-	disks: [{ path: "/data", total_bytes: 100, free_bytes: 5 }],
+	disks: [{ path: "/data", total_bytes: 100, free_bytes: 5, used_bytes: 7 }],
 	video_bytes: 10,
 	audio_bytes: 20,
 	originals_bytes: 30,
@@ -62,6 +63,26 @@ describe("admin api", () => {
 		await expect(getStorage()).resolves.toEqual(storageBody);
 		expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toBe(
 			"/api/admin/storage",
+		);
+	});
+
+	it("переключает авточистку оригиналов", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ auto_cleanup: false }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(setAutoCleanup(false)).resolves.toEqual({
+			auto_cleanup: false,
+		});
+		const call = fetchMock.mock.calls[0];
+		if (call === undefined) {
+			throw new Error("запрос не отправлен");
+		}
+		expect(String(call[0])).toBe("/api/admin/storage/settings");
+		expect((call[1] as RequestInit).method).toBe("PUT");
+		expect((call[1] as RequestInit).body).toBe(
+			JSON.stringify({ auto_cleanup: false }),
 		);
 	});
 

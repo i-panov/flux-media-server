@@ -91,16 +91,17 @@ func setupUploadTest(t *testing.T, workers, queueLimit int) (*fiber.App, reposit
 // фиксирует вызовы, файлы не трогает (кроме Cancel, который убирает
 // исходник — как настоящая очередь).
 type stubTranscodeQueue struct {
-	mu        sync.Mutex
-	enqueued  []transcodeEnqueueCall
-	byID      map[uint64]string
-	nextID    uint64
-	status    services.TranscodeJobStatus
-	statusOK  bool
-	cancelErr error
-	cancelled []uint64
-	retryErr  error
-	spaceErr  error
+	mu          sync.Mutex
+	enqueued    []transcodeEnqueueCall
+	byID        map[uint64]string
+	nextID      uint64
+	status      services.TranscodeJobStatus
+	statusOK    bool
+	cancelErr   error
+	cancelled   []uint64
+	retryErr    error
+	spaceErr    error
+	autoCleanup bool
 }
 
 type transcodeEnqueueCall struct {
@@ -153,6 +154,18 @@ func (s *stubTranscodeQueue) EnsureSpaceForUpload(int64) error { return s.spaceE
 
 func (s *stubTranscodeQueue) OriginalsStatus() ([]services.OriginalInfo, error) {
 	return nil, nil
+}
+
+func (s *stubTranscodeQueue) AutoCleanup() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.autoCleanup
+}
+
+func (s *stubTranscodeQueue) SetAutoCleanup(enabled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.autoCleanup = enabled
 }
 
 func (s *stubTranscodeQueue) enqueuedCount() int {

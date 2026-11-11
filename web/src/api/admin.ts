@@ -6,6 +6,7 @@ const diskSchema = z.object({
 	path: z.string(),
 	total_bytes: z.number(),
 	free_bytes: z.number(),
+	used_bytes: z.number().default(0),
 });
 
 const storageSchema = z.object({
@@ -18,6 +19,12 @@ const storageSchema = z.object({
 });
 
 export type StorageInfo = z.infer<typeof storageSchema>;
+
+const storageSettingsSchema = z.object({
+	auto_cleanup: z.boolean(),
+});
+
+export type StorageSettings = z.infer<typeof storageSettingsSchema>;
 
 const originalSchema = z.object({
 	name: z.string(),
@@ -46,6 +53,16 @@ const adminUsersSchema = z.array(adminUserSchema);
 export async function getStorage(signal?: AbortSignal): Promise<StorageInfo> {
 	const body = await apiFetch<unknown>("/admin/storage", { signal });
 	return storageSchema.parse(body);
+}
+
+export async function setAutoCleanup(
+	autoCleanup: boolean,
+): Promise<StorageSettings> {
+	const body = await apiFetch<unknown>("/admin/storage/settings", {
+		method: "PUT",
+		body: JSON.stringify({ auto_cleanup: autoCleanup }),
+	});
+	return storageSettingsSchema.parse(body);
 }
 
 export async function listOriginals(
@@ -142,6 +159,16 @@ export function useDeleteOriginal() {
 		mutationFn: (name: string) => deleteOriginal(name),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "originals"] });
+			void queryClient.invalidateQueries({ queryKey: ["admin", "storage"] });
+		},
+	});
+}
+
+export function useSetAutoCleanup() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (autoCleanup: boolean) => setAutoCleanup(autoCleanup),
+		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "storage"] });
 		},
 	});

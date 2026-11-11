@@ -124,6 +124,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.UploadTask{},
 		&models.Subtitle{},
 		&models.SchemaMigration{},
+		&models.Setting{},
 	)
 }
 

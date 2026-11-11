@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"flux/internal/config"
+	"flux/internal/repository"
 	"flux/internal/response"
 	"flux/internal/services"
 )
@@ -38,6 +40,50 @@ func newTestApp(t *testing.T) *App {
 	require.NoError(t, err)
 	t.Cleanup(func() { application.Shutdown(context.Background()) })
 	return application
+}
+
+func TestStorageAutoCleanupSettingOverridesConfig(t *testing.T) {
+	base := t.TempDir()
+	dbPath := filepath.Join(base, "test.db")
+
+	// Готовим персистентную настройку до старта приложения.
+	db, err := repository.InitDB(dbPath)
+	require.NoError(t, err)
+	require.NoError(t, repository.RunMigrations(db))
+	require.NoError(t, repository.AutoMigrate(db))
+	settings := repository.NewSettingRepository(db)
+	require.NoError(t, settings.SetBool(context.Background(), repository.SettingAutoCleanupOriginals, true))
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	cfg := &config.Config{
+		Server:   config.ServerConfig{Port: 0, Debug: true, MaxUploadSize: 100 << 20},
+		Database: config.DatabaseConfig{Path: dbPath},
+		Auth: config.AuthConfig{
+			JWTSecret:         "test-secret-that-is-at-least-32-characters-long",
+			JWTExpiry:         24,
+			CodeLength:        6,
+			CodeExpiry:        300,
+			MaxOTPEntries:     1000,
+			AllowUnknownEmail: true,
+		},
+		Media: config.MediaConfig{
+			VideoPath: filepath.Join(base, "video"),
+			AudioPath: filepath.Join(base, "audio"),
+		},
+		Storage: config.StorageConfig{
+			OriginalsDir:         filepath.Join(base, "originals"),
+			TempDir:              filepath.Join(base, "tmp"),
+			AutoCleanupOriginals: false,
+		},
+	}
+	application, err := New(cfg, "test")
+	require.NoError(t, err)
+	t.Cleanup(func() { application.Shutdown(context.Background()) })
+
+	assert.True(t, application.TranscodeQueue.AutoCleanup(),
+		"сохранённая настройка должна перекрывать auto_cleanup_originals из конфига")
 }
 
 func jsonBody(t *testing.T, v interface{}) io.Reader {

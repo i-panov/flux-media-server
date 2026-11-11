@@ -55,7 +55,7 @@ func setupAdminUsersTestApp(t *testing.T, authUserID uint) *adminUsersFixture {
 	require.NoError(t, userRepo.Create(ctx, &models.User{ID: 1, Email: "admin@test.com"}))
 	require.NoError(t, userRepo.Create(ctx, &models.User{ID: 2, Email: "user@test.com"}))
 
-	handler := handlers.NewAdminHandler(mediaRepo, nil, nil, config.StorageConfig{}, config.MediaConfig{}, userRepo)
+	handler := handlers.NewAdminHandler(mediaRepo, nil, nil, config.StorageConfig{}, config.MediaConfig{}, userRepo, nil)
 	app := fiber.New()
 	admin := app.Group("/api/admin", func(c *fiber.Ctx) error {
 		c.Locals(middleware.LocalsUserID, authUserID)
@@ -284,7 +284,7 @@ func setupAdminUsersTestAppWithUserRepo(t *testing.T, authUserID uint, userRepo 
 	require.NoError(t, realRepo.Create(ctx, &models.User{ID: 1, Email: "admin@test.com"}))
 	require.NoError(t, realRepo.Create(ctx, &models.User{ID: 2, Email: "user@test.com"}))
 
-	handler := handlers.NewAdminHandler(nil, nil, nil, config.StorageConfig{}, config.MediaConfig{}, userRepo)
+	handler := handlers.NewAdminHandler(nil, nil, nil, config.StorageConfig{}, config.MediaConfig{}, userRepo, nil)
 	app := fiber.New()
 	admin := app.Group("/api/admin", func(c *fiber.Ctx) error {
 		c.Locals(middleware.LocalsUserID, authUserID)

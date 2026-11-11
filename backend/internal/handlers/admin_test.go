@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -23,7 +24,7 @@ import (
 	"flux/internal/services"
 )
 
-func setupAdminTestApp(t *testing.T, authUserID uint) (*fiber.App, repository.MediaRepository, repository.TranscodeTaskRepository, string, *services.TranscodeQueue) {
+func setupAdminTestApp(t *testing.T, authUserID uint) (*fiber.App, repository.MediaRepository, repository.TranscodeTaskRepository, string, *services.TranscodeQueue, repository.SettingRepository) {
 	t.Helper()
 
 	db, err := repository.InitDB(":memory:")
@@ -33,6 +34,7 @@ func setupAdminTestApp(t *testing.T, authUserID uint) (*fiber.App, repository.Me
 	taskRepo := repository.NewTranscodeTaskRepository(db)
 	subRepo := repository.NewSubtitleRepository(db)
 	userRepo := repository.NewUserRepository(db)
+	settingRepo := repository.NewSettingRepository(db)
 	// Первый созданный пользователь автоматически становится админом
 	// (промоушен в userRepo.Create), второй — обычный.
 	require.NoError(t, userRepo.Create(context.Background(), &models.User{ID: 1, Email: "admin@test.com"}))
@@ -51,36 +53,186 @@ func setupAdminTestApp(t *testing.T, authUserID uint) (*fiber.App, repository.Me
 	)
 	t.Cleanup(transQueue.Stop)
 
-	handler := handlers.NewAdminHandler(mediaRepo, taskRepo, transQueue, storageCfg, mediaCfg, userRepo)
+	handler := handlers.NewAdminHandler(mediaRepo, taskRepo, transQueue, storageCfg, mediaCfg, userRepo, settingRepo)
 	app := fiber.New()
 	admin := app.Group("/api/admin", func(c *fiber.Ctx) error {
 		c.Locals(middleware.LocalsUserID, authUserID)
 		return c.Next()
 	}, middleware.RequireAdmin(userRepo))
 	admin.Get("/storage", handler.StorageInfo)
+	admin.Put("/storage/settings", handler.UpdateStorageSettings)
 	admin.Get("/originals", handler.OriginalsList)
 	admin.Get("/originals/:name/download", handler.OriginalDownload)
 	admin.Delete("/originals/:name", handler.OriginalDelete)
 	admin.Get("/transcodes", handler.TranscodesList)
 	admin.Post("/transcodes/:id/retry", handler.TranscodeRetry)
-	return app, mediaRepo, taskRepo, originalsDir, transQueue
+	return app, mediaRepo, taskRepo, originalsDir, transQueue, settingRepo
 }
 
 func TestAdminStorageInfo(t *testing.T) {
-	app, _, _, _, _ := setupAdminTestApp(t, 1)
+	app, _, _, originalsDir, _, _ := setupAdminTestApp(t, 1)
+	require.NoError(t, os.WriteFile(filepath.Join(originalsDir, "a.mkv"), []byte("abc"), 0644))
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/admin/storage", nil))
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
-	body, err := io.ReadAll(resp.Body)
+	var body struct {
+		Disks []struct {
+			Path      string `json:"path"`
+			UsedBytes int64  `json:"used_bytes"`
+		} `json:"disks"`
+		OriginalsBytes int64 `json:"originals_bytes"`
+		AutoCleanup    bool  `json:"auto_cleanup"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	resp.Body.Close()
+
+	assert.False(t, body.AutoCleanup)
+	assert.Equal(t, int64(3), body.OriginalsBytes)
+	found := false
+	for _, disk := range body.Disks {
+		if disk.Path == originalsDir {
+			found = true
+			assert.Equal(t, int64(3), disk.UsedBytes, "used_bytes каталога — размер его файлов")
+		}
+	}
+	assert.True(t, found, "каталог оригиналов должен быть среди дисков")
+}
+
+func TestAdminStorageSettingsTogglePersists(t *testing.T) {
+	app, _, _, _, queue, settingsRepo := setupAdminTestApp(t, 1)
+
+	req := httptest.NewRequest("PUT", "/api/admin/storage/settings", strings.NewReader(`{"auto_cleanup":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
 	require.NoError(t, err)
-	assert.Contains(t, string(body), `"disks"`)
-	assert.Contains(t, string(body), `"auto_cleanup":false`)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var body map[string]bool
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	resp.Body.Close()
+	assert.True(t, body["auto_cleanup"])
+	assert.True(t, queue.AutoCleanup())
+
+	stored, ok, err := settingsRepo.GetBool(context.Background(), repository.SettingAutoCleanupOriginals)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.True(t, stored)
+
+	// GET /storage отдаёт состояние очереди, а не конфига.
+	resp, err = app.Test(httptest.NewRequest("GET", "/api/admin/storage", nil))
+	require.NoError(t, err)
+	var storage map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&storage))
+	resp.Body.Close()
+	assert.Equal(t, true, storage["auto_cleanup"])
+
+	// Обратное переключение тоже персистится.
+	req = httptest.NewRequest("PUT", "/api/admin/storage/settings", strings.NewReader(`{"auto_cleanup":false}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+	assert.False(t, queue.AutoCleanup())
+	stored, ok, err = settingsRepo.GetBool(context.Background(), repository.SettingAutoCleanupOriginals)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.False(t, stored)
+}
+
+func TestAdminStorageSettingsValidation(t *testing.T) {
+	app, _, _, _, _, _ := setupAdminTestApp(t, 1)
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "missing key", body: `{}`},
+		{name: "wrong type", body: `{"auto_cleanup":"yes"}`},
+		{name: "broken json", body: `{`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("PUT", "/api/admin/storage/settings", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+			resp.Body.Close()
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+		})
+	}
+}
+
+func TestAdminStorageSettingsRevertsOnSaveError(t *testing.T) {
+	queue := &stubTranscodeQueue{}
+	settingsRepo := &stubSettingsRepo{err: errors.New("db down")}
+	handler := handlers.NewAdminHandler(nil, nil, queue, config.StorageConfig{}, config.MediaConfig{}, nil, settingsRepo)
+	app := fiber.New()
+	app.Put("/api/admin/storage/settings", handler.UpdateStorageSettings)
+
+	req := httptest.NewRequest("PUT", "/api/admin/storage/settings", strings.NewReader(`{"auto_cleanup":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+	assert.False(t, queue.AutoCleanup(), "несохранённый флаг обязан откатиться")
+}
+
+func TestAdminStorageSettingsForbiddenForNonAdmin(t *testing.T) {
+	app, _, _, _, _, _ := setupAdminTestApp(t, 2)
+
+	req := httptest.NewRequest("PUT", "/api/admin/storage/settings", strings.NewReader(`{"auto_cleanup":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+}
+
+// stubSettingsRepo — репозиторий с управляемой ошибкой для проверки
+// отката флага очереди при неудачной записи.
+type stubSettingsRepo struct {
+	err    error
+	values map[string]string
+}
+
+func (s *stubSettingsRepo) Get(_ context.Context, key string) (string, bool, error) {
+	if s.err != nil {
+		return "", false, s.err
+	}
+	value, ok := s.values[key]
+	return value, ok, nil
+}
+
+func (s *stubSettingsRepo) Set(_ context.Context, key, value string) error {
+	if s.err != nil {
+		return s.err
+	}
+	if s.values == nil {
+		s.values = make(map[string]string)
+	}
+	s.values[key] = value
+	return nil
+}
+
+func (s *stubSettingsRepo) GetBool(ctx context.Context, key string) (bool, bool, error) {
+	value, ok, err := s.Get(ctx, key)
+	if err != nil || !ok {
+		return false, false, err
+	}
+	return value == "true", true, nil
+}
+
+func (s *stubSettingsRepo) SetBool(ctx context.Context, key string, value bool) error {
+	if value {
+		return s.Set(ctx, key, "true")
+	}
+	return s.Set(ctx, key, "false")
 }
 
 func TestAdminForbiddenForNonAdmin(t *testing.T) {
-	app, _, _, _, _ := setupAdminTestApp(t, 2)
+	app, _, _, _, _, _ := setupAdminTestApp(t, 2)
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/admin/storage", nil))
 	require.NoError(t, err)
@@ -88,7 +240,7 @@ func TestAdminForbiddenForNonAdmin(t *testing.T) {
 }
 
 func TestAdminOriginalsListJoinsTaskAndViews(t *testing.T) {
-	app, mediaRepo, taskRepo, originalsDir, _ := setupAdminTestApp(t, 1)
+	app, mediaRepo, taskRepo, originalsDir, _, _ := setupAdminTestApp(t, 1)
 	ctx := context.Background()
 
 	require.NoError(t, os.WriteFile(filepath.Join(originalsDir, "a.mkv"), []byte("aaa"), 0644))
@@ -122,7 +274,7 @@ func TestAdminOriginalsListJoinsTaskAndViews(t *testing.T) {
 }
 
 func TestAdminOriginalDownloadAndDelete(t *testing.T) {
-	app, _, _, originalsDir, _ := setupAdminTestApp(t, 1)
+	app, _, _, originalsDir, _, _ := setupAdminTestApp(t, 1)
 
 	require.NoError(t, os.WriteFile(filepath.Join(originalsDir, "film.mkv"), []byte("0123456789"), 0644))
 
@@ -155,7 +307,7 @@ func TestAdminOriginalDownloadAndDelete(t *testing.T) {
 }
 
 func TestAdminTranscodeRetry(t *testing.T) {
-	app, _, taskRepo, _, queue := setupAdminTestApp(t, 1)
+	app, _, taskRepo, _, queue, _ := setupAdminTestApp(t, 1)
 	// Воркер остановлен: иначе он тут же подхватит requeued-задание
 	// и статус уплывёт из-под assert'а.
 	queue.Stop()
@@ -183,7 +335,7 @@ func TestAdminTranscodeRetryConflict(t *testing.T) {
 	// Гонка проиграна (Retry вернул конфликт) — 409 с понятным текстом.
 	stub := &stubTranscodeQueue{retryErr: services.ErrTranscodeConflict}
 	app := fiber.New()
-	handler := handlers.NewAdminHandler(nil, nil, stub, config.StorageConfig{}, config.MediaConfig{}, nil)
+	handler := handlers.NewAdminHandler(nil, nil, stub, config.StorageConfig{}, config.MediaConfig{}, nil, nil)
 	app.Post("/api/admin/transcodes/:id/retry", handler.TranscodeRetry)
 
 	resp, err := app.Test(httptest.NewRequest("POST", "/api/admin/transcodes/1/retry", nil))
@@ -192,7 +344,7 @@ func TestAdminTranscodeRetryConflict(t *testing.T) {
 }
 
 func TestAdminTranscodeRetryZeroIDIsBadRequest(t *testing.T) {
-	app, _, _, _, _ := setupAdminTestApp(t, 1)
+	app, _, _, _, _, _ := setupAdminTestApp(t, 1)
 
 	resp, err := app.Test(httptest.NewRequest("POST", "/api/admin/transcodes/0/retry", nil))
 	require.NoError(t, err)
@@ -211,7 +363,7 @@ type adminTranscodeJSON struct {
 }
 
 func TestAdminTranscodesList(t *testing.T) {
-	app, _, taskRepo, _, queue := setupAdminTestApp(t, 1)
+	app, _, taskRepo, _, queue, _ := setupAdminTestApp(t, 1)
 	// Воркер остановлен: иначе он подхватит queued-задания и статусы
 	// уплывут из-под assert'ов (как в TestAdminTranscodeRetry).
 	queue.Stop()
@@ -256,7 +408,7 @@ func TestAdminTranscodesList(t *testing.T) {
 }
 
 func TestAdminTranscodesListForbiddenForNonAdmin(t *testing.T) {
-	app, _, _, _, _ := setupAdminTestApp(t, 2)
+	app, _, _, _, _, _ := setupAdminTestApp(t, 2)
 
 	resp, err := app.Test(httptest.NewRequest("GET", "/api/admin/transcodes", nil))
 	require.NoError(t, err)

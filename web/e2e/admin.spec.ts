@@ -12,6 +12,7 @@ function sessionBody(isAdmin: boolean): string {
 }
 
 async function stubAdmin(page: Page, isAdmin: boolean) {
+	let autoCleanup = true;
 	await page.route("**/api/auth/me", (route) =>
 		route.fulfill({
 			status: 200,
@@ -36,14 +37,38 @@ async function stubAdmin(page: Page, isAdmin: boolean) {
 				status: 200,
 				contentType: "application/json",
 				body: JSON.stringify({
-					disks: [{ path: "/data", total_bytes: 1000, free_bytes: 50 }],
+					disks: [
+						{
+							path: "/data",
+							total_bytes: 1000,
+							free_bytes: 50,
+							used_bytes: 200,
+						},
+					],
 					video_bytes: 10,
 					audio_bytes: 20,
 					originals_bytes: 30,
 					temp_bytes: 40,
-					auto_cleanup: true,
+					auto_cleanup: autoCleanup,
 				}),
 			}),
+	);
+	await page.route(
+		(url) => url.pathname === "/api/admin/storage/settings",
+		(route) => {
+			if (route.request().method() !== "PUT") {
+				return route.fallback();
+			}
+			const body = route.request().postDataJSON() as {
+				auto_cleanup: boolean;
+			};
+			autoCleanup = body.auto_cleanup;
+			return route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ auto_cleanup: autoCleanup }),
+			});
+		},
 	);
 	await page.route(
 		(url) => url.pathname === "/api/admin/transcodes",
@@ -124,11 +149,31 @@ test("админка показывает все секции", async ({ page })
 	await expect(
 		page.getByRole("heading", { name: "Пользователи" }),
 	).toBeVisible();
+	await expect(
+		page.getByText(
+			"Новые пользователи появляются после первого входа по email. Себя нельзя удалить или снять администратора.",
+		),
+	).toBeVisible();
 	await expect(page.getByText("movie.mp4").first()).toBeVisible();
 	await expect(page.getByText("user@example.com")).toBeVisible();
 	await expect(
 		page.getByRole("link", { name: "Админка" }).first(),
 	).toBeVisible();
+});
+
+test("админка переключает авточистку оригиналов", async ({ page }) => {
+	await stubAdmin(page, true);
+	await page.goto("/admin");
+
+	await expect(page.getByText("Раздел занимает 200 B")).toBeVisible();
+	const toggle = page.getByRole("switch", {
+		name: "Авточистка оригиналов",
+	});
+	await expect(toggle).toBeChecked();
+
+	await toggle.click();
+
+	await expect(toggle).not.toBeChecked();
 });
 
 test("админка недоступна обычному пользователю", async ({ page }) => {

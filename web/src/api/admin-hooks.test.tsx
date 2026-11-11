@@ -2,10 +2,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useDeleteUser, useRetryTranscode } from "./admin";
+import { useDeleteUser, useRetryTranscode, useSetAutoCleanup } from "./admin";
 
 function emptyResponse(status = 204): Response {
 	return new Response(null, { status });
+}
+
+function jsonResponse(body: unknown): Response {
+	return new Response(JSON.stringify(body), {
+		status: 200,
+		headers: { "Content-Type": "application/json" },
+	});
 }
 
 function createClient(): QueryClient {
@@ -78,6 +85,36 @@ describe("admin mutation wiring", () => {
 		await waitFor(() => {
 			expect(invalidateSpy).toHaveBeenCalledWith({
 				queryKey: ["admin", "users"],
+			});
+		});
+	});
+
+	it("useSetAutoCleanup инвалидирует сводку хранилища", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ auto_cleanup: true }));
+		vi.stubGlobal("fetch", fetchMock);
+		const client = createClient();
+		activeClient = client;
+		const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+
+		const { result } = renderHook(() => useSetAutoCleanup(), {
+			wrapper: TestWrapper,
+		});
+		result.current.mutate(true);
+
+		await waitFor(() => {
+			expect(result.current.isSuccess).toBe(true);
+		});
+		const call = fetchMock.mock.calls[0];
+		if (call === undefined) {
+			throw new Error("запрос не отправлен");
+		}
+		expect(String(call[0])).toBe("/api/admin/storage/settings");
+		expect((call[1] as RequestInit).method).toBe("PUT");
+		await waitFor(() => {
+			expect(invalidateSpy).toHaveBeenCalledWith({
+				queryKey: ["admin", "storage"],
 			});
 		});
 	});

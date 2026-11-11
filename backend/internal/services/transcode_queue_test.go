@@ -447,6 +447,43 @@ func TestTranscodeNoSpaceWithoutCleanup(t *testing.T) {
 	require.ErrorIs(t, err, ErrInsufficientSpace)
 }
 
+func TestTranscodeAutoCleanupToggle(t *testing.T) {
+	env := setupTranscodeTest(t, &fakeTranscodeRunner{}, false)
+	require.False(t, env.queue.AutoCleanup())
+
+	// Готовый оригинал — кандидат на чистку.
+	src := writeSource(t, env.quar, "a.mp4", "aaa")
+	resultPath := filepath.Join(env.library, "a.mp4")
+	require.NoError(t, os.WriteFile(resultPath, []byte("result"), 0644))
+	media := &models.Media{Title: "a.mp4", Type: models.MediaTypeVideo, FilePath: resultPath, FileHash: "h-a"}
+	require.NoError(t, env.media.Create(context.Background(), media))
+	require.NoError(t, env.tasks.Create(context.Background(), &models.TranscodeTask{
+		SourcePath: src, Filename: "a.mp4", Status: TranscodeTaskDone, MediaID: media.ID,
+	}))
+
+	env.queue.freeBytes = func(string) int64 { return 10 }
+	require.ErrorIs(t, env.queue.EnsureSpaceForUpload(500), ErrInsufficientSpace,
+		"при выключенной чистке оригинал не трогаем")
+
+	// Включение на лету меняет поведение ensureFreeSpace без рестарта.
+	env.queue.SetAutoCleanup(true)
+	require.True(t, env.queue.AutoCleanup())
+	calls := 0
+	env.queue.freeBytes = func(string) int64 {
+		calls++
+		if calls == 1 {
+			return 10
+		}
+		return 600
+	}
+	require.NoError(t, env.queue.EnsureSpaceForUpload(500))
+	_, err := os.Stat(src)
+	require.True(t, os.IsNotExist(err), "включённая чистка удаляет кандидата")
+
+	env.queue.SetAutoCleanup(false)
+	require.False(t, env.queue.AutoCleanup())
+}
+
 func TestEstimateSeconds(t *testing.T) {
 	assert.Equal(t, int64(25), estimateSeconds(&models.TranscodeTask{Progress: 50, Speed: 2, DurationSecs: 100}))
 	assert.Equal(t, int64(0), estimateSeconds(&models.TranscodeTask{Progress: 100, Speed: 2, DurationSecs: 100}))

@@ -22,6 +22,8 @@ type TranscodeQueue interface {
 	Retry(id uint64) error
 	EnsureSpaceForUpload(fileSize int64) error
 	OriginalsStatus() ([]services.OriginalInfo, error)
+	AutoCleanup() bool
+	SetAutoCleanup(bool)
 }
 
 // TranscodeHandler обслуживает статусы заданий нормализации.

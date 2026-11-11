@@ -124,6 +124,10 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - `repository/` — доступ к данным; интерфейсы в `repository/interfaces.go`,
   ad-hoc миграции в `db.go` с версией в `schema_migrations`.
 - `models/` — GORM-модели.
+- `models/setting.go`, `repository/setting.go` — key/value-настройки
+  инстанса в таблице `settings`; persisted-значение
+  (`storage.auto_cleanup_originals`) перекрывает YAML, конфиг остаётся
+  fallback'ом.
 - `middleware/` — JWT/куки, admin, security headers.
 - `email/` — SMTP/OTP.
 - `metadata/` — разбор имён и source URL.

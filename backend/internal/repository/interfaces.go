@@ -262,6 +262,15 @@ type SubtitleRepository interface {
 	DeleteByMedia(ctx context.Context, mediaID uint) error
 }
 
+// SettingRepository — персистентные настройки инстанса (key/value).
+type SettingRepository interface {
+	// Get возвращает значение; ok=false, если ключа ещё нет.
+	Get(ctx context.Context, key string) (string, bool, error)
+	Set(ctx context.Context, key, value string) error
+	GetBool(ctx context.Context, key string) (bool, bool, error)
+	SetBool(ctx context.Context, key string, value bool) error
+}
+
 // RefreshTokenRepository defines data access methods for RefreshToken entities.
 type RefreshTokenRepository interface {
 	Create(ctx context.Context, userID uint, rawToken string, expiresAt time.Time) error

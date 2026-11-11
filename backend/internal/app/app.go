@@ -166,6 +166,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	artistRepo := repository.NewArtistRepository(db)
 	taskRepo := repository.NewTranscodeTaskRepository(db)
 	subRepo := repository.NewSubtitleRepository(db)
+	settingRepo := repository.NewSettingRepository(db)
 
 	// Services
 	otpStore := services.NewOTPStore(
@@ -289,6 +290,15 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		log.Printf("transcode: requeued %d interrupted tasks", n)
 	}
 
+	// Персистентная настройка авточистки перекрывает конфиг: админка
+	// меняет её без рестарта. Ошибка чтения не фатальна — работаем на
+	// значении из YAML (config остаётся fallback'ом).
+	if enabled, ok, err := settingRepo.GetBool(context.Background(), repository.SettingAutoCleanupOriginals); err != nil {
+		log.Printf("settings: read %s, using config fallback: %v", repository.SettingAutoCleanupOriginals, err)
+	} else if ok {
+		transcodeQueue.SetAutoCleanup(enabled)
+	}
+
 	// Фоновая очередь обработки загрузок: POST /upload сохраняет файл и
 	// отвечает 202, хэш/ffprobe/ffmpeg выполняют воркеры очереди.
 	// Строки заданий персистентны: рестарт поднимает незавершённые
@@ -311,7 +321,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	})
 	transcodeHandler := handlers.NewTranscodeHandler(mediaRepo, transcodeQueue)
 	subsHandler := handlers.NewSubsHandler(mediaRepo, subRepo, cfg.Media)
-	adminHandler := handlers.NewAdminHandler(mediaRepo, taskRepo, transcodeQueue, cfg.Storage, cfg.Media, userRepo)
+	adminHandler := handlers.NewAdminHandler(mediaRepo, taskRepo, transcodeQueue, cfg.Storage, cfg.Media, userRepo, settingRepo)
 	// Очередь извлечения аудио из видео: отдельный воркер (ffmpeg тяжёлый),
 	// механика статусов — как у загрузок. Строки заданий персистентны:
 	// рестарт поднимает незавершённые обратно в очередь.
@@ -532,6 +542,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// Админка хранилища: диск, карантин оригиналов, список и ретрай заданий.
 	admin := api.Group("/admin", requireAdmin)
 	admin.Get("/storage", readRateLimiter, adminHandler.StorageInfo)
+	admin.Put("/storage/settings", adminHandler.UpdateStorageSettings)
 	admin.Get("/originals", readRateLimiter, adminHandler.OriginalsList)
 	admin.Get("/originals/:name/download", uploadRateLimiter, adminHandler.OriginalDownload)
 	admin.Delete("/originals/:name", adminHandler.OriginalDelete)

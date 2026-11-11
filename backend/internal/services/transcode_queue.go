@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gorm.io/gorm"
@@ -107,18 +108,19 @@ type OriginalInfo struct {
 // в БД (переживают рестарт). Файл сохраняется синхронно в хендлере,
 // probe/ffmpeg — в фоне.
 type TranscodeQueue struct {
-	mu       sync.Mutex
-	running  map[uint64]context.CancelFunc
-	wake     chan struct{}
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	cfg      TranscodeWorkerConfig
-	tasks    repository.TranscodeTaskRepository
-	media    repository.MediaRepository
-	subs     repository.SubtitleRepository
-	thumbSvc *ThumbnailService
-	runner   FFmpegRunner
+	mu          sync.Mutex
+	running     map[uint64]context.CancelFunc
+	wake        chan struct{}
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
+	cfg         TranscodeWorkerConfig
+	autoCleanup atomic.Bool
+	tasks       repository.TranscodeTaskRepository
+	media       repository.MediaRepository
+	subs        repository.SubtitleRepository
+	thumbSvc    *ThumbnailService
+	runner      FFmpegRunner
 	// freeBytes — шов для тестов (дефолт diskFreeBytes).
 	freeBytes func(string) int64
 }
@@ -163,11 +165,25 @@ func NewTranscodeQueue(
 		runner:    runner,
 		freeBytes: diskFreeBytes,
 	}
+	q.autoCleanup.Store(cfg.AutoCleanup)
 	q.wg.Add(1)
 	go q.worker()
 	q.wg.Add(1)
 	go q.sweepLoop()
 	return q
+}
+
+// AutoCleanup сообщает, включена ли авточистка оригиналов. Значение
+// атомарное: админка переключает его на лету, без рестарта и без гонки
+// с воркером, который читает флаг в ensureFreeSpace.
+func (q *TranscodeQueue) AutoCleanup() bool {
+	return q.autoCleanup.Load()
+}
+
+// SetAutoCleanup включает/выключает авточистку. При ошибке сохранения
+// настройки вызывающий обязан вернуть прежнее значение.
+func (q *TranscodeQueue) SetAutoCleanup(enabled bool) {
+	q.autoCleanup.Store(enabled)
 }
 
 // Enqueue создаёт задание и будит воркера. Возвращает ID задания.
@@ -1059,7 +1075,7 @@ func (q *TranscodeQueue) ensureFreeSpace(dir string, need int64, protect map[str
 		if free < 0 || free >= need {
 			return nil
 		}
-		if !q.cfg.AutoCleanup {
+		if !q.AutoCleanup() {
 			return ErrInsufficientSpace
 		}
 		victim, ok := q.nextEvictionVictim(protect)

@@ -23,12 +23,13 @@ import (
 // AdminHandler обслуживает админку хранилища: диск, карантин оригиналов,
 // ручной ретрай заданий, управление пользователями. Все роуты — за requireAdmin.
 type AdminHandler struct {
-	mediaRepo  repository.MediaRepository
-	taskRepo   repository.TranscodeTaskRepository
-	userRepo   repository.UserRepository
-	transQueue TranscodeQueue
-	storageCfg config.StorageConfig
-	mediaCfg   config.MediaConfig
+	mediaRepo    repository.MediaRepository
+	taskRepo     repository.TranscodeTaskRepository
+	userRepo     repository.UserRepository
+	settingsRepo repository.SettingRepository
+	transQueue   TranscodeQueue
+	storageCfg   config.StorageConfig
+	mediaCfg     config.MediaConfig
 }
 
 func NewAdminHandler(
@@ -38,14 +39,16 @@ func NewAdminHandler(
 	storageCfg config.StorageConfig,
 	mediaCfg config.MediaConfig,
 	userRepo repository.UserRepository,
+	settingsRepo repository.SettingRepository,
 ) *AdminHandler {
 	return &AdminHandler{
-		mediaRepo:  mediaRepo,
-		taskRepo:   taskRepo,
-		userRepo:   userRepo,
-		transQueue: transQueue,
-		storageCfg: storageCfg,
-		mediaCfg:   mediaCfg,
+		mediaRepo:    mediaRepo,
+		taskRepo:     taskRepo,
+		userRepo:     userRepo,
+		settingsRepo: settingsRepo,
+		transQueue:   transQueue,
+		storageCfg:   storageCfg,
+		mediaCfg:     mediaCfg,
 	}
 }
 
@@ -53,6 +56,7 @@ type diskInfo struct {
 	Path       string `json:"path"`
 	TotalBytes int64  `json:"total_bytes"`
 	FreeBytes  int64  `json:"free_bytes"`
+	UsedBytes  int64  `json:"used_bytes"`
 }
 
 type storageInfoResponse struct {
@@ -66,25 +70,77 @@ type storageInfoResponse struct {
 
 // StorageInfo возвращает занятость дисков и каталогов. Дорогой обход
 // (filepath.Walk) — только по явному запросу админа, не фоном.
+// Каждый уникальный каталог обходится один раз: размер идёт и в карточку
+// диска (used_bytes), и в соответствующую секцию.
 func (h *AdminHandler) StorageInfo(c *fiber.Ctx) error {
-	seen := make(map[string]bool)
+	dirs := []string{
+		h.mediaCfg.VideoPath,
+		h.mediaCfg.AudioPath,
+		h.storageCfg.OriginalsDir,
+		h.storageCfg.TempDir,
+	}
+	sizes := make(map[string]int64, len(dirs))
+	seen := make(map[string]bool, len(dirs))
 	var disks []diskInfo
-	for _, dir := range []string{h.mediaCfg.VideoPath, h.mediaCfg.AudioPath, h.storageCfg.OriginalsDir, h.storageCfg.TempDir} {
+	for _, dir := range dirs {
 		if dir == "" || seen[dir] {
 			continue
 		}
 		seen[dir] = true
 		total, free := services.DiskUsage(dir)
-		disks = append(disks, diskInfo{Path: dir, TotalBytes: total, FreeBytes: free})
+		used := dirSizeBytes(dir)
+		sizes[dir] = used
+		disks = append(disks, diskInfo{
+			Path:       dir,
+			TotalBytes: total,
+			FreeBytes:  free,
+			UsedBytes:  used,
+		})
+	}
+	autoCleanup := false
+	if h.transQueue != nil {
+		autoCleanup = h.transQueue.AutoCleanup()
 	}
 	return c.JSON(storageInfoResponse{
 		Disks:          disks,
-		VideoBytes:     dirSizeBytes(h.mediaCfg.VideoPath),
-		AudioBytes:     dirSizeBytes(h.mediaCfg.AudioPath),
-		OriginalsBytes: dirSizeBytes(h.storageCfg.OriginalsDir),
-		TempBytes:      dirSizeBytes(h.storageCfg.TempDir),
-		AutoCleanup:    h.storageCfg.AutoCleanupOriginals,
+		VideoBytes:     sizes[h.mediaCfg.VideoPath],
+		AudioBytes:     sizes[h.mediaCfg.AudioPath],
+		OriginalsBytes: sizes[h.storageCfg.OriginalsDir],
+		TempBytes:      sizes[h.storageCfg.TempDir],
+		AutoCleanup:    autoCleanup,
 	})
+}
+
+// storageSettingsRequest — тело PUT /api/admin/storage/settings.
+// Указатель различает «ключ не прислали» (400) и явный false.
+type storageSettingsRequest struct {
+	AutoCleanup *bool `json:"auto_cleanup"`
+}
+
+// UpdateStorageSettings переключает авточистку оригиналов на лету.
+// Значение применяется к очереди и персистится в settings; если запись
+// в БД не удалась, флаг очереди откатывается, чтобы API не врал о
+// состоянии, которое не переживёт рестарт.
+func (h *AdminHandler) UpdateStorageSettings(c *fiber.Ctx) error {
+	if h.transQueue == nil || h.settingsRepo == nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Storage settings are unavailable")
+	}
+	var req storageSettingsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if req.AutoCleanup == nil {
+		return response.Error(c, fiber.StatusBadRequest, "auto_cleanup is required")
+	}
+
+	previous := h.transQueue.AutoCleanup()
+	h.transQueue.SetAutoCleanup(*req.AutoCleanup)
+	if err := h.settingsRepo.SetBool(c.UserContext(), repository.SettingAutoCleanupOriginals, *req.AutoCleanup); err != nil {
+		h.transQueue.SetAutoCleanup(previous)
+		log.Printf("admin: save auto cleanup setting: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to save storage settings")
+	}
+	return c.JSON(fiber.Map{"auto_cleanup": *req.AutoCleanup})
 }
 
 // dirSizeBytes суммирует размеры файлов дерева. Ошибки отдельных

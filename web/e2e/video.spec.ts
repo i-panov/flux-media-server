@@ -11,6 +11,8 @@ import {
 	videoItem,
 } from "./video-fixtures";
 
+const REMAINING_LINK_PATTERN = /Осталось/;
+
 async function stubEmptyVideoList(page: Page) {
 	await page.route(
 		(url) => url.pathname === "/api/media",
@@ -523,5 +525,7 @@ test("главная: «Продолжить просмотр» показыва
 	await expect(
 		page.getByRole("heading", { name: "Продолжить просмотр" }),
 	).toBeVisible();
-	await expect(page.getByRole("link", { name: /Осталось/ })).toHaveCount(1);
+	await expect(
+		page.getByRole("link", { name: REMAINING_LINK_PATTERN }),
+	).toHaveCount(1);
 });
