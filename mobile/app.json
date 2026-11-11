@@ -3,7 +3,7 @@
     "name": "Flux",
     "slug": "mobile",
     "scheme": "flux",
-    "version": "0.1.32",
+    "version": "0.1.33",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -20,7 +20,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.lib.flux",
-      "versionCode": 50
+      "versionCode": 51
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -59,7 +59,16 @@
         }
       ],
       "expo-image",
-      "expo-system-ui"
+      "expo-system-ui",
+      [
+        "@react-native-tvos/config-tv",
+        {
+          "isTV": false,
+          "removeFlipperOnAndroid": true,
+          "androidTVBanner": "./assets/tv-banner.png",
+          "androidTVIcon": "./assets/tv-icon.png"
+        }
+      ]
     ]
   }
 }

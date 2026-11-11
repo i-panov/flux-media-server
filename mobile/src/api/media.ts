@@ -2,6 +2,7 @@ import {
 	apiFetch,
 	audioListOptions,
 	type CoreFetcher,
+	imageListOptions,
 	mediaOptions,
 	videoListOptions,
 } from "@flux/shared";
@@ -51,6 +52,10 @@ export function useVideoList(q = "", sort: SortOrder = "desc") {
 
 export function useAudioList(q = "", sort: SortOrder = "desc") {
 	return useInfiniteQuery(audioSearchOptions(fetcher, q, sort));
+}
+
+export function useImageList(q = "") {
+	return useInfiniteQuery(imageListOptions(fetcher, normalizeSearchQuery(q)));
 }
 
 // Треки артиста фильтруются на сервере (artist_id): клиент не тянет всю

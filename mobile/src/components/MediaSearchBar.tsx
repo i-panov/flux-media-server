@@ -8,8 +8,9 @@ import { useTheme } from "../theme/ThemeProvider";
 interface MediaSearchBarProps {
 	value: string;
 	onChangeText: (value: string) => void;
-	sort: SortOrder;
-	onSortChange: (sort: SortOrder) => void;
+	/** Для списков без сортировки (мемы) переключатель не показывается. */
+	sort?: SortOrder;
+	onSortChange?: (sort: SortOrder) => void;
 	placeholder: string;
 	/** Базовый testID: input/clear/sort получают суффиксы. */
 	testID: string;
@@ -29,12 +30,15 @@ export function MediaSearchBar({
 	const { colors, radii, spacing } = useTheme();
 	const sortLabel = sort === "asc" ? t("search.sortAsc") : t("search.sortDesc");
 	const sortIcon = sort === "asc" ? "arrow-up" : "arrow-down";
+	const showSort = sort !== undefined && onSortChange !== undefined;
 
 	const onClear = useCallback(() => {
 		onChangeText("");
 	}, [onChangeText]);
 	const onPressSort = useCallback(() => {
-		onSortChange(nextSort(sort));
+		if (sort !== undefined && onSortChange !== undefined) {
+			onSortChange(nextSort(sort));
+		}
 	}, [onSortChange, sort]);
 
 	return (
@@ -81,30 +85,32 @@ export function MediaSearchBar({
 					</Pressable>
 				)}
 			</View>
-			<Pressable
-				accessibilityRole="button"
-				accessibilityLabel={sortLabel}
-				accessibilityHint={t("search.sortHint")}
-				accessibilityState={{ selected: sort === "asc" }}
-				onPress={onPressSort}
-				hitSlop={8}
-				testID={`${testID}-sort`}
-				style={({ pressed }) => [
-					styles.sortButton,
-					{
-						backgroundColor: colors.surfaceMuted,
-						borderColor: colors.controlBorder,
-						borderRadius: radii.sm,
-						paddingHorizontal: spacing.sm,
-					},
-					pressed && styles.pressed,
-				]}
-			>
-				<Ionicons name={sortIcon} size={16} color={colors.text} />
-				<Text style={[styles.sortLabel, { color: colors.text }]}>
-					{sortLabel}
-				</Text>
-			</Pressable>
+			{showSort && (
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={sortLabel}
+					accessibilityHint={t("search.sortHint")}
+					accessibilityState={{ selected: sort === "asc" }}
+					onPress={onPressSort}
+					hitSlop={8}
+					testID={`${testID}-sort`}
+					style={({ pressed }) => [
+						styles.sortButton,
+						{
+							backgroundColor: colors.surfaceMuted,
+							borderColor: colors.controlBorder,
+							borderRadius: radii.sm,
+							paddingHorizontal: spacing.sm,
+						},
+						pressed && styles.pressed,
+					]}
+				>
+					<Ionicons name={sortIcon} size={16} color={colors.text} />
+					<Text style={[styles.sortLabel, { color: colors.text }]}>
+						{sortLabel}
+					</Text>
+				</Pressable>
+			)}
 		</View>
 	);
 }

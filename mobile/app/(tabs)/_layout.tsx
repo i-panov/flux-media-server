@@ -6,6 +6,7 @@ import { AuthGate } from "../../src/components/AuthGate";
 import { t, useLanguage } from "../../src/i18n";
 import { AudioBar } from "../../src/player/AudioBar";
 import { useTheme } from "../../src/theme/ThemeProvider";
+import { isTV } from "../../src/tv/profile";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -79,8 +80,23 @@ export default function TabsLayout() {
 					}}
 				/>
 				<Tabs.Screen
+					name="memes"
+					options={{
+						title: t("memes.title"),
+						tabBarButtonTestID: "tab-memes",
+						tabBarIcon: ({ color, size, focused }) => (
+							<TabIcon
+								name={focused ? "images" : "images-outline"}
+								color={color}
+								size={size}
+							/>
+						),
+					}}
+				/>
+				<Tabs.Screen
 					name="library"
 					options={{
+						href: isTV ? null : undefined,
 						title: t("library.title"),
 						tabBarButtonTestID: "tab-library",
 						tabBarIcon: ({ color, size, focused }) => (

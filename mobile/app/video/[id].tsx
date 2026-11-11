@@ -35,6 +35,7 @@ import { t, useLanguage } from "../../src/i18n";
 import { isHttpSourceUrl } from "../../src/media/source";
 import { VideoPlayer } from "../../src/player/VideoPlayer";
 import { useTheme } from "../../src/theme/ThemeProvider";
+import { isTV, tvCapabilities } from "../../src/tv/profile";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -426,13 +427,17 @@ function VideoDetailContent() {
 					selected={isFavorite}
 					danger={isFavorite}
 				/>
-				<DownloadButton media={item} testID="video-detail-download" />
-				<ActionButton
-					icon="folder-open-outline"
-					label={t("video.addToCollection")}
-					onPress={() => setCollectionSheetOpen(true)}
-					testID="video-detail-add-collection"
-				/>
+				{tvCapabilities.canDownload && (
+					<DownloadButton media={item} testID="video-detail-download" />
+				)}
+				{tvCapabilities.canManageCollections && (
+					<ActionButton
+						icon="folder-open-outline"
+						label={t("video.addToCollection")}
+						onPress={() => setCollectionSheetOpen(true)}
+						testID="video-detail-add-collection"
+					/>
+				)}
 				{isHttpSourceUrl(sourceUrl) && (
 					<ActionButton
 						icon="link-outline"
@@ -441,7 +446,7 @@ function VideoDetailContent() {
 						testID="video-detail-source"
 					/>
 				)}
-				{session.data?.is_admin === true && (
+				{!isTV && session.data?.is_admin === true && (
 					<>
 						<ExtractAudioControl mediaId={item.id} />
 						<ActionButton

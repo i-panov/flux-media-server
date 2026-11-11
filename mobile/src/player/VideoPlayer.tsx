@@ -18,7 +18,9 @@ import {
 } from "react-native";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { isTV } from "../tv/profile";
 import { PlayerControls } from "./PlayerControls";
+import { useTVVideoRemote } from "./useTVVideoRemote";
 import { useVideoProgress } from "./useVideoProgress";
 import { useVideoSource } from "./useVideoSource";
 import { VideoPoster } from "./VideoPoster";
@@ -76,6 +78,7 @@ function PlayOverlay({
 			accessibilityRole="button"
 			accessibilityLabel={t("video.player.play")}
 			onPress={onPlay}
+			hasTVPreferredFocus={isTV}
 			testID="video-player-play-overlay"
 			style={styles.overlay}
 		>
@@ -285,6 +288,7 @@ export function VideoPlayer({
 		});
 	};
 
+	useTVVideoRemote({ position, seek: seekTo, toggle: togglePlayback });
 	return (
 		<View
 			testID="video-player"

@@ -1,7 +1,7 @@
 import { createQueryClient } from "@flux/shared";
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -14,6 +14,7 @@ import { setLanguage } from "../src/i18n";
 import { loadLanguage } from "../src/i18n/languageStorage";
 import { AudioProvider } from "../src/player/AudioProvider";
 import { ThemeProvider, useTheme } from "../src/theme/ThemeProvider";
+import { isTV } from "../src/tv/profile";
 
 SplashScreen.preventAutoHideAsync().catch(() => {
 	// Повторный вызов при Fast Refresh — не ошибка.
@@ -32,6 +33,22 @@ function AppShell({
 }) {
 	const { hydrated } = useTheme();
 	const ready = apiReady && hydrated;
+	const pathname = usePathname();
+	const router = useRouter();
+
+	useEffect(() => {
+		if (!isTV) {
+			return;
+		}
+		if (
+			pathname === "/upload" ||
+			pathname === "/trash" ||
+			pathname === "/downloads" ||
+			pathname.startsWith("/media/")
+		) {
+			router.replace("/video");
+		}
+	}, [pathname, router]);
 
 	useEffect(() => {
 		if (!ready) {
@@ -70,6 +87,7 @@ function AppShell({
 							/>
 							<Stack.Screen name="login" />
 							<Stack.Screen name="server" />
+							<Stack.Screen name="meme/[id]" />
 							<Stack.Screen name="downloads" />
 						</Stack>
 					</AudioProvider>

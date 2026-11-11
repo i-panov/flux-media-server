@@ -23,6 +23,7 @@ import { Screen } from "../../src/components/Screen";
 import { useDownloadState } from "../../src/downloads/DownloadProvider";
 import { t, useLanguage } from "../../src/i18n";
 import { useTheme } from "../../src/theme/ThemeProvider";
+import { isTV } from "../../src/tv/profile";
 
 function toggleCollapsed(
 	collapsed: ReadonlySet<number>,
@@ -40,6 +41,7 @@ function toggleCollapsed(
 function LibraryDownloadsRow() {
 	const { colors, spacing } = useTheme();
 	const { entries, active } = useDownloadState();
+	if (isTV) return null;
 	const activeCount = active.filter(
 		(item) => item.status === "downloading",
 	).length;
@@ -87,6 +89,7 @@ function LibraryDownloadsRow() {
 
 function LibraryUploadRow() {
 	const { colors, spacing } = useTheme();
+	if (isTV) return null;
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -164,29 +167,31 @@ export default function LibraryScreen() {
 				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
 			</Pressable>
 
-			<Pressable
-				accessibilityRole="button"
-				accessibilityLabel={t("trash.title")}
-				onPress={() => router.push("/trash")}
-				testID="library-trash"
-				style={({ pressed }) => [
-					styles.row,
-					{
-						padding: spacing.lg,
-						borderColor: colors.border,
-						backgroundColor: colors.surface,
-					},
-					pressed && styles.pressed,
-				]}
-			>
-				<View style={styles.rowLead}>
-					<Ionicons name="trash-outline" size={20} color={colors.textMuted} />
-					<Text style={[styles.rowTitle, { color: colors.text }]}>
-						{t("trash.title")}
-					</Text>
-				</View>
-				<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-			</Pressable>
+			{!isTV && (
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("trash.title")}
+					onPress={() => router.push("/trash")}
+					testID="library-trash"
+					style={({ pressed }) => [
+						styles.row,
+						{
+							padding: spacing.lg,
+							borderColor: colors.border,
+							backgroundColor: colors.surface,
+						},
+						pressed && styles.pressed,
+					]}
+				>
+					<View style={styles.rowLead}>
+						<Ionicons name="trash-outline" size={20} color={colors.textMuted} />
+						<Text style={[styles.rowTitle, { color: colors.text }]}>
+							{t("trash.title")}
+						</Text>
+					</View>
+					<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+				</Pressable>
+			)}
 
 			<LibraryDownloadsRow />
 
@@ -196,29 +201,31 @@ export default function LibraryScreen() {
 				<Text style={[styles.sectionTitle, { color: colors.text }]}>
 					{t("collections.title")}
 				</Text>
-				<Pressable
-					accessibilityRole="button"
-					accessibilityLabel={t("collections.create")}
-					onPress={openCreate}
-					testID="library-create-collection"
-					hitSlop={4}
-					style={({ pressed }) => [
-						styles.createButton,
-						{
-							borderColor: colors.accent,
-							backgroundColor: colors.surface,
-							borderRadius: radii.pill,
-							gap: spacing.xs,
-							paddingHorizontal: spacing.md,
-						},
-						pressed && styles.pressed,
-					]}
-				>
-					<Ionicons name="add" size={18} color={colors.accent} />
-					<Text style={[styles.createLabel, { color: colors.accent }]}>
-						{t("common.create")}
-					</Text>
-				</Pressable>
+				{!isTV && (
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel={t("collections.create")}
+						onPress={openCreate}
+						testID="library-create-collection"
+						hitSlop={4}
+						style={({ pressed }) => [
+							styles.createButton,
+							{
+								borderColor: colors.accent,
+								backgroundColor: colors.surface,
+								borderRadius: radii.pill,
+								gap: spacing.xs,
+								paddingHorizontal: spacing.md,
+							},
+							pressed && styles.pressed,
+						]}
+					>
+						<Ionicons name="add" size={18} color={colors.accent} />
+						<Text style={[styles.createLabel, { color: colors.accent }]}>
+							{t("common.create")}
+						</Text>
+					</Pressable>
+				)}
 			</View>
 
 			{collections.isError && hasCachedData && (
@@ -248,8 +255,8 @@ export default function LibraryScreen() {
 					icon="folder-open-outline"
 					title={t("collections.empty")}
 					description={t("collections.emptyHint")}
-					actionLabel={t("collections.create")}
-					onActionPress={openCreate}
+					actionLabel={isTV ? undefined : t("collections.create")}
+					onActionPress={isTV ? undefined : openCreate}
 					testID="library-collections-empty"
 				/>
 			) : (

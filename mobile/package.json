@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -24,12 +24,13 @@
     "expo-system-ui": "~58.0.7",
     "expo-video": "~58.0.13",
     "react": "19.3.0",
-    "react-native": "0.88.1",
+    "react-native": "npm:react-native-tvos@0.88.1-0",
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
+    "@react-native-tvos/config-tv": "^0.1.7",
     "@types/react": "~19.3.0",
     "eslint": "^9.39.4",
     "eslint-config-expo": "^58.0.4",
