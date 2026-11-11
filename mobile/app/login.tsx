@@ -21,6 +21,8 @@ import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
 import { secureStore } from "../src/storage/secureStore";
 import { useTheme } from "../src/theme/ThemeProvider";
+import { tvFocusStyle } from "../src/tv/focus";
+import { isTV } from "../src/tv/profile";
 
 export default function LoginScreen() {
 	useLanguage();
@@ -32,6 +34,9 @@ export default function LoginScreen() {
 	const [codeSent, setCodeSent] = useState(false);
 	const [debugCode, setDebugCode] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [focusedField, setFocusedField] = useState<"email" | "code" | null>(
+		null,
+	);
 
 	const request = useMutation({
 		mutationFn: requestCode,
@@ -84,7 +89,7 @@ export default function LoginScreen() {
 	const inputStyle = [
 		styles.input,
 		{
-			borderColor: colors.controlBorder,
+			borderColor: focusedField === null ? colors.controlBorder : colors.accent,
 			backgroundColor: colors.surface,
 			color: colors.text,
 		},
@@ -112,6 +117,8 @@ export default function LoginScreen() {
 							style={inputStyle}
 							value={code}
 							onChangeText={setCode}
+							onFocus={() => setFocusedField("code")}
+							onBlur={() => setFocusedField(null)}
 							keyboardType="number-pad"
 							autoComplete="one-time-code"
 							placeholderTextColor={colors.textMuted}
@@ -128,13 +135,14 @@ export default function LoginScreen() {
 							testID="login-sign-in"
 							accessibilityRole="button"
 							accessibilityState={{ disabled: signInDisabled }}
-							style={({ pressed }) => [
+							style={({ pressed, focused }) => [
 								styles.button,
 								{
 									backgroundColor: colors.accent,
 									opacity: signInDisabled ? 0.5 : 1,
 								},
 								pressed && !signInDisabled && styles.pressed,
+								tvFocusStyle(focused, colors.accent),
 							]}
 							disabled={signInDisabled}
 							onPress={() =>
@@ -170,6 +178,9 @@ export default function LoginScreen() {
 							style={inputStyle}
 							value={email}
 							onChangeText={setEmail}
+							onFocus={() => setFocusedField("email")}
+							onBlur={() => setFocusedField(null)}
+							hasTVPreferredFocus={isTV}
 							autoCapitalize="none"
 							autoCorrect={false}
 							keyboardType="email-address"
@@ -179,13 +190,14 @@ export default function LoginScreen() {
 							testID="login-request-code"
 							accessibilityRole="button"
 							accessibilityState={{ disabled: requestCodeDisabled }}
-							style={({ pressed }) => [
+							style={({ pressed, focused }) => [
 								styles.button,
 								{
 									backgroundColor: colors.accent,
 									opacity: requestCodeDisabled ? 0.5 : 1,
 								},
 								pressed && !requestCodeDisabled && styles.pressed,
+								tvFocusStyle(focused, colors.accent),
 							]}
 							disabled={requestCodeDisabled}
 							onPress={() => request.mutate(email.trim())}
