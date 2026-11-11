@@ -23,6 +23,7 @@ import { useTheme } from "../src/theme/ThemeProvider";
 
 // Публичный экран: адрес сервера задаётся до входа, поэтому AuthGate здесь
 // намеренно не используется.
+// eslint-disable-next-line max-lines-per-function -- экран держит форму, health и сброс сессии.
 export default function ServerScreen() {
 	useLanguage();
 	const { colors } = useTheme();
@@ -34,6 +35,7 @@ export default function ServerScreen() {
 	const [error, setError] = useState<string | null>(null);
 	const [saved, setSaved] = useState(false);
 	const [saving, setSaving] = useState(false);
+	const [inputFocused, setInputFocused] = useState(false);
 
 	let backendStatus: string;
 	if (!configured) {
@@ -179,7 +181,7 @@ export default function ServerScreen() {
 				style={[
 					styles.input,
 					{
-						borderColor: colors.controlBorder,
+						borderColor: inputFocused ? colors.accent : colors.controlBorder,
 						backgroundColor: colors.surface,
 						color: colors.text,
 					},
@@ -189,6 +191,11 @@ export default function ServerScreen() {
 					setDraft(value);
 					setSaved(false);
 				}}
+				onFocus={() => setInputFocused(true)}
+				onBlur={() => setInputFocused(false)}
+				onSubmitEditing={() => void save()}
+				returnKeyType="go"
+				blurOnSubmit
 				autoCapitalize="none"
 				autoCorrect={false}
 				keyboardType="url"
