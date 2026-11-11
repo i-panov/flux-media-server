@@ -14,9 +14,9 @@ export function AddToCollectionButton({
 	type: MediaType;
 }) {
 	const { t } = useTranslation();
-	const { tvMode } = useTVMode();
+	const { capabilities } = useTVMode();
 	const [opened, setOpened] = useState(false);
-	if (tvMode) {
+	if (!capabilities.canManageCollections) {
 		return null;
 	}
 	return (

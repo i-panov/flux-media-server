@@ -20,27 +20,41 @@ import { useArtist, useRenameArtist } from "../../api/metadata";
 import { useSession } from "../../api/session";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
+import { ArtistFavoriteButton } from "../favorites/ArtistFavoriteButton";
 import { ChangeCoverButton } from "../media/ChangeCoverButton";
 import { EditMetadataModal } from "../media/EditMetadataModal";
 import {
+	clickFirstLink,
+	clickNode,
 	TVButton,
 	TVFocusScope,
 	TVModalAutoFocus,
 	useTVFocusable,
 } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
 
 function ArtistTrackRow({
 	media,
 	onEdit,
+	canEditMetadata,
+	canChangeCover,
 }: {
 	media: Media;
 	onEdit: () => void;
+	canEditMetadata: boolean;
+	canChangeCover: boolean;
 }) {
 	const { t } = useTranslation();
-	const session = useSession();
-	const isAdmin = session.data?.is_admin === true;
+	// Строка трека — spatial-цель: Enter открывает детали через ссылку,
+	// как в общем списке аудио.
+	const { targetRef: rowRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		`artist-track-${media.id}`,
+		clickFirstLink,
+	);
 	return (
 		<Group
+			ref={rowRef}
+			tabIndex={tvMode ? -1 : undefined}
 			justify="space-between"
 			wrap="nowrap"
 			className="rounded-md border border-[var(--mantine-color-default-border)] px-3 py-2"
@@ -57,15 +71,68 @@ function ArtistTrackRow({
 					{media.album === "" ? formatDuration(media.duration) : media.album}
 				</Text>
 			</Link>
-			{isAdmin && (
+			{canEditMetadata && (
 				<Group gap={4} wrap="nowrap">
 					<Button variant="subtle" size="xs" onClick={onEdit}>
 						{t("metadata.edit")}
 					</Button>
-					<ChangeCoverButton mediaId={media.id} />
+					{canChangeCover && <ChangeCoverButton mediaId={media.id} />}
 				</Group>
 			)}
 		</Group>
+	);
+}
+
+function ArtistBackButton({
+	label,
+	onClick,
+}: {
+	label: string;
+	onClick: () => void;
+}) {
+	const { targetRef } = useTVFocusable<HTMLButtonElement>(
+		"artist-back",
+		clickNode,
+	);
+	return (
+		<Button
+			ref={targetRef}
+			data-tv-focus-key="artist-back"
+			variant="subtle"
+			w="fit-content"
+			leftSection={<ArrowLeft size={16} />}
+			onClick={onClick}
+		>
+			{label}
+		</Button>
+	);
+}
+
+function ArtistFavoriteControl({
+	artistId,
+	artistName,
+}: {
+	artistId: number;
+	artistName: string;
+}) {
+	// Отдельный компонент: он монтируется только вместе с загруженной
+	// страницей, поэтому useFocusable получает настоящий DOM-узел сразу.
+	// Внутри ArtistPage hook живёт с первого рендера скелетона и при
+	// позднем появлении узла spatial-реестр остаётся с node=null.
+	const { targetRef, tvMode } = useTVFocusable<HTMLDivElement>(
+		"artist-favorite",
+		(node) => {
+			node?.querySelector<HTMLButtonElement>("button")?.click();
+		},
+	);
+	return (
+		<div
+			ref={targetRef}
+			tabIndex={tvMode ? -1 : undefined}
+			className="rounded-full"
+		>
+			<ArtistFavoriteButton artistId={artistId} artistName={artistName} />
+		</div>
 	);
 }
 
@@ -159,6 +226,7 @@ export function ArtistPage() {
 
 	const session = useSession();
 	const isAdmin = session.data?.is_admin === true;
+	const { capabilities } = useTVMode();
 	const {
 		artist,
 		isPending,
@@ -169,9 +237,14 @@ export function ArtistPage() {
 	const [renameOpened, setRenameOpened] = useState(false);
 	const [editMedia, setEditMedia] = useState<Media | null>(null);
 	// ТВ-режим: корень страницы — spatial-секция, треки внутри —
-	// контент секции.
+	// контент секции. Capabilities скрывают write-действия (read-only),
+	// но избранное остаётся.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("artist-page");
+	// Скелетон — отдельная цель: route-focus не должен уходить в навбар,
+	// пока данные артиста грузятся.
+	const { targetRef: tvLoadingRef } =
+		useTVFocusable<HTMLDivElement>("artist-loading");
 	const retryLabel = t("common.retry");
 
 	const {
@@ -184,6 +257,8 @@ export function ArtistPage() {
 	// Фильтр по артисту — на сервере (artist_id), поэтому клиент не
 	// догружает всю аудиотеку и не фильтрует её в памяти.
 	const tracks = list.data?.pages.flatMap((page) => page.items) ?? [];
+	const canEditMetadata = isAdmin && capabilities.canEditMetadata;
+	const canChangeCover = isAdmin && capabilities.canChangeCover;
 
 	if (!valid) {
 		return (
@@ -191,16 +266,14 @@ export function ArtistPage() {
 				<Alert color="red" variant="light">
 					{t("artists.notFound")}
 				</Alert>
-				<Button variant="light" w="fit-content" onClick={backToAudio}>
-					{backLabel}
-				</Button>
+				<ArtistBackButton label={backLabel} onClick={backToAudio} />
 			</Stack>
 		);
 	}
 
 	if (isPending || list.isPending) {
 		return (
-			<Stack gap="md">
+			<Stack gap="md" ref={tvLoadingRef} tabIndex={tvMode ? -1 : undefined}>
 				<Skeleton height={32} width="40%" radius="sm" />
 				<Skeleton height={64} radius="md" />
 				<Skeleton height={64} radius="md" />
@@ -227,9 +300,7 @@ export function ArtistPage() {
 						</Button>
 					)}
 				</Alert>
-				<Button variant="light" w="fit-content" onClick={backToAudio}>
-					{backLabel}
-				</Button>
+				<ArtistBackButton label={backLabel} onClick={backToAudio} />
 			</Stack>
 		);
 	}
@@ -243,14 +314,7 @@ export function ArtistPage() {
 			data-tv-focus-key="artist-page"
 		>
 			<TVFocusScope focusKey="artist-page">
-				<Button
-					variant="subtle"
-					w="fit-content"
-					leftSection={<ArrowLeft size={16} />}
-					onClick={backToAudio}
-				>
-					{backLabel}
-				</Button>
+				<ArtistBackButton label={backLabel} onClick={backToAudio} />
 				<Group justify="space-between" align="center" wrap="wrap">
 					<Group gap="md" align="center">
 						<Avatar
@@ -264,11 +328,17 @@ export function ArtistPage() {
 						>
 							<Music size={28} />
 						</Avatar>
-						<Title order={1} size="h2">
-							{artist.name}
-						</Title>
+						<Group gap="xs" align="center">
+							<Title order={1} size="h2">
+								{artist.name}
+							</Title>
+							<ArtistFavoriteControl
+								artistId={artistId}
+								artistName={artist.name}
+							/>
+						</Group>
 					</Group>
-					{isAdmin && (
+					{canEditMetadata && (
 						<Button
 							variant="light"
 							leftSection={<Pencil size={16} />}
@@ -298,6 +368,8 @@ export function ArtistPage() {
 								key={media.id}
 								media={media}
 								onEdit={() => setEditMedia(media)}
+								canEditMetadata={canEditMetadata}
+								canChangeCover={canChangeCover}
 							/>
 						))}
 					</Stack>
@@ -315,21 +387,22 @@ export function ArtistPage() {
 					</Alert>
 				) : (
 					hasNextPage && (
-						<Button
+						<TVButton
+							focusKey="artist-load-more"
 							variant="light"
 							w="fit-content"
 							loading={isFetchingNextPage}
 							onClick={() => void fetchNextPage()}
 						>
 							{t("audio.loadMore")}
-						</Button>
+						</TVButton>
 					)
 				)}
 			</TVFocusScope>
 			{/* Модалка монтируется только на время открытия, а key по имени
 			пересоздаёт её, когда артист подгружается позже: поле стартует
 			с загруженным именем, а не с пустого маунта. */}
-			{renameOpened && (
+			{canEditMetadata && renameOpened && (
 				<RenameArtistModal
 					key={`${artistId}:${artist?.name ?? ""}`}
 					opened

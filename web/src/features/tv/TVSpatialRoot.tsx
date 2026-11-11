@@ -1,4 +1,4 @@
-import { destroy, init } from "@noriginmedia/norigin-spatial-navigation";
+import { init, pause, resume } from "@noriginmedia/norigin-spatial-navigation";
 import { useEffect } from "react";
 import { useTVBackNavigation } from "./tvBack";
 import { useTVRouteFocus } from "./tvRouteFocus";
@@ -7,7 +7,7 @@ import { useTVMode } from "./useTVMode";
 const TV_ROOT_CLASS = "tv-mode";
 
 // Корень ТВ-режима: живёт рядом с провайдерами в __root.tsx. В обычном режиме
-// ничего не делает.
+// навигацию не перехватывает, но и не сносит реестр focusable-компонентов.
 export function TVSpatialRoot() {
 	const { tvMode } = useTVMode();
 	useTVBackNavigation(tvMode);
@@ -15,15 +15,25 @@ export function TVSpatialRoot() {
 
 	useEffect(() => {
 		setTVRootClass(tvMode);
-		if (!tvMode) {
-			return;
+		if (tvMode) {
+			// shouldFocusDOMNode: фокус уходит в реальные DOM-узлы, поэтому CSS
+			// `.tv-mode :focus` подсвечивает текущий элемент, а проверки
+			// document.activeElement в e2e видят spatial-фокус.
+			// init() идемпотентен: повторное включение не сбрасывает реестр.
+			init({ shouldFocusDOMNode: true });
+			resume();
+		} else {
+			// destroy() обнуляет focusableComponents, а useFocusable
+			// регистрируется только при монтировании — после off→on
+			// навигация оставалась пустой. Поэтому выключение лишь ставит
+			// навигацию на паузу; включение возвращает её на место.
+			pause();
 		}
-		// shouldFocusDOMNode: фокус уходит в реальные DOM-узлы, поэтому CSS
-		// `.tv-mode :focus` подсвечивает текущий элемент, а проверки
-		// document.activeElement в e2e видят spatial-фокус.
-		init({ shouldFocusDOMNode: true });
 		return () => {
-			destroy();
+			// На размонтировании/смене режима гасим обработчики, но реестр
+			// не трогаем: StrictMode прогоняет setup→cleanup→setup, а
+			// повторный init() должен увидеть те же focusable-узлы.
+			pause();
 			setTVRootClass(false);
 		};
 	}, [tvMode]);

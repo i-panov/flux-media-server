@@ -10,7 +10,7 @@ export interface ClientCapabilities {
 	canManageTrash: boolean;
 	canDownload: boolean;
 	canManageCollections: boolean;
-	canUseQrLogin: boolean;
+	canAccessAdmin: boolean;
 }
 
 const READ_ONLY_CAPABILITIES: ClientCapabilities = {
@@ -19,10 +19,11 @@ const READ_ONLY_CAPABILITIES: ClientCapabilities = {
 	canChangeCover: false,
 	canDelete: false,
 	canManageTrash: false,
-	canDownload: true,
+	// Скачивание на ТВ — выгрузка файла на устройство, которого у пульта
+	// нет; матрица roadmap прямо запрещает downloads/export.
+	canDownload: false,
 	canManageCollections: false,
-	// QR-вход — следующая фаза, в этой версии выключен для всех клиентов.
-	canUseQrLogin: false,
+	canAccessAdmin: false,
 };
 
 const FULL_CAPABILITIES: ClientCapabilities = {
@@ -33,7 +34,7 @@ const FULL_CAPABILITIES: ClientCapabilities = {
 	canManageTrash: true,
 	canDownload: true,
 	canManageCollections: true,
-	canUseQrLogin: false,
+	canAccessAdmin: true,
 };
 
 export function capabilitiesForTVMode(tvMode: boolean): ClientCapabilities {

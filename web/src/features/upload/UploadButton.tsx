@@ -12,8 +12,8 @@ export function UploadButton({ type }: { type: UploadType }) {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const session = useSession();
-	const { tvMode } = useTVMode();
-	if (tvMode || session.data?.is_admin !== true) {
+	const { capabilities } = useTVMode();
+	if (!capabilities.canUpload || session.data?.is_admin !== true) {
 		return null;
 	}
 	return (

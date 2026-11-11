@@ -6,16 +6,20 @@ import { TV_MODE_STORAGE_KEY } from "./tvMode";
 import { type TVModeState, useTVMode } from "./useTVMode";
 
 const routerSearch = vi.hoisted(() => ({ value: "" }));
+const historyReplace = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", () => ({
 	useRouterState: (options: {
 		select: (state: { location: { searchStr: string } }) => string;
 	}): string => options.select({ location: { searchStr: routerSearch.value } }),
+	useRouter: () => ({ history: { replace: historyReplace } }),
 }));
 
 afterEach(() => {
 	routerSearch.value = "";
+	historyReplace.mockClear();
 	window.localStorage.clear();
+	window.history.replaceState(null, "", "/");
 });
 
 function StateProbe({
@@ -83,9 +87,10 @@ describe("useTVMode", () => {
 		expect(window.localStorage.getItem(TV_MODE_STORAGE_KEY)).toBe("0");
 	});
 
-	it("выключенный тумблер при `?tv=1` остаётся выключенным", () => {
+	it("выключенный тумблер при `?tv=1` остаётся выключенным и после reload", () => {
+		window.history.replaceState(null, "", "/settings?tv=1");
 		routerSearch.value = "?tv=1";
-		const { result } = renderHook(() => useTVMode());
+		const { result, unmount } = renderHook(() => useTVMode());
 		expect(result.current.tvMode).toBe(true);
 
 		act(() => {
@@ -93,6 +98,16 @@ describe("useTVMode", () => {
 		});
 
 		expect(result.current.tvMode).toBe(false);
+		// Эффект больше не переписывает "1", а устаревший параметр убран,
+		// иначе reload снова включил бы ТВ.
+		expect(window.localStorage.getItem(TV_MODE_STORAGE_KEY)).toBe("0");
+		expect(window.location.search).toBe("");
+
+		unmount();
+		routerSearch.value = window.location.search;
+		const reloaded = renderHook(() => useTVMode());
+		expect(reloaded.result.current.tvMode).toBe(false);
+		reloaded.unmount();
 	});
 
 	it("два инстанса под одним провайдером видят одно состояние", () => {

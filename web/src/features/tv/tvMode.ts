@@ -40,6 +40,23 @@ export function writeStoredTVMode(enabled: boolean): void {
 	}
 }
 
+// Ручной тумблер старше URL-параметра, но после перезагрузки параметр снова
+// стал бы главным. Поэтому при явном выборе убираем `?tv=...` из адреса:
+// сохранённый "0"/"1" переживает reload, а не перебивается старым URL.
+// Возвращает новый href или null, если параметра не было.
+export function hrefWithoutTVSearchParam(): string | null {
+	try {
+		const url = new URL(window.location.href);
+		if (!url.searchParams.has(TV_MODE_SEARCH_PARAM)) {
+			return null;
+		}
+		url.searchParams.delete(TV_MODE_SEARCH_PARAM);
+		return `${url.pathname}${url.search}${url.hash}`;
+	} catch {
+		return null;
+	}
+}
+
 export function readTVHintDismissed(): boolean {
 	try {
 		return window.localStorage.getItem(TV_HINT_STORAGE_KEY) === "1";

@@ -1,6 +1,7 @@
 # TV Roadmap — Android TV, web-TV и QR-вход
 
-**Дата:** 2026-11-11. **Статус:** план, код ещё не начат.
+**Дата:** 2026-11-11. **Статус:** план; web-TV P1/P2 закрыты в web 0.1.33,
+кроме OSD плеера; реальный ТВ не проверялся. Android TV/QR — впереди.
 **Базовый HEAD:** `5e41973` (mobile Task 24, без финального ревью).
 **Связанные документы:** [mobile-parity-plan-2026-11-09.md](mobile-parity-plan-2026-11-09.md),
 [mobile-parity-handoff-2026-11-10.md](mobile-parity-handoff-2026-11-10.md),
@@ -38,7 +39,7 @@
 |---|---|---|
 | backend | 1.0.29 | API, auth, upload/transcode/extract, trash, collections |
 | shared | 0.1.8 | media, favorites, collections, progress, lyrics, audioQueue |
-| web | 0.1.31 | функционально полный web-клиент, TV-режим частичный |
+| web | 0.1.33 | функционально полный web-клиент; TV P1/P2 закрыты, OSD плеера открыт; реальный ТВ не проверялся |
 | mobile | 0.1.31 / 49 | Tasks 1–24 и поиск/сортировка закрыты, Task 25 не начат |
 
 Mobile-долги, которые нужно закрыть до ТВ:

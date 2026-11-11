@@ -29,6 +29,7 @@ import {
 	TVModalAutoFocus,
 	useTVFocusable,
 } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
 
 function TrashActionsBar({
 	onRestore,
@@ -156,6 +157,8 @@ export function TrashPage() {
 	const actions = useTrashActions();
 	const [emptyOpened, setEmptyOpened] = useState(false);
 	const isAdmin = session.data?.is_admin === true;
+	const { capabilities } = useTVMode();
+	const canManageTrash = isAdmin && capabilities.canManageTrash;
 	// ТВ-режим: корень страницы — spatial-секция, карточки внутри —
 	// контент секции.
 	const { targetRef: tvRef, tvMode } =
@@ -229,7 +232,7 @@ export function TrashPage() {
 							{t("trash.title")}
 						</Title>
 					</Group>
-					{isAdmin && !empty && (
+					{canManageTrash && !empty && (
 						<Button
 							color="red"
 							variant="light"
@@ -283,7 +286,7 @@ export function TrashPage() {
 								<Title order={2} size="h4">
 									{t("trash.media")}
 								</Title>
-								{!isAdmin && (
+								{!canManageTrash && (
 									<Text size="sm" c="dimmed">
 										{t("trash.adminOnlyMedia")}
 									</Text>
@@ -292,7 +295,7 @@ export function TrashPage() {
 									<TrashMediaCard
 										key={media.id}
 										media={media}
-										isAdmin={isAdmin}
+										isAdmin={canManageTrash}
 										restorePending={actions.restoreMedia.isPending}
 										purgePending={actions.purgeMedia.isPending}
 										onRestore={() => {

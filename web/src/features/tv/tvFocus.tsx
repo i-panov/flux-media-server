@@ -15,7 +15,8 @@ import {
 import {
 	type ComponentPropsWithoutRef,
 	type ReactNode,
-	type RefObject,
+	type RefCallback,
+	useCallback,
 	useEffect,
 } from "react";
 import {
@@ -48,7 +49,7 @@ export function useTVFocusable<T extends HTMLElement>(
 	onArrowPress?: (direction: string) => boolean,
 	options?: { secondary?: boolean },
 ): {
-	targetRef: RefObject<T | null>;
+	targetRef: RefCallback<T>;
 	tvMode: boolean;
 	focused: boolean;
 } {
@@ -73,24 +74,27 @@ export function useTVFocusable<T extends HTMLElement>(
 	// data-tv-focus-key — точка поиска для route-focus: после смены роута
 	// хук ждёт появления контента (скелетон → карточки) и ведёт фокус
 	// по этим атрибутам, а не по одному таймауту.
-	useEffect(() => {
-		const node = ref.current;
-		if (node === null) {
-			return;
-		}
-		if (tvMode) {
-			node.setAttribute(TV_FOCUS_KEY_ATTRIBUTE, focusKey);
-			node.toggleAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE, secondary);
-		} else {
-			node.removeAttribute(TV_FOCUS_KEY_ATTRIBUTE);
-			node.removeAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE);
-		}
-		return () => {
-			node.removeAttribute(TV_FOCUS_KEY_ATTRIBUTE);
-			node.removeAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE);
-		};
-	}, [focusKey, tvMode, secondary, ref]);
-	return { targetRef: ref, tvMode, focused };
+	// Callback-ref, а не useEffect: форма/ветка может смонтироваться позже
+	// первого рендера (код после отправки письма, данные после скелетона),
+	// а effect с неизменными deps на новый DOM-узел уже не сработает.
+	const targetRef = useCallback(
+		(node: T | null) => {
+			// eslint-disable-next-line react-hooks/immutability -- callback-ref синхронизирует внутренний ref useFocusable, чтобы spatial видел поздний DOM-узел.
+			(ref as { current: T | null }).current = node;
+			if (node === null) {
+				return;
+			}
+			if (tvMode) {
+				node.setAttribute(TV_FOCUS_KEY_ATTRIBUTE, focusKey);
+				node.toggleAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE, secondary);
+			} else {
+				node.removeAttribute(TV_FOCUS_KEY_ATTRIBUTE);
+				node.removeAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE);
+			}
+		},
+		[focusKey, tvMode, secondary, ref],
+	);
+	return { targetRef, tvMode, focused };
 }
 
 // Виртуальная секция: задаёт общий родительский focusKey для карточек
@@ -112,9 +116,20 @@ export function TVFocusScope({
 // обычная Button с тем же поведением.
 export function TVButton({
 	focusKey,
+	onTVArrowPress,
 	...props
-}: ButtonProps & ComponentPropsWithoutRef<"button"> & { focusKey: string }) {
-	const { targetRef } = useTVFocusable<HTMLButtonElement>(focusKey, clickNode);
+}: ButtonProps &
+	ComponentPropsWithoutRef<"button"> & {
+		focusKey: string;
+		// Явный переход стрелкой для составных форм: у полей ввода
+		// геометрическая навигация библиотеки ненадёжна.
+		onTVArrowPress?: (direction: string) => boolean;
+	}) {
+	const { targetRef } = useTVFocusable<HTMLButtonElement>(
+		focusKey,
+		clickNode,
+		onTVArrowPress,
+	);
 	return <Button ref={targetRef} {...props} />;
 }
 

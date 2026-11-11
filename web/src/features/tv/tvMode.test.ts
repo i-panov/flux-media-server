@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+	hrefWithoutTVSearchParam,
 	parseTVSearchParam,
 	readStoredTVMode,
 	TV_MODE_STORAGE_KEY,
@@ -26,6 +27,18 @@ describe("parseTVSearchParam", () => {
 	it("без параметра возвращает null", () => {
 		expect(parseTVSearchParam("")).toBeNull();
 		expect(parseTVSearchParam("?foo=1")).toBeNull();
+	});
+});
+
+describe("hrefWithoutTVSearchParam", () => {
+	it("убирает tv, сохраняя остальные параметры", () => {
+		window.history.replaceState(null, "", "/settings?tv=1&tab=theme");
+		expect(hrefWithoutTVSearchParam()).toBe("/settings?tab=theme");
+	});
+
+	it("без tv возвращает null и адрес не трогает", () => {
+		window.history.replaceState(null, "", "/settings?tab=theme");
+		expect(hrefWithoutTVSearchParam()).toBeNull();
 	});
 });
 

@@ -24,12 +24,18 @@ export function MediaAdminActions({
 }) {
 	const { t } = useTranslation();
 	const session = useSession();
-	const { tvMode } = useTVMode();
+	const { capabilities } = useTVMode();
 	const [editOpened, setEditOpened] = useState(false);
 
-	// ТВ — read-only: правка метаданных, обложка, удаление и extract
-	// недоступны даже админу.
-	if (tvMode || session.data?.is_admin !== true) {
+	// Read-only профиль (ТВ) скрывает write-действия даже админу;
+	// возможности берём из capability-слоя, а не из одного tvMode.
+	if (session.data?.is_admin !== true) {
+		return null;
+	}
+	const canEdit = capabilities.canEditMetadata;
+	const canChangeCover = capabilities.canChangeCover;
+	const canDelete = capabilities.canDelete;
+	if (!canEdit && !canChangeCover && !canDelete) {
 		return null;
 	}
 
@@ -37,17 +43,23 @@ export function MediaAdminActions({
 		<>
 			<Stack gap="xs">
 				<Group gap="xs" wrap="wrap">
-					<Button
-						variant="light"
-						leftSection={<Pencil size={16} />}
-						onClick={() => setEditOpened(true)}
-					>
-						{t("metadata.edit")}
-					</Button>
-					<ChangeCoverButton mediaId={media.id} />
-					<DeleteMediaButton mediaId={media.id} backPath={backPath} />
+					{canEdit && (
+						<Button
+							variant="light"
+							leftSection={<Pencil size={16} />}
+							onClick={() => setEditOpened(true)}
+						>
+							{t("metadata.edit")}
+						</Button>
+					)}
+					{canChangeCover && <ChangeCoverButton mediaId={media.id} />}
+					{canDelete && (
+						<DeleteMediaButton mediaId={media.id} backPath={backPath} />
+					)}
 				</Group>
-				{extractAudio === true && <ExtractAudioSection mediaId={media.id} />}
+				{extractAudio === true && canEdit && (
+					<ExtractAudioSection mediaId={media.id} />
+				)}
 			</Stack>
 			{/* Модалка монтируется только на время открытия: «Отмена»
 			выбрасывает черновик, повторное открытие показывает данные

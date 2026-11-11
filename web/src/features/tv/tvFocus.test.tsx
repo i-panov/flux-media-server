@@ -1,7 +1,17 @@
+import { destroy, init } from "@noriginmedia/norigin-spatial-navigation";
 import { render } from "@testing-library/react";
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TVModalAutoFocus } from "./tvFocus";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
+import { TVModalAutoFocus, useTVFocusable } from "./tvFocus";
 
 const spatial = vi.hoisted(() => ({
 	setFocus: vi.fn(),
@@ -28,6 +38,14 @@ vi.mock("@tanstack/react-router", () => ({
 	}): string => options.select({ location: { searchStr: routerSearch.value } }),
 }));
 
+beforeAll(() => {
+	init({ shouldFocusDOMNode: true });
+});
+
+afterAll(() => {
+	destroy();
+});
+
 beforeEach(() => {
 	vi.useFakeTimers();
 });
@@ -46,6 +64,28 @@ function advanceModalFocus(): void {
 		vi.advanceTimersByTime(100);
 	});
 }
+
+function LateNode({ show }: { show: boolean }) {
+	const { targetRef } = useTVFocusable<HTMLButtonElement>("late-node");
+	return show ? <button ref={targetRef} type="button" /> : null;
+}
+
+describe("useTVFocusable", () => {
+	it("ставит data-tv-focus-key узлу, который смонтировался позже", () => {
+		// Библиотека предупреждает о регистрации без node — это и есть
+		// проверяемый поздний маунт.
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		try {
+			const { rerender } = render(<LateNode show={false} />);
+			rerender(<LateNode show />);
+			expect(
+				document.querySelector('[data-tv-focus-key="late-node"]'),
+			).not.toBeNull();
+		} finally {
+			warn.mockRestore();
+		}
+	});
+});
 
 describe("TVModalAutoFocus", () => {
 	it("ставит spatial-фокус на кнопку модалки без инпута", () => {

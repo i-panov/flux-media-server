@@ -61,6 +61,12 @@ describe("shouldBlockTVRoute", () => {
 		expect(shouldBlockTVRoute("/upload", "?tv=1", DESKTOP)).toBe(true);
 	});
 
+	it("перед redirect сохраняет режим в localStorage", () => {
+		expect(shouldBlockTVRoute("/upload", "?tv=1", DESKTOP)).toBe(true);
+		expect(window.localStorage.getItem(TV_MODE_STORAGE_KEY)).toBe("1");
+		expect(shouldBlockTVRoute("/video", "", DESKTOP)).toBe(false);
+	});
+
 	it("в обычном режиме write-маршруты доступны", () => {
 		expect(shouldBlockTVRoute("/upload", "", DESKTOP)).toBe(false);
 		expect(shouldBlockTVRoute("/trash", "?tv=0", TV)).toBe(false);

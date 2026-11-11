@@ -95,6 +95,46 @@ describe("useTVRouteFocus", () => {
 		expect(setFocusMock).not.toHaveBeenCalledWith("late-card");
 	});
 
+	it("не перехватывает фокус, если пользователь сам ушёл в навбар", async () => {
+		renderHook(() => useTVRouteFocus(true));
+		await waitFor(() => {
+			expect(setFocusMock).toHaveBeenCalledWith("video-page");
+		});
+
+		// Пользователь ушёл в шапку/навбар — поздние данные не должны
+		// возвращать фокус в main.
+		const nav = document.createElement("nav");
+		const navLink = document.createElement("a");
+		navLink.setAttribute("data-tv-focus-key", "nav-home");
+		nav.appendChild(navLink);
+		document.body.prepend(nav);
+		currentFocusKey = "nav-home";
+		const lateCard = document.createElement("div");
+		lateCard.setAttribute("data-tv-focus-key", "late-card");
+		document.querySelector("main")?.appendChild(lateCard);
+
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		expect(setFocusMock).not.toHaveBeenCalledWith("late-card");
+	});
+
+	it("не сдёргивает фокус с навбара, если он там остался", async () => {
+		const nav = document.createElement("nav");
+		const navLink = document.createElement("a");
+		navLink.setAttribute("data-tv-focus-key", "nav-home");
+		nav.appendChild(navLink);
+		document.body.prepend(nav);
+		currentFocusKey = "nav-home";
+		const card = document.createElement("div");
+		card.setAttribute("data-tv-focus-key", "late-card");
+		document.querySelector("main")?.appendChild(card);
+
+		renderHook(() => useTVRouteFocus(true));
+
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		expect(setFocusMock).not.toHaveBeenCalledWith("late-card");
+		expect(setFocusMock).not.toHaveBeenCalledWith("video-page");
+	});
+
 	it("в обычном режиме фокус не трогает", async () => {
 		renderHook(() => useTVRouteFocus(false));
 		await new Promise((resolve) => setTimeout(resolve, 80));

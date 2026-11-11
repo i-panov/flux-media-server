@@ -21,6 +21,7 @@ import { FavoriteArtistsSection } from "../favorites/FavoriteArtistsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
 import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
 import { UploadButton } from "../upload/UploadButton";
 import { AudioTrackRow } from "./AudioTrackRow";
 
@@ -51,6 +52,7 @@ export function AudioPage() {
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const { data: session } = useSession();
 	const isAdmin = session?.is_admin === true;
+	const { capabilities } = useTVMode();
 	const visibleItems = useVisibleMedia("audio", items, debounced !== "");
 
 	return (
@@ -135,7 +137,7 @@ export function AudioPage() {
 									player.playQueue(visibleItems, index);
 									void navigate({ to: "/player" });
 								}}
-								showDelete={isAdmin && !tvMode}
+								showDelete={isAdmin && capabilities.canDelete}
 								isCurrent={player.current?.id === media.id}
 								isPlaying={player.playing}
 							/>

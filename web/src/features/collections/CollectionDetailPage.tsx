@@ -18,6 +18,7 @@ import {
 import { isMediaType } from "../../components/mediaType";
 import type { Media, MediaType } from "../../core/media";
 import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
 import { AddMediaToCollectionModal } from "./AddMediaToCollectionModal";
 import { BulkMoveCollectionModal } from "./BulkMoveCollectionModal";
 import { CollectionBulkBar } from "./CollectionBulkBar";
@@ -127,6 +128,10 @@ export function CollectionDetailPage() {
 		useCollectionSelection(collectionId);
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("collection-detail");
+	// CRUD коллекций — отдельная capability: в ТВ-профиле остаётся только
+	// просмотр, а не «выключено всё из-за tvMode».
+	const { capabilities } = useTVMode();
+	const canManageCollections = capabilities.canManageCollections;
 	const { targetRef: tvLoadingRef } = useTVFocusable<HTMLDivElement>(
 		"collection-detail-loading",
 	);
@@ -207,7 +212,7 @@ export function CollectionDetailPage() {
 					onRename={() => setRenameOpened(true)}
 					onMove={() => setMoveOpened(true)}
 					onDelete={() => setDeleteOpened(true)}
-					readOnly={tvMode}
+					readOnly={!canManageCollections}
 				/>
 
 				{children.length > 0 && (
@@ -226,7 +231,7 @@ export function CollectionDetailPage() {
 					</Stack>
 				)}
 
-				{!tvMode && (
+				{canManageCollections && (
 					<CollectionBulkBar
 						collectionId={collectionId}
 						selectedIds={selectedIds}
@@ -253,11 +258,11 @@ export function CollectionDetailPage() {
 					onToggle={(mediaId) =>
 						setSelectedIds((prev) => toggleSelected(prev, mediaId))
 					}
-					readOnly={tvMode}
+					readOnly={!canManageCollections}
 				/>
 			</TVFocusScope>
 
-			{!tvMode && (
+			{canManageCollections && (
 				<>
 					<RenameCollectionModal
 						key={`${collection.id}-${renameOpened}`}

@@ -231,10 +231,9 @@ async function focusVideoNav(page: Page): Promise<void> {
 	);
 }
 
-test("ТВ: с главной по навбару в раздел, карточка, Back", async ({ page }) => {
+test("ТВ: навбар не теряет фокус после перехода в раздел", async ({ page }) => {
 	await stubAuthedSession(page);
 	await stubVideoApi(page);
-	await stubVideoDetail(page, 2, "Второй фильм");
 
 	await page.goto("/?tv=1");
 	await expect(
@@ -252,11 +251,23 @@ test("ТВ: с главной по навбару в раздел, карточ�
 	await focusVideoNav(page);
 	await page.keyboard.press("Enter");
 	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
-	await expect.poll(() => activeElementText(page)).toContain("Первый фильм");
+	await expect(page.getByText("Первый фильм", { exact: true })).toBeVisible();
+	// Route-focus не сдёргивает фокус с навбара после клика по ссылке.
+	await expect.poll(() => activeFocusKey(page)).toBe("nav-desktop-video");
 	// Read-only: кнопки загрузки в ТВ нет.
 	await expect(
 		page.getByRole("button", { name: "Загрузить видео" }),
 	).toHaveCount(0);
+});
+
+test("ТВ: список видео, карточки, детали и Back", async ({ page }) => {
+	await stubAuthedSession(page);
+	await stubVideoApi(page);
+	await stubVideoDetail(page, 2, "Второй фильм");
+
+	await page.goto("/video?tv=1");
+	// Начальный route-focus ведёт на первую карточку.
+	await expect.poll(() => activeElementText(page)).toContain("Первый фильм");
 
 	await page.keyboard.press("ArrowRight");
 	await expect.poll(() => activeElementText(page)).toContain("Второй фильм");
@@ -277,7 +288,7 @@ test("ТВ: с главной по навбару в раздел, карточ�
 	await expect(page.getByText("Первый фильм", { exact: true })).toBeVisible();
 });
 
-test("ТВ: read-only маршруты /upload и /trash заблокированы", async ({
+test("ТВ: /upload?tv=1 сохраняет режим после redirect и reload", async ({
 	page,
 }) => {
 	await stubAuthedSession(page);
@@ -287,16 +298,48 @@ test("ТВ: read-only маршруты /upload и /trash заблокирова�
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Flux" }),
 	).toBeVisible();
+	// Guard пишет режим до redirect: без этого reload терял ТВ.
+	await expect
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("flux.tv-mode")),
+		)
+		.toBe("1");
+
+	await page.reload();
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Flux" }),
+	).toBeVisible();
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				document.getElementById("root")?.classList.contains("tv-mode"),
+			),
+		)
+		.toBe(true);
 
 	await page.goto("/trash?tv=1");
 	await expect(page).toHaveURL(HOME_PATTERN);
 });
 
-test("ТВ: Back закрывает Select, история не меняется", async ({ page }) => {
+test("ТВ: Back закрывает Select и возвращает фокус, история не меняется", async ({
+	page,
+}) => {
 	await stubSettings(page);
 
 	await page.goto("/settings?tv=1");
-	await expect.poll(() => activeFocusKey(page)).toBe("settings-language");
+	// Первая цель страницы — переключатель темы, затем тумблер ТВ,
+	// затем Select языка.
+	await expect.poll(() => activeFocusKey(page)).toBe("settings-theme");
+	await pressUntilFocusKey(
+		page,
+		"ArrowDown",
+		(key) => key === "settings-tv-toggle",
+	);
+	await pressUntilFocusKey(
+		page,
+		"ArrowRight",
+		(key) => key === "settings-language",
+	);
 
 	await page.keyboard.press("Enter");
 	await expect(page.getByRole("listbox")).toBeVisible();
@@ -310,8 +353,62 @@ test("ТВ: Back закрывает Select, история не меняется
 	});
 	await expect(page.getByRole("listbox")).toBeHidden();
 	expect(page.url()).toBe(url);
+	// Фокус остался на обёртке Select (spatial-ключ не потерян).
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() =>
+					document.activeElement?.closest(
+						'[data-tv-focus-key="settings-language"]',
+					) !== null,
+			),
+		)
+		.toBe(true);
 	// Ссылки на корзину в ТВ-настройках нет.
 	await expect(page.getByRole("link", { name: "Корзина" })).toHaveCount(0);
+});
+
+test("ТВ: тумблер режима выключается и включается с пульта", async ({
+	page,
+}) => {
+	await stubSettings(page);
+
+	await page.goto("/settings?tv=1");
+	await expect.poll(() => activeFocusKey(page)).toBe("settings-theme");
+	await pressUntilFocusKey(
+		page,
+		"ArrowDown",
+		(key) => key === "settings-tv-toggle",
+	);
+
+	const isTV = () =>
+		page.evaluate(() =>
+			document.getElementById("root")?.classList.contains("tv-mode"),
+		);
+	const stored = () =>
+		page.evaluate(() => window.localStorage.getItem("flux.tv-mode"));
+
+	await page.keyboard.press("Enter");
+	await expect.poll(isTV).toBe(false);
+	await expect.poll(stored).toBe("0");
+	// Устаревший ?tv=1 убран, иначе reload снова включил бы режим.
+	await expect.poll(() => page.url()).not.toContain("tv=1");
+
+	// Reload с сохранённым "0" остаётся вне ТВ.
+	await page.reload();
+	await expect.poll(isTV).toBe(false);
+	await expect.poll(stored).toBe("0");
+
+	// Включаем обратно с клавиатуры: фокус на чекбокс, Space — переключение.
+	await page.getByLabel("ТВ-режим").focus();
+	await page.keyboard.press("Space");
+	await expect.poll(isTV).toBe(true);
+	await expect.poll(stored).toBe("1");
+	// Пространственная навигация после off→on жива: route-focus ведёт на
+	// тему, а стрелка уводит на тумблер, а не оставляет пустой реестр.
+	await expect.poll(() => activeFocusKey(page)).toBe("settings-theme");
+	await page.keyboard.press("ArrowDown");
+	await expect.poll(() => activeFocusKey(page)).toBe("settings-tv-toggle");
 });
 
 test("ТВ: детали с задержкой API получают фокус на скелетоне и контенте", async ({

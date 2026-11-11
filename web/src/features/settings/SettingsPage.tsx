@@ -21,13 +21,15 @@ import { useHealthQuery } from "../../api/health";
 import { useSession } from "../../api/session";
 import { pickLang, SUPPORTED_LANGS, type SupportedLang } from "../../i18n";
 import { useLogout } from "../auth/useLogout";
-import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { useTVMode } from "../tv/useTVMode";
 
 const languageNames: Record<SupportedLang, string> = {
 	ru: "Русский",
 	en: "English",
 };
+
+const THEME_ORDER = ["auto", "light", "dark"] as const;
 
 function SettingsCard({
 	title,
@@ -72,6 +74,32 @@ export function SettingsPage() {
 			input?.click();
 		},
 	);
+	// Тема: у SegmentedControl нет одного ref на всю группу, поэтому
+	// фокусируем обёртку, а Enter/влево-вправо переключают значение —
+	// иначе пульт не мог бы изменить тему вообще.
+	const cycleColorScheme = (delta: number) => {
+		const index = THEME_ORDER.indexOf(colorScheme);
+		const next =
+			THEME_ORDER[(index + delta + THEME_ORDER.length) % THEME_ORDER.length];
+		setColorScheme(next);
+	};
+	const { targetRef: themeRef } = useTVFocusable<HTMLDivElement>(
+		"settings-theme",
+		() => cycleColorScheme(1),
+		(direction) => {
+			if (direction === "left" || direction === "right") {
+				cycleColorScheme(direction === "right" ? 1 : -1);
+				return false;
+			}
+			return true;
+		},
+	);
+	// Тумблер ТВ — обычный input: Enter повторяет click, Space работает
+	// нативно. Без этого пульт не мог ни включить, ни выключить режим.
+	const { targetRef: tvToggleRef } = useTVFocusable<HTMLInputElement>(
+		"settings-tv-toggle",
+		clickNode,
+	);
 
 	return (
 		<Stack
@@ -92,19 +120,22 @@ export function SettingsPage() {
 							<Text size="sm" c="dimmed">
 								{t("settings.appearance.theme")}
 							</Text>
-							<SegmentedControl
-								value={colorScheme}
-								onChange={(value) => setColorScheme(value)}
-								data={[
-									{ value: "auto", label: t("settings.appearance.auto") },
-									{ value: "light", label: t("settings.appearance.light") },
-									{ value: "dark", label: t("settings.appearance.dark") },
-								]}
-								fullWidth
-								size="xs"
-							/>
+							<div ref={themeRef} tabIndex={tvSectionMode ? -1 : undefined}>
+								<SegmentedControl
+									value={colorScheme}
+									onChange={(value) => setColorScheme(value)}
+									data={[
+										{ value: "auto", label: t("settings.appearance.auto") },
+										{ value: "light", label: t("settings.appearance.light") },
+										{ value: "dark", label: t("settings.appearance.dark") },
+									]}
+									fullWidth
+									size="xs"
+								/>
+							</div>
 						</Stack>
 						<Switch
+							ref={tvToggleRef}
 							label={t("settings.tv.label")}
 							description={t("settings.tv.hint")}
 							checked={tvMode}

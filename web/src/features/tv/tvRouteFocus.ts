@@ -120,13 +120,14 @@ export function useTVRouteFocus(tvMode: boolean): void {
 			}
 			const current = readCurrentFocusKey();
 			const currentNode = current === null ? null : findFocusNode(current);
-			// Пользователь уже ушёл с автоматической цели внутри контента —
-			// не перехватываем. Фокус на навбаре/хэдере (вне main) после
-			// перехода считается исходной точкой: контент всё равно фокусируем.
+			// Доводим фокус только когда он ещё наш (autoKey: скелетон или
+			// корень страницы) либо потерян. Если пользователь уже выбрал
+			// цель сам — включая шапку/навбар — не перехватываем: иначе
+			// фоновое обновление данных каждый раз сдёргивало бы его
+			// из навигации обратно в контент.
 			if (
 				currentNode !== null &&
-				main.contains(currentNode) &&
-				current !== autoKey
+				(current !== autoKey || !main.contains(currentNode))
 			) {
 				return;
 			}

@@ -166,7 +166,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 	const { data: session } = useSession();
 	const { logout, isPending: logoutPending } = useLogout();
 	const miniPlayerVisible = useMiniPlayerVisible();
-	const { tvMode } = useTVMode();
+	const { capabilities } = useTVMode();
 	const { targetRef: logoutRef } = useTVFocusable<HTMLButtonElement>(
 		"header-logout",
 		clickNode,
@@ -190,7 +190,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 	const authed = session != null;
 	const isAdmin = session?.is_admin === true;
 	// В ТВ админ-раздел только для чтения: ссылку не показываем.
-	const desktopExtra: NavItemConfig[] = isAdmin && !tvMode ? [ADMIN_NAV] : [];
+	const desktopExtra: NavItemConfig[] =
+		isAdmin && capabilities.canAccessAdmin ? [ADMIN_NAV] : [];
 	// Конфиг навбара задаёт отступ Main даже когда самой панели нет:
 	// на /login без сессии 240 px слева сдвигали карточку входа.
 	const navbar = authed

@@ -34,7 +34,7 @@ function rootCollections(
 
 export function CollectionsSection({ type }: { type: MediaType }) {
 	const { t } = useTranslation();
-	const { tvMode } = useTVMode();
+	const { capabilities } = useTVMode();
 	const [createOpened, setCreateOpened] = useState(false);
 	const collections = useCollections();
 	const roots = rootCollections(collections.data ?? [], type);
@@ -50,7 +50,7 @@ export function CollectionsSection({ type }: { type: MediaType }) {
 						{t("collections.title")}
 					</Title>
 				</Group>
-				{!tvMode && (
+				{capabilities.canManageCollections && (
 					<ActionIcon
 						variant="light"
 						aria-label={t("collections.create")}
@@ -91,7 +91,7 @@ export function CollectionsSection({ type }: { type: MediaType }) {
 					))}
 				</SimpleGrid>
 			)}
-			{!tvMode && (
+			{capabilities.canManageCollections && (
 				<CreateCollectionModal
 					opened={createOpened}
 					type={type}

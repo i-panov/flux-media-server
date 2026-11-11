@@ -16,6 +16,7 @@ import { AddToCollectionButton } from "../collections/AddToCollectionButton";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
 import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
 
 // Просмотрщик мема: оригинал отдаётся стримом (превью — только для
 // сетки), поэтому картинка грузится в исходном качестве.
@@ -59,6 +60,7 @@ export function MemeDetailPage() {
 		"meme-detail-back",
 		clickNode,
 	);
+	const { capabilities } = useTVMode();
 
 	const media = useMedia(valid ? mediaId : 0, valid);
 
@@ -155,14 +157,16 @@ export function MemeDetailPage() {
 					<Group gap="xs">
 						<FavoriteButton mediaId={item.id} type="image" />
 						<AddToCollectionButton mediaId={item.id} type="image" />
-						<Button
-							component="a"
-							variant="light"
-							href={`/api/media/${item.id}/stream`}
-							download={filename}
-						>
-							{t("memes.download")}
-						</Button>
+						{capabilities.canDownload && (
+							<Button
+								component="a"
+								variant="light"
+								href={`/api/media/${item.id}/stream`}
+								download={filename}
+							>
+								{t("memes.download")}
+							</Button>
+						)}
 					</Group>
 				</Group>
 				<MemeImage item={item} />

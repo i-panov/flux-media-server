@@ -3,7 +3,11 @@ import {
 	detectBrowserClientProfile,
 	resolveTVMode,
 } from "./clientProfile";
-import { parseTVSearchParam, readStoredTVModeOverride } from "./tvMode";
+import {
+	parseTVSearchParam,
+	readStoredTVModeOverride,
+	writeStoredTVMode,
+} from "./tvMode";
 
 // Маршруты записи. В ТВ они недоступны и на уровне навигации, и на уровне
 // URL: guard отвечает за прямой заход/закладку, а не только за скрытые кнопки.
@@ -45,8 +49,14 @@ export function shouldBlockTVRoute(
 	search: string,
 	profile?: ClientProfile,
 ): boolean {
-	return (
+	const blocked =
 		isTVReadOnlyPath(pathname) &&
-		isTVModeAtLocation(search, profile ?? detectBrowserClientProfile())
-	);
+		isTVModeAtLocation(search, profile ?? detectBrowserClientProfile());
+	// Guard срабатывает до монтирования TVModeContext, поэтому `?tv=1` из
+	// заблокированного URL сам в localStorage не попадёт. Сохраняем режим
+	// здесь: после redirect и reload пользователь остаётся в ТВ-профиле.
+	if (blocked) {
+		writeStoredTVMode(true);
+	}
+	return blocked;
 }

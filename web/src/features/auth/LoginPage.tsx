@@ -1,6 +1,5 @@
 import {
 	Alert,
-	Button,
 	Card,
 	Container,
 	Stack,
@@ -8,19 +7,29 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
+import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Play } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import {
 	useRequestCodeMutation,
 	useVerifyCodeMutation,
 } from "../../api/session";
-import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 
 type AuthStep = "request" | "verify";
+
+const ARROW_DOWN = "down";
+const ARROW_UP = "up";
+const LOGIN_PAGE_KEY = "login-page";
+const LOGIN_EMAIL_KEY = "login-email";
+const LOGIN_CODE_KEY = "login-code";
+const LOGIN_SUBMIT_KEY = "login-submit";
+const LOGIN_VERIFY_KEY = "login-verify";
+const LOGIN_CHANGE_EMAIL_KEY = "login-change-email";
 
 function toAuthError(t: TFunction, error: unknown, step: AuthStep): string {
 	if (error instanceof ApiError) {
@@ -52,10 +61,12 @@ export function LoginPage() {
 	// ТВ-режим: корень страницы — spatial-секция, форма внутри —
 	// контент секции.
 	const { targetRef: tvRef, tvMode } =
-		useTVFocusable<HTMLDivElement>("login-page");
+		useTVFocusable<HTMLDivElement>(LOGIN_PAGE_KEY);
 
-	const handleRequestCode = (event: FormEvent) => {
-		event.preventDefault();
+	const requestCode = () => {
+		if (pending) {
+			return;
+		}
 		setError(null);
 		requestMutation.mutate(email.trim(), {
 			onSuccess: (data) => {
@@ -68,8 +79,10 @@ export function LoginPage() {
 		});
 	};
 
-	const handleVerify = (event: FormEvent) => {
-		event.preventDefault();
+	const verifyCode = () => {
+		if (pending) {
+			return;
+		}
 		setError(null);
 		verifyMutation.mutate(
 			{ email: email.trim(), code: code.trim() },
@@ -82,6 +95,53 @@ export function LoginPage() {
 				},
 			},
 		);
+	};
+
+	// Поля и кнопки — самостоятельные spatial-цели: иначе на Tizen пульт
+	// видел только корень страницы и шапку. Enter в поле отправляет шаг,
+	// Enter на кнопке повторяет клик. Стрелки вниз/вверх ведём явно:
+	// у полей ввода геометрическая навигация библиотеки не срабатывает.
+	const focusOnArrow = (key: string, direction: string) => {
+		return (actual: string): boolean => {
+			if (actual !== direction) {
+				return true;
+			}
+			void setFocus(key);
+			return false;
+		};
+	};
+	const { targetRef: emailRef } = useTVFocusable<HTMLInputElement>(
+		LOGIN_EMAIL_KEY,
+		requestCode,
+		focusOnArrow(LOGIN_SUBMIT_KEY, ARROW_DOWN),
+	);
+	const { targetRef: codeRef } = useTVFocusable<HTMLInputElement>(
+		LOGIN_CODE_KEY,
+		verifyCode,
+		focusOnArrow(LOGIN_VERIFY_KEY, ARROW_DOWN),
+	);
+
+	// После отправки письма фокус переезжает на код: route-focus срабатывает
+	// только на смену пути, а шаг формы меняется внутри /login.
+	useEffect(() => {
+		if (!tvMode) {
+			return;
+		}
+		const focusKey = codeSent ? LOGIN_CODE_KEY : LOGIN_EMAIL_KEY;
+		const timer = setTimeout(() => {
+			void setFocus(focusKey);
+		}, 80);
+		return () => clearTimeout(timer);
+	}, [codeSent, tvMode]);
+
+	const handleRequestCode = (event: FormEvent) => {
+		event.preventDefault();
+		requestCode();
+	};
+
+	const handleVerify = (event: FormEvent) => {
+		event.preventDefault();
+		verifyCode();
 	};
 
 	const handleChangeEmail = () => {
@@ -99,9 +159,9 @@ export function LoginPage() {
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
 			data-tv-page-root="true"
-			data-tv-focus-key="login-page"
+			data-tv-focus-key={LOGIN_PAGE_KEY}
 		>
-			<TVFocusScope focusKey="login-page">
+			<TVFocusScope focusKey={LOGIN_PAGE_KEY}>
 				<Card
 					withBorder
 					padding="lg"
@@ -142,6 +202,7 @@ export function LoginPage() {
 										</Alert>
 									)}
 									<TextInput
+										ref={codeRef}
 										label={t("auth.code")}
 										inputMode="numeric"
 										autoComplete="one-time-code"
@@ -150,26 +211,31 @@ export function LoginPage() {
 										onChange={(event) => setCode(event.currentTarget.value)}
 										disabled={pending}
 									/>
-									<Button
+									<TVButton
+										focusKey={LOGIN_VERIFY_KEY}
 										type="submit"
+										onTVArrowPress={focusOnArrow(LOGIN_CODE_KEY, ARROW_UP)}
 										loading={verifyMutation.isPending}
 										fullWidth
 									>
 										{t("auth.signIn")}
-									</Button>
-									<Button
+									</TVButton>
+									<TVButton
+										focusKey={LOGIN_CHANGE_EMAIL_KEY}
 										variant="subtle"
+										onTVArrowPress={focusOnArrow(LOGIN_VERIFY_KEY, ARROW_UP)}
 										onClick={handleChangeEmail}
 										disabled={pending}
 									>
 										{t("auth.changeEmail")}
-									</Button>
+									</TVButton>
 								</Stack>
 							</form>
 						) : (
 							<form onSubmit={handleRequestCode}>
 								<Stack gap="md">
 									<TextInput
+										ref={emailRef}
 										label={t("auth.email")}
 										placeholder={t("auth.emailPlaceholder")}
 										type="email"
@@ -179,13 +245,15 @@ export function LoginPage() {
 										onChange={(event) => setEmail(event.currentTarget.value)}
 										disabled={pending}
 									/>
-									<Button
+									<TVButton
+										focusKey={LOGIN_SUBMIT_KEY}
 										type="submit"
+										onTVArrowPress={focusOnArrow(LOGIN_EMAIL_KEY, ARROW_UP)}
 										loading={requestMutation.isPending}
 										fullWidth
 									>
 										{t("auth.getCode")}
-									</Button>
+									</TVButton>
 								</Stack>
 							</form>
 						)}

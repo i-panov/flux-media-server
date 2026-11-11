@@ -25,7 +25,12 @@ export function TVEnableBanner() {
 				<Button
 					size="xs"
 					variant="light"
-					onClick={() => setTVMode(true)}
+					onClick={() => {
+						// Явное включение — это и есть ответ на подсказку: больше
+						// не показываем её после будущего выключения режима.
+						dismissTVHint();
+						setTVMode(true);
+					}}
 					w="fit-content"
 				>
 					{t("tv.hint.enable")}

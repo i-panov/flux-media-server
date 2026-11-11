@@ -20,6 +20,7 @@ import {
 	useDeleteOriginal,
 } from "../../api/admin";
 import { ApiError } from "../../api/client";
+import { useTVMode } from "../tv/useTVMode";
 
 const QUEUE_STATUSES = [
 	"queued",
@@ -59,6 +60,7 @@ function formatBytes(value: number): string {
 export function OriginalsTable({ items }: { items: OriginalItem[] }) {
 	const { t } = useTranslation();
 	const remove = useDeleteOriginal();
+	const { capabilities } = useTVMode();
 	const [pending, setPending] = useState<string | null>(null);
 	const [confirm, setConfirm] = useState<string | null>(null);
 	const downloadLabel = t("admin.originals.download");
@@ -160,16 +162,18 @@ export function OriginalsTable({ items }: { items: OriginalItem[] }) {
 							</Table.Td>
 							<Table.Td>
 								<Group gap="xs">
-									<Tooltip label={downloadLabel} withArrow>
-										<ActionIcon
-											variant="light"
-											aria-label={downloadLabel}
-											loading={pending === item.name}
-											onClick={() => handleDownload(item.name)}
-										>
-											<Download size={16} />
-										</ActionIcon>
-									</Tooltip>
+									{capabilities.canDownload && (
+										<Tooltip label={downloadLabel} withArrow>
+											<ActionIcon
+												variant="light"
+												aria-label={downloadLabel}
+												loading={pending === item.name}
+												onClick={() => handleDownload(item.name)}
+											>
+												<Download size={16} />
+											</ActionIcon>
+										</Tooltip>
+									)}
 									<Tooltip label={deleteLabel} withArrow>
 										<ActionIcon
 											variant="light"

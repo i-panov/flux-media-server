@@ -3,7 +3,7 @@ import { capabilitiesForProfile, capabilitiesForTVMode } from "./capabilities";
 import { detectClientProfile } from "./clientProfile";
 
 describe("capabilitiesForTVMode", () => {
-	it("ТВ-режим оставляет только чтение и скачивание", () => {
+	it("ТВ-режим оставляет только чтение и избранное", () => {
 		const caps = capabilitiesForTVMode(true);
 		expect(caps).toMatchObject({
 			canUpload: false,
@@ -11,9 +11,9 @@ describe("capabilitiesForTVMode", () => {
 			canChangeCover: false,
 			canDelete: false,
 			canManageTrash: false,
-			canDownload: true,
+			canDownload: false,
 			canManageCollections: false,
-			canUseQrLogin: false,
+			canAccessAdmin: false,
 		});
 	});
 
@@ -27,12 +27,8 @@ describe("capabilitiesForTVMode", () => {
 			canManageTrash: true,
 			canDownload: true,
 			canManageCollections: true,
+			canAccessAdmin: true,
 		});
-	});
-
-	it("QR-вход выключен для всех до следующей фазы", () => {
-		expect(capabilitiesForTVMode(true).canUseQrLogin).toBe(false);
-		expect(capabilitiesForTVMode(false).canUseQrLogin).toBe(false);
 	});
 
 	it("профиль ТВ даёт read-only, профиль десктопа — полный набор", () => {
