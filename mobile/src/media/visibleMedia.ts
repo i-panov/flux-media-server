@@ -12,3 +12,23 @@ export function excludeMediaIds(
 	}
 	return items.filter((item) => !excludedIds.has(item.id));
 }
+
+interface EmptyBecauseOfExclusionsInput {
+	/** Идёт поиск: избранное в результатах не исключается. */
+	searching: boolean;
+	allCount: number;
+	visibleCount: number;
+	excludedCount: number;
+}
+
+// Отличает «библиотека пуста» от «все элементы уже показаны в избранном
+// выше». Второй случай нейтрален: это не пустая библиотека и не результат
+// поиска, поэтому CTA «загрузите файлы» здесь был бы неверным.
+export function isEmptyBecauseOfExclusions({
+	searching,
+	allCount,
+	visibleCount,
+	excludedCount,
+}: EmptyBecauseOfExclusionsInput): boolean {
+	return !searching && allCount > 0 && visibleCount === 0 && excludedCount > 0;
+}

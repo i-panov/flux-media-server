@@ -39,15 +39,16 @@
 | backend | 1.0.29 | API, auth, upload/transcode/extract, trash, collections |
 | shared | 0.1.8 | media, favorites, collections, progress, lyrics, audioQueue |
 | web | 0.1.31 | функционально полный web-клиент, TV-режим частичный |
-| mobile | 0.1.30 / 48 | Tasks 1–23 приняты, Task 24 реализован, Task 25 не начат |
+| mobile | 0.1.31 / 49 | Tasks 1–24 и поиск/сортировка закрыты, Task 25 не начат |
 
 Mobile-долги, которые нужно закрыть до ТВ:
 
 - финальное ревью Task 24 (`5e41973`);
-- поиск и сортировка списков видео/аудио (shared `q`/`sort` уже есть,
-  экраны их не передают);
 - Task 25: релиз, APK, smoke на устройстве;
 - Maestro/эмулятор в текущем окружении отсутствуют — flows не запускались.
+
+Поиск и сортировка списков видео/аудио закрыты в mobile 0.1.31
+, из mobile-долгов исключены.
 
 Web-долги:
 
@@ -66,7 +67,10 @@ Web-долги:
 - Закрыть P1/P2, если остались.
 - Только после этого считать Task 24 принятым.
 
-### 3.2. Поиск и сортировка mobile
+### 3.2. Поиск и сортировка mobile ✅ (0.1.31)
+
+**Статус:** закрыто в mobile 0.1.31. Ниже — историческая
+постановка.
 
 **Проблема:** в `mobile/src/api/media.ts` `useVideoList()`/`useAudioList()`
 всегда передают `q=""`; shared уже принимает `q` и `sort`.
@@ -353,7 +357,7 @@ SafeArea, Constants и др.
 ## 9. Порядок работ
 
 1. Mobile: финальное ревью Task 24.
-2. Mobile: поиск/сортировка + версия 0.1.31.
+2. Mobile: поиск/сортировка закрыты в 0.1.31; остался Task 25 release + smoke.
 3. Mobile: Task 25 release + smoke.
 4. Web: добить обычную версию и закрыть P1/P2/P3-долги.
 5. Web-TV: TV-детект, capability-слой, read-only, навигация, OSD.
@@ -369,7 +373,7 @@ SafeArea, Constants и др.
 
 | Этап | Часы агента |
 |---|---:|
-| Mobile Task 24 review + search/sort + release | 10–20 |
+| Mobile Task 24 review + Task 25 release (search/sort уже закрыт) | 10–20 |
 | Web: закрыть обычные долги и прогнать полный гейт | 8–16 |
 | Web TV-детект/capabilities/read-only | 8–16 |
 | Web TV-навигация/фокус/OSD | 10–20 |
@@ -401,7 +405,7 @@ SafeArea, Constants и др.
 
 ## 12. Definition of Done для ТВ
 
-- [ ] Mobile закрыт: Task 24 review, search/sort, Task 25.
+- [ ] Mobile закрыт: Task 24 review, поиск/сортировка (0.1.31), Task 25.
 - [ ] Web закрыт: обычные P1/P2/P3, полный гейт, регрессия сценариев.
 - [ ] Web TV-профиль: детект + override, read-only, навигация, OSD.
 - [ ] QR/device-code вход работает на web-TV и native TV.

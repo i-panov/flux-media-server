@@ -3,8 +3,8 @@
 **Дата снимка:** 2026-11-10. **HEAD снимка:** `8ec88b8`. **Ветка:** `master`.
 **План:** [mobile-parity-plan-2026-11-09.md](mobile-parity-plan-2026-11-09.md).
 **Статус:** исторический снимок от 2026-11-10. Актуальное состояние —
-в разделе 0: Tasks 1–24 выполнены, остался Task 25 (релиз) и отдельный
-пробел паритета — поиск/сортировка списков.
+в разделе 0: Tasks 1–24 и поиск/сортировка списков (0.1.31) выполнены,
+остался Task 25 (релиз и device-smoke).
 
 Этот файл — самодостаточное ТЗ для другого агента: текущее состояние, правила
 работы, оставшиеся задачи, известные долги и подводные камни.
@@ -13,10 +13,10 @@
 
 ## 0. Актуальный статус на 2026-11-11
 
-**Кодовая база:** `2c4d776` (`feat(mobile): настройки, тема и i18n`).
-**Task 24:** коммит `chore(mobile): e2e, CI и документация` — текущая
-вершина `master`. **Версии:** backend `1.0.29`, shared `0.1.8`,
-web `0.1.31`, mobile `0.1.30`, versionCode `48`.
+**Кодовая база:** коммит `feat(mobile): поиск и сортировка списков`.
+**Task 24:** коммит `chore(mobile): e2e, CI и документация` — база перед
+search/sort. **Версии:** backend `1.0.29`, shared `0.1.8`, web `0.1.31`,
+mobile `0.1.31`, versionCode `49`.
 
 Tasks 1–23 реализованы и закоммичены. Компактная карта коммитов (подробные
 описания и приёмка — в разделах 2 и 4):
@@ -40,6 +40,8 @@ Tasks 1–23 реализованы и закоммичены. Компактн�
 | 21 | `351ab7f` | offline-скачивание и индекс |
 | 22 | `8e2edf6` | offline playback и экспорт |
 | 23 | `2c4d776` | настройки, тема, i18n, logout-reset |
+| 24 | `5e41973` | e2e, CI и документация |
+| search/sort | `feat(mobile): поиск и сортировка` | поиск и сортировка списков видео/аудио, версия 0.1.31 |
 
 **Task 24 (этот коммит):** CI-обвязка для 18 Maestro flow, которые были
 созданы в Tasks 4–23: ручной `.github/workflows/mobile-e2e.yml` (Android
@@ -49,23 +51,17 @@ emulator + Metro + Maestro), проверки `expo install --check` и
 `expo export`, `version:sync --check` (0.1.30/48), YAML-парсинг всех flow и
 workflow.
 
-**Пробел паритета:** поиск и сортировка списков видео/аудио не реализованы
-в UI. Shared API уже принимает `q`/`sort` (`videoListOptions`,
-`audioListOptions`), но экраны передают только пустой запрос и дефолт.
-DoD паритета поэтому **не закрыт**; это отдельная задача, не входившая в
-Tasks 1–23.
-
-**Осталось:** Task 25 — релиз (`version:sync`, versionCode, dogfood APK
-arm64, device-smoke) и отдельная задача на поиск/сортировку списков.
-Tasks 8–23 в разделе 4 отмечены `✅` и оставлены как исторический контекст.
+**Пробел паритета закрыт:** поиск и сортировка списков видео/аудио
+реализованы в 0.1.31 — `useVideoList(q, sort)`/
+`useAudioList(q, sort)`, `MediaSearchBar`, debounce 300 мс, asc/desc,
+очистка и отдельные пустые состояния. В библиотеке остаётся Task 25:
+релиз, dogfood APK arm64 и device-smoke.
 
 ### Актуальные известные ограничения
 
-- **Нет поиска и сортировки списков:** shared API `q`/`sort` готов, но в
-  табах видео/аудио нет полей ввода и переключателя; DoD паритета открыт.
 - **Maestro не запускался:** в окружении разработки нет maestro, adb,
-  эмулятора и KVM. Все flow проверены только парсингом YAML. Утверждать,
-  что сценарий «прошёл», нельзя.
+  эмулятора и KVM. Все flow, включая новый `search.yaml`, проверены только
+  парсингом YAML. Утверждать, что сценарий «прошёл», нельзя.
 - **`mobile-e2e.yml` не проверен на раннере:** job ручной
   (`workflow_dispatch`), в push/PR не входит; возможны правки образа,
   AVD, KVM и таймаутов Maestro.
@@ -174,11 +170,11 @@ Shared: `npm run test -w @flux/shared` — 96 тестов. Web не менял�
 
 ---
 
-## 4. Оставшиеся задачи (24–25) и пробел паритета
+## 4. Оставшиеся задачи (24–25)
 
-> Tasks 8–23 выполнены (см. раздел 0); их описания ниже сохранены как
-> исторический контекст. Task 24 закрыт текущим коммитом; актуальны
-> Task 25, релиз и отдельная задача на поиск/сортировку списков.
+> Tasks 8–24 выполнены; поиск/сортировка закрыты в 0.1.31. Их описания ниже
+> сохранены как исторический контекст. Актуален только Task 25 — релиз и
+> device-smoke.
 
 Формат: цель → файлы → что сделать → приёмка/тесты. Все задачи делать
 TDD/с тестами, где возможно; после каждой — commit, отчёт, review.
@@ -483,7 +479,8 @@ service; iOS audio session.
 
 ### Task 24 ✅ — тесты, CI, документация
 
-**Итог:** 18 flow в `.maestro/`, ручной `.github/workflows/mobile-e2e.yml`,
+**Итог:** 18 flow в `.maestro/` на момент Task 24; search/sort добавил
+19-й `search.yaml`. Ручной `.github/workflows/mobile-e2e.yml`,
 config-проверки в `ci.yml`, обновлённые plan/handoff/README/AGENTS и
 release notes. Maestro и e2e-workflow не запускались (см. раздел 0).
 
@@ -499,23 +496,26 @@ release notes. Maestro и e2e-workflow не запускались (см. раз
 
 ---
 
-### Пробел паритета — поиск и сортировка списков
+### Поиск и сортировка списков ✅ — закрыто в 0.1.31
 
 **Цель:** закрыть единственный известный функциональный разрыв с Flutter.
 
 **Files:** `mobile/app/(tabs)/video.tsx`, `audio.tsx`,
 `mobile/src/api/media.ts`, `mobile/src/components/MediaList.tsx`,
-`mobile/src/i18n/index.ts`, новый debounce/controls-компонент.
+`mobile/src/i18n/index.ts`, debounce/controls-компонент.
 
-**Сделать:**
-- `useVideoList(q, sort)` и `useAudioList(q, sort)` пробросить в
+**Сделано:**
+- `useVideoList(q, sort)` и `useAudioList(q, sort)` проброшены в
   `videoListOptions`/`audioListOptions` (shared уже поддерживает).
-- TextInput поиска с debounce, переключатель asc/desc, скрытие home-рядов
-  при активном поиске, пустое состояние «ничего не найдено».
-- Тесты на чистые хелперы (toggle sort, нормализация запроса); version bump
-  mobile patch + `version:sync`.
+- TextInput поиска с debounce 300 мс, переключатель asc/desc, скрытие
+  home-рядов при активном поиске, пустые состояния «ничего не найдено»,
+  «библиотека пуста» и «всё в избранном».
+- Тесты на чистые хелперы (debounce, toggle sort, нормализация запроса,
+  сброс пагинации, excluded/empty); version bump mobile patch и
+  `version:sync` (0.1.31/49).
 
-**Приёмка:** поиск/сортировка работают в обоих табах; DoD закрыт.
+**Приёмка:** поиск/сортировка работают в обоих табах по коду и unit-тестам;
+realtime-проверка на устройстве не выполнялась — см. Task 25.
 
 ---
 
@@ -627,11 +627,11 @@ release notes. Maestro и e2e-workflow не запускались (см. раз
 - backend `1.0.29`;
 - web `0.1.31`;
 - shared `0.1.8`;
-- mobile `0.1.30`, versionCode 48.
+- mobile `0.1.31`, versionCode 49.
 
 **Долг снимка 2026-11-10 снят:** shared поднят до `0.1.8`, web и mobile
 пинят `0.1.8`; `package-lock.json` обновлён. Task 24 — docs/CI-коммит без
-изменения кода и версий, поэтому mobile остаётся `0.1.30`/48.
+изменения кода и версий; search/sort поднял mobile до `0.1.31`/49.
 
 Правило версий: каждый коммит, затрагивающий backend/web/mobile/shared,
 поднимает patch; mobile `versionCode` — через `npm run version:sync`,
@@ -674,9 +674,9 @@ cd backend && go test ./internal/... -count=1
 
 ## 8. Definition of Done для паритета
 
-DoD **не закрыт**: функциональные пункты Tasks 1–24 реализованы, но нет
-поиска/сортировки списков, а device-smoke и dogfood-сборка ещё не сделаны.
-Чекбоксы ниже не отмечать до закрытия обоих пунктов.
+DoD **функционально закрыт**: поиск/сортировка списков вошли в 0.1.31,
+пункты Tasks 1–24 реализованы. Формально чекбоксы не отмечать до Task 25:
+dogfood-сборка и device-smoke ещё не выполнены.
 
 - [ ] Видео: список/поиск/детали/плеер (play/pause/seek/±10/скорость/
       fullscreen/PiP), resume, source, favorite, коллекции, extract, offline.
@@ -695,14 +695,13 @@ DoD **не закрыт**: функциональные пункты Tasks 1–2
 
 ## 9. Что проверить перед Task 25
 
-1. `git status` — чисто; HEAD — коммит Task 24
-   `chore(mobile): e2e, CI и документация`.
+1. `git status` — чисто; HEAD — коммит search/sort
+   `feat(mobile): поиск и сортировка списков`.
 2. `npm run typecheck -w mobile && npm run lint -w mobile && npm run test -w mobile`.
-3. `npm run version:sync -w mobile -- --check` — 0.1.30/48.
+3. `npm run version:sync -w mobile -- --check` — 0.1.31/49.
 4. `cd mobile && EXPO_OFFLINE=1 npx expo install --check && npx expo config --type introspect`.
-5. Прогнать `.maestro/tabs.yaml` и `.maestro/theme.yaml` на эмуляторе или
-   устройстве; не выдавать структурную проверку YAML за прогон.
+5. Прогнать `.maestro/tabs.yaml`, `.maestro/theme.yaml` и
+   `.maestro/search.yaml` на эмуляторе или устройстве; не выдавать
+   структурную проверку YAML за прогон.
 6. Собрать dogfood APK arm64 и пройти device-smoke: login, video,
-   audio background/lock, offline.
-7. Закрыть пробел паритета — поиск/сортировку списков — отдельной задачей
-   до отметки DoD.
+   audio background/lock, offline, поиск/сортировка.

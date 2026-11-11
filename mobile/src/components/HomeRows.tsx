@@ -26,7 +26,7 @@ function openVideo(media: Media): void {
 	router.push(`/video/${media.id}`);
 }
 
-export function VideoHomeRows() {
+export function VideoHomeRows({ hidden = false }: { hidden?: boolean }) {
 	useLanguage();
 	const { spacing } = useTheme();
 	const continueQuery = useContinueWatching("video");
@@ -35,6 +35,13 @@ export function VideoHomeRows() {
 	const collections = useVideoCollections();
 	const toggleFavorite = useToggleVideoFavorite();
 	const favoriteSet = favoriteIds.data ?? EMPTY_IDS;
+
+	// Не размонтируем ряды при поиске: компонент остаётся в дереве и
+	// просто не рендерит содержимое, чтобы сброс поиска не поднимал
+	// заново запросы продолжения/избранного/коллекций.
+	if (hidden) {
+		return null;
+	}
 
 	const onToggleFavorite = (item: MediaRowItem) => {
 		toggleFavorite.mutate(
@@ -87,7 +94,7 @@ export function VideoHomeRows() {
 	);
 }
 
-export function AudioHomeRows() {
+export function AudioHomeRows({ hidden = false }: { hidden?: boolean }) {
 	useLanguage();
 	const { spacing } = useTheme();
 	const continueQuery = useContinueWatching("audio");
@@ -97,6 +104,10 @@ export function AudioHomeRows() {
 	const toggleFavorite = useToggleAudioFavorite();
 	const { playQueue } = useAudioActions();
 	const favoriteSet = favoriteIds.data ?? EMPTY_IDS;
+
+	if (hidden) {
+		return null;
+	}
 
 	const play = (media: Media) => {
 		playQueue([media], 0);

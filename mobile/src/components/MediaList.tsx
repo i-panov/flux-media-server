@@ -16,7 +16,10 @@ import {
 } from "react-native";
 import { useDownloadIndicator } from "../downloads/DownloadProvider";
 import { t, useLanguage } from "../i18n";
-import { excludeMediaIds } from "../media/visibleMedia";
+import {
+	excludeMediaIds,
+	isEmptyBecauseOfExclusions,
+} from "../media/visibleMedia";
 import { useTheme } from "../theme/ThemeProvider";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
@@ -83,6 +86,8 @@ interface MediaListProps {
 	ListHeaderComponent?: ReactElement;
 	/** Избранное, уже показанное рядом выше. undefined — ещё не загружено. */
 	excludedIds?: ReadonlySet<number>;
+	/** Активен поиск: избранное не исключается и пустое состояние иное. */
+	searching?: boolean;
 }
 
 export function MediaList({
@@ -96,11 +101,24 @@ export function MediaList({
 	testID,
 	ListHeaderComponent,
 	excludedIds,
+	searching = false,
 }: MediaListProps) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const allItems = query.data?.pages.flatMap((page) => page.items) ?? [];
 	const items = excludeMediaIds(allItems, excludedIds);
+	const onlyExcluded = isEmptyBecauseOfExclusions({
+		searching,
+		allCount: allItems.length,
+		visibleCount: items.length,
+		excludedCount: excludedIds?.size ?? 0,
+	});
+	const resolvedEmptyTitle = onlyExcluded
+		? t("search.allFavorites")
+		: (emptyTitle ?? t("media.empty"));
+	const resolvedEmptyDescription = onlyExcluded
+		? t("search.allFavoritesHint")
+		: emptyDescription;
 	// Если первые страницы целиком состоят из избранного, догружаем
 	// следующие, иначе основной список навсегда останется пустым.
 	const waitingForMore =
@@ -157,8 +175,8 @@ export function MediaList({
 					</View>
 				) : (
 					<EmptyState
-						title={emptyTitle ?? t("media.empty")}
-						description={emptyDescription}
+						title={resolvedEmptyTitle}
+						description={resolvedEmptyDescription}
 						testID={emptyTestID}
 					/>
 				)
@@ -169,6 +187,9 @@ export function MediaList({
 				}
 			}}
 			onEndReachedThreshold={0.4}
+			keyboardShouldPersistTaps="handled"
+			keyboardDismissMode="on-drag"
+			automaticallyAdjustKeyboardInsets
 			ListFooterComponent={
 				<ListFooter
 					isFetchingNextPage={query.isFetchingNextPage}
@@ -201,6 +222,7 @@ export function MediaList({
 				>
 					<View style={styles.info}>
 						<Text
+							testID={`media-row-${item.id}-title`}
 							style={[styles.title, { color: colors.text }]}
 							numberOfLines={2}
 						>

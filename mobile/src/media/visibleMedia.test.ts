@@ -1,6 +1,6 @@
 import type { Media } from "@flux/shared";
 import { describe, expect, it } from "vitest";
-import { excludeMediaIds } from "./visibleMedia";
+import { excludeMediaIds, isEmptyBecauseOfExclusions } from "./visibleMedia";
 
 function media(id: number): Media {
 	return {
@@ -45,5 +45,52 @@ describe("excludeMediaIds", () => {
 
 	it("все элементы могут оказаться избранными", () => {
 		expect(excludeMediaIds([media(1)], new Set([1]))).toEqual([]);
+	});
+});
+
+// biome-ignore lint/security/noSecrets: имя тестируемой функции, не секрет.
+describe("isEmptyBecauseOfExclusions", () => {
+	it("распознаёт список, целиком скрытый избранным", () => {
+		expect(
+			isEmptyBecauseOfExclusions({
+				searching: false,
+				allCount: 2,
+				visibleCount: 0,
+				excludedCount: 2,
+			}),
+		).toBe(true);
+	});
+
+	it("не считает пустым реально пустую библиотеку", () => {
+		expect(
+			isEmptyBecauseOfExclusions({
+				searching: false,
+				allCount: 0,
+				visibleCount: 0,
+				excludedCount: 0,
+			}),
+		).toBe(false);
+	});
+
+	it("при поиске избранное не исключается и состояние не favorites", () => {
+		expect(
+			isEmptyBecauseOfExclusions({
+				searching: true,
+				allCount: 2,
+				visibleCount: 0,
+				excludedCount: 2,
+			}),
+		).toBe(false);
+	});
+
+	it("если видимые элементы есть, это обычный список", () => {
+		expect(
+			isEmptyBecauseOfExclusions({
+				searching: false,
+				allCount: 2,
+				visibleCount: 1,
+				excludedCount: 1,
+			}),
+		).toBe(false);
 	});
 });

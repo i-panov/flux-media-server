@@ -1,0 +1,135 @@
+# Поиск и сортировка в табах видео/аудио.
+#
+# Предусловия те же, что у tabs.yaml:
+#   * backend запущен с debug: true и allow_unknown_email: true;
+#   * приложение собрано/установлено (appId app.lib.flux);
+#   * SERVER_URL доступен с устройства (10.0.2.2 для Android-эмулятора);
+#   * в библиотеке есть хотя бы одно видео и один аудиотрек.
+#
+# Поток проверяет: ввод существующего названия, сортировку asc/desc,
+# очистку, пустой результат и те же контролы в аудио-табе.
+# В окружении разработки Maestro CLI нет — flow только валидируется как YAML,
+# не считается прогнанным.
+#
+# Запуск:
+#   maestro test .maestro/search.yaml
+#   maestro test -e SERVER_URL=http://localhost:8080/api .maestro/search.yaml
+appId: app.lib.flux
+name: "Search: query, sort, clear and empty result"
+env:
+  SERVER_URL: http://10.0.2.2:8080/api
+  SENTINEL_URL: http://127.0.0.1:1/flux-sentinel/api
+---
+- runFlow:
+    file: tabs.yaml
+    env:
+      SERVER_URL: ${SERVER_URL}
+      SENTINEL_URL: ${SENTINEL_URL}
+
+# --- Видео: ввод существующего названия ---
+- tapOn:
+    id: "tab-video"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*-title"
+    timeout: 20000
+- copyTextFrom:
+    id: "media-row-.*-title"
+- evalScript: ${output.videoTitle = maestro.copiedText}
+- tapOn:
+    id: "video-search-input"
+- inputText: ${output.videoTitle}
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "video-search-clear"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*-title"
+    timeout: 20000
+- assertVisible:
+    text: ${output.videoTitle}
+
+# --- Видео: сортировка переключается asc/desc ---
+- assertVisible:
+    text: "(Новые|Newest)"
+- tapOn:
+    id: "video-search-sort"
+- assertVisible:
+    text: "(Старые|Oldest)"
+- tapOn:
+    id: "video-search-sort"
+- assertVisible:
+    text: "(Новые|Newest)"
+
+# --- Видео: очистка возвращает полный список ---
+- tapOn:
+    id: "video-search-clear"
+- extendedWaitUntil:
+    notVisible:
+      id: "video-search-clear"
+    timeout: 10000
+
+# --- Видео: пустой результат ---
+- tapOn:
+    id: "video-search-input"
+- inputText: "zzzz-no-such-media-zzzz"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "video-search-empty"
+    timeout: 20000
+- assertVisible:
+    text: "(Ничего не найдено|Nothing found)"
+- tapOn:
+    id: "video-search-clear"
+- extendedWaitUntil:
+    notVisible:
+      id: "video-search-empty"
+    timeout: 10000
+
+# --- Аудио: те же контролы ---
+- tapOn:
+    id: "tab-audio"
+- extendedWaitUntil:
+    visible:
+      id: "media-row-.*-title"
+    timeout: 20000
+- copyTextFrom:
+    id: "media-row-.*-title"
+- evalScript: ${output.audioTitle = maestro.copiedText}
+- tapOn:
+    id: "audio-search-input"
+- inputText: ${output.audioTitle}
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "audio-search-clear"
+    timeout: 10000
+- assertVisible:
+    text: ${output.audioTitle}
+- assertVisible:
+    text: "(Новые|Newest)"
+- tapOn:
+    id: "audio-search-sort"
+- assertVisible:
+    text: "(Старые|Oldest)"
+- tapOn:
+    id: "audio-search-clear"
+- extendedWaitUntil:
+    notVisible:
+      id: "audio-search-clear"
+    timeout: 10000
+
+# --- Аудио: пустой результат ---
+- tapOn:
+    id: "audio-search-input"
+- inputText: "zzzz-no-such-media-zzzz"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "audio-search-empty"
+    timeout: 20000
+- assertVisible:
+    text: "(Ничего не найдено|Nothing found)"

@@ -6,22 +6,51 @@ import {
 	videoListOptions,
 } from "@flux/shared";
 import {
+	keepPreviousData,
 	useInfiniteQuery,
 	useMutation,
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
+import { normalizeSearchQuery, type SortOrder } from "../media/search";
 
 // CoreFetcher уже платформенно-нейтрален; транспорт подставляет
 // configureApi (Bearer + базовый URL сервера).
 const fetcher: CoreFetcher = (path, init) => apiFetch(path, init);
 
-export function useVideoList() {
-	return useInfiniteQuery(videoListOptions(fetcher, ""));
+// Нормализация и query key живут в shared: смена q/sort автоматически
+// сбрасывает пагинацию (новый infinite-запрос с offset=0).
+export function videoSearchOptions(
+	fetch: CoreFetcher,
+	q: string,
+	sort: SortOrder,
+) {
+	return {
+		...videoListOptions(fetch, normalizeSearchQuery(q), sort),
+		// Смена q/sort не должна схлопывать уже загруженный список в
+		// спиннер: предыдущие данные остаются до ответа нового ключа.
+		placeholderData: keepPreviousData,
+	};
 }
 
-export function useAudioList() {
-	return useInfiniteQuery(audioListOptions(fetcher, ""));
+export function audioSearchOptions(
+	fetch: CoreFetcher,
+	q: string,
+	sort: SortOrder,
+) {
+	// artistId не передаём: отдельный список артиста — useArtistTracks.
+	return {
+		...audioListOptions(fetch, normalizeSearchQuery(q), undefined, sort),
+		placeholderData: keepPreviousData,
+	};
+}
+
+export function useVideoList(q = "", sort: SortOrder = "desc") {
+	return useInfiniteQuery(videoSearchOptions(fetcher, q, sort));
+}
+
+export function useAudioList(q = "", sort: SortOrder = "desc") {
+	return useInfiniteQuery(audioSearchOptions(fetcher, q, sort));
 }
 
 // Треки артиста фильтруются на сервере (artist_id): клиент не тянет всю
