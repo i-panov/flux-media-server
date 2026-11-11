@@ -137,7 +137,7 @@ cd web && npm run test:e2e && npm run build && npm run size
 - [docs/mobile-parity-handoff-2026-11-10.md](docs/mobile-parity-handoff-2026-11-10.md)
   — исторический handoff mobile-задач и актуальный статус.
 - [docs/mobile-release-notes-2026-11-11.md](docs/mobile-release-notes-2026-11-11.md)
-  — что вошло в mobile 0.1.32 и известные ограничения.
+  — что вошло в mobile 0.1.33 и известные ограничения.
 - [docs/web-release-notes-2026-11-11.md](docs/web-release-notes-2026-11-11.md)
   — web 0.1.35: TV-OSD видео, TV-вход, read-only, фикс карточек и
   «Продолжить просмотр»; реальный ТВ не проверялся.

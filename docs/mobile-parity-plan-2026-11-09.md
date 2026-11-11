@@ -442,8 +442,8 @@ web imports; mobile tests.
 
 #### Task 25: релиз
 
-- [x] `version:sync`, versionCode 50.
-- [x] Dogfood APK arm64 — собран `0.1.32`/50, ~33 МБ, только `arm64-v8a`.
+- [x] `version:sync`, versionCode 51.
+- [x] Dogfood APK arm64 — собран `0.1.33`/51, ~33 МБ, только `arm64-v8a`.
 - [ ] Smoke на устройстве: login, video, audio background, offline —
   заблокировано: нет устройства/эмулятора.
 - [x] Записать известные ограничения (Expo Go без background).

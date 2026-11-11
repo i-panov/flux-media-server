@@ -9,9 +9,9 @@
 | [../README.md](../README.md) | актуальный | запуск, Docker, клиенты, проверки |
 | [../AGENTS.md](../AGENTS.md) | актуальный | структура, команды, конвенции, версии |
 | [review-2026-11-09.md](review-2026-11-09.md) | итоговый отчёт | ревью, закрытые находки, осознанные ограничения, журнал коммитов |
-| [mobile-parity-plan-2026-11-09.md](mobile-parity-plan-2026-11-09.md) | Tasks 1–24 + поиск/сортировка; APK 0.1.32; DoD открыт из-за device-smoke | дорожная карта mobile до паритета с Flutter: фазы, файлы, тесты, риски |
-| [mobile-parity-handoff-2026-11-10.md](mobile-parity-handoff-2026-11-10.md) | исторический снимок + статус | состояние на 2026-11-10, фактический статус, APK 0.1.32 собран, остался device-smoke |
-| [mobile-release-notes-2026-11-11.md](mobile-release-notes-2026-11-11.md) | актуальный | mobile 0.1.32: адрес сервера/первый запуск, APK собран, device-smoke ждёт устройства |
+| [mobile-parity-plan-2026-11-09.md](mobile-parity-plan-2026-11-09.md) | Tasks 1–24 + поиск/сортировка; APK 0.1.33; DoD открыт из-за device-smoke | дорожная карта mobile до паритета с Flutter: фазы, файлы, тесты, риски |
+| [mobile-parity-handoff-2026-11-10.md](mobile-parity-handoff-2026-11-10.md) | исторический снимок + статус | состояние на 2026-11-10, фактический статус, APK 0.1.33 собран, остался device-smoke |
+| [mobile-release-notes-2026-11-11.md](mobile-release-notes-2026-11-11.md) | актуальный | mobile 0.1.33: мемы, TV-каркас, APK собран, device-smoke ждёт устройства |
 | [web-release-notes-2026-11-11.md](web-release-notes-2026-11-11.md) | исторический | web 0.1.35: TV-OSD, TV-вход, read-only, фикс карточек и «Продолжить просмотр»; реальный ТВ не проверялся |
 | [admin-release-notes-2026-11-11.md](admin-release-notes-2026-11-11.md) | актуальный | web 0.1.36, backend 1.0.30: авточистка из админки, `used_bytes`, подсказка в пользователях |
 | [tv-roadmap-2026-11-11.md](tv-roadmap-2026-11-11.md) | план + статус | Android TV, web-TV, read-only, QR/device-code, Fire TV; web 0.1.35 закрыл web-TV P1/P2; реальные ТВ не проверялись |

@@ -99,7 +99,7 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - Анализаторы: biome (extends web) + `eslint-config-expo` + sonarjs.
 - `@flux/shared` — единственный источник API/очереди/lyrics-логики;
   не дублировать fetch-контракты в mobile.
-- Поиск и сортировка списков видео/аудио реализованы в mobile 0.1.31, текущий релиз 0.1.32:
+- Поиск и сортировка списков видео/аудио реализованы в mobile 0.1.31, текущий релиз 0.1.33:
   `useVideoList(q, sort)`/`useAudioList(q, sort)`, debounce 300 мс,
   переключатель asc/desc и отдельные пустые состояния.
 - Maestro: 19 flow в `.maestro/` (tabs, theme, video, audio, lyrics,
@@ -236,4 +236,4 @@ E2E и production build — перед крупными изменениями w
 - `docs/mobile-parity-plan-2026-11-09.md` — план паритета mobile.
 - `docs/mobile-parity-handoff-2026-11-10.md` — исторический handoff и
   актуальный статус mobile.
-- `docs/mobile-release-notes-2026-11-11.md` — release notes mobile 0.1.32.
+- `docs/mobile-release-notes-2026-11-11.md` — release notes mobile 0.1.33.
