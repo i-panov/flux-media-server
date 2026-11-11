@@ -37,3 +37,6 @@ mobile/.artifacts/
 .android-avd/
 .android-emulator/
 .runtime/
+
+# Local artifacts
+.artifacts/
