@@ -214,6 +214,7 @@ export function MediaList({
 					hasTVPreferredFocus={isTV && index === 0}
 					style={({ pressed, focused }) => [
 						styles.row,
+						isTV && styles.rowTV,
 						{
 							gap: spacing.md,
 							padding: spacing.md,
@@ -260,6 +261,7 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderRadius: 10,
 	},
+	rowTV: { minHeight: 96, borderRadius: 16 },
 	info: { flex: 1 },
 	download: { flexDirection: "row", alignItems: "center", gap: 2 },
 	title: { fontSize: 16, fontWeight: "600" },

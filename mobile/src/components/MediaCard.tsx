@@ -55,6 +55,8 @@ export interface MediaCardProps {
 	favoriteLabel?: string;
 	menuLabel?: string;
 	testID?: string;
+	/** ТВ: первый элемент списка получает фокус при открытии. */
+	hasTVPreferredFocus?: boolean;
 	style?: StyleProp<ViewStyle>;
 }
 
@@ -188,6 +190,7 @@ export function MediaCard({
 	favoriteLabel,
 	menuLabel,
 	testID,
+	hasTVPreferredFocus,
 	style,
 }: MediaCardProps) {
 	useLanguage();
@@ -329,6 +332,7 @@ export function MediaCard({
 					}
 					onPress={onPress}
 					onLongPress={onLongPress}
+					hasTVPreferredFocus={hasTVPreferredFocus}
 					testID={testID}
 					style={({ pressed, focused }) => [
 						styles.content,

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { isTV } from "../tv/profile";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
 import { ListFooter } from "./ListFooter";
@@ -108,7 +109,7 @@ export function MediaGrid<T extends MediaGridItem>({
 		<FlatList
 			data={items}
 			keyExtractor={(item) => String(item.id)}
-			numColumns={2}
+			numColumns={isTV ? 4 : 2}
 			columnWrapperStyle={[styles.row, { marginBottom: spacing.md }]}
 			contentContainerStyle={[
 				{ paddingBottom: spacing.xl },
@@ -132,8 +133,8 @@ export function MediaGrid<T extends MediaGridItem>({
 			onEndReached={onEndReached}
 			onEndReachedThreshold={0.4}
 			testID={testID}
-			renderItem={({ item }) => (
-				<View style={styles.cell}>
+			renderItem={({ item, index }) => (
+				<View style={isTV ? styles.cellTV : styles.cell}>
 					<MediaCard
 						title={item.title}
 						subtitle={item.subtitle}
@@ -160,6 +161,7 @@ export function MediaGrid<T extends MediaGridItem>({
 							onMenuItem === undefined ? undefined : () => onMenuItem(item)
 						}
 						testID={testID === undefined ? undefined : `${testID}-${item.id}`}
+						hasTVPreferredFocus={isTV && index === 0}
 					/>
 				</View>
 			)}
@@ -172,6 +174,7 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 	},
 	cell: { width: "48%" },
+	cellTV: { flex: 1 },
 	emptyContent: { flexGrow: 1 },
 	loading: {
 		flex: 1,

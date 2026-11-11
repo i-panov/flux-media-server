@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { type Edge, SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
+import { isTV } from "../tv/profile";
 
 interface ScreenProps {
 	children: ReactNode;
@@ -30,7 +31,10 @@ export function Screen({
 	contentContainerStyle,
 }: ScreenProps) {
 	const { colors, spacing } = useTheme();
-	const padding: ViewStyle = { padding: spacing.lg, gap: spacing.md };
+	// 10-foot UI: на ТВ больше воздуха и крупнее базовый отступ.
+	const padding: ViewStyle = isTV
+		? { padding: spacing.xl, gap: spacing.lg }
+		: { padding: spacing.lg, gap: spacing.md };
 
 	return (
 		<SafeAreaView
