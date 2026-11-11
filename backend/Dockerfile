@@ -23,13 +23,9 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 COPY web/package.json ./web/
 COPY packages/shared/package.json ./packages/shared/
-# npm 10 не устанавливает платформенные optional-зависимости, если их нет в
-# lock-файле (npm/cli#4828): сборка падает на «Cannot find native binding» для
-# @tailwindcss/oxide. Доставляем бинарник под архитектуру сборки явно.
-RUN npm ci --workspace=flux-web \
- && oxide=$(node -p "require('./web/node_modules/@tailwindcss/oxide/package.json').version") \
- && npm install --no-save --no-package-lock \
-      "@tailwindcss/oxide-linux-$(node -p 'process.arch')-gnu@${oxide}"
+# В lock-файле есть optional-бинарники @tailwindcss/oxide для linux x64 и
+# arm64: npm ci сам выбирает нужный по os/cpu. Отдельная установка не нужна.
+RUN npm ci --workspace=flux-web
 
 COPY web/ ./web/
 COPY packages/shared/ ./packages/shared/

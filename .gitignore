@@ -21,3 +21,9 @@ node_modules/
 # Local historical plans (kept out of the repo)
 docs/superpowers/
 frontend/android/build/
+
+# Local Android Gradle cache (SDK build)
+mobile/.gradle-home/
+
+# Local Android Maven artifact cache
+mobile/.m2/
