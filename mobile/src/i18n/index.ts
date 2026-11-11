@@ -7,7 +7,7 @@ import { metadataEn, metadataRu } from "./metadata";
 import { trashEn, trashRu } from "./trash";
 import { uploadEn, uploadRu } from "./upload";
 
-const ru = {
+export const ru = {
 	...collectionRu,
 	...downloadsRu,
 	...trashRu,
@@ -194,17 +194,26 @@ const ru = {
 	"settings.saveError": "Не удалось сохранить адрес",
 	"settings.version": "Версия приложения",
 	"settings.language": "Язык",
+	"settings.languageRu": "Русский",
+	"settings.languageEn": "English",
 	"settings.theme": "Тема",
 	"settings.themeSystem": "Системная",
 	"settings.themeLight": "Светлая",
 	"settings.themeDark": "Тёмная",
 	"settings.themeSaved": "Сохранено",
+	"settings.logoutTitle": "Выйти из аккаунта?",
+	"settings.logoutConfirm":
+		"Очередь воспроизведения, скачанные файлы и кэш будут удалены с устройства.",
+	"settings.logoutAction": "Выйти",
+	// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
+	"settings.loggingOut": "Выходим…",
+	"settings.logoutError": "Не удалось выйти. Повторите попытку.",
 	"server.title": "Сервер",
 	"server.hint": "Адрес сервера можно задать до входа.",
 	"server.open": "Настроить сервер",
 } as const;
 
-const en: Record<keyof typeof ru, string> = {
+export const en: Record<keyof typeof ru, string> = {
 	...collectionEn,
 	...downloadsEn,
 	...trashEn,
@@ -393,17 +402,33 @@ const en: Record<keyof typeof ru, string> = {
 	"settings.saveError": "Could not save URL",
 	"settings.version": "App version",
 	"settings.language": "Language",
+	"settings.languageRu": "Русский",
+	"settings.languageEn": "English",
 	"settings.theme": "Theme",
 	"settings.themeSystem": "System",
 	"settings.themeLight": "Light",
 	"settings.themeDark": "Dark",
 	"settings.themeSaved": "Saved",
+	"settings.logoutTitle": "Log out?",
+	"settings.logoutConfirm":
+		"The playback queue, downloaded files, and cache will be removed from this device.",
+	"settings.logoutAction": "Log out",
+	"settings.loggingOut": "Signing out…",
+	"settings.logoutError": "Could not log out. Try again.",
 	"server.title": "Server",
 	"server.hint": "You can set the server URL before signing in.",
 	"server.open": "Configure server",
 };
 
 export type Language = "ru" | "en";
+
+// Значение из AsyncStorage: всё неизвестное/битое трактуем как «выбора нет»
+// и оставляем язык, определённый по системной локали.
+export function parseLanguage(
+	value: string | null | undefined,
+): Language | null {
+	return value === "ru" || value === "en" ? value : null;
+}
 
 function detectLanguage(): Language {
 	try {

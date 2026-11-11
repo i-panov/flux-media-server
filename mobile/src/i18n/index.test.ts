@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getLanguage, setLanguage, t } from "./index";
+import { en, getLanguage, parseLanguage, ru, setLanguage, t } from "./index";
 
 describe("mobile i18n", () => {
 	afterEach(() => {
@@ -16,6 +16,29 @@ describe("mobile i18n", () => {
 
 	it("неизвестный ключ не ломает рендер", () => {
 		expect(t("common.loading")).not.toBe("");
+	});
+
+	it("ru и en содержат одинаковый набор ключей", () => {
+		expect(Object.keys(en).sort()).toEqual(Object.keys(ru).sort());
+	});
+
+	it("парсит сохранённый язык и отбрасывает неизвестный", () => {
+		expect(parseLanguage("ru")).toBe("ru");
+		expect(parseLanguage("en")).toBe("en");
+		expect(parseLanguage(null)).toBeNull();
+		expect(parseLanguage(undefined)).toBeNull();
+		expect(parseLanguage("de")).toBeNull();
+		expect(parseLanguage("")).toBeNull();
+	});
+
+	it("переводит настройки и подтверждение выхода", () => {
+		setLanguage("ru");
+		expect(t("settings.languageRu")).toBe("Русский");
+		expect(t("settings.languageEn")).toBe("English");
+		expect(t("settings.logoutAction")).toBe("Выйти");
+		setLanguage("en");
+		expect(t("settings.logoutTitle")).toBe("Log out?");
+		expect(t("settings.logoutConfirm")).toContain("downloaded files");
 	});
 
 	it("включает строки метаданных и обложки", () => {

@@ -5,10 +5,25 @@ import {
 	fetchMe,
 	REFRESH_TOKEN_KEY,
 } from "@flux/shared";
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import {
+	type QueryClient,
+	queryOptions,
+	useQuery,
+} from "@tanstack/react-query";
 import { secureStore } from "../storage/secureStore";
 
 export const sessionQueryKey = ["session"] as const;
+
+// Logout/смена сервера: сначала выставляем null, чтобы mounted useSession
+// увидели переход user → null и очистили очередь/скачанное. removeQueries
+// с предикатом не трогает саму session-запись: иначе observer получил бы
+// undefined, а следующий setQueryData(null) уже не дошёл бы до подписчиков.
+export function markSessionSignedOut(queryClient: QueryClient): void {
+	queryClient.setQueryData(sessionQueryKey, null);
+	queryClient.removeQueries({
+		predicate: (query) => query.queryKey[0] !== sessionQueryKey[0],
+	});
+}
 
 async function fetchSession(signal: AbortSignal): Promise<AuthUser | null> {
 	try {

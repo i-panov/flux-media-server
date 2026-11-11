@@ -10,9 +10,9 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { normalizeServerUrl, SERVER_URL_KEY } from "../src/api/setup";
-import { sessionQueryKey } from "../src/auth/session";
+import { emitLocalReset } from "../src/auth/reset";
+import { markSessionSignedOut, sessionQueryKey } from "../src/auth/session";
 import { Screen } from "../src/components/Screen";
-import { useDownloadActions } from "../src/downloads/DownloadProvider";
 import { t, useLanguage } from "../src/i18n";
 import { secureStore } from "../src/storage/secureStore";
 import { useTheme } from "../src/theme/ThemeProvider";
@@ -24,7 +24,6 @@ export default function ServerScreen() {
 	const { colors } = useTheme();
 	const health = useHealthQuery();
 	const queryClient = useQueryClient();
-	const { clearAll: clearDownloads } = useDownloadActions();
 	const [draft, setDraft] = useState(() => getApiConfig().baseUrl);
 	const [appliedUrl, setAppliedUrl] = useState(() => getApiConfig().baseUrl);
 	const [error, setError] = useState<string | null>(null);
@@ -63,26 +62,32 @@ export default function ServerScreen() {
 				// Гасим запросы/refresh старого origin до удаления токенов:
 				// иначе refresh может записать новую пару уже после del().
 				await queryClient.cancelQueries();
-				queryClient.removeQueries();
-				await secureStore.del(ACCESS_TOKEN_KEY);
-				await secureStore.del(REFRESH_TOKEN_KEY);
+				const previousSession = queryClient.getQueryData(sessionQueryKey);
+				const hadSession =
+					previousSession !== null && previousSession !== undefined;
+				// null виден mounted useSession до удаления остального кэша:
+				// иначе observers получили бы undefined и не очистили данные.
+				markSessionSignedOut(queryClient);
+				// Переход user → null эмитит SessionResetProvider. Если входа
+				// уже не было, перехода не случится — чистим явно.
+				if (!hadSession) {
+					emitLocalReset();
+				}
+				// Оба токена удаляем независимо: ошибка одного не должна
+				// оставить второй.
+				await Promise.allSettled([
+					secureStore.del(ACCESS_TOKEN_KEY),
+					secureStore.del(REFRESH_TOKEN_KEY),
+				]);
 				tokensDeleted = true;
 			}
 			await secureStore.set(SERVER_URL_KEY, normalized);
 			configureApi({ baseUrl: normalized });
-			if (changed) {
-				// Файлы принадлежат прежнему origin: индекс и кеш не переносим.
-				clearDownloads();
-			}
 			setAppliedUrl(normalized);
 			setDraft(normalized);
 			setError(null);
 			setSaved(true);
 			if (changed) {
-				// Кэш принадлежит прежнему серверу: на новый origin его тащить
-				// нельзя. removeQueries также отменяет висящий /auth/me.
-				queryClient.removeQueries();
-				queryClient.setQueryData(sessionQueryKey, null);
 				// replace не схлопывает стек: без dismissAll после входа
 				// остался бы дублирующий login/server в истории.
 				if (router.canDismiss()) {
@@ -103,8 +108,7 @@ export default function ServerScreen() {
 			if (tokensDeleted) {
 				// URL не сохранился, но токенов уже нет: кэшированную сессию
 				// оставлять нельзя, иначе UI покажет вход без токенов.
-				queryClient.removeQueries();
-				queryClient.setQueryData(sessionQueryKey, null);
+				markSessionSignedOut(queryClient);
 				if (router.canDismiss()) {
 					router.dismissAll();
 				}

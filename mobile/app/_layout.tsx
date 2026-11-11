@@ -8,7 +8,10 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 // Импорт ради побочного эффекта (дефолт configureApi) и initApiConfig:
 // модуль должен выполниться до любых запросов.
 import { initApiConfig } from "../src/api/setup";
+import { SessionResetProvider } from "../src/auth/SessionResetProvider";
 import { DownloadProvider } from "../src/downloads/DownloadProvider";
+import { setLanguage } from "../src/i18n";
+import { loadLanguage } from "../src/i18n/languageStorage";
 import { AudioProvider } from "../src/player/AudioProvider";
 import { ThemeProvider, useTheme } from "../src/theme/ThemeProvider";
 
@@ -50,26 +53,28 @@ function AppShell({
 	}
 	return (
 		<QueryClientProvider client={client}>
-			<DownloadProvider>
-				<AudioProvider>
-					<Stack screenOptions={{ headerShown: false }}>
-						<Stack.Screen name="(tabs)" />
-						{/* Свайп-назад iOS не должен обходить confirm о несохранённых
-						    правках в редакторе метаданных. */}
-						<Stack.Screen
-							name="media/[id]/edit"
-							options={{ gestureEnabled: false, headerShown: false }}
-						/>
-						<Stack.Screen
-							name="player"
-							options={{ presentation: "modal", headerShown: false }}
-						/>
-						<Stack.Screen name="login" />
-						<Stack.Screen name="server" />
-						<Stack.Screen name="downloads" />
-					</Stack>
-				</AudioProvider>
-			</DownloadProvider>
+			<SessionResetProvider>
+				<DownloadProvider>
+					<AudioProvider>
+						<Stack screenOptions={{ headerShown: false }}>
+							<Stack.Screen name="(tabs)" />
+							{/* Свайп-назад iOS не должен обходить confirm о несохранённых
+							    правках в редакторе метаданных. */}
+							<Stack.Screen
+								name="media/[id]/edit"
+								options={{ gestureEnabled: false, headerShown: false }}
+							/>
+							<Stack.Screen
+								name="player"
+								options={{ presentation: "modal", headerShown: false }}
+							/>
+							<Stack.Screen name="login" />
+							<Stack.Screen name="server" />
+							<Stack.Screen name="downloads" />
+						</Stack>
+					</AudioProvider>
+				</DownloadProvider>
+			</SessionResetProvider>
 		</QueryClientProvider>
 	);
 }
@@ -80,7 +85,15 @@ export default function RootLayout() {
 
 	useEffect(() => {
 		let cancelled = false;
-		initApiConfig().finally(() => {
+		// Язык читаем до первого кадра: иначе выбранный в настройках ru/en
+		// на мгновение перекрывался бы системной локалью. Ошибка хранилища
+		// не блокирует старт — остаётся определённый по локали язык.
+		const language = loadLanguage().then((stored) => {
+			if (!cancelled && stored !== null) {
+				setLanguage(stored);
+			}
+		});
+		Promise.allSettled([initApiConfig(), language]).finally(() => {
 			if (!cancelled) {
 				setReady(true);
 			}

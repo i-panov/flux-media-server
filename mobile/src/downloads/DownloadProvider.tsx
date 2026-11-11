@@ -11,6 +11,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useLocalReset } from "../auth/reset";
 import {
 	clearDownloadDirectory,
 	hydrateDownloads,
@@ -179,6 +180,24 @@ function disposeTask(
 
 interface MutableRef<T> {
 	current: T;
+}
+
+// Стабильный резолвер локального пути: читает refs в момент вызова, поэтому
+// плеер не получает устаревший снимок индекса после commit/clearAll.
+function useStoredDownloadedPath(
+	entriesRef: MutableRef<DownloadEntry[]>,
+	hydratedRef: MutableRef<boolean>,
+): (mediaId: number) => string | null {
+	return useCallback(
+		(mediaId: number) =>
+			resolveDownloadedPath(
+				entriesRef.current,
+				hydratedRef.current,
+				mediaId,
+				FileSystem.documentDirectory,
+			),
+		[entriesRef, hydratedRef],
+	);
 }
 
 // Индекс и persist — до удаления файла: ошибка FS не должна оставлять
@@ -448,6 +467,11 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 		});
 	}, [bumpToken, persist, setActive, setEntries]);
 
+	// Logout и смена сервера: индекс/файлы/активные задачи принадлежат
+	// прошлому origin и пользователю. Повторный сброс безопасен (задачи
+	// отменяются, каталог удаляется идемпотентно).
+	useLocalReset(clearAll);
+
 	const actions = useMemo<DownloadActions>(
 		() => ({ start, cancel, retry: start, remove, clearAll }),
 		[cancel, clearAll, remove, start],
@@ -456,16 +480,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 		() => ({ hydrated, entries, active }),
 		[hydrated, entries, active],
 	);
-	const getDownloadedPath = useCallback(
-		(mediaId: number): string | null =>
-			resolveDownloadedPath(
-				entriesRef.current,
-				hydratedRef.current,
-				mediaId,
-				FileSystem.documentDirectory,
-			),
-		[],
-	);
+	const getDownloadedPath = useStoredDownloadedPath(entriesRef, hydratedRef);
 
 	return (
 		<DownloadLookupContext.Provider value={getDownloadedPath}>

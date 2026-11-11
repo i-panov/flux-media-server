@@ -1,7 +1,9 @@
 import { getApiConfig, useHealthQuery } from "@flux/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, router } from "expo-router";
+import { useState } from "react";
 import {
+	Alert,
 	Pressable,
 	type StyleProp,
 	StyleSheet,
@@ -13,7 +15,8 @@ import { version as appVersion } from "../../package.json";
 import { signOutLocal } from "../../src/auth/logout";
 import { useSession } from "../../src/auth/session";
 import { Screen } from "../../src/components/Screen";
-import { setLanguage, t, useLanguage } from "../../src/i18n";
+import { type Language, setLanguage, t, useLanguage } from "../../src/i18n";
+import { saveLanguage } from "../../src/i18n/languageStorage";
 import { useTheme } from "../../src/theme/ThemeProvider";
 import { THEME_MODES, type ThemeMode } from "../../src/theme/tokens";
 
@@ -33,6 +36,7 @@ function SettingsButton({
 	onPress,
 	selected = false,
 	danger = false,
+	disabled = false,
 	testID,
 	style,
 }: {
@@ -40,6 +44,7 @@ function SettingsButton({
 	onPress: () => void;
 	selected?: boolean;
 	danger?: boolean;
+	disabled?: boolean;
 	testID?: string;
 	style?: StyleProp<ViewStyle>;
 }) {
@@ -59,7 +64,8 @@ function SettingsButton({
 			testID={testID}
 			accessibilityRole="button"
 			accessibilityLabel={title}
-			accessibilityState={{ selected }}
+			accessibilityState={{ selected, disabled }}
+			disabled={disabled}
 			onPress={onPress}
 			style={({ pressed }) => [
 				styles.actionButton,
@@ -70,7 +76,8 @@ function SettingsButton({
 					paddingHorizontal: spacing.md,
 					paddingVertical: spacing.sm,
 				},
-				pressed && styles.pressed,
+				pressed && !disabled && styles.pressed,
+				disabled && styles.disabled,
 				style,
 			]}
 		>
@@ -85,6 +92,7 @@ export default function SettingsScreen() {
 	const language = useLanguage();
 	const { colors, mode, persistedMode, radii, setMode, spacing } = useTheme();
 	const queryClient = useQueryClient();
+	const [signingOut, setSigningOut] = useState(false);
 
 	let backendStatus: string;
 	if (health.isPending) {
@@ -101,9 +109,36 @@ export default function SettingsScreen() {
 		testID: `settings-theme-${value}`,
 	}));
 
+	const changeLanguage = (next: Language) => {
+		setLanguage(next);
+		void saveLanguage(next);
+	};
+
 	const signOut = async () => {
-		await signOutLocal(queryClient);
-		router.replace("/login");
+		if (signingOut) {
+			return;
+		}
+		setSigningOut(true);
+		try {
+			await signOutLocal(queryClient);
+			router.replace("/login");
+		} catch {
+			setSigningOut(false);
+			Alert.alert(t("settings.logoutError"));
+		}
+	};
+
+	// Кэш, очередь и скачанные файлы принадлежат аккаунту: предупреждаем
+	// до выхода, потому что восстановить их после logout нельзя.
+	const confirmSignOut = () => {
+		Alert.alert(t("settings.logoutTitle"), t("settings.logoutConfirm"), [
+			{ text: t("common.cancel"), style: "cancel" },
+			{
+				text: t("settings.logoutAction"),
+				style: "destructive",
+				onPress: () => void signOut(),
+			},
+		]);
 	};
 
 	return (
@@ -174,15 +209,15 @@ export default function SettingsScreen() {
 				</Text>
 				<View style={{ flexDirection: "row", gap: spacing.sm }}>
 					<SettingsButton
-						title="Русский"
-						onPress={() => setLanguage("ru")}
+						title={t("settings.languageRu")}
+						onPress={() => changeLanguage("ru")}
 						selected={language === "ru"}
 						testID="settings-language-ru"
 						style={styles.languageButton}
 					/>
 					<SettingsButton
-						title="English"
-						onPress={() => setLanguage("en")}
+						title={t("settings.languageEn")}
+						onPress={() => changeLanguage("en")}
 						selected={language === "en"}
 						testID="settings-language-en"
 						style={styles.languageButton}
@@ -251,8 +286,9 @@ export default function SettingsScreen() {
 
 			{(session.data || session.isError) && (
 				<SettingsButton
-					title={t("home.logout")}
-					onPress={() => void signOut()}
+					title={signingOut ? t("settings.loggingOut") : t("home.logout")}
+					onPress={confirmSignOut}
+					disabled={signingOut}
 					danger
 					testID="settings-logout"
 				/>
@@ -291,4 +327,5 @@ const styles = StyleSheet.create({
 	persistedRow: { flexDirection: "row", gap: 4 },
 	segmentLabel: { fontSize: 13, fontWeight: "600" },
 	pressed: { opacity: 0.75 },
+	disabled: { opacity: 0.5 },
 });

@@ -20,7 +20,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { useSession } from "../auth/session";
+import { useLocalReset } from "../auth/reset";
 import { useDownloadedPathResolver } from "../downloads/DownloadProvider";
 import { t, useLanguage } from "../i18n";
 import { desiredAfterStatus } from "./audioPlaybackPolicy";
@@ -112,20 +112,6 @@ function useStableAudioActions(actions: AudioActions): AudioActions {
 	);
 }
 
-// Выход из аккаунта не оставляет очередь прошлого пользователя.
-// undefined — сессия ещё грузится (или упала сеть), тогда не трогаем.
-function useSignOutQueueClear(
-	hydrated: boolean,
-	signedOut: boolean,
-	clearQueue: () => void,
-): void {
-	useEffect(() => {
-		if (hydrated && signedOut) {
-			clearQueue();
-		}
-	}, [clearQueue, hydrated, signedOut]);
-}
-
 export function AudioProvider({ children }: { children: ReactNode }) {
 	useLanguage();
 	// Императивный createAudioPlayer + useReleasingSharedObject: плеер
@@ -146,7 +132,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		repeat,
 		setShuffle,
 		setRepeat,
-		hydrated,
 		markUserAction,
 	} = useAudioQueueState();
 
@@ -318,8 +303,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		}
 	});
 
-	const session = useSession();
-	useSignOutQueueClear(hydrated, session.data === null, editing.clear);
+	// Выход из аккаунта и смена сервера не оставляют очередь прошлого
+	// пользователя/origin. Событие эмитится только на переходе user → null,
+	// поэтому холодный старт без входа сохранённую очередь не стирает.
+	useLocalReset(editing.clear);
 
 	const seek = useAudioSeek(player, handleSeek, markUserStarted);
 

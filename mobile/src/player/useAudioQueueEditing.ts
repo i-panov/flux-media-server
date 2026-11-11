@@ -57,6 +57,8 @@ export function useAudioQueueEditing({
 	}, [queueState]);
 
 	const clear = useCallback(() => {
+		// markUserAction обязателен даже при пустой очереди: иначе поздняя
+		// гидратация AsyncStorage вернула бы очередь уже после logout.
 		markUserAction();
 		resetUserStarted();
 		setDesiredPlaying(false);
