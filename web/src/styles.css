@@ -23,7 +23,7 @@ body {
 }
 
 /* ТВ и большие экраны: интерфейс читается с дивана, не меняя
-   сетку и логику. Отдельного ТВ-управления пока нет. */
+   сетку и логику. Пульт, spatial-фокус и видео-OSD — в .tv-mode. */
 @media (min-width: 120em) {
 	html {
 		font-size: 18px;
@@ -88,4 +88,97 @@ body {
 .media-card:focus-within,
 .media-row:focus-within {
 	content-visibility: visible;
+}
+
+/* Видео-OSD ТВ-режима: лежит поверх <video> внутри общего контейнера.
+   Скрытие — прозрачность + inert/aria-hidden из React; pointer-events
+   выключены, а показ и восстановление фокуса делает логика OSD. */
+.tv-video-shell {
+	position: relative;
+	width: 100%;
+	overflow: hidden;
+	border-radius: var(--mantine-radius-md);
+	background: #000;
+}
+
+.tv-video-shell video {
+	display: block;
+	width: 100%;
+}
+
+.tv-video-osd {
+	position: absolute;
+	inset: 0;
+	z-index: 5;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	padding: clamp(1rem, 3vw, 2.5rem);
+	color: #fff;
+	background:
+		linear-gradient(to bottom, rgb(0 0 0 / 60%), transparent 32%),
+		linear-gradient(to top, rgb(0 0 0 / 72%), transparent 42%);
+	opacity: 1;
+	pointer-events: none;
+	transition: opacity 180ms ease;
+}
+
+/* Скрытая панель не должна ловить ни клики, ни фокус (inert в JSX). */
+.tv-video-osd[data-visible="false"] {
+	opacity: 0;
+}
+
+.tv-video-osd__top,
+.tv-video-osd__center,
+.tv-video-osd__bottom {
+	pointer-events: none;
+}
+
+.tv-video-osd__top :is(button, [role="slider"]),
+.tv-video-osd__center :is(button, [role="slider"]),
+.tv-video-osd__bottom :is(button, [role="slider"]),
+.tv-video-osd__bottom .mantine-Slider-root {
+	pointer-events: auto;
+}
+
+.tv-video-osd[data-visible="false"] :is(button, [role="slider"]),
+.tv-video-osd[data-visible="false"] .mantine-Slider-root,
+.tv-video-osd[data-visible="false"] .mantine-Slider-thumb {
+	pointer-events: none;
+}
+
+.tv-video-osd__state {
+	color: rgb(255 255 255 / 78%);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.tv-video-osd__center {
+	padding: 0.5rem 0.75rem;
+}
+
+.tv-video-osd__center .mantine-ActionIcon-root {
+	background: rgb(0 0 0 / 42%);
+}
+
+.tv-video-osd__bottom {
+	gap: 0.5rem;
+}
+
+.tv-video-osd__time {
+	color: rgb(255 255 255 / 88%);
+	font-variant-numeric: tabular-nums;
+}
+
+.tv-video-osd__volume {
+	width: 7.5rem;
+}
+
+/* Старые ТВ-браузеры без backdrop-filter не должны терять читаемость:
+   подложка OSD уже даёт контраст, эффект — только улучшение. */
+@supports (backdrop-filter: blur(6px)) {
+	.tv-video-osd__center .mantine-ActionIcon-root,
+	.tv-video-osd__bottom .mantine-Slider-root {
+		backdrop-filter: blur(6px);
+	}
 }

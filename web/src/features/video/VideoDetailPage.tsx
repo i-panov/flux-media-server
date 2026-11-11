@@ -25,6 +25,7 @@ import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
 import { useMediaProgress } from "../media/useMediaProgress";
 import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { TVVideoControls } from "./TVVideoControls";
 
 // Мета-строка деталей: свой компонент, чтобы страница оставалась
 // в лимите строк.
@@ -102,9 +103,13 @@ export function VideoDetailPage() {
 	const { targetRef: tvLoadingRef } = useTVFocusable<HTMLDivElement>(
 		"video-detail-loading",
 	);
+	// Назад — secondary: route-focus сначала ведёт на кнопку play OSD,
+	// а к списку видео пульт доходит стрелками.
 	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
 		"video-detail-back",
 		clickNode,
+		undefined,
+		{ secondary: true },
 	);
 	const position = useSavedTime(videoRef);
 	const played = useRef(false);
@@ -117,9 +122,7 @@ export function VideoDetailPage() {
 		played.current = false;
 	}, [mediaId]);
 
-	const goBack = () => {
-		void navigate({ to: "/video" });
-	};
+	const goBack = () => void navigate({ to: "/video" });
 	const backLabel = t("video.back");
 
 	// Позиция сохраняется перед ЛЮБЫМ изменением nonce (ошибка video,
@@ -216,46 +219,56 @@ export function VideoDetailPage() {
 				</Button>
 				{/* Сервер отдаёт только субтитры-переводы, дорожек captions нет —
 			размечать перевод как captions было бы неверно. Выбор дорожки
-			доступен в нативных контролах плеера. */}
-				{/* biome-ignore lint/a11y/useMediaCaption: нет captions-дорожек в данных. */}
-				<video
-					ref={videoRef}
-					key={reload.nonce}
-					controls
-					preload="metadata"
-					src={`/api/media/${item.id}/stream`}
-					poster={item.thumbnail_url === "" ? undefined : item.thumbnail_url}
-					className="aspect-video w-full rounded-md bg-black"
-					onError={handleMediaError}
-					onLoadedMetadata={() => {
-						position.restore();
-						videoProgress.handleLoadedMetadata();
-					}}
-					onPlay={() => {
-						// Счётчик backend инкрементирует в Stream: подтягиваем
-						// свежее значение один раз за просмотр, плеер не трогаем.
-						if (!played.current) {
-							played.current = true;
-							void media.refetch();
-						}
-					}}
-					onPause={videoProgress.handlePause}
-					onTimeUpdate={videoProgress.handleTimeUpdate}
-					onEnded={videoProgress.handleEnded}
-				>
-					{(subs.data ?? []).map((track) => {
-						const { base, label } = splitSubLang(track.lang);
-						return (
-							<SubTrack
-								key={track.lang}
-								base={base}
-								label={label}
-								url={track.url}
-								onError={handleMediaError}
-							/>
-						);
-					})}
-				</video>
+			доступен в нативных контролах обычного режима; в ТВ-OSD
+			отдельного меню дорожек пока нет. */}
+				<div className="tv-video-shell">
+					{/* biome-ignore lint/a11y/useMediaCaption: нет captions-дорожек в данных. */}
+					<video
+						ref={videoRef}
+						key={reload.nonce}
+						controls={!tvMode}
+						preload="metadata"
+						src={`/api/media/${item.id}/stream`}
+						poster={item.thumbnail_url === "" ? undefined : item.thumbnail_url}
+						className="aspect-video w-full rounded-md bg-black"
+						onError={handleMediaError}
+						onLoadedMetadata={() => {
+							position.restore();
+							videoProgress.handleLoadedMetadata();
+						}}
+						onPlay={() => {
+							// Счётчик backend инкрементирует в Stream: подтягиваем
+							// свежее значение один раз за просмотр, плеер не трогаем.
+							if (!played.current) {
+								played.current = true;
+								void media.refetch();
+							}
+						}}
+						onPause={videoProgress.handlePause}
+						onTimeUpdate={videoProgress.handleTimeUpdate}
+						onEnded={videoProgress.handleEnded}
+					>
+						{(subs.data ?? []).map((track) => {
+							const { base, label } = splitSubLang(track.lang);
+							return (
+								<SubTrack
+									key={track.lang}
+									base={base}
+									label={label}
+									url={track.url}
+									onError={handleMediaError}
+								/>
+							);
+						})}
+					</video>
+					{tvMode && (
+						<TVVideoControls
+							videoRef={videoRef}
+							videoNonce={reload.nonce}
+							onBack={goBack}
+						/>
+					)}
+				</div>
 				{reload.failed && (
 					<Alert color="red" variant="light" title={t("video.loadError")}>
 						<Button variant="light" size="xs" mt="xs" onClick={handleRetry}>

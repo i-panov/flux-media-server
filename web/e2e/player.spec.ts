@@ -44,7 +44,7 @@ function audioItem(id: number, title: string) {
 	};
 }
 
-function silentWav(seconds = 1): Buffer {
+function silentWav(seconds = 60): Buffer {
 	const sampleRate = 8000;
 	const dataSize = sampleRate * seconds * 2;
 	const buffer = Buffer.alloc(44 + dataSize);

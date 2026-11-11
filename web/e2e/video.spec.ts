@@ -43,6 +43,9 @@ test("видео: список, поиск и переход в детали с 
 
 	await page.getByRole("link", { name: "Первый фильм" }).click();
 	await expect(page).toHaveURL(VIDEO_DETAIL_PATTERN);
+	// Обычный режим: нативные контролы, OSD ТВ не рендерится.
+	await expect(page.locator("video")).toHaveAttribute("controls", "");
+	await expect(page.getByTestId("tv-video-osd")).toHaveCount(0);
 	await expect(page.locator("video")).toBeVisible();
 	await expect(page.getByText("Описание Первый фильм")).toBeVisible();
 	await expect(page.getByText("1:02:05")).toBeVisible();

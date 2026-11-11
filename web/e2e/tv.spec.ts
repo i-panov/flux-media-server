@@ -271,6 +271,16 @@ test("ТВ: список видео, карточки, детали и Back", as
 
 	await page.keyboard.press("ArrowRight");
 	await expect.poll(() => activeElementText(page)).toContain("Второй фильм");
+	await expect.poll(() => activeFocusKey(page)).toContain("video-card-2-");
+	// Ждём не таймаут, а фактическую отметку spatial-фокуса: под
+	// параллельной нагрузкой DOM-фокус появляется раньше неё.
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() => document.activeElement?.getAttribute("data-focused") === "true",
+			),
+		)
+		.toBe(true);
 
 	await page.keyboard.press("Enter");
 	await expect(page).toHaveURL(VIDEO_DETAIL_ID_PATTERN);
@@ -423,7 +433,7 @@ test("ТВ: детали с задержкой API получают фокус �
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Второй фильм" }),
 	).toBeVisible();
-	await expect.poll(() => activeFocusKey(page)).toBe("video-detail-back");
+	await expect.poll(() => activeFocusKey(page)).toBe("video-osd-play");
 });
 
 test("ТВ: плеер с пульта — стрелки сикают и меняют громкость", async ({

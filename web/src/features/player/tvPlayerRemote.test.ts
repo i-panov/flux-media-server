@@ -1,9 +1,17 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { clickFirstLink, clickNode } from "../tv/tvFocus";
 import {
+	canRequestTVFullscreen,
+	changeVideoVolume,
+	clampTVSeek,
+	clampTVVolume,
+	isTVFullscreenActive,
 	resolveTVRemoteAction,
+	resolveTVVideoRemoteAction,
+	seekVideoBy,
 	TV_SEEK_STEP,
 	TV_VOLUME_STEP,
+	toggleTVFullscreen,
 } from "./tvPlayerRemote";
 
 function keyEvent(init: {
@@ -148,5 +156,225 @@ describe("tv clicks", () => {
 		});
 		clickNode(button);
 		expect(clicked).toBe(1);
+	});
+});
+
+describe("resolveTVVideoRemoteAction", () => {
+	it("стрелки — seek и громкость", () => {
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: "ArrowLeft" }))).toBe(
+			"seek-back",
+		);
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: "ArrowRight" }))).toBe(
+			"seek-forward",
+		);
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: "ArrowUp" }))).toBe(
+			"volume-up",
+		);
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: "ArrowDown" }))).toBe(
+			"volume-down",
+		);
+	});
+
+	it("Enter/Space на корне — play/pause, на кнопке — без дубля", () => {
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: "Enter" }))).toBe(
+			"toggle",
+		);
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: " " }))).toBe("toggle");
+		const button = document.createElement("button");
+		document.body.appendChild(button);
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "Enter", target: button })),
+		).toBeNull();
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: " ", target: button })),
+		).toBeNull();
+	});
+
+	it("F и M — полный экран и mute", () => {
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: "f" }))).toBe(
+			"fullscreen",
+		);
+		expect(resolveTVVideoRemoteAction(keyEvent({ key: "M" }))).toBe(
+			"toggle-mute",
+		);
+	});
+
+	it("media-клавиши: play/pause и seek вместо треков", () => {
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "MediaPlayPause" })),
+		).toBe("toggle");
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "MediaTrackNext" })),
+		).toBe("seek-forward");
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "MediaTrackPrevious" })),
+		).toBe("seek-back");
+		expect(
+			resolveTVVideoRemoteAction(
+				keyEvent({ key: "Unidentified", keyCode: 179 }),
+			),
+		).toBe("toggle");
+	});
+
+	it("play: ←/→ сикают, ↑/↓ отдаются spatial-навигации", () => {
+		const play = document.createElement("button");
+		play.setAttribute("data-tv-focus-key", "video-osd-play");
+		document.body.appendChild(play);
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "ArrowRight", target: play })),
+		).toBe("seek-forward");
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "ArrowLeft", target: play })),
+		).toBe("seek-back");
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "ArrowUp", target: play })),
+		).toBeNull();
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "ArrowDown", target: play })),
+		).toBeNull();
+	});
+
+	it("остальные OSD-кнопки стрелками не перехватываются", () => {
+		const button = document.createElement("button");
+		button.setAttribute("data-tv-focus-key", "video-osd-mute");
+		document.body.appendChild(button);
+		for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+			expect(
+				resolveTVVideoRemoteAction(keyEvent({ key, target: button })),
+			).toBeNull();
+		}
+	});
+
+	it("spatial focusKey не даёт дублировать Enter/Space", () => {
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "Enter" }), "video-osd-play"),
+		).toBeNull();
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: " " }), "video-osd-mute"),
+		).toBeNull();
+		expect(
+			resolveTVVideoRemoteAction(
+				keyEvent({ key: "ArrowRight" }),
+				"video-osd-play",
+			),
+		).toBe("seek-forward");
+		expect(
+			resolveTVVideoRemoteAction(
+				keyEvent({ key: "ArrowUp" }),
+				"video-osd-play",
+			),
+		).toBeNull();
+		expect(
+			resolveTVVideoRemoteAction(
+				keyEvent({ key: "ArrowDown" }),
+				"video-osd-mute",
+			),
+		).toBeNull();
+	});
+
+	it("слайдер и ввод живут нативно, модалка гасит пульт", () => {
+		const slider = document.createElement("div");
+		slider.setAttribute("role", "slider");
+		document.body.appendChild(slider);
+		expect(
+			resolveTVVideoRemoteAction(
+				keyEvent({ key: "ArrowLeft", target: slider }),
+			),
+		).toBeNull();
+
+		const field = document.createElement("input");
+		document.body.appendChild(field);
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "ArrowUp", target: field })),
+		).toBeNull();
+
+		const modal = document.createElement("div");
+		modal.setAttribute("role", "dialog");
+		document.body.appendChild(modal);
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "ArrowLeft" })),
+		).toBeNull();
+		expect(
+			resolveTVVideoRemoteAction(keyEvent({ key: "MediaPlayPause" })),
+		).toBeNull();
+	});
+});
+
+describe("видео-экшены и clamp", () => {
+	it("seek не уходит за границы", () => {
+		expect(clampTVSeek(5, -TV_SEEK_STEP, 100)).toBe(0);
+		expect(clampTVSeek(95, TV_SEEK_STEP, 100)).toBe(100);
+		expect(clampTVSeek(5, TV_SEEK_STEP, 0)).toBe(15);
+		expect(clampTVSeek(Number.NaN, TV_SEEK_STEP, 100)).toBe(10);
+	});
+
+	it("громкость клампится в 0..1", () => {
+		expect(clampTVVolume(-0.2)).toBe(0);
+		expect(clampTVVolume(1.4)).toBe(1);
+		expect(clampTVVolume(0.5)).toBe(0.5);
+		expect(clampTVVolume(Number.NaN)).toBe(0);
+	});
+
+	it("seekVideoBy и changeVideoVolume работают с элементом", () => {
+		const video = {
+			currentTime: 95,
+			duration: 100,
+			volume: 0.98,
+			muted: true,
+		} as HTMLVideoElement;
+		seekVideoBy(video, TV_SEEK_STEP);
+		expect(video.currentTime).toBe(100);
+		changeVideoVolume(video, TV_VOLUME_STEP);
+		expect(video.volume).toBe(1);
+		expect(video.muted).toBe(false);
+	});
+});
+
+describe("fullscreen helpers", () => {
+	it("стандартный и legacy WebKit API распознаются", () => {
+		const standard = document.createElement("div");
+		Object.defineProperty(standard, "requestFullscreen", {
+			configurable: true,
+			value: () => Promise.resolve(),
+		});
+		expect(canRequestTVFullscreen(standard)).toBe(true);
+
+		const legacy = document.createElement("div");
+		Object.defineProperty(legacy, "requestFullscreen", {
+			configurable: true,
+			value: undefined,
+		});
+		Object.defineProperty(legacy, "webkitRequestFullscreen", {
+			configurable: true,
+			value: vi.fn(),
+		});
+		expect(canRequestTVFullscreen(legacy)).toBe(true);
+		expect(canRequestTVFullscreen(null)).toBe(false);
+	});
+
+	it("legacy WebKit request вызывается, если стандартного нет", async () => {
+		const legacy = document.createElement("div");
+		Object.defineProperty(legacy, "requestFullscreen", {
+			configurable: true,
+			value: undefined,
+		});
+		const request = vi.fn();
+		Object.defineProperty(legacy, "webkitRequestFullscreen", {
+			configurable: true,
+			value: request,
+		});
+		await toggleTVFullscreen(legacy);
+		expect(request).toHaveBeenCalledTimes(1);
+	});
+
+	it("webkitFullscreenElement учитывается как активный fullscreen", () => {
+		const target = document.createElement("div");
+		Object.defineProperty(document, "webkitFullscreenElement", {
+			configurable: true,
+			value: target,
+		});
+		expect(isTVFullscreenActive()).toBe(true);
+		Reflect.deleteProperty(document, "webkitFullscreenElement");
+		expect(isTVFullscreenActive()).toBe(false);
 	});
 });
