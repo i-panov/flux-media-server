@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { t, useLanguage } from "../i18n";
 import { nextSort, type SortOrder } from "../media/search";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvFocusStyle } from "../tv/focus";
 
 interface MediaSearchBarProps {
 	value: string;
@@ -94,7 +95,7 @@ export function MediaSearchBar({
 					onPress={onPressSort}
 					hitSlop={8}
 					testID={`${testID}-sort`}
-					style={({ pressed }) => [
+					style={({ pressed, focused }) => [
 						styles.sortButton,
 						{
 							backgroundColor: colors.surfaceMuted,
@@ -103,6 +104,7 @@ export function MediaSearchBar({
 							paddingHorizontal: spacing.sm,
 						},
 						pressed && styles.pressed,
+						tvFocusStyle(focused, colors.accent),
 					]}
 				>
 					<Ionicons name={sortIcon} size={16} color={colors.text} />

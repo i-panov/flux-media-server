@@ -21,6 +21,8 @@ import {
 	isEmptyBecauseOfExclusions,
 } from "../media/visibleMedia";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvFocusStyle } from "../tv/focus";
+import { isTV } from "../tv/profile";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
 import { ListFooter } from "./ListFooter";
@@ -197,7 +199,7 @@ export function MediaList({
 					onRetry={() => void query.refetch()}
 				/>
 			}
-			renderItem={({ item }) => (
+			renderItem={({ item, index }) => (
 				<Pressable
 					accessibilityRole={onPressItem === undefined ? undefined : "button"}
 					accessibilityLabel={
@@ -209,7 +211,8 @@ export function MediaList({
 					testID={
 						onPressItem === undefined ? undefined : `media-row-${item.id}`
 					}
-					style={({ pressed }) => [
+					hasTVPreferredFocus={isTV && index === 0}
+					style={({ pressed, focused }) => [
 						styles.row,
 						{
 							gap: spacing.md,
@@ -218,6 +221,7 @@ export function MediaList({
 							backgroundColor: colors.surface,
 						},
 						pressed && onPressItem !== undefined && styles.pressed,
+						tvFocusStyle(focused, colors.accent),
 					]}
 				>
 					<View style={styles.info}>

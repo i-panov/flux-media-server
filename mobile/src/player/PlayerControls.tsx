@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvFocusStyle } from "../tv/focus";
 import {
 	clampSeek,
 	formatTime,
@@ -55,13 +56,14 @@ function ControlButton({
 			onPress={onPress}
 			testID={testID}
 			hitSlop={4}
-			style={({ pressed }) => [
+			style={({ pressed, focused }) => [
 				styles.controlButton,
 				primary && [
 					styles.primaryButton,
 					{ backgroundColor: colors.accent, borderRadius: radii.pill },
 				],
 				pressed && styles.pressed,
+				tvFocusStyle(focused, colors.accent),
 			]}
 		>
 			{children}

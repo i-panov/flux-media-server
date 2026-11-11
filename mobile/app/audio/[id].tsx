@@ -35,6 +35,7 @@ import {
 import { AudioCover } from "../../src/player/AudioCover";
 import { useAudioState } from "../../src/player/AudioProvider";
 import { useTheme } from "../../src/theme/ThemeProvider";
+import { isTV } from "../../src/tv/profile";
 
 // Deep link может открыть текст первым — тогда назад ведёт на вкладку аудио.
 function closeLyrics(): void {
@@ -232,7 +233,7 @@ function AudioLyricsContent() {
 	const isCurrentTrack = mediaId !== null && current?.id === mediaId;
 	// «Добавить» доступно админу и без успешного fetch (пустой/ошибочный
 	// ответ), «Редактировать» — только когда существующие данные загружены.
-	const canEdit = isAdmin && lyrics.isSuccess && lyrics.data !== null;
+	const canEdit = !isTV && isAdmin && lyrics.isSuccess && lyrics.data !== null;
 	// 404 медиа — это «трека нет», а не сетевая ошибка с retry.
 	const mediaNotFound =
 		media.error instanceof ApiError && media.error.status === 404;

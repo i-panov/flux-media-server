@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvFocusStyle } from "../tv/focus";
 import { clampProgress } from "./homeRows";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -97,7 +98,7 @@ function CardAction({
 			onPress={onPress}
 			testID={testID}
 			hitSlop={8}
-			style={({ pressed }) => [
+			style={({ pressed, focused }) => [
 				styles.actionButton,
 				{
 					backgroundColor: active ? colors.favorite : colors.overlay,
@@ -105,6 +106,7 @@ function CardAction({
 					marginLeft: spacing.xs,
 				},
 				pressed && styles.pressed,
+				tvFocusStyle(focused, colors.accent),
 			]}
 		>
 			<Ionicons name={icon} size={17} color={colors.onOverlay} />
@@ -166,6 +168,7 @@ function DownloadBadge({
 	);
 }
 
+// eslint-disable-next-line max-lines-per-function -- карточка держит все варианты и оверлеи.
 export function MediaCard({
 	title,
 	subtitle,
@@ -327,7 +330,11 @@ export function MediaCard({
 					onPress={onPress}
 					onLongPress={onLongPress}
 					testID={testID}
-					style={({ pressed }) => [styles.content, pressed && styles.pressed]}
+					style={({ pressed, focused }) => [
+						styles.content,
+						pressed && styles.pressed,
+						tvFocusStyle(focused, colors.accent),
+					]}
 				>
 					{cardContent}
 				</Pressable>
