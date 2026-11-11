@@ -17,7 +17,9 @@ backend `1.0.30`, web `0.1.36`.
   (upload/trash/downloads/metadata/cover/delete/collections CRUD),
   TV-профиль скрывает лишнюю вкладку «Библиотека», D-pad-управление
   видео (play/pause, seek, rewind/fastForward), TV-иконка и баннер.
-  TV-сборка собирается через `EXPO_TV=1`. Проверено на Android TV
+  TV-сборка собирается через `EXPO_TV=1`. Для self-hosted HTTP добавлен
+  config-plugin `android:usesCleartextTraffic="true"` — без него release
+  TV не логинится на LAN-сервер по `http://`. Проверено на Android TV
   emulator (android-36, x86_64, leanback, 1920×1080): APK ставится,
   приложение запускается, экран сервера открывается, D-pad переводит
   фокус в поле URL (подтверждено uiautomator). Полный сценарий
