@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { t, useLanguage } from "../i18n";
-import { coverPath, imageSource, thumbPath } from "../media/source";
+import { coverPath, imageSource } from "../media/source";
 import { useTheme } from "../theme/ThemeProvider";
 
 interface AudioCoverProps {
@@ -23,17 +23,8 @@ export function AudioCover({
 }: AudioCoverProps) {
 	useLanguage();
 	const { colors, radii } = useTheme();
-	const thumbnail = media.thumbnail_url === "" ? null : thumbPath(media.id);
-	const hasCover = media.cover_url !== "";
-	const preferred = hasCover ? coverPath(media.id) : thumbnail;
-	// Fallback привязан к id: смена трека сама возвращает preferred, без
-	// setState в эффекте (и лишнего каскадного рендера).
-	const [fallback, setFallback] = useState<{
-		id: number;
-		path: string;
-	} | null>(null);
-	const path: string | null =
-		fallback?.id === media.id ? fallback.path : preferred;
+	// У аудио нет thumbnail: единственный источник обложки — cover_url.
+	const path = media.cover_url === "" ? null : coverPath(media.id);
 	const [loaded, setLoaded] = useState<{
 		path: string;
 		source: Awaited<ReturnType<typeof imageSource>>;
@@ -93,21 +84,10 @@ export function AudioCover({
 					source={source}
 					style={StyleSheet.absoluteFill}
 					contentFit="cover"
-					cachePolicy={
-						path !== null && path === thumbnail ? "memory-disk" : "none"
-					}
+					cachePolicy="none"
 					transition={150}
 					accessibilityIgnoresInvertColors
 					onError={() => {
-						const fallbackThumb = thumbnail;
-						if (
-							path !== null &&
-							fallbackThumb !== null &&
-							path !== fallbackThumb
-						) {
-							setFallback({ id: media.id, path: fallbackThumb });
-							return;
-						}
 						if (path !== null) {
 							setFailedPath(path);
 						}

@@ -2,6 +2,7 @@ import type { AudioQueueState, Media } from "@flux/shared";
 import type { AudioPlayer } from "expo-audio";
 import { type Dispatch, type SetStateAction, useEffect } from "react";
 import { useMediaArtists } from "../api/metadata";
+import { lockScreenArtwork } from "./lockScreenArtwork";
 import { applyArtistNames } from "./queueArtistNames";
 import { audioMetadataFor } from "./useAudioSource";
 
@@ -31,10 +32,25 @@ export function useAudioArtistSync(
 		if (current === null || !isLoaded(current.id)) {
 			return;
 		}
-		try {
-			player.setActiveForLockScreen(true, audioMetadataFor(current));
-		} catch {
-			// Нет разрешения/платформы — играем без lock screen.
-		}
+		void (async () => {
+			try {
+				const artwork = await lockScreenArtwork(current);
+				player.setActiveForLockScreen(
+					true,
+					{
+						...audioMetadataFor(current),
+						...(artwork === undefined ? {} : { artworkUrl: artwork }),
+					},
+					{
+						showSeekForward: true,
+						showSeekBackward: true,
+						seekForwardIntervalSeconds: 10,
+						seekBackwardIntervalSeconds: 10,
+					},
+				);
+			} catch {
+				// Нет разрешения/платформы — играем без lock screen.
+			}
+		})();
 	}, [current, isLoaded, player]);
 }

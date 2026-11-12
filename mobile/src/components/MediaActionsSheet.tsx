@@ -5,12 +5,15 @@ import { useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDeleteMedia } from "../api/media";
 import { useSession } from "../auth/session";
+import {
+	useDownloadActions,
+	useDownloadIndicator,
+} from "../downloads/DownloadProvider";
 import { saveMediaFile } from "../downloads/saveMediaFile";
 import { t } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 import { AddToCollectionSheet } from "./AddToCollectionSheet";
 import { ChangeCoverSheet } from "./ChangeCoverSheet";
-import { DownloadButton } from "./DownloadButton";
 
 export function MediaActionsSheet({
 	media,
@@ -22,6 +25,8 @@ export function MediaActionsSheet({
 	const { colors, radii, spacing } = useTheme();
 	const session = useSession();
 	const remove = useDeleteMedia();
+	const download = useDownloadIndicator(media?.id ?? 0);
+	const downloadActions = useDownloadActions();
 	const [coverOpen, setCoverOpen] = useState(false);
 	const [collectionOpen, setCollectionOpen] = useState(false);
 	if (media === null) return null;
@@ -80,7 +85,37 @@ export function MediaActionsSheet({
 						<Text style={[styles.title, { color: colors.text }]}>
 							{media.title}
 						</Text>
-						<DownloadButton media={media} testID="media-actions-download" />
+						{row(
+							download?.status === "downloaded"
+								? "checkmark-circle-outline"
+								: "cloud-download-outline",
+							download === null
+								? t("downloads.download")
+								: download.status === "downloading"
+									? t("downloads.downloading")
+									: download.status === "error"
+										? t("downloads.retry")
+										: t("downloads.downloaded"),
+							() => {
+								if (download === null) {
+									downloadActions.start(media);
+									onClose();
+									return;
+								}
+								if (download.status === "downloading") {
+									downloadActions.cancel(media.id);
+									onClose();
+									return;
+								}
+								if (download.status === "error") {
+									downloadActions.retry(media);
+									onClose();
+									return;
+								}
+								downloadActions.remove(media.id);
+								onClose();
+							},
+						)}
 						{row("download-outline", t("media.saveFile"), () => {
 							onClose();
 							void saveMediaFile(media);

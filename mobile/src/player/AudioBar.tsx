@@ -3,11 +3,11 @@ import type { RepeatMode } from "@flux/shared";
 import { router } from "expo-router";
 import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useFavoriteMediaIds, useToggleAudioFavorite } from "../api/favorites";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 import { AudioCover } from "./AudioCover";
 import { useAudioActions, useAudioState } from "./AudioProvider";
-import { formatAudioTime } from "./audioLabels";
 import { progressRatio } from "./videoControls";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -71,8 +71,6 @@ export function AudioBar() {
 	const { colors, spacing } = useTheme();
 	const {
 		current,
-		queue,
-		index,
 		displayPlaying,
 		currentTime,
 		duration,
@@ -80,10 +78,13 @@ export function AudioBar() {
 		repeat,
 		error,
 	} = useAudioState();
-	const { toggle, next, clear } = useAudioActions();
+	const { toggle, clear } = useAudioActions();
+	const favorites = useFavoriteMediaIds("audio");
+	const toggleFavorite = useToggleAudioFavorite();
 	if (current === null) {
 		return null;
 	}
+	const isFavorite = favorites.data?.has(current.id) ?? false;
 	const artists = current.artists.map((entry) => entry.name).join(", ");
 	const showPause = displayPlaying;
 	const modeLabel = [
@@ -152,43 +153,37 @@ export function AudioBar() {
 						>
 							{artists === "" ? t("audio.player.unknownArtist") : artists}
 						</Text>
-						<View style={[styles.metaRow, { gap: spacing.sm }]}>
-							<Text
-								testID="audio-bar-index"
-								style={[styles.muted, { color: colors.textMuted }]}
-							>
-								{`${index + 1}/${queue.length}`}
-							</Text>
-							<Text
-								testID="audio-bar-time"
-								style={[styles.muted, { color: colors.textMuted }]}
-							>
-								{`${formatAudioTime(currentTime)} / ${formatAudioTime(duration)}`}
-							</Text>
-							{modeLabel === "" ? null : (
+						{modeLabel === "" ? null : (
+							<View style={[styles.metaRow, { gap: spacing.sm }]}>
 								<Text
 									numberOfLines={1}
 									style={[styles.muted, styles.modes, { color: colors.accent }]}
 								>
 									{modeLabel}
 								</Text>
-							)}
-						</View>
+							</View>
+						)}
 					</View>
 				</Pressable>
 				<View style={styles.actions}>
+					<BarButton
+						icon={isFavorite ? "heart" : "heart-outline"}
+						label={isFavorite ? t("media.unfavorite") : t("media.favorite")}
+						testID="audio-bar-favorite"
+						onPress={() =>
+							toggleFavorite.mutate({
+								mediaId: current.id,
+								favorite: isFavorite,
+								media: current,
+							})
+						}
+					/>
 					<BarButton
 						primary
 						icon={showPause ? "pause" : "play"}
 						label={showPause ? t("audio.player.pause") : t("audio.player.play")}
 						testID={showPause ? "audio-bar-pause" : "audio-bar-play"}
 						onPress={toggle}
-					/>
-					<BarButton
-						icon="play-skip-forward"
-						label={t("audio.player.next")}
-						testID="audio-bar-next"
-						onPress={next}
 					/>
 					<BarButton
 						icon="close"

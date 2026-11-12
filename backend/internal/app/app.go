@@ -493,6 +493,19 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 
+	// Отдельный лимит на ручной ввод кода: 20/мин на IP. Polling
+	// /device/token его не использует и остаётся на 120/мин.
+	deviceApproveLimiter := limiter.New(limiter.Config{
+		Max:          20,
+		Expiration:   time.Minute,
+		KeyGenerator: clientKey,
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
+
 	// Upload limiter — upload-запросы тяжёлые (multipart-тело), их
 	// нужно лимитировать отдельно от auth-роутов.
 	uploadMax := cfg.RateLimiter.UploadMax
@@ -571,8 +584,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Get("/auth/devices", authHandler.ListDevices)
 	api.Delete("/auth/devices/:device_id", authHandler.RevokeDevice)
 	api.Patch("/auth/devices/:device_id", authHandler.RenameDevice)
-	api.Post("/auth/device/inspect", deviceRateLimiter, authHandler.InspectDevice)
-	api.Post("/auth/device/approve", deviceRateLimiter, authHandler.ApproveDevice)
+	api.Post("/auth/device/inspect", deviceApproveLimiter, authHandler.InspectDevice)
+	api.Post("/auth/device/approve", deviceApproveLimiter, authHandler.ApproveDevice)
 
 	// Admin-only middleware for destructive/administrative operations.
 	requireAdmin := middleware.RequireAdmin(userRepo)

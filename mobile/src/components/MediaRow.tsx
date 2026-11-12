@@ -45,7 +45,8 @@ function RowCard({
 	// битую картинку MediaCard заменит заглушкой. Обложка меняется по тому
 	// же URL, поэтому кеш для неё отключён.
 	const hasCover = item.media.cover_url !== "";
-	const hasThumb = item.media.thumbnail_url !== "";
+	const hasThumb =
+		item.media.type !== "audio" && item.media.thumbnail_url !== "";
 	const path = hasCover
 		? coverPath(item.media.id)
 		: hasThumb

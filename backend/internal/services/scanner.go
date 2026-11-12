@@ -432,6 +432,19 @@ func (s *ScannerService) scanFile(ctx context.Context, path string) {
 	s.createNewMedia(ctx, path, info)
 }
 
+// backfillDuration заполняет Duration у неизменившегося файла, не
+// перезаписывая остальные поля и не трогая связи Artists.
+func (s *ScannerService) backfillDuration(ctx context.Context, media *models.Media) {
+	duration := s.metaExtractor.probeDuration(ctx, media.FilePath)
+	if duration <= 0 {
+		return
+	}
+	media.Duration = duration
+	if err := s.mediaRepo.Update(ctx, media); err != nil {
+		log.Printf("Backfill duration for media %d (%s): %v", media.ID, media.FilePath, err)
+	}
+}
+
 // updateChangedFile обновляет запись изменившегося файла (quick hash
 // не совпал).
 func (s *ScannerService) updateChangedFile(ctx context.Context, path string, info os.FileInfo, existing *models.Media) {
@@ -447,6 +460,12 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 		// проиндексированные до появления pHash, иначе навсегда
 		// остались бы невидимыми для дедупа.
 		s.backfillImagePHash(ctx, existing)
+		// У записей, созданных до фикса аудио-длительности, Duration
+		// остался нулевым. Обычный скан их больше не трогает, поэтому
+		// добираем только нулевые значения точечным ffprobe.
+		if existing.Duration == 0 && existing.Type != models.MediaTypeImage {
+			s.backfillDuration(ctx, existing)
+		}
 		return // unchanged
 	}
 

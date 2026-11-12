@@ -1,6 +1,7 @@
-import type { Collection, Media } from "@flux/shared";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { type Collection, formatDuration, type Media } from "@flux/shared";
 import { router } from "expo-router";
-import { Alert, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { useAudioCollections, useVideoCollections } from "../api/collections";
 import {
 	useFavoriteMedia,
@@ -10,11 +11,17 @@ import {
 } from "../api/favorites";
 import { useContinueWatching } from "../api/progress";
 import { t, useLanguage } from "../i18n";
+import { AudioCover } from "../player/AudioCover";
 import { useAudioActions } from "../player/AudioProvider";
 import { useTheme } from "../theme/ThemeProvider";
 import { CollectionRow } from "./CollectionRow";
-import { continueProgressRatio, rootCollections } from "./homeRows";
+import {
+	continueProgressRatio,
+	isRowVisible,
+	rootCollections,
+} from "./homeRows";
 import { MediaRow, type MediaRowItem } from "./MediaRow";
+import { SectionHeader } from "./SectionHeader";
 
 const EMPTY_IDS: ReadonlySet<number> = new Set<number>();
 
@@ -70,7 +77,7 @@ export function VideoHomeRows({ hidden = false }: { hidden?: boolean }) {
 	const roots = rootCollections(collections.data ?? [], "video");
 
 	return (
-		<View style={{ gap: spacing.lg }}>
+		<View style={{ gap: spacing.lg, marginBottom: spacing.lg }}>
 			<MediaRow
 				title={t("continue.watching")}
 				items={continueItems}
@@ -90,6 +97,100 @@ export function VideoHomeRows({ hidden = false }: { hidden?: boolean }) {
 				testID="collections-row"
 				onPressCollection={openCollection}
 			/>
+		</View>
+	);
+}
+
+function AudioHomeList({
+	title,
+	items,
+	testID,
+	onPressItem,
+	onFavoriteItem,
+}: {
+	title: string;
+	items: readonly MediaRowItem[];
+	testID: string;
+	onPressItem: (item: MediaRowItem) => void;
+	onFavoriteItem: (item: MediaRowItem) => void;
+}) {
+	const { colors, spacing } = useTheme();
+	if (!isRowVisible(items)) return null;
+	return (
+		<View style={{ gap: spacing.sm }} testID={testID}>
+			<SectionHeader
+				title={title}
+				titleStyle={{ fontSize: 16, fontWeight: "700" }}
+			/>
+			<View style={{ gap: spacing.xs }}>
+				{items.map((item) => (
+					<View
+						key={item.media.id}
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing.sm,
+							padding: spacing.sm,
+							borderWidth: 1,
+							borderColor: colors.border,
+							borderRadius: 10,
+							backgroundColor: colors.surface,
+						}}
+					>
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel={item.media.title}
+							onPress={() => onPressItem(item)}
+							style={{
+								flex: 1,
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing.sm,
+							}}
+						>
+							<AudioCover media={item.media} size={48} />
+							<View style={{ flex: 1 }}>
+								<Text
+									numberOfLines={1}
+									style={{
+										color: colors.text,
+										fontSize: 15,
+										fontWeight: "600",
+									}}
+								>
+									{item.media.title}
+								</Text>
+								<Text
+									numberOfLines={1}
+									style={{ color: colors.textMuted, fontSize: 12 }}
+								>
+									{item.media.artists.map((artist) => artist.name).join(", ") ||
+										t("audio.player.unknownArtist")}
+								</Text>
+							</View>
+							<Text style={{ color: colors.textMuted, fontSize: 12 }}>
+								{item.media.duration > 0
+									? formatDuration(item.media.duration)
+									: "—"}
+							</Text>
+						</Pressable>
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel={
+								item.isFavorite ? t("media.unfavorite") : t("media.favorite")
+							}
+							onPress={() => onFavoriteItem(item)}
+							hitSlop={8}
+						>
+							<Ionicons
+								name={item.isFavorite ? "heart" : "heart-outline"}
+								size={20}
+								color={item.isFavorite ? colors.favorite : colors.textMuted}
+							/>
+						</Pressable>
+					</View>
+				))}
+			</View>
 		</View>
 	);
 }
@@ -142,14 +243,14 @@ export function AudioHomeRows({ hidden = false }: { hidden?: boolean }) {
 
 	return (
 		<View style={{ gap: spacing.lg }}>
-			<MediaRow
+			<AudioHomeList
 				title={t("continue.listening")}
 				items={continueItems}
 				testID="continue-row"
 				onPressItem={(item) => play(item.media)}
 				onFavoriteItem={onToggleFavorite}
 			/>
-			<MediaRow
+			<AudioHomeList
 				title={t("favorites.title")}
 				items={favoriteItems}
 				testID="favorite-row"

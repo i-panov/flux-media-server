@@ -54,6 +54,10 @@ function QrGrid({ value }: { value: string }) {
 
 type Status = "loading" | "waiting" | "expired" | "error" | "approved";
 
+function formatCode(code: string): string {
+	return code.length > 3 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+}
+
 export function TVDeviceLogin({ onUseOtp }: { onUseOtp: () => void }) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
@@ -187,7 +191,7 @@ export function TVDeviceLogin({ onUseOtp }: { onUseOtp: () => void }) {
 			<Text style={{ color: colors.textMuted }}>{t("auth.qrHint")}</Text>
 			<QrGrid value={data.verification_uri_complete} />
 			<Text style={[styles.code, { color: colors.text }]}>
-				{t("auth.qrCode")} {data.user_code}
+				{t("auth.qrCode")} {formatCode(data.user_code)}
 			</Text>
 			<Text style={{ color: colors.textMuted }}>{data.verification_uri}</Text>
 			{button(retryLabel, () => void start(), "tv-qr-new")}

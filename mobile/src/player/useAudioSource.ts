@@ -3,6 +3,7 @@ import { useEventListener } from "expo";
 import type { AudioMetadata, AudioPlayer, AudioStatus } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type AuthSource, authSource, streamPath } from "../media/source";
+import { lockScreenArtwork } from "./lockScreenArtwork";
 
 export interface AudioSourceOptions {
 	/**
@@ -101,6 +102,7 @@ function playIfWanted(player: AudioPlayer, wanted: () => boolean): void {
 
 // Источник аудио живёт отдельно от очереди: replace меняет трек, а 401
 // обрабатывается одним preflight-запросом.
+// eslint-disable-next-line max-lines-per-function -- источник, preflight и restore позиции.
 export function useAudioSource(
 	player: AudioPlayer,
 	getDownloadedPath: (mediaId: number) => string | null = () => null,
@@ -170,7 +172,20 @@ export function useAudioSource(
 			try {
 				// Ошибка lock screen (нет разрешения/платформы) не должна
 				// помечать источник сломанным: звук при этом уже загружен.
-				player.setActiveForLockScreen(true, audioMetadataFor(media));
+				const artwork = await lockScreenArtwork(media);
+				player.setActiveForLockScreen(
+					true,
+					{
+						...audioMetadataFor(media),
+						...(artwork === undefined ? {} : { artworkUrl: artwork }),
+					},
+					{
+						showSeekForward: true,
+						showSeekBackward: true,
+						seekForwardIntervalSeconds: 10,
+						seekBackwardIntervalSeconds: 10,
+					},
+				);
 			} catch {
 				// Играем без lock screen.
 			}

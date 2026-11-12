@@ -30,8 +30,8 @@ export default function ActivateScreen() {
 	const [done, setDone] = useState(false);
 
 	const inspect = useCallback(async (value: string) => {
-		const normalized = value.trim().toUpperCase();
-		if (normalized === "") return;
+		const normalized = value.replace(/\D/g, "").slice(0, 6);
+		if (normalized.length !== 6) return;
 		setLoading(true);
 		setError(null);
 		try {
@@ -50,11 +50,17 @@ export default function ActivateScreen() {
 		}
 	}, [inspect, params.code]);
 
+	const codeDigits = code.replace(/\D/g, "").slice(0, 6);
+	const displayCode =
+		codeDigits.length > 3
+			? `${codeDigits.slice(0, 3)} ${codeDigits.slice(3)}`
+			: codeDigits;
+
 	const approve = async () => {
 		setLoading(true);
 		setError(null);
 		try {
-			await approveDeviceCode(code.trim().toUpperCase());
+			await approveDeviceCode(codeDigits);
 			setDone(true);
 		} catch {
 			setError(t("auth.activateInvalid"));
@@ -107,9 +113,14 @@ export default function ActivateScreen() {
 			) : (
 				<View style={{ gap: spacing.md }}>
 					<TextInput
-						value={code}
-						onChangeText={setCode}
-						autoCapitalize="characters"
+						value={displayCode}
+						onChangeText={(value) =>
+							setCode(value.replace(/\D/g, "").slice(0, 6))
+						}
+						keyboardType="number-pad"
+						inputMode="numeric"
+						autoComplete="one-time-code"
+						maxLength={7}
 						placeholder={t("auth.activateCode")}
 						placeholderTextColor={colors.textMuted}
 						style={[

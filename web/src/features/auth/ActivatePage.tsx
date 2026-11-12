@@ -19,6 +19,9 @@ import {
 	useSession,
 } from "../../api/session";
 
+const HASH_PREFIX = /^#/;
+const NON_DIGITS = /\D/g;
+
 export function ActivatePage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
@@ -26,26 +29,41 @@ export function ActivatePage() {
 	const session = useSession();
 	const inspect = useInspectDeviceCodeMutation();
 	const approve = useApproveDeviceCodeMutation();
-	const [code, setCode] = useState(search.code ?? "");
+	const [code, setCode] = useState("");
 	const [done, setDone] = useState(false);
 	const inspectedRef = useRef(false);
 
 	const runInspect = useCallback(
 		(value: string) => {
-			const normalized = value.trim().toUpperCase();
-			if (normalized === "") return;
+			const normalized = value.replace(NON_DIGITS, "").slice(0, 6);
+			if (normalized.length !== 6) return;
 			inspect.mutate(normalized);
 		},
 		[inspect],
 	);
 
+	// Код приходит во фрагменте (#code=482913): он не уходит на сервер
+	// при загрузке страницы. Query оставлен для старых ссылок.
 	useEffect(() => {
 		if (inspectedRef.current) return;
-		if (search.code !== undefined && search.code !== "") {
-			inspectedRef.current = true;
-			runInspect(search.code);
-		}
+		const hash = new URLSearchParams(
+			window.location.hash.replace(HASH_PREFIX, ""),
+		);
+		const fromHash = hash.get("code") ?? "";
+		const raw = fromHash === "" ? (search.code ?? "") : fromHash;
+		const normalized = raw.replace(NON_DIGITS, "").slice(0, 6);
+		if (normalized.length !== 6) return;
+		inspectedRef.current = true;
+		setCode(normalized);
+		runInspect(normalized);
+		window.history.replaceState(null, "", window.location.pathname);
 	}, [runInspect, search.code]);
+
+	const codeDigits = code.replace(/\D/g, "").slice(0, 6);
+	const displayCode =
+		codeDigits.length > 3
+			? `${codeDigits.slice(0, 3)} ${codeDigits.slice(3)}`
+			: codeDigits;
 
 	if (session.data === null || session.data === undefined) {
 		return (
@@ -96,7 +114,7 @@ export function ActivatePage() {
 								>
 									{t("auth.activateDone")}
 								</Button>
-								<Code>{code.trim().toUpperCase()}</Code>
+								<Code>{displayCode}</Code>
 							</Group>
 						</>
 					) : (
@@ -110,10 +128,17 @@ export function ActivatePage() {
 								<Stack gap="sm">
 									<TextInput
 										label={t("auth.activateCode")}
-										value={code}
-										onChange={(event) => setCode(event.currentTarget.value)}
-										autoCapitalize="characters"
-										maxLength={12}
+										value={displayCode}
+										onChange={(event) =>
+											setCode(
+												event.currentTarget.value
+													.replace(/\D/g, "")
+													.slice(0, 6),
+											)
+										}
+										inputMode="numeric"
+										autoComplete="one-time-code"
+										maxLength={7}
 										required
 									/>
 									<Button type="submit" loading={inspect.isPending}>
@@ -134,7 +159,7 @@ export function ActivatePage() {
 											color="green"
 											loading={approve.isPending}
 											onClick={() =>
-												approve.mutate(code.trim().toUpperCase(), {
+												approve.mutate(codeDigits, {
 													onSuccess: () => setDone(true),
 												})
 											}

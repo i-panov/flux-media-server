@@ -49,7 +49,22 @@ func (e *MetadataExtractor) ExtractFromFileContext(ctx context.Context, path str
 
 	switch {
 	case audioExtensions[ext]:
-		return e.extractAudio(ctx, path)
+		meta := e.extractAudio(ctx, path)
+		if meta == nil {
+			meta = &FileMetadata{}
+		}
+		// ID3/Vorbis не содержат длительности. В сканере проба уже есть;
+		// для upload/внешних вызовов без неё делаем отдельный ffprobe.
+		if len(probeData) > 0 && probeData[0] != nil && probeData[0].Format != nil {
+			if dur := probeData[0].Format.Duration(); dur > 0 {
+				meta.Duration = int(dur.Seconds())
+			}
+		} else if meta.Duration == 0 {
+			if dur := e.probeDuration(ctx, path); dur > 0 {
+				meta.Duration = dur
+			}
+		}
+		return meta
 	case videoExtensions[ext], imageExtensions[ext]:
 		// Картинкам из пробы нужны только Width/Height — их отдаёт тот
 		// же поток, что и у видео. Длительность у картинки нулевая.
@@ -106,6 +121,21 @@ func (e *MetadataExtractor) extractVideo(ctx context.Context, path string) *File
 	}
 
 	return extractVideoFromData(data)
+}
+
+// probeDuration — ffprobe только за длительностью. Нужен аудио при
+// вызовах без готовой probeData (upload, backfill старых записей).
+func (e *MetadataExtractor) probeDuration(ctx context.Context, path string) int {
+	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	data, err := ffprobe.ProbeURL(probeCtx, path)
+	if err != nil || data == nil || data.Format == nil {
+		return 0
+	}
+	if dur := data.Format.Duration(); dur > 0 {
+		return int(dur.Seconds())
+	}
+	return 0
 }
 
 // extractVideoFromData builds FileMetadata from existing ffprobe data.

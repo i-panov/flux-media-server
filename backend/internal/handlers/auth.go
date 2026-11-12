@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -142,18 +143,31 @@ func (h *AuthHandler) clearSessionCookies(c *fiber.Ctx) {
 	}
 }
 
-const userCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-
+// randomUserCode возвращает 6 цифр. 24-битное значение с отбраковкой
+// больше миллиона даёт равномерное распределение без modulo-смещения.
 func randomUserCode() (string, error) {
-	raw := make([]byte, 8)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
+	raw := make([]byte, 4)
+	for {
+		if _, err := rand.Read(raw); err != nil {
+			return "", err
+		}
+		value := binary.BigEndian.Uint32(raw) & 0xFFFFFF
+		if value < 1_000_000 {
+			return fmt.Sprintf("%06d", value), nil
+		}
 	}
-	out := make([]byte, len(raw))
-	for i, b := range raw {
-		out[i] = userCodeAlphabet[int(b)%len(userCodeAlphabet)]
+}
+
+// normalizeUserCode принимает код с пробелами/дефисами и цифровую
+// клавиатуру: "482 913" -> "482913".
+func normalizeUserCode(value string) string {
+	var digits strings.Builder
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			digits.WriteRune(r)
+		}
 	}
-	return string(out), nil
+	return digits.String()
 }
 
 func randomDeviceCode() (string, error) {
@@ -291,10 +305,6 @@ func (h *AuthHandler) DeviceCode(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate device code")
 	}
-	userCode, err := randomUserCode()
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate user code")
-	}
 	expiresIn := h.config.Auth.CodeExpiry
 	if expiresIn < 120 {
 		expiresIn = 120
@@ -309,16 +319,31 @@ func (h *AuthHandler) DeviceCode(c *fiber.Ctx) error {
 	interval := 3
 	// Ленивая уборка: отдельный воркер для короткоживущих кодов избыточен.
 	_ = h.deviceAuthRepo.DeleteExpired(c.UserContext())
-	_, err = h.deviceAuthRepo.Create(
-		c.UserContext(),
-		repository.HashDeviceCode(deviceCode),
-		repository.HashDeviceCode(userCode),
-		deviceID,
-		name,
-		platform,
-		time.Now().Add(time.Duration(expiresIn)*time.Second),
-		interval,
-	)
+	// 6 цифр дают заметно больше коллизий, чем прежние 8 символов.
+	// user_code_hash unique: при совпадении пробуем ещё раз, не отдавая 500.
+	var userCode string
+	for attempt := 0; attempt < 8; attempt++ {
+		userCode, err = randomUserCode()
+		if err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to generate user code")
+		}
+		_, err = h.deviceAuthRepo.Create(
+			c.UserContext(),
+			repository.HashDeviceCode(deviceCode),
+			repository.HashDeviceCode(userCode),
+			deviceID,
+			name,
+			platform,
+			time.Now().Add(time.Duration(expiresIn)*time.Second),
+			interval,
+		)
+		if err == nil {
+			break
+		}
+		if !strings.Contains(strings.ToLower(err.Error()), "unique") {
+			break
+		}
+	}
 	if err != nil {
 		log.Printf("device code: create: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create device code")
@@ -329,7 +354,7 @@ func (h *AuthHandler) DeviceCode(c *fiber.Ctx) error {
 		"device_code":               deviceCode,
 		"user_code":                 userCode,
 		"verification_uri":          verification,
-		"verification_uri_complete": verification + "?code=" + url.QueryEscape(userCode),
+		"verification_uri_complete": verification + "#code=" + url.QueryEscape(userCode),
 		"expires_in":                expiresIn,
 		"interval":                  interval,
 	})
@@ -347,9 +372,12 @@ func (h *AuthHandler) InspectDevice(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
-	code := strings.ToUpper(strings.TrimSpace(req.UserCode))
+	code := normalizeUserCode(req.UserCode)
 	if code == "" {
 		return response.Error(c, fiber.StatusBadRequest, "user_code is required")
+	}
+	if len(code) != 6 {
+		return response.Error(c, fiber.StatusBadRequest, "user_code must be 6 digits")
 	}
 	record, err := h.deviceAuthRepo.FindPendingByUserCode(c.UserContext(), repository.HashDeviceCode(code))
 	if err != nil {
@@ -377,9 +405,12 @@ func (h *AuthHandler) ApproveDevice(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
-	code := strings.ToUpper(strings.TrimSpace(req.UserCode))
+	code := normalizeUserCode(req.UserCode)
 	if code == "" {
 		return response.Error(c, fiber.StatusBadRequest, "user_code is required")
+	}
+	if len(code) != 6 {
+		return response.Error(c, fiber.StatusBadRequest, "user_code must be 6 digits")
 	}
 	record, err := h.deviceAuthRepo.Approve(c.UserContext(), repository.HashDeviceCode(code), userID)
 	if err != nil {

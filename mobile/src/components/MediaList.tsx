@@ -20,6 +20,7 @@ import {
 	excludeMediaIds,
 	isEmptyBecauseOfExclusions,
 } from "../media/visibleMedia";
+import { AudioCover } from "../player/AudioCover";
 import { useTheme } from "../theme/ThemeProvider";
 import { tvFocusStyle } from "../tv/focus";
 import { isTV } from "../tv/profile";
@@ -227,6 +228,7 @@ export function MediaList({
 						tvFocusStyle(focused, colors.accent),
 					]}
 				>
+					<AudioCover media={item} size={48} />
 					<View style={styles.info}>
 						<Text
 							testID={`media-row-${item.id}-title`}
