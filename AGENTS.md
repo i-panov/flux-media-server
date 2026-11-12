@@ -174,6 +174,10 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - `core/` — media-схемы, fetch, format.
 - `query.ts`, `storage.ts` — общий query client и `KeyValueStore`.
 
+## Режим файловой системы
+
+Если сессия запущена в read-only, **запрещено пытаться изменять файлы** любыми инструментами: `edit`, `write`, shell-команды, перенаправления, генераторы. Нельзя «проверять, сработает ли» запись и нельзя обходить отказ. Любая правка — только после явного переключения в workspace-write.
+
 ## Ключевые паттерны
 
 - Backend-хендлеры принимают `*fiber.Ctx`, репозитории — `c.UserContext()`.
