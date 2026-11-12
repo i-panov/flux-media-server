@@ -1,6 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Media, MediaList as MediaListData } from "@flux/shared";
-import { formatDuration } from "@flux/shared";
 import type {
 	InfiniteData,
 	UseInfiniteQueryResult,
@@ -245,9 +244,6 @@ export function MediaList({
 						</Text>
 					</View>
 					<RowDownloadIndicator mediaId={item.id} />
-					<Text style={[styles.muted, { color: colors.textMuted }]}>
-						{item.duration > 0 ? formatDuration(item.duration) : "—"}
-					</Text>
 					{onMenuItem !== undefined && (
 						<Pressable
 							accessibilityRole="button"

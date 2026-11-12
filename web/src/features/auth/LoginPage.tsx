@@ -254,6 +254,7 @@ export function LoginPage() {
 										label={t("auth.code")}
 										inputMode="numeric"
 										autoComplete="one-time-code"
+										autoFocus
 										required
 										value={code}
 										onChange={(event) => setCode(event.currentTarget.value)}
@@ -288,6 +289,7 @@ export function LoginPage() {
 										placeholder={t("auth.emailPlaceholder")}
 										type="email"
 										autoComplete="email"
+										autoFocus
 										required
 										value={email}
 										onChange={(event) => setEmail(event.currentTarget.value)}

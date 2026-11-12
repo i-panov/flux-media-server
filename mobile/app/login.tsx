@@ -136,6 +136,7 @@ export default function LoginScreen() {
 							onBlur={() => setFocusedField(null)}
 							keyboardType="number-pad"
 							autoComplete="one-time-code"
+							autoFocus
 							placeholderTextColor={colors.textMuted}
 						/>
 						{debugCode !== null && (

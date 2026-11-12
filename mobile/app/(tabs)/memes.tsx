@@ -1,5 +1,5 @@
 import type { Media } from "@flux/shared";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { useImageList } from "../../src/api/media";
@@ -16,6 +16,7 @@ import { thumbPath } from "../../src/media/source";
 import { useAuthImageSource } from "../../src/media/useAuthImageSource";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
 import { useTheme } from "../../src/theme/ThemeProvider";
+import { isTV } from "../../src/tv/profile";
 
 const NUMERIC_TITLE = /^\d+$/;
 
@@ -39,7 +40,7 @@ function MemeTile({ media, onMenu }: { media: Media; onMenu: () => void }) {
 	);
 }
 
-export default function MemesScreen() {
+function MemesContent() {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const [query, setQuery] = useState("");
@@ -117,6 +118,10 @@ export default function MemesScreen() {
 			/>
 		</Screen>
 	);
+}
+
+export default function MemesScreen() {
+	return isTV ? <Redirect href="/video" /> : <MemesContent />;
 }
 
 const styles = StyleSheet.create({

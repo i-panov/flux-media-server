@@ -48,7 +48,6 @@ export function useCollectionItemActions({
 			const queue = media.filter((entry) => entry.type === "audio");
 			const index = queue.findIndex((entry) => entry.id === item.id);
 			playQueue(queue, Math.max(index, 0));
-			router.push("/player");
 			return;
 		}
 		if (item.type === "video") {

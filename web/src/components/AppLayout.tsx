@@ -166,7 +166,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 	const { data: session } = useSession();
 	const { logout, isPending: logoutPending } = useLogout();
 	const miniPlayerVisible = useMiniPlayerVisible();
-	const { capabilities } = useTVMode();
+	const { capabilities, tvMode } = useTVMode();
 	const { targetRef: logoutRef } = useTVFocusable<HTMLButtonElement>(
 		"header-logout",
 		clickNode,
@@ -191,7 +191,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
 	const isAdmin = session?.is_admin === true;
 	// В ТВ админ-раздел только для чтения: ссылку не показываем.
 	const desktopExtra: NavItemConfig[] =
-		isAdmin && capabilities.canAccessAdmin ? [ADMIN_NAV] : [];
+		!tvMode && isAdmin && capabilities.canAccessAdmin ? [ADMIN_NAV] : [];
+	const visibleMainNav = tvMode
+		? MAIN_NAV.filter((item) => item.to !== "/memes")
+		: MAIN_NAV;
 	// Конфиг навбара задаёт отступ Main даже когда самой панели нет:
 	// на /login без сессии 240 px слева сдвигали карточку входа.
 	const navbar = authed
@@ -246,7 +249,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 				>
 					<AppShell.Section grow>
 						<nav className="flex flex-col gap-1" aria-label={t("nav.main")}>
-							{MAIN_NAV.map((item) => (
+							{visibleMainNav.map((item) => (
 								<DesktopNavItem key={item.to} item={item} />
 							))}
 							{desktopExtra.map((item) => (
@@ -291,9 +294,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
 					<div className="h-full md:hidden">
 						<Group h="100%" gap={0} wrap="nowrap">
 							<nav className="flex h-full w-full" aria-label={t("nav.mobile")}>
-								{[...MAIN_NAV, ...desktopExtra, SETTINGS_NAV].map((item) => (
-									<MobileNavItem key={item.to} item={item} />
-								))}
+								{[...visibleMainNav, ...desktopExtra, SETTINGS_NAV].map(
+									(item) => (
+										<MobileNavItem key={item.to} item={item} />
+									),
+								)}
 							</nav>
 						</Group>
 					</div>

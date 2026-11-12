@@ -18,6 +18,7 @@ import {
 	type RefCallback,
 	useCallback,
 	useEffect,
+	useState,
 } from "react";
 import {
 	TV_FOCUS_KEY_ATTRIBUTE,
@@ -55,9 +56,13 @@ export function useTVFocusable<T extends HTMLElement>(
 } {
 	const { tvMode } = useTVMode();
 	const secondary = options?.secondary === true;
+	// Регистрируем focusable только после появления DOM-узла. Иначе
+	// norigin добавляет компонент с node: null, координаты пустые, и
+	// после перехода фокус теряется.
+	const [nodeReady, setNodeReady] = useState(false);
 	const { ref, focused } = useFocusable<object, T>({
 		focusKey,
-		focusable: tvMode,
+		focusable: tvMode && nodeReady,
 		onEnterPress:
 			onEnterPress === undefined
 				? undefined
@@ -82,8 +87,10 @@ export function useTVFocusable<T extends HTMLElement>(
 			// eslint-disable-next-line react-hooks/immutability -- callback-ref синхронизирует внутренний ref useFocusable, чтобы spatial видел поздний DOM-узел.
 			(ref as { current: T | null }).current = node;
 			if (node === null) {
+				setNodeReady(false);
 				return;
 			}
+			setNodeReady(true);
 			if (tvMode) {
 				node.setAttribute(TV_FOCUS_KEY_ATTRIBUTE, focusKey);
 				node.toggleAttribute(TV_FOCUS_SECONDARY_ATTRIBUTE, secondary);

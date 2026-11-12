@@ -15,7 +15,11 @@ const TV_READ_ONLY_PATHS: ReadonlySet<string> = new Set([
 	"/upload",
 	"/trash",
 	"/admin",
+	"/memes",
 ]);
+
+// Раздел мемов вместе с деталями: на ТВ не показываем.
+const TV_READ_ONLY_PREFIXES = ["/memes/"];
 
 function normalizePathname(pathname: string): string {
 	if (pathname === "") {
@@ -27,7 +31,15 @@ function normalizePathname(pathname: string): string {
 }
 
 export function isTVReadOnlyPath(pathname: string): boolean {
-	return TV_READ_ONLY_PATHS.has(normalizePathname(pathname));
+	const normalized = normalizePathname(pathname);
+	return (
+		TV_READ_ONLY_PATHS.has(normalized) ||
+		TV_READ_ONLY_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+	);
+}
+
+export function tvRouteRedirectTarget(pathname: string): "/" | "/video" {
+	return normalizePathname(pathname).startsWith("/memes") ? "/video" : "/";
 }
 
 // Тот же приоритет, что и у TVModeContext: URL, сохранённый выбор,

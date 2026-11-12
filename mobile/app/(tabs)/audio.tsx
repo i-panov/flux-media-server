@@ -42,7 +42,7 @@ export default function AudioScreen() {
 	// их до того, как debounce активирует фильтр. hidden оставляет ряды
 	// смонтированными, чтобы сброс поиска не поднимал запросы заново.
 	const header = useMemo(
-		() => <AudioHomeRows hidden={searching} />,
+		() => <AudioHomeRows hidden={searching} onMenuItem={setActionsMedia} />,
 		[searching],
 	);
 

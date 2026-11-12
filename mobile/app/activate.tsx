@@ -120,6 +120,7 @@ export default function ActivateScreen() {
 						keyboardType="number-pad"
 						inputMode="numeric"
 						autoComplete="one-time-code"
+						autoFocus
 						maxLength={7}
 						placeholder={t("auth.activateCode")}
 						placeholderTextColor={colors.textMuted}

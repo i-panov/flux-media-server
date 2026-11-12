@@ -22,6 +22,16 @@ import {
 const HASH_PREFIX = /^#/;
 const NON_DIGITS = /\D/g;
 
+function initialCode(searchCode?: string): string {
+	if (typeof window === "undefined") return "";
+	const hash = new URLSearchParams(
+		window.location.hash.replace(HASH_PREFIX, ""),
+	);
+	const fromHash = hash.get("code") ?? "";
+	const raw = fromHash === "" ? (searchCode ?? "") : fromHash;
+	return raw.replace(NON_DIGITS, "").slice(0, 6);
+}
+
 export function ActivatePage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
@@ -29,7 +39,7 @@ export function ActivatePage() {
 	const session = useSession();
 	const inspect = useInspectDeviceCodeMutation();
 	const approve = useApproveDeviceCodeMutation();
-	const [code, setCode] = useState("");
+	const [code, setCode] = useState(() => initialCode(search.code));
 	const [done, setDone] = useState(false);
 	const inspectedRef = useRef(false);
 
@@ -43,21 +53,16 @@ export function ActivatePage() {
 	);
 
 	// Код приходит во фрагменте (#code=482913): он не уходит на сервер
-	// при загрузке страницы. Query оставлен для старых ссылок.
+	// при загрузке страницы. Query оставлен для старых ссылок. Начальное
+	// значение уже прочитано из hash, поэтому здесь только запуск проверки.
 	useEffect(() => {
 		if (inspectedRef.current) return;
-		const hash = new URLSearchParams(
-			window.location.hash.replace(HASH_PREFIX, ""),
-		);
-		const fromHash = hash.get("code") ?? "";
-		const raw = fromHash === "" ? (search.code ?? "") : fromHash;
-		const normalized = raw.replace(NON_DIGITS, "").slice(0, 6);
+		const normalized = code.replace(NON_DIGITS, "").slice(0, 6);
 		if (normalized.length !== 6) return;
 		inspectedRef.current = true;
-		setCode(normalized);
 		runInspect(normalized);
 		window.history.replaceState(null, "", window.location.pathname);
-	}, [runInspect, search.code]);
+	}, [code, runInspect]);
 
 	const codeDigits = code.replace(/\D/g, "").slice(0, 6);
 	const displayCode =
@@ -138,6 +143,7 @@ export function ActivatePage() {
 										}
 										inputMode="numeric"
 										autoComplete="one-time-code"
+										autoFocus
 										maxLength={7}
 										required
 									/>

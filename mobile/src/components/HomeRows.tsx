@@ -1,12 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { type Collection, formatDuration, type Media } from "@flux/shared";
+import type { Collection, Media } from "@flux/shared";
 import { router } from "expo-router";
 import { Alert, Pressable, Text, View } from "react-native";
 import { useAudioCollections, useVideoCollections } from "../api/collections";
 import {
 	useFavoriteMedia,
 	useFavoriteMediaIds,
-	useToggleAudioFavorite,
 	useToggleVideoFavorite,
 } from "../api/favorites";
 import { useContinueWatching } from "../api/progress";
@@ -106,13 +105,13 @@ function AudioHomeList({
 	items,
 	testID,
 	onPressItem,
-	onFavoriteItem,
+	onMenuItem,
 }: {
 	title: string;
 	items: readonly MediaRowItem[];
 	testID: string;
 	onPressItem: (item: MediaRowItem) => void;
-	onFavoriteItem: (item: MediaRowItem) => void;
+	onMenuItem: (item: MediaRowItem) => void;
 }) {
 	const { colors, spacing } = useTheme();
 	if (!isRowVisible(items)) return null;
@@ -168,24 +167,18 @@ function AudioHomeList({
 										t("audio.player.unknownArtist")}
 								</Text>
 							</View>
-							<Text style={{ color: colors.textMuted, fontSize: 12 }}>
-								{item.media.duration > 0
-									? formatDuration(item.media.duration)
-									: "—"}
-							</Text>
 						</Pressable>
 						<Pressable
 							accessibilityRole="button"
-							accessibilityLabel={
-								item.isFavorite ? t("media.unfavorite") : t("media.favorite")
-							}
-							onPress={() => onFavoriteItem(item)}
+							accessibilityLabel={t("media.actions")}
+							onPress={() => onMenuItem(item)}
 							hitSlop={8}
+							testID={`audio-home-${item.media.id}-menu`}
 						>
 							<Ionicons
-								name={item.isFavorite ? "heart" : "heart-outline"}
+								name="ellipsis-horizontal"
 								size={20}
-								color={item.isFavorite ? colors.favorite : colors.textMuted}
+								color={colors.textMuted}
 							/>
 						</Pressable>
 					</View>
@@ -195,14 +188,19 @@ function AudioHomeList({
 	);
 }
 
-export function AudioHomeRows({ hidden = false }: { hidden?: boolean }) {
+export function AudioHomeRows({
+	hidden = false,
+	onMenuItem,
+}: {
+	hidden?: boolean;
+	onMenuItem: (media: Media) => void;
+}) {
 	useLanguage();
 	const { spacing } = useTheme();
 	const continueQuery = useContinueWatching("audio");
 	const favorites = useFavoriteMedia("audio");
 	const favoriteIds = useFavoriteMediaIds("audio");
 	const collections = useAudioCollections();
-	const toggleFavorite = useToggleAudioFavorite();
 	const { playQueue } = useAudioActions();
 	const favoriteSet = favoriteIds.data ?? EMPTY_IDS;
 
@@ -212,18 +210,6 @@ export function AudioHomeRows({ hidden = false }: { hidden?: boolean }) {
 
 	const play = (media: Media) => {
 		playQueue([media], 0);
-		router.push("/player");
-	};
-
-	const onToggleFavorite = (item: MediaRowItem) => {
-		toggleFavorite.mutate(
-			{
-				mediaId: item.media.id,
-				favorite: item.isFavorite === true,
-				media: item.media,
-			},
-			{ onError: () => Alert.alert(t("audio.player.favoriteError")) },
-		);
 	};
 
 	const continueItems: MediaRowItem[] = (continueQuery.data ?? []).map(
@@ -248,14 +234,14 @@ export function AudioHomeRows({ hidden = false }: { hidden?: boolean }) {
 				items={continueItems}
 				testID="continue-row"
 				onPressItem={(item) => play(item.media)}
-				onFavoriteItem={onToggleFavorite}
+				onMenuItem={(item) => onMenuItem(item.media)}
 			/>
 			<AudioHomeList
 				title={t("favorites.title")}
 				items={favoriteItems}
 				testID="favorite-row"
 				onPressItem={(item) => play(item.media)}
-				onFavoriteItem={onToggleFavorite}
+				onMenuItem={(item) => onMenuItem(item.media)}
 			/>
 			<CollectionRow
 				collections={roots}
