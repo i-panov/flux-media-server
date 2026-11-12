@@ -113,7 +113,9 @@ export function DeviceQrLogin() {
 			</Text>
 			<Group gap="xs">
 				<Text size="sm">{t("auth.qrCode")}</Text>
-				<Code fz="lg">{data.user_code}</Code>
+				<Code fz="lg" data-testid="device-user-code">
+					{data.user_code}
+				</Code>
 			</Group>
 			<Text size="xs" c="dimmed" ta="center">
 				{data.verification_uri}

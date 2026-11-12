@@ -9,6 +9,7 @@ const PORT = Number(process.env.FAKE_BACKEND_PORT ?? "18080");
 const issuedAccess = new Set();
 const issuedRefresh = new Set();
 let counter = 0;
+const deviceCodes = new Map();
 
 function sameOrigin(req) {
 	const origin = req.headers.origin ?? "";
@@ -36,6 +37,11 @@ function parseCookies(req) {
 		}
 	}
 	return result;
+}
+
+function isAuthed(req) {
+	const cookies = parseCookies(req);
+	return issuedAccess.has(cookies.flux_access ?? "");
 }
 
 function readBody(req) {
@@ -148,6 +154,98 @@ const server = createServer(async (req, res) => {
 			"flux_access=; Path=/; Max-Age=0",
 			"flux_refresh=; Path=/api/auth; Max-Age=0",
 		]);
+		return;
+	}
+
+	if (req.method === "POST" && url.pathname === "/api/auth/device/code") {
+		const userCode = "654321";
+		const deviceCode = `fake-device-${counter + 1}`;
+		deviceCodes.set(deviceCode, {
+			userCode,
+			deviceName: "Fake TV",
+			platform: "web-tv",
+			approved: false,
+		});
+		json(res, 200, {
+			device_code: deviceCode,
+			user_code: userCode,
+			verification_uri: "http://127.0.0.1:5174/activate",
+			verification_uri_complete: `http://127.0.0.1:5174/activate#code=${userCode}`,
+			expires_in: 300,
+			interval: 1,
+		});
+		return;
+	}
+
+	if (req.method === "POST" && url.pathname === "/api/auth/device/inspect") {
+		if (!isAuthed(req)) {
+			json(res, 401, { error: "Unauthorized" });
+			return;
+		}
+		const body = JSON.parse(await readBody(req));
+		const userCode = String(body.user_code ?? "").replace(/\D/g, "");
+		const entry = [...deviceCodes.entries()].find(
+			([, value]) => value.userCode === userCode,
+		);
+		if (entry === undefined) {
+			json(res, 404, { error: "Code not found" });
+			return;
+		}
+		json(res, 200, {
+			device_name: entry[1].deviceName,
+			platform: entry[1].platform,
+			expires_at: new Date(Date.now() + 300_000).toISOString(),
+			current: false,
+		});
+		return;
+	}
+
+	if (req.method === "POST" && url.pathname === "/api/auth/device/approve") {
+		if (!isAuthed(req)) {
+			json(res, 401, { error: "Unauthorized" });
+			return;
+		}
+		const body = JSON.parse(await readBody(req));
+		const userCode = String(body.user_code ?? "").replace(/\D/g, "");
+		const entry = [...deviceCodes.entries()].find(
+			([, value]) => value.userCode === userCode,
+		);
+		if (entry === undefined) {
+			json(res, 404, { error: "Code not found" });
+			return;
+		}
+		entry[1].approved = true;
+		json(res, 200, {
+			approved: true,
+			device_name: entry[1].deviceName,
+			platform: entry[1].platform,
+		});
+		return;
+	}
+
+	if (req.method === "POST" && url.pathname === "/api/auth/device/token") {
+		const body = JSON.parse(await readBody(req));
+		const entry = deviceCodes.get(String(body.device_code ?? ""));
+		if (entry === undefined) {
+			json(res, 400, { status: "invalid_grant" });
+			return;
+		}
+		if (!entry.approved) {
+			json(res, 200, { status: "pending", interval: 1 });
+			return;
+		}
+		const { access, refresh } = issuePair();
+		json(
+			res,
+			200,
+			{
+				status: "ok",
+				token: access,
+				refresh_token: refresh,
+				user: { id: 1, email: "user@example.com", is_admin: false },
+			},
+			sessionCookies(access, refresh),
+		);
 		return;
 	}
 

@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 // иначе можно подхватить чужой dev без VITE_API_PROXY и тест пойдёт
 // мимо fake-backend.
 const vitePort = 5174;
-const fakeBackendPort = 18080;
+const fakeBackendPort = 18081;
 
 export default defineConfig({
 	testDir: "./e2e",
