@@ -14,6 +14,7 @@ const (
 // SHA-256-хеши, поэтому утечка базы не даёт завершить чужой вход.
 type DeviceAuth struct {
 	ID              uint       `json:"id" gorm:"primaryKey"`
+	DeviceID        string     `json:"device_id" gorm:"index;size:64"`
 	DeviceCodeHash  string     `json:"-" gorm:"uniqueIndex;size:64"`
 	UserCodeHash    string     `json:"-" gorm:"uniqueIndex;size:64"`
 	DeviceName      string     `json:"device_name" gorm:"size:120"`

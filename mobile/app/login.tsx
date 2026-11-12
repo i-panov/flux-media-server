@@ -16,6 +16,7 @@ import {
 	TextInput,
 	View,
 } from "react-native";
+import { getDeviceIdentity } from "../src/auth/deviceInfo";
 import { sessionQueryKey, useSession } from "../src/auth/session";
 import { TVDeviceLogin } from "../src/auth/TVDeviceLogin";
 import { Screen } from "../src/components/Screen";
@@ -52,13 +53,16 @@ export default function LoginScreen() {
 	});
 
 	const verify = useMutation({
-		mutationFn: ({
+		mutationFn: async ({
 			email: value,
 			code: value2,
 		}: {
 			email: string;
 			code: string;
-		}) => verifyCode(value, value2),
+		}) => {
+			const device = await getDeviceIdentity();
+			return verifyCode(value, value2, device);
+		},
 		onSuccess: async (data) => {
 			await secureStore.set(ACCESS_TOKEN_KEY, data.token);
 			await secureStore.set(REFRESH_TOKEN_KEY, data.refresh_token);

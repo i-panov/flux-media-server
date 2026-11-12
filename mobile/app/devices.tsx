@@ -1,6 +1,14 @@
-import { fetchDevices, revokeDevice } from "@flux/shared";
+import { fetchDevices, renameDevice, revokeDevice } from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import {
+	Alert,
+	Pressable,
+	StyleSheet,
+	Text,
+	TextInput,
+	View,
+} from "react-native";
 import { AuthGate } from "../src/components/AuthGate";
 import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
@@ -15,19 +23,30 @@ export default function DevicesScreen() {
 		queryFn: fetchDevices,
 	});
 	const revoke = useMutation({
-		mutationFn: (id: number) => revokeDevice(id),
+		mutationFn: (deviceId: string) => revokeDevice(deviceId),
 		onSuccess: () =>
 			queryClient.invalidateQueries({ queryKey: ["auth", "devices"] }),
 		onError: () => Alert.alert(t("devices.revokeError")),
 	});
+	const rename = useMutation({
+		mutationFn: ({ deviceId, name }: { deviceId: string; name: string }) =>
+			renameDevice(deviceId, name),
+		onSuccess: () => {
+			setEditingId(null);
+			void queryClient.invalidateQueries({ queryKey: ["auth", "devices"] });
+		},
+		onError: () => Alert.alert(t("devices.renameError")),
+	});
+	const [editingId, setEditingId] = useState<string | null>(null);
+	const [draft, setDraft] = useState("");
 
-	const confirmRevoke = (id: number) => {
+	const confirmRevoke = (deviceId: string) => {
 		Alert.alert(t("devices.title"), t("devices.confirm"), [
 			{ text: t("common.cancel"), style: "cancel" },
 			{
 				text: t("devices.revoke"),
 				style: "destructive",
-				onPress: () => revoke.mutate(id),
+				onPress: () => revoke.mutate(deviceId),
 			},
 		]);
 	};
@@ -47,7 +66,7 @@ export default function DevicesScreen() {
 				)}
 				{devices.data?.map((device) => (
 					<View
-						key={device.id}
+						key={device.device_id}
 						style={[
 							styles.card,
 							{
@@ -58,15 +77,77 @@ export default function DevicesScreen() {
 							},
 						]}
 					>
-						<Text
-							style={{ color: colors.text, fontSize: 18, fontWeight: "600" }}
-						>
-							{device.device_name}
-						</Text>
+						{editingId === device.device_id ? (
+							<View style={{ flexDirection: "row", gap: spacing.sm }}>
+								<TextInput
+									value={draft}
+									onChangeText={setDraft}
+									maxLength={80}
+									autoFocus
+									style={[
+										styles.input,
+										{
+											borderColor: colors.controlBorder,
+											color: colors.text,
+											flex: 1,
+										},
+									]}
+								/>
+								<Pressable
+									style={[styles.revoke, { borderColor: colors.accent }]}
+									onPress={() =>
+										rename.mutate({
+											deviceId: device.device_id,
+											name: draft.trim(),
+										})
+									}
+								>
+									<Text style={{ color: colors.accent }}>
+										{t("common.save")}
+									</Text>
+								</Pressable>
+								<Pressable
+									style={[styles.revoke, { borderColor: colors.border }]}
+									onPress={() => setEditingId(null)}
+								>
+									<Text style={{ color: colors.textMuted }}>
+										{t("common.cancel")}
+									</Text>
+								</Pressable>
+							</View>
+						) : (
+							<View
+								style={{
+									flexDirection: "row",
+									gap: spacing.sm,
+									alignItems: "center",
+								}}
+							>
+								<Text
+									style={{
+										color: colors.text,
+										fontSize: 18,
+										fontWeight: "600",
+									}}
+								>
+									{device.device_name}
+								</Text>
+								<Pressable
+									onPress={() => {
+										setEditingId(device.device_id);
+										setDraft(device.device_name);
+									}}
+								>
+									<Text style={{ color: colors.accent }}>
+										{t("devices.rename")}
+									</Text>
+								</Pressable>
+							</View>
+						)}
 						<Text style={{ color: colors.textMuted }}>{device.platform}</Text>
 						<Pressable
 							style={[styles.revoke, { borderColor: colors.danger }]}
-							onPress={() => confirmRevoke(device.id)}
+							onPress={() => confirmRevoke(device.device_id)}
 						>
 							<Text style={{ color: colors.danger }}>
 								{t("devices.revoke")}
@@ -82,6 +163,7 @@ export default function DevicesScreen() {
 const styles = StyleSheet.create({
 	title: { fontSize: 26, fontWeight: "700" },
 	card: { borderWidth: 1, gap: 6 },
+	input: { borderWidth: 1, borderRadius: 8, padding: 8 },
 	revoke: {
 		borderWidth: 1,
 		borderRadius: 8,

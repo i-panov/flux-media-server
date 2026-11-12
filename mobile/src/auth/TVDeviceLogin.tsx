@@ -20,6 +20,7 @@ import { t, useLanguage } from "../i18n";
 import { secureStore } from "../storage/secureStore";
 import { useTheme } from "../theme/ThemeProvider";
 import { tvFocusStyle } from "../tv/focus";
+import { getDeviceIdentity } from "./deviceInfo";
 import { sessionQueryKey } from "./session";
 
 function QrGrid({ value }: { value: string }) {
@@ -63,9 +64,11 @@ export function TVDeviceLogin({ onUseOtp }: { onUseOtp: () => void }) {
 	const start = useCallback(async () => {
 		setStatus("loading");
 		try {
+			const device = await getDeviceIdentity();
 			const result = await createDeviceCode({
-				deviceName: "Android TV",
-				platform: "androidtv",
+				deviceId: device.deviceId,
+				deviceName: device.deviceName,
+				platform: device.platform,
 			});
 			setData(result);
 			setStatus("waiting");

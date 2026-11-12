@@ -36,13 +36,26 @@ export async function requestCode(email: string): Promise<RequestCodeResponse> {
 	return requestCodeSchema.parse(body);
 }
 
+export interface DeviceInfoInput {
+	deviceId?: string;
+	deviceName?: string;
+	platform?: string;
+}
+
 export async function verifyCode(
 	email: string,
 	code: string,
+	device?: DeviceInfoInput,
 ): Promise<VerifyCodeResponse> {
 	const body = await apiFetch<unknown>("/auth/verify-code", {
 		method: "POST",
-		body: JSON.stringify({ email, code }),
+		body: JSON.stringify({
+			email,
+			code,
+			device_id: device?.deviceId ?? "",
+			device_name: device?.deviceName ?? "",
+			platform: device?.platform ?? "",
+		}),
 	});
 	return verifyCodeSchema.parse(body);
 }
@@ -52,10 +65,10 @@ export async function fetchMe(signal?: AbortSignal): Promise<AuthUser> {
 	return authUserSchema.parse(body);
 }
 
-export async function logout(): Promise<void> {
+export async function logout(refreshToken?: string): Promise<void> {
 	await apiFetch<unknown>("/auth/logout", {
 		method: "POST",
-		body: "{}",
+		body: JSON.stringify({ refresh_token: refreshToken ?? "" }),
 	});
 }
 
@@ -91,12 +104,14 @@ export type DevicePollResponse =
 	| { status: "invalid_grant" };
 
 export async function createDeviceCode(input?: {
+	deviceId?: string;
 	deviceName?: string;
 	platform?: string;
 }): Promise<DeviceCodeResponse> {
 	const body = await apiFetch<unknown>("/auth/device/code", {
 		method: "POST",
 		body: JSON.stringify({
+			device_id: input?.deviceId ?? "",
 			device_name: input?.deviceName ?? "",
 			platform: input?.platform ?? "",
 		}),
@@ -153,7 +168,7 @@ export async function approveDeviceCode(
 }
 
 const deviceSessionSchema = z.object({
-	id: z.number(),
+	device_id: z.string(),
 	device_name: z.string(),
 	platform: z.string(),
 	created_at: z.string(),
@@ -172,6 +187,22 @@ export async function fetchDevices(): Promise<DeviceSession[]> {
 	return deviceListSchema.parse(body).items;
 }
 
-export async function revokeDevice(id: number): Promise<void> {
-	await apiFetch<unknown>(`/auth/devices/${id}`, { method: "DELETE" });
+export async function revokeDevice(deviceId: string): Promise<void> {
+	await apiFetch<unknown>(
+		`/auth/devices/${encodeURIComponent(deviceId)}`,
+		{ method: "DELETE" },
+	);
+}
+
+export async function renameDevice(
+	deviceId: string,
+	name: string,
+): Promise<void> {
+	await apiFetch<unknown>(
+		`/auth/devices/${encodeURIComponent(deviceId)}`,
+		{
+			method: "PATCH",
+			body: JSON.stringify({ name }),
+		},
+	);
 }

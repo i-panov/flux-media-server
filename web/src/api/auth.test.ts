@@ -59,7 +59,13 @@ describe("verifyCode", () => {
 			"/api/auth/verify-code",
 			expect.objectContaining({
 				method: "POST",
-				body: JSON.stringify({ email: "user@example.com", code: "123456" }),
+				body: JSON.stringify({
+					email: "user@example.com",
+					code: "123456",
+					device_id: "",
+					device_name: "",
+					platform: "",
+				}),
 			}),
 		);
 	});
@@ -83,7 +89,7 @@ describe("fetchMe", () => {
 });
 
 describe("logout", () => {
-	it("отправляет пустое тело", async () => {
+	it("отправляет refresh текущего устройства", async () => {
 		const fetchMock = vi
 			.fn()
 			.mockResolvedValue(jsonResponse({ message: "ok" }));
@@ -92,7 +98,10 @@ describe("logout", () => {
 		await expect(logout()).resolves.toBeUndefined();
 		expect(fetchMock).toHaveBeenCalledWith(
 			"/api/auth/logout",
-			expect.objectContaining({ method: "POST", body: "{}" }),
+			expect.objectContaining({
+				method: "POST",
+				body: JSON.stringify({ refresh_token: "" }),
+			}),
 		);
 	});
 });

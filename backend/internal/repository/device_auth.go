@@ -31,8 +31,9 @@ func HashDeviceCode(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (r *DeviceAuthStore) Create(ctx context.Context, deviceCodeHash, userCodeHash, deviceName, platform string, expiresAt time.Time, intervalSeconds int) (*models.DeviceAuth, error) {
+func (r *DeviceAuthStore) Create(ctx context.Context, deviceCodeHash, userCodeHash, deviceID, deviceName, platform string, expiresAt time.Time, intervalSeconds int) (*models.DeviceAuth, error) {
 	record := &models.DeviceAuth{
+		DeviceID:        deviceID,
 		DeviceCodeHash:  deviceCodeHash,
 		UserCodeHash:    userCodeHash,
 		DeviceName:      deviceName,

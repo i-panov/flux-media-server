@@ -5,6 +5,7 @@ import { sessionQueryKey } from "./session";
 
 const mocks = vi.hoisted(() => ({
 	del: vi.fn(),
+	get: vi.fn(),
 	logout: vi.fn(),
 	accessKey: "flux.access",
 	refreshKey: "flux.refresh",
@@ -17,14 +18,16 @@ vi.mock("@flux/shared", () => ({
 }));
 
 vi.mock("../storage/secureStore", () => ({
-	secureStore: { del: mocks.del },
+	secureStore: { del: mocks.del, get: mocks.get },
 }));
 
 describe("локальный выход", () => {
 	beforeEach(() => {
 		mocks.del.mockReset();
+		mocks.get.mockReset();
 		mocks.logout.mockReset();
 		mocks.del.mockResolvedValue(undefined);
+		mocks.get.mockResolvedValue(mocks.refreshKey);
 		mocks.logout.mockResolvedValue(undefined);
 	});
 
@@ -37,7 +40,7 @@ describe("локальный выход", () => {
 
 		await signOutLocal(client);
 
-		expect(mocks.logout).toHaveBeenCalledTimes(1);
+		expect(mocks.logout).toHaveBeenCalledWith(mocks.refreshKey);
 		expect(mocks.del).toHaveBeenNthCalledWith(1, mocks.accessKey);
 		expect(mocks.del).toHaveBeenNthCalledWith(2, mocks.refreshKey);
 		expect(cancelQueries).toHaveBeenCalledWith();

@@ -12,6 +12,7 @@ export {
 	logout,
 	pollDeviceCode,
 	type RequestCodeResponse,
+	renameDevice,
 	revokeDevice,
 	requestCode,
 	type VerifyCodeResponse,

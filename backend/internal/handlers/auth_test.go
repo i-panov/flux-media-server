@@ -3,7 +3,6 @@ package handlers_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -580,9 +579,26 @@ func TestDeviceCodeLoginFlow(t *testing.T) {
 	require.NotEmpty(t, items)
 	first := items[0].(map[string]interface{})
 	assert.Equal(t, "Android TV", first["device_name"])
-	deviceID := uint(first["id"].(float64))
+	deviceID := first["device_id"].(string)
 
-	req = httptest.NewRequest("DELETE", fmt.Sprintf("/api/auth/devices/%d", deviceID), nil)
+	renameBody, _ := json.Marshal(map[string]string{"name": "Мой ТВ"})
+	req = httptest.NewRequest("PATCH", "/api/auth/devices/"+deviceID, bytes.NewReader(renameBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	req = httptest.NewRequest("GET", "/api/auth/devices", nil)
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	parseJSONResponse(t, resp, &devices)
+	renamed := devices["items"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, "Мой ТВ", renamed["device_name"])
+
+	req = httptest.NewRequest("DELETE", "/api/auth/devices/"+deviceID, nil)
 	req.Header.Set("Authorization", "Bearer "+access)
 	resp, err = application.Fiber.Test(req)
 	require.NoError(t, err)
@@ -596,4 +612,25 @@ func TestDeviceCodeLoginFlow(t *testing.T) {
 	resp, err = application.Fiber.Test(req)
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode)
+}
+
+func TestLogoutRemovesOnlyCurrentDevice(t *testing.T) {
+	application := newTestAppForAuth(t)
+	access, refresh, _ := loginWithCookies(t, application, "logout-device@example.com")
+
+	req := httptest.NewRequest("POST", "/api/auth/logout", bytes.NewReader([]byte(`{"refresh_token":"`+refresh+`"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	req = httptest.NewRequest("GET", "/api/auth/devices", nil)
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	var devices map[string]interface{}
+	parseJSONResponse(t, resp, &devices)
+	assert.Empty(t, devices["items"])
 }

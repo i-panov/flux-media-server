@@ -13,6 +13,7 @@ import {
 	fetchMe,
 	inspectDeviceCode,
 	logout,
+	renameDevice,
 	requestCode,
 	revokeDevice,
 	verifyCode,
@@ -71,8 +72,15 @@ export function useRequestCodeMutation() {
 export function useVerifyCodeMutation() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({ email, code }: { email: string; code: string }) =>
-			verifyCode(email, code),
+		mutationFn: ({
+			email,
+			code,
+			deviceId,
+		}: {
+			email: string;
+			code: string;
+			deviceId?: string;
+		}) => verifyCode(email, code, { deviceId }),
 		onSuccess: (data) => {
 			// Затираем кэши прошлого пользователя. Ответ уже содержит
 			// пользователя — класть в кэш напрямую, а не инвалидировать:
@@ -100,8 +108,11 @@ const deviceCodeQueryKey = ["auth", "device-code"];
 
 export function useCreateDeviceCodeMutation() {
 	return useMutation({
-		mutationFn: (input?: { deviceName?: string; platform?: string }) =>
-			createDeviceCode(input),
+		mutationFn: (input?: {
+			deviceId?: string;
+			deviceName?: string;
+			platform?: string;
+		}) => createDeviceCode(input),
 	});
 }
 
@@ -127,7 +138,17 @@ export function useDevicesQuery() {
 export function useRevokeDeviceMutation() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) => revokeDevice(id),
+		mutationFn: (deviceId: string) => revokeDevice(deviceId),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: deviceCodeQueryKey }),
+	});
+}
+
+export function useRenameDeviceMutation() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ deviceId, name }: { deviceId: string; name: string }) =>
+			renameDevice(deviceId, name),
 		onSuccess: () =>
 			queryClient.invalidateQueries({ queryKey: deviceCodeQueryKey }),
 	});

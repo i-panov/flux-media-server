@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DeviceCodeResponse } from "../../api/auth";
 import { pollDeviceCode } from "../../api/auth";
+import { getWebDeviceId } from "../../api/deviceId";
 import {
 	adoptSessionUser,
 	useCreateDeviceCodeMutation,
@@ -25,7 +26,7 @@ export function DeviceQrLogin() {
 	const start = useCallback(() => {
 		setStatus("loading");
 		create.mutate(
-			{ deviceName: "Web TV", platform: "web-tv" },
+			{ deviceId: getWebDeviceId(), deviceName: "Web TV", platform: "web-tv" },
 			{
 				onSuccess: (result) => {
 					setData(result);

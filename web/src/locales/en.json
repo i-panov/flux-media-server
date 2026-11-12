@@ -376,5 +376,7 @@
 	"devices.current": "Current",
 	"devices.revoke": "Sign out device",
 	"devices.revoked": "Device signed out",
-	"devices.confirm": "Sign out this device?"
+	"devices.confirm": "Sign out this device?",
+	"devices.rename": "Rename device",
+	"devices.renameError": "Rename failed: name is taken or device not found"
 }

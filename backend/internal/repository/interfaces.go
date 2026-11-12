@@ -280,13 +280,15 @@ type RefreshTokenRepository interface {
 	FindByToken(ctx context.Context, rawToken string) (*models.RefreshToken, error)
 	DeleteByToken(ctx context.Context, rawToken string) error
 	DeleteByID(ctx context.Context, id, userID uint) error
+	DeleteByDeviceID(ctx context.Context, deviceID string, userID uint) error
+	RenameDevice(ctx context.Context, userID uint, deviceID, name string) error
 	DeleteByUserID(ctx context.Context, userID uint) error
 	DeleteExpired(ctx context.Context) error
 }
 
 // DeviceAuthRepository stores short-lived device-code login requests.
 type DeviceAuthRepository interface {
-	Create(ctx context.Context, deviceCodeHash, userCodeHash, deviceName, platform string, expiresAt time.Time, intervalSeconds int) (*models.DeviceAuth, error)
+	Create(ctx context.Context, deviceCodeHash, userCodeHash, deviceID, deviceName, platform string, expiresAt time.Time, intervalSeconds int) (*models.DeviceAuth, error)
 	FindByDeviceCode(ctx context.Context, hash string) (*models.DeviceAuth, error)
 	FindPendingByUserCode(ctx context.Context, hash string) (*models.DeviceAuth, error)
 	Approve(ctx context.Context, userCodeHash string, userID uint) (*models.DeviceAuth, error)

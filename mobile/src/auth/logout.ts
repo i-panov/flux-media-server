@@ -8,9 +8,10 @@ import { markSessionSignedOut } from "./session";
 // session=null выставляется первым, чтобы подписчики увидели переход и
 // очистили очередь/downloads; остальные queries удаляются следом.
 export async function signOutLocal(queryClient: QueryClient): Promise<void> {
-	// Запрос стартует до удаления токенов: transport успевает прочитать
-	// Bearer, а результат нам не нужен.
-	void logout().catch(() => undefined);
+	// Передаём refresh текущего устройства: сервер удалит только его
+	// сессии, а не все устройства пользователя.
+	const refreshToken = await secureStore.get(REFRESH_TOKEN_KEY);
+	void logout(refreshToken ?? undefined).catch(() => undefined);
 	// Висящие запросы (включая /auth/me) не должны вернуть user уже после
 	// session=null. Заодно отменяем возможный refresh до удаления токенов.
 	await queryClient.cancelQueries();

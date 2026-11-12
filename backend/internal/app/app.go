@@ -569,7 +569,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Get("/auth/me", authHandler.Me)
 	api.Post("/auth/logout", authHandler.Logout)
 	api.Get("/auth/devices", authHandler.ListDevices)
-	api.Delete("/auth/devices/:id", authHandler.RevokeDevice)
+	api.Delete("/auth/devices/:device_id", authHandler.RevokeDevice)
+	api.Patch("/auth/devices/:device_id", authHandler.RenameDevice)
 	api.Post("/auth/device/inspect", deviceRateLimiter, authHandler.InspectDevice)
 	api.Post("/auth/device/approve", deviceRateLimiter, authHandler.ApproveDevice)
 

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -8,7 +9,7 @@ import (
 	"log"
 	"net/mail"
 	"net/url"
-	"strconv"
+	"sort"
 	"strings"
 	"time"
 
@@ -61,6 +62,7 @@ type RequestCodeRequest struct {
 type VerifyCodeRequest struct {
 	Email      string `json:"email"`
 	Code       string `json:"code"`
+	DeviceID   string `json:"device_id"`
 	DeviceName string `json:"device_name"`
 	Platform   string `json:"platform"`
 }
@@ -189,16 +191,19 @@ func normalizeDeviceLabel(name, platform string) (string, string) {
 	return name, platform
 }
 
-func (h *AuthHandler) issueSession(c *fiber.Ctx, user *models.User, name, platform string) (map[string]any, error) {
+func (h *AuthHandler) issueSession(c *fiber.Ctx, user *models.User, deviceID, name, platform string) (map[string]any, error) {
 	ctx := c.UserContext()
 	tokens, err := h.jwtService.GenerateTokenPair(user.ID, user.Email)
 	if err != nil {
 		return nil, err
 	}
-	deviceID, err := randomDeviceCode()
-	if err != nil {
-		return nil, err
+	if deviceID == "" {
+		deviceID, err = randomDeviceCode()
+		if err != nil {
+			return nil, err
+		}
 	}
+	name = h.uniqueDeviceName(ctx, user.ID, deviceID, name)
 	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
 	if err := h.refreshTokenDB.CreateSession(ctx, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry), repository.SessionMeta{
 		DeviceID:   deviceID,
@@ -219,6 +224,46 @@ func (h *AuthHandler) issueSession(c *fiber.Ctx, user *models.User, name, platfo
 	}, nil
 }
 
+func (h *AuthHandler) deviceLabelForRequest(c *fiber.Ctx, name, platform string) (string, string) {
+	if strings.TrimSpace(name) == "" || strings.TrimSpace(platform) == "" {
+		uaName, uaPlatform := deviceLabelFromUserAgent(c.Get("User-Agent"))
+		if strings.TrimSpace(name) == "" {
+			name = uaName
+		}
+		if strings.TrimSpace(platform) == "" {
+			platform = uaPlatform
+		}
+	}
+	return normalizeDeviceLabel(name, platform)
+}
+
+// uniqueDeviceName не даёт двум устройствам одного пользователя
+// называться одинаково: иначе список сессий снова превращается в кашу.
+func (h *AuthHandler) uniqueDeviceName(ctx context.Context, userID uint, deviceID, requested string) string {
+	name := strings.TrimSpace(requested)
+	if name == "" {
+		name = "Устройство"
+	}
+	tokens, err := h.refreshTokenDB.ListByUserID(ctx, userID)
+	if err != nil {
+		return name
+	}
+	used := make(map[string]struct{}, len(tokens))
+	for _, token := range tokens {
+		if token.DeviceID == "" || token.DeviceID == deviceID {
+			continue
+		}
+		used[strings.ToLower(token.DeviceName)] = struct{}{}
+	}
+	base := name
+	for i := 2; ; i++ {
+		if _, taken := used[strings.ToLower(name)]; !taken {
+			return name
+		}
+		name = fmt.Sprintf("%s (%d)", base, i)
+	}
+}
+
 func (h *AuthHandler) verificationBaseURL(c *fiber.Ctx) string {
 	if h.config.Server.PublicURL != "" {
 		return h.config.Server.PublicURL
@@ -229,6 +274,7 @@ func (h *AuthHandler) verificationBaseURL(c *fiber.Ctx) string {
 }
 
 type DeviceCodeRequest struct {
+	DeviceID   string `json:"device_id"`
 	DeviceName string `json:"device_name"`
 	Platform   string `json:"platform"`
 }
@@ -253,6 +299,13 @@ func (h *AuthHandler) DeviceCode(c *fiber.Ctx) error {
 	if expiresIn < 120 {
 		expiresIn = 120
 	}
+	deviceID := strings.TrimSpace(req.DeviceID)
+	if deviceID == "" {
+		deviceID, err = randomDeviceCode()
+		if err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to generate device id")
+		}
+	}
 	interval := 3
 	// Ленивая уборка: отдельный воркер для короткоживущих кодов избыточен.
 	_ = h.deviceAuthRepo.DeleteExpired(c.UserContext())
@@ -260,6 +313,7 @@ func (h *AuthHandler) DeviceCode(c *fiber.Ctx) error {
 		c.UserContext(),
 		repository.HashDeviceCode(deviceCode),
 		repository.HashDeviceCode(userCode),
+		deviceID,
 		name,
 		platform,
 		time.Now().Add(time.Duration(expiresIn)*time.Second),
@@ -382,7 +436,7 @@ func (h *AuthHandler) DeviceToken(c *fiber.Ctx) error {
 		if err != nil {
 			return reaction(c, fiber.StatusBadRequest, "invalid_grant")
 		}
-		payload, err := h.issueSession(c, user, consumed.DeviceName, consumed.Platform)
+		payload, err := h.issueSession(c, user, consumed.DeviceID, consumed.DeviceName, consumed.Platform)
 		if err != nil {
 			log.Printf("device token: issue session: %v", err)
 			return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
@@ -407,21 +461,69 @@ func (h *AuthHandler) ListDevices(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to load devices")
 	}
-	items := make([]fiber.Map, 0, len(tokens))
+	type summary struct {
+		DeviceID   string
+		Name       string
+		Platform   string
+		CreatedAt  time.Time
+		LastUsedAt *time.Time
+		ExpiresAt  time.Time
+	}
+	devices := make(map[string]*summary)
 	for _, token := range tokens {
-		name := token.DeviceName
-		if name == "" {
-			name = "Неизвестное устройство"
+		deviceID := token.DeviceID
+		if deviceID == "" {
+			// Старые сессии без device_id показываем отдельными записями.
+			deviceID = fmt.Sprintf("legacy-%d", token.ID)
 		}
+		item, exists := devices[deviceID]
+		if !exists {
+			name := token.DeviceName
+			if name == "" || strings.EqualFold(name, "Устройство") {
+				name = "Браузер"
+			}
+			devices[deviceID] = &summary{
+				DeviceID:   deviceID,
+				Name:       name,
+				Platform:   token.Platform,
+				CreatedAt:  token.CreatedAt,
+				LastUsedAt: token.LastUsedAt,
+				ExpiresAt:  token.ExpiresAt,
+			}
+			continue
+		}
+		if token.DeviceName != "" {
+			item.Name = token.DeviceName
+		}
+		if token.Platform != "" {
+			item.Platform = token.Platform
+		}
+		if token.CreatedAt.Before(item.CreatedAt) {
+			item.CreatedAt = token.CreatedAt
+		}
+		if token.LastUsedAt != nil && (item.LastUsedAt == nil || token.LastUsedAt.After(*item.LastUsedAt)) {
+			item.LastUsedAt = token.LastUsedAt
+		}
+		if token.ExpiresAt.After(item.ExpiresAt) {
+			item.ExpiresAt = token.ExpiresAt
+		}
+	}
+	items := make([]fiber.Map, 0, len(devices))
+	for _, item := range devices {
 		items = append(items, fiber.Map{
-			"id":           token.ID,
-			"device_name":  name,
-			"platform":     token.Platform,
-			"created_at":   token.CreatedAt,
-			"last_used_at": token.LastUsedAt,
-			"expires_at":   token.ExpiresAt,
+			"device_id":    item.DeviceID,
+			"device_name":  item.Name,
+			"platform":     item.Platform,
+			"created_at":   item.CreatedAt,
+			"last_used_at": item.LastUsedAt,
+			"expires_at":   item.ExpiresAt,
 		})
 	}
+	sort.Slice(items, func(i, j int) bool {
+		left, _ := items[i]["created_at"].(time.Time)
+		right, _ := items[j]["created_at"].(time.Time)
+		return left.After(right)
+	})
 	return c.JSON(fiber.Map{"items": items})
 }
 
@@ -430,14 +532,54 @@ func (h *AuthHandler) RevokeDevice(c *fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 	}
-	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
-	if err != nil || id == 0 {
+	deviceID := strings.TrimSpace(c.Params("device_id"))
+	if deviceID == "" {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid device id")
 	}
-	if err := h.refreshTokenDB.DeleteByID(c.UserContext(), uint(id), userID); err != nil {
+	if err := h.refreshTokenDB.DeleteByDeviceID(c.UserContext(), deviceID, userID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.Error(c, fiber.StatusNotFound, "Device not found")
+		}
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to revoke device")
 	}
 	return c.JSON(fiber.Map{"message": "Device revoked"})
+}
+
+func (h *AuthHandler) RenameDevice(c *fiber.Ctx) error {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+	deviceID := strings.TrimSpace(c.Params("device_id"))
+	if deviceID == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid device id")
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" || len([]rune(name)) > 80 {
+		return response.Error(c, fiber.StatusBadRequest, "Device name must be 1..80 characters")
+	}
+	tokens, err := h.refreshTokenDB.ListByUserID(c.UserContext(), userID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to load devices")
+	}
+	for _, token := range tokens {
+		if token.DeviceID != deviceID && strings.EqualFold(strings.TrimSpace(token.DeviceName), name) {
+			return response.Error(c, fiber.StatusConflict, "Device name is already used")
+		}
+	}
+	if err := h.refreshTokenDB.RenameDevice(c.UserContext(), userID, deviceID, name); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.Error(c, fiber.StatusNotFound, "Device not found")
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to rename device")
+	}
+	return c.JSON(fiber.Map{"message": "Device renamed", "device_name": name})
 }
 
 func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
@@ -542,8 +684,8 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 		}
 	}
 
-	name, platform := normalizeDeviceLabel(req.DeviceName, req.Platform)
-	payload, err := h.issueSession(c, user, name, platform)
+	name, platform := h.deviceLabelForRequest(c, req.DeviceName, req.Platform)
+	payload, err := h.issueSession(c, user, req.DeviceID, name, platform)
 	if err != nil {
 		log.Printf("Failed to create session: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
@@ -581,16 +723,39 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		RefreshTokenID *uint `json:"refresh_token_id"`
+		RefreshToken   string `json:"refresh_token"`
+		RefreshTokenID *uint  `json:"refresh_token_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
-		log.Printf("Logout: invalid body, falling back to full logout: %v", err)
+		log.Printf("Logout: invalid body, falling back to session logout: %v", err)
 	}
 
 	ctx := c.UserContext()
+	refreshToken := strings.TrimSpace(req.RefreshToken)
+	if refreshToken == "" {
+		refreshToken = c.Cookies(middleware.CookieRefreshToken)
+	}
 	if req.RefreshTokenID != nil {
 		if err := h.refreshTokenDB.DeleteByID(ctx, *req.RefreshTokenID, userID); err != nil {
 			log.Printf("Logout: delete refresh token %d: %v", *req.RefreshTokenID, err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+		}
+	} else if refreshToken != "" {
+		// Выход с устройства удаляет только его сессии, а не все
+		// устройства пользователя.
+		record, err := h.refreshTokenDB.FindByToken(ctx, refreshToken)
+		if err == nil && record.UserID == userID {
+			if record.DeviceID == "" {
+				if err := h.refreshTokenDB.DeleteByToken(ctx, refreshToken); err != nil {
+					log.Printf("Logout: delete refresh token: %v", err)
+					return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+				}
+			} else if err := h.refreshTokenDB.DeleteByDeviceID(ctx, record.DeviceID, userID); err != nil {
+				log.Printf("Logout: delete device: %v", err)
+				return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+			}
+		} else if err := h.refreshTokenDB.DeleteByToken(ctx, refreshToken); err != nil {
+			log.Printf("Logout: delete refresh token: %v", err)
 			return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
 		}
 	} else {

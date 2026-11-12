@@ -11,6 +11,7 @@ export {
 	inspectDeviceCode,
 	logout,
 	pollDeviceCode,
+	renameDevice,
 	requestCode,
 	revokeDevice,
 	verifyCode,

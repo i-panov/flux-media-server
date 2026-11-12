@@ -118,6 +118,32 @@ func (r *RefreshTokenStore) ListByUserID(ctx context.Context, userID uint) ([]mo
 	return tokens, err
 }
 
+// DeleteByDeviceID revokes every session of one device.
+func (r *RefreshTokenStore) DeleteByDeviceID(ctx context.Context, deviceID string, userID uint) error {
+	if deviceID == "" {
+		return gorm.ErrRecordNotFound
+	}
+	return r.db.WithContext(ctx).
+		Where("device_id = ? AND user_id = ?", deviceID, userID).
+		Delete(&models.RefreshToken{}).Error
+}
+
+func (r *RefreshTokenStore) RenameDevice(ctx context.Context, userID uint, deviceID, name string) error {
+	if deviceID == "" {
+		return gorm.ErrRecordNotFound
+	}
+	result := r.db.WithContext(ctx).Model(&models.RefreshToken{}).
+		Where("user_id = ? AND device_id = ?", userID, deviceID).
+		Update("device_name", name)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (r *RefreshTokenStore) DeleteByUserID(ctx context.Context, userID uint) error {
 	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&models.RefreshToken{}).Error
 }
