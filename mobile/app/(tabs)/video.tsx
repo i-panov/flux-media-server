@@ -11,7 +11,10 @@ import { Screen } from "../../src/components/Screen";
 import { t, useLanguage } from "../../src/i18n";
 import { normalizeSearchQuery, type SortOrder } from "../../src/media/search";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
+import { excludeMediaIds } from "../../src/media/visibleMedia";
 import { useTheme } from "../../src/theme/ThemeProvider";
+import { isTV } from "../../src/tv/profile";
+import { TVVideoList } from "../../src/tv/TVVideoList";
 
 // Стабильный обработчик: FlatList не получает новую функцию на каждый
 // рендер экрана (набор в поиске перерисовывает его часто).
@@ -31,6 +34,8 @@ export default function VideoScreen() {
 	const searching = debouncedQuery !== "" || normalizeSearchQuery(query) !== "";
 	const list = useVideoList(debouncedQuery, sort);
 	const favorites = useFavoriteVideoIds();
+	const allItems = list.data?.pages.flatMap((page) => page.items) ?? [];
+	const tvItems = excludeMediaIds(allItems, favorites.data);
 	// Ряды остаются смонтированными и просто скрываются: сброс поиска не
 	// создаёт заново их запросы.
 	const header = useMemo(
@@ -50,26 +55,30 @@ export default function VideoScreen() {
 				placeholder={t("video.search")}
 				testID="video-search"
 			/>
-			<MediaList
-				query={list}
-				onPressItem={openVideo}
-				// При поиске home-ряды получают hidden и рендерят null,
-				// не размонтируясь; избранное в результатах не исключается.
-				ListHeaderComponent={header}
-				// Избранное исключается только когда оно показано отдельным
-				// рядом; в результатах поиска оно должно находиться.
-				excludedIds={searching ? undefined : favorites.data}
-				searching={searching}
-				emptyTitle={
-					searching ? t("search.noResults") : t("search.libraryEmpty")
-				}
-				emptyDescription={
-					searching
-						? t("search.noResultsHint")
-						: t("search.libraryEmptyVideoHint")
-				}
-				emptyTestID={searching ? "video-search-empty" : "video-empty"}
-			/>
+			{isTV ? (
+				<TVVideoList items={tvItems} onPressItem={openVideo} />
+			) : (
+				<MediaList
+					query={list}
+					onPressItem={openVideo}
+					// При поиске home-ряды получают hidden и рендерят null,
+					// не размонтируясь; избранное в результатах не исключается.
+					ListHeaderComponent={header}
+					// Избранное исключается только когда оно показано отдельным
+					// рядом; в результатах поиска оно должно находиться.
+					excludedIds={searching ? undefined : favorites.data}
+					searching={searching}
+					emptyTitle={
+						searching ? t("search.noResults") : t("search.libraryEmpty")
+					}
+					emptyDescription={
+						searching
+							? t("search.noResultsHint")
+							: t("search.libraryEmptyVideoHint")
+					}
+					emptyTestID={searching ? "video-search-empty" : "video-empty"}
+				/>
+			)}
 		</Screen>
 	);
 }
