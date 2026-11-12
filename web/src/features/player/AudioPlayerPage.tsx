@@ -25,6 +25,7 @@ import {
 	Shuffle,
 	SkipBack,
 	SkipForward,
+	Volume2,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -243,7 +244,7 @@ function TransportControls() {
 		() => false,
 	);
 	return (
-		<Group justify="center" gap="md">
+		<Group justify="center" gap="md" wrap="wrap">
 			<Tooltip label={t("player.shuffle")} withArrow>
 				<ActionIcon
 					variant={player.shuffle ? "filled" : "subtle"}
@@ -296,6 +297,23 @@ function TransportControls() {
 					<SkipForward size={22} />
 				</ActionIcon>
 			</Tooltip>
+			<Group gap={6} wrap="nowrap" w={156} justify="flex-end">
+				<Volume2
+					size={18}
+					className="shrink-0 text-[var(--mantine-color-dimmed)]"
+				/>
+				<Slider
+					aria-label={t("player.volumeLabel")}
+					value={player.volume * 100}
+					min={0}
+					max={100}
+					label={`${Math.round(player.volume * 100)}%`}
+					thumbLabel={t("player.volumeLabel")}
+					onChange={(value) => player.setVolume(value / 100)}
+					className="flex-1"
+					size="xs"
+				/>
+			</Group>
 			<Tooltip
 				label={
 					player.repeat === "all"
@@ -437,21 +455,6 @@ export function AudioPlayerPage() {
 						/>
 
 						<TransportControls />
-
-						<Group gap="sm" wrap="nowrap">
-							<Text size="xs" c="dimmed">
-								{t("player.volume")}
-							</Text>
-							<Slider
-								value={player.volume * 100}
-								min={0}
-								max={100}
-								label={`${Math.round(player.volume * 100)}%`}
-								thumbLabel={t("player.volumeLabel")}
-								onChange={(value) => player.setVolume(value / 100)}
-								className="flex-1"
-							/>
-						</Group>
 					</Stack>
 				</Group>
 

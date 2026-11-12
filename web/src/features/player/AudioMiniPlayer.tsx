@@ -2,6 +2,7 @@ import {
 	ActionIcon,
 	Group,
 	Progress,
+	Slider,
 	Stack,
 	Text,
 	Tooltip,
@@ -13,6 +14,7 @@ import {
 	SkipBack,
 	SkipForward,
 	TriangleAlert,
+	Volume2,
 	X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -66,6 +68,23 @@ export function AudioMiniPlayer() {
 					{formatDuration(player.currentTime)} /{" "}
 					{formatDuration(player.duration)}
 				</Text>
+				<Group gap={6} wrap="nowrap" visibleFrom="md">
+					<Volume2
+						size={16}
+						className="shrink-0 text-[var(--mantine-color-dimmed)]"
+					/>
+					<Slider
+						aria-label={t("player.volumeLabel")}
+						value={player.volume * 100}
+						min={0}
+						max={100}
+						label={`${Math.round(player.volume * 100)}%`}
+						thumbLabel={t("player.volumeLabel")}
+						onChange={(value) => player.setVolume(value / 100)}
+						className="w-[96px]"
+						size="xs"
+					/>
+				</Group>
 				<Group gap={4} wrap="nowrap">
 					<Tooltip label={t("player.previous")} withArrow>
 						<ActionIcon
