@@ -10,6 +10,7 @@ import {
 	Title,
 	Tooltip,
 } from "@mantine/core";
+import { Link } from "@tanstack/react-router";
 import { Check, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -51,9 +52,14 @@ export function DevicesCard() {
 	return (
 		<Card withBorder padding="lg" radius="md" h="100%">
 			<Stack gap="md">
-				<Title order={2} size="h4">
-					{t("devices.title")}
-				</Title>
+				<Group justify="space-between" align="center" wrap="nowrap">
+					<Title order={2} size="h4">
+						{t("devices.title")}
+					</Title>
+					<Button component={Link} to="/activate" variant="light" size="xs">
+						{t("auth.activateTitle")}
+					</Button>
+				</Group>
 				<Text size="sm" c="dimmed">
 					{t("devices.hint")}
 				</Text>
