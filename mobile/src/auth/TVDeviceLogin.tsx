@@ -7,6 +7,7 @@ import {
 	REFRESH_TOKEN_KEY,
 } from "@flux/shared";
 import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
 	ActivityIndicator,
@@ -92,6 +93,7 @@ export function TVDeviceLogin({ onUseOtp }: { onUseOtp: () => void }) {
 					queryClient.removeQueries();
 					queryClient.setQueryData(sessionQueryKey, result.user);
 					setStatus("approved");
+					router.replace("/");
 					return;
 				}
 				if (result.status === "pending") {
