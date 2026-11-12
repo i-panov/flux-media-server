@@ -17,7 +17,9 @@ backend `1.0.30`, web `0.1.36`.
   (upload/trash/downloads/metadata/cover/delete/collections CRUD),
   TV-профиль скрывает лишнюю вкладку «Библиотека», D-pad-управление
   видео (play/pause, seek, rewind/fastForward), TV-иконка и баннер.
-  TV-сборка собирается через `EXPO_TV=1`. Для self-hosted HTTP добавлен
+  TV-сборка собирается через `EXPO_TV=1`. На эмуляторе пройден
+  server→login (OTP), открывается экран «Видео»; список видео на TV пока
+  пуст — это следующий баг для разбора. Для self-hosted HTTP добавлен
   config-plugin `android:usesCleartextTraffic="true"` — без него release
   TV не логинится на LAN-сервер по `http://`. Проверено на Android TV
   emulator (android-36, x86_64, leanback, 1920×1080): APK ставится,
