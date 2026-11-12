@@ -1,3 +1,4 @@
+import type { MediaType } from "@flux/shared";
 import * as DocumentPicker from "expo-document-picker";
 import {
 	createUploadSource,
@@ -21,9 +22,15 @@ export interface PickedUploadSources {
 
 // Системный picker с фильтром video/audio/image. copyToCacheDirectory
 // обязателен: XHR читает файл из кэша приложения, а не из чужого provider.
-export async function pickUploadSources(): Promise<PickedUploadSources> {
+export async function pickUploadSources(
+	mediaType?: MediaType,
+): Promise<PickedUploadSources> {
+	const filter =
+		mediaType === undefined
+			? ["video/*", "audio/*", "image/*"]
+			: `${mediaType}/*`;
 	const result = await DocumentPicker.getDocumentAsync({
-		type: ["video/*", "audio/*", "image/*"],
+		type: filter,
 		copyToCacheDirectory: true,
 		multiple: true,
 	});
@@ -39,7 +46,10 @@ export async function pickUploadSources(): Promise<PickedUploadSources> {
 			name: asset.name,
 			mimeType: asset.mimeType,
 		});
-		if (source === null) {
+		if (
+			source === null ||
+			(mediaType !== undefined && source.mediaType !== mediaType)
+		) {
 			skipped += 1;
 		} else if (isFileTooLarge(asset.size)) {
 			oversized.push({ name: source.name, size: asset.size ?? 0 });

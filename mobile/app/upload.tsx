@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
 	ActivityIndicator,
@@ -26,7 +26,7 @@ function closeUpload(): void {
 		router.back();
 		return;
 	}
-	router.replace("/library");
+	router.replace("/video");
 }
 
 function UploadHeader({ onBack }: { onBack: () => void }) {
@@ -83,6 +83,9 @@ function AdminOnlyNotice() {
 
 function UploadContent() {
 	useLanguage();
+	const params = useLocalSearchParams<{ type?: string }>();
+	const uploadType =
+		params.type === "audio" || params.type === "image" ? params.type : "video";
 	const { colors, radii, spacing } = useTheme();
 	const session = useSession();
 	const queue = useUploadQueue();
@@ -132,7 +135,7 @@ function UploadContent() {
 		setPicking(true);
 		setPickerError(null);
 		try {
-			const picked = await pickUploadSources();
+			const picked = await pickUploadSources(uploadType);
 			const oversized = picked.oversized[0];
 			if (oversized !== undefined) {
 				setPickerError(
@@ -159,6 +162,9 @@ function UploadContent() {
 			<UploadHeader onBack={confirmLeave} />
 			<Text style={[styles.hint, { color: colors.textMuted }]}>
 				{t("upload.subtitle")}
+			</Text>
+			<Text style={[styles.hint, { color: colors.textMuted }]}>
+				{t(`upload.type.${uploadType}`)}
 			</Text>
 
 			<Pressable

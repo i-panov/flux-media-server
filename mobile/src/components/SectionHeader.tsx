@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
 	Pressable,
 	type StyleProp,
@@ -15,6 +16,7 @@ interface SectionHeaderProps {
 	actionLabel?: string;
 	onActionPress?: () => void;
 	actionTestID?: string;
+	trailing?: ReactNode;
 	testID?: string;
 }
 
@@ -25,6 +27,7 @@ export function SectionHeader({
 	actionLabel,
 	onActionPress,
 	actionTestID,
+	trailing,
 	testID,
 }: SectionHeaderProps) {
 	const { colors, spacing } = useTheme();
@@ -42,6 +45,7 @@ export function SectionHeader({
 					</Text>
 				)}
 			</View>
+			{trailing}
 			{showAction && (
 				<Pressable
 					accessibilityRole="button"

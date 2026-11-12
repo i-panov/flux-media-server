@@ -34,7 +34,7 @@ function closeDownloads(): void {
 		router.back();
 		return;
 	}
-	router.replace("/library");
+	router.replace("/settings");
 }
 
 function downloadFailureLabel(failure: DownloadFailure | null): string {

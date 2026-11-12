@@ -43,7 +43,7 @@ function detailRoute(media: Media): string {
 	if (media.type === "video") {
 		return `/video/${media.id}`;
 	}
-	return "/library";
+	return "/video";
 }
 
 // Deep link может открыть редактор первым: тогда истории нет и back ведёт
@@ -61,7 +61,7 @@ function closeWithoutMedia(): void {
 		router.back();
 		return;
 	}
-	router.replace("/library");
+	router.replace("/video");
 }
 
 function DefaultHeader({ onBack }: { onBack: () => void }) {

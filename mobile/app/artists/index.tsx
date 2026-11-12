@@ -30,7 +30,7 @@ function closeArtists(): void {
 		router.back();
 		return;
 	}
-	router.replace("/library");
+	router.replace("/audio");
 }
 
 function ArtistsHeader() {

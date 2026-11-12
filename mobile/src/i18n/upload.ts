@@ -4,6 +4,10 @@
 export const uploadRu = {
 	"upload.title": "Загрузка",
 	"upload.subtitle": "Видео, аудио и изображения",
+	"upload.short": "Загрузить",
+	"upload.type.video": "Будут показаны только видеофайлы.",
+	"upload.type.audio": "Будут показаны только аудиофайлы.",
+	"upload.type.image": "Будут показаны только изображения.",
 	"upload.add": "Выбрать файлы",
 	"upload.adminOnly": "Загрузка доступна только администратору.",
 	"upload.back": "Назад",
@@ -46,6 +50,10 @@ export const uploadRu = {
 export const uploadEn: Record<keyof typeof uploadRu, string> = {
 	"upload.title": "Upload",
 	"upload.subtitle": "Video, audio and images",
+	"upload.short": "Upload",
+	"upload.type.video": "Only video files will be shown.",
+	"upload.type.audio": "Only audio files will be shown.",
+	"upload.type.image": "Only image files will be shown.",
 	"upload.add": "Choose files",
 	"upload.adminOnly": "Only an administrator can upload files.",
 	"upload.back": "Back",

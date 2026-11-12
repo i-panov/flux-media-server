@@ -1,18 +1,19 @@
 import type { Media } from "@flux/shared";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet } from "react-native";
 import { useFavoriteVideoIds } from "../../src/api/favorites";
 import { useVideoList } from "../../src/api/media";
 import { VideoHomeRows } from "../../src/components/HomeRows";
 import { MediaList } from "../../src/components/MediaList";
 import { MediaSearchBar } from "../../src/components/MediaSearchBar";
 import { Screen } from "../../src/components/Screen";
+import { SectionHeader } from "../../src/components/SectionHeader";
+import { UploadAction } from "../../src/components/UploadAction";
 import { t, useLanguage } from "../../src/i18n";
 import { normalizeSearchQuery, type SortOrder } from "../../src/media/search";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
 import { excludeMediaIds } from "../../src/media/visibleMedia";
-import { useTheme } from "../../src/theme/ThemeProvider";
 import { isTV } from "../../src/tv/profile";
 import { TVVideoList } from "../../src/tv/TVVideoList";
 
@@ -24,7 +25,6 @@ function openVideo(item: Media): void {
 
 export default function VideoScreen() {
 	useLanguage();
-	const { colors } = useTheme();
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<SortOrder>("desc");
 	const debouncedQuery = useDebouncedValue(query);
@@ -44,9 +44,11 @@ export default function VideoScreen() {
 	);
 	return (
 		<Screen>
-			<Text style={[styles.title, { color: colors.text }]}>
-				{t("video.title")}
-			</Text>
+			<SectionHeader
+				title={t("video.title")}
+				titleStyle={styles.title}
+				trailing={<UploadAction type="video" />}
+			/>
 			<MediaSearchBar
 				value={query}
 				onChangeText={setQuery}

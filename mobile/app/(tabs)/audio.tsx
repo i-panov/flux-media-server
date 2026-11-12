@@ -8,6 +8,7 @@ import { MediaList } from "../../src/components/MediaList";
 import { MediaSearchBar } from "../../src/components/MediaSearchBar";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
+import { UploadAction } from "../../src/components/UploadAction";
 import { t, useLanguage } from "../../src/i18n";
 import { normalizeSearchQuery, type SortOrder } from "../../src/media/search";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
@@ -61,6 +62,7 @@ export default function AudioScreen() {
 				actionLabel={t("artists.title")}
 				onActionPress={() => router.push("/artists")}
 				actionTestID="audio-open-artists"
+				trailing={<UploadAction type="audio" />}
 			/>
 			<MediaSearchBar
 				value={query}

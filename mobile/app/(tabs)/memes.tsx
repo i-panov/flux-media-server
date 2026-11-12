@@ -1,19 +1,15 @@
 import type { Media } from "@flux/shared";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-	ActivityIndicator,
-	FlatList,
-	StyleSheet,
-	Text,
-	View,
-} from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { useImageList } from "../../src/api/media";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ListFooter } from "../../src/components/ListFooter";
 import { MediaCard } from "../../src/components/MediaCard";
 import { MediaSearchBar } from "../../src/components/MediaSearchBar";
 import { Screen } from "../../src/components/Screen";
+import { SectionHeader } from "../../src/components/SectionHeader";
+import { UploadAction } from "../../src/components/UploadAction";
 import { t, useLanguage } from "../../src/i18n";
 import { thumbPath } from "../../src/media/source";
 import { useAuthImageSource } from "../../src/media/useAuthImageSource";
@@ -49,9 +45,11 @@ export default function MemesScreen() {
 
 	return (
 		<Screen>
-			<Text style={[styles.title, { color: colors.text }]}>
-				{t("memes.title")}
-			</Text>
+			<SectionHeader
+				title={t("memes.title")}
+				titleStyle={styles.title}
+				trailing={<UploadAction type="image" />}
+			/>
 			<MediaSearchBar
 				value={query}
 				onChangeText={setQuery}

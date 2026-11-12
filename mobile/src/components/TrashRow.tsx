@@ -19,7 +19,7 @@ function closeTrash(): void {
 		router.back();
 		return;
 	}
-	router.replace("/library");
+	router.replace("/settings");
 }
 
 export function mediaIcon(type: string): IoniconName {

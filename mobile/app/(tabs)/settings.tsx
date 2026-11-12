@@ -296,6 +296,35 @@ export default function SettingsScreen() {
 						},
 					]}
 				>
+					<Link href="/downloads" asChild>
+						<Pressable style={styles.linkButton}>
+							<Text style={[styles.link, { color: colors.accent }]}>
+								{t("downloads.title")}
+							</Text>
+						</Pressable>
+					</Link>
+					{session.data?.is_admin === true && (
+						<Link href="/trash" asChild>
+							<Pressable style={styles.linkButton}>
+								<Text style={[styles.link, { color: colors.accent }]}>
+									{t("trash.title")}
+								</Text>
+							</Pressable>
+						</Link>
+					)}
+				</View>
+			)}
+
+			{!isTV && session.data !== null && (
+				<View
+					style={[
+						styles.card,
+						{
+							borderColor: colors.borderStrong,
+							backgroundColor: colors.surface,
+						},
+					]}
+				>
 					<Text style={[styles.cardTitle, { color: colors.text }]}>
 						{t("devices.title")}
 					</Text>
