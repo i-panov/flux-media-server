@@ -284,7 +284,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
 			</AppShell.Main>
 
 			{session != null && (
-				<AppShell.Footer className="border-t border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)]">
+				<AppShell.Footer
+					style={{ zIndex: 300 }}
+					className="border-t border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)]"
+				>
 					<div className="h-full md:hidden">
 						<Group h="100%" gap={0} wrap="nowrap">
 							<nav className="flex h-full w-full" aria-label={t("nav.mobile")}>

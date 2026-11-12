@@ -1,4 +1,4 @@
-import { Alert, Button, FileButton, Text } from "@mantine/core";
+import { Alert, Button, FileButton, Menu, Text } from "@mantine/core";
 import { ImagePlus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +10,13 @@ import { useUploadCover } from "../../api/cover";
 // не меняется), поэтому превью обновляется сразу после инвалидации.
 const MAX_COVER_BYTES = 10 * 1024 * 1024;
 
-export function ChangeCoverButton({ mediaId }: { mediaId: number }) {
+export function ChangeCoverButton({
+	mediaId,
+	asMenuItem = false,
+}: {
+	mediaId: number;
+	asMenuItem?: boolean;
+}) {
 	const { t } = useTranslation();
 	const upload = useUploadCover(mediaId);
 	const [error, setError] = useState<string | null>(null);
@@ -38,16 +44,26 @@ export function ChangeCoverButton({ mediaId }: { mediaId: number }) {
 	return (
 		<>
 			<FileButton onChange={pick} accept="image/jpeg,image/png,image/webp">
-				{(props) => (
-					<Button
-						{...props}
-						variant="light"
-						leftSection={<ImagePlus size={16} />}
-						loading={upload.isPending}
-					>
-						{t("cover.change")}
-					</Button>
-				)}
+				{(props) =>
+					asMenuItem ? (
+						<Menu.Item
+							{...props}
+							leftSection={<ImagePlus size={16} />}
+							disabled={upload.isPending}
+						>
+							{t("cover.change")}
+						</Menu.Item>
+					) : (
+						<Button
+							{...props}
+							variant="light"
+							leftSection={<ImagePlus size={16} />}
+							loading={upload.isPending}
+						>
+							{t("cover.change")}
+						</Button>
+					)
+				}
 			</FileButton>
 			{error !== null && (
 				<Alert

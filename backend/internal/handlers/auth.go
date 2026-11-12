@@ -462,6 +462,13 @@ func (h *AuthHandler) ListDevices(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to load devices")
 	}
 	currentID := strings.TrimSpace(c.Query("device_id"))
+	// Веб-клиент определяем по refresh-куке: это надёжнее localStorage и
+	// работает для сессий, созданных до появления device_id на клиенте.
+	if cookie := c.Cookies(middleware.CookieRefreshToken); cookie != "" {
+		if record, err := h.refreshTokenDB.FindByToken(c.UserContext(), cookie); err == nil {
+			currentID = record.DeviceID
+		}
+	}
 	type summary struct {
 		DeviceID   string
 		Name       string

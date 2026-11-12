@@ -8,13 +8,15 @@ import {
 	Text,
 	Tooltip,
 } from "@mantine/core";
-import { MoreVertical, Music, Trash2 } from "lucide-react";
+import { MoreVertical, Music, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDeleteMedia, useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { ChangeCoverButton } from "../media/ChangeCoverButton";
+import { EditMetadataModal } from "../media/EditMetadataModal";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
 import { clickNode, useTVFocusable } from "../tv/tvFocus";
 import { useTVMode } from "../tv/useTVMode";
@@ -27,13 +29,11 @@ export function AudioTrackRow({
 	onPlay,
 	showDelete = false,
 	isCurrent = false,
-	isPlaying = false,
 }: {
 	media: Media;
 	onPlay?: () => void;
 	showDelete?: boolean;
 	isCurrent?: boolean;
-	isPlaying?: boolean;
 }) {
 	const { t } = useTranslation();
 	const player = useAudioPlayer();
@@ -41,6 +41,7 @@ export function AudioTrackRow({
 	const reload = useMediaReload(media.id);
 	const remove = useDeleteMedia();
 	const [deleteOpened, setDeleteOpened] = useState(false);
+	const [editOpened, setEditOpened] = useState(false);
 	const startPlayback = () => {
 		if (onPlay !== undefined) {
 			onPlay();
@@ -144,9 +145,17 @@ export function AudioTrackRow({
 							</Tooltip>
 						</Menu.Target>
 						<Menu.Dropdown>
-							<Menu.Item onClick={startPlayback}>
-								{isCurrent && isPlaying ? t("player.pause") : t("player.play")}
-							</Menu.Item>
+							{capabilities.canEditMetadata && (
+								<Menu.Item
+									leftSection={<Pencil size={16} />}
+									onClick={() => setEditOpened(true)}
+								>
+									{t("metadata.edit")}
+								</Menu.Item>
+							)}
+							{capabilities.canChangeCover && (
+								<ChangeCoverButton mediaId={media.id} asMenuItem />
+							)}
 							{showDelete && capabilities.canDelete && (
 								<Menu.Item
 									color="red"
@@ -186,6 +195,14 @@ export function AudioTrackRow({
 					</Group>
 				</Stack>
 			</Modal>
+			{editOpened && (
+				<EditMetadataModal
+					key={media.id}
+					opened
+					media={media}
+					onClose={() => setEditOpened(false)}
+				/>
+			)}
 		</>
 	);
 }

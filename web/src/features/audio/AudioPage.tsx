@@ -138,7 +138,6 @@ export function AudioPage() {
 								}}
 								showDelete={isAdmin && capabilities.canDelete}
 								isCurrent={player.current?.id === media.id}
-								isPlaying={player.playing}
 							/>
 						))}
 					</Stack>
