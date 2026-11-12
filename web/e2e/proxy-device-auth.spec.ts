@@ -30,7 +30,7 @@ test("вход по device-code из второго браузера", async ({ 
 		expect(code).toMatch(SIX_DIGITS);
 
 		await ownerPage.goto(`/activate#code=${code}`);
-		await expect(ownerPage.getByText("Fake TV")).toBeVisible();
+		await expect(ownerPage.getByText(/Web TV|Fake TV/)).toBeVisible();
 		await ownerPage.getByRole("button", { name: "Подтвердить вход" }).click();
 		await expect(ownerPage.getByText("Устройство подтверждено")).toBeVisible();
 

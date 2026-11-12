@@ -393,6 +393,8 @@ func (h *AuthHandler) InspectDevice(c *fiber.Ctx) error {
 		"device_name": record.DeviceName,
 		"platform":    record.Platform,
 		"expires_at":  record.ExpiresAt,
+		// Inspect — не сессия, но контракт shared требует булев флаг.
+		"current": false,
 	})
 }
 

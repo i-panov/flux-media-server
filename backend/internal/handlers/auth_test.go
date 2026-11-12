@@ -537,6 +537,7 @@ func TestDeviceCodeLoginFlow(t *testing.T) {
 	var inspected map[string]interface{}
 	parseJSONResponse(t, resp, &inspected)
 	assert.Equal(t, "Android TV", inspected["device_name"])
+	assert.Equal(t, false, inspected["current"])
 
 	req = httptest.NewRequest("POST", "/api/auth/device/approve", bytes.NewReader(inspectBody))
 	req.Header.Set("Content-Type", "application/json")
