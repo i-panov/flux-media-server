@@ -48,7 +48,7 @@ CGO_ENABLED=1 go build -o flux-server ./cmd/server
 ```bash
 cd web
 npm run dev            # Vite :5173, proxy /api → :8080
-npm run build          # tsr generate + tsc + vite build
+npm run build          # tsr generate + tsc + vite build + .br/.gz
 npm run typecheck
 npm run lint           # Biome + ESLint, должен быть чистым
 npm run lint:deadcode  # Knip

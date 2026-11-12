@@ -135,3 +135,33 @@ func TestWebLeavesAPIAlone(t *testing.T) {
 	assert.Equal(t, fiber.StatusNotFound, status)
 	assert.True(t, strings.Contains(body, "error"), body)
 }
+
+func TestWebPrecompressedAssets(t *testing.T) {
+	root := webTestDist(t)
+	asset := filepath.Join(root, "assets", "app-abc123.js")
+	require.NoError(t, os.WriteFile(asset+".br", []byte("brotli-body"), 0644))
+	require.NoError(t, os.WriteFile(asset+".gz", []byte("gzip-body"), 0644))
+	app := webTestApp(t, root)
+
+	req := httptest.NewRequest(http.MethodGet, "/assets/app-abc123.js", nil)
+	req.Header.Set("Accept-Encoding", "gzip, br")
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "br", resp.Header.Get("Content-Encoding"))
+	assert.Equal(t, "Accept-Encoding", resp.Header.Get("Vary"))
+	assert.Equal(t, "text/javascript; charset=utf-8", resp.Header.Get("Content-Type"))
+	assert.Equal(t, "brotli-body", string(body))
+
+	req = httptest.NewRequest(http.MethodGet, "/assets/app-abc123.js", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	resp, err = app.Test(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
+	assert.Equal(t, "gzip-body", string(body))
+}

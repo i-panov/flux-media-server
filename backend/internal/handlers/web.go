@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +83,8 @@ func (h *WebHandler) serve(c *fiber.Ctx) error {
 }
 
 func (h *WebHandler) serveFile(c *fiber.Ctx, rel, full string) error {
+	// Vary нужен всегда: один и тот же URL отдаёт обычный и сжатый ответ.
+	c.Set("Vary", "Accept-Encoding")
 	switch {
 	case rel == "/index.html":
 		c.Set("Cache-Control", webCacheNoStore)
@@ -102,5 +105,50 @@ func (h *WebHandler) serveFile(c *fiber.Ctx, rel, full string) error {
 	default:
 		c.Set("Cache-Control", webCacheStatic)
 	}
+	if encoded, encoding, ok := precompressed(full, c.Get("Accept-Encoding")); ok {
+		c.Set("Content-Encoding", encoding)
+		// SendFile выбирает тип по .br/.gz, поэтому возвращаем тип оригинала.
+		if contentType := mime.TypeByExtension(filepath.Ext(rel)); contentType != "" {
+			c.Set("Content-Type", contentType)
+		}
+		return c.SendFile(encoded)
+	}
 	return c.SendFile(full)
+}
+
+// precompressed выбирает готовый .br/.gz, созданный scripts/compress-dist.mjs.
+// q=0 и неизвестные кодировки игнорируются; brotli предпочтительнее gzip.
+func precompressed(full, acceptEncoding string) (path, encoding string, ok bool) {
+	accepted := make(map[string]bool)
+	for _, part := range strings.Split(acceptEncoding, ",") {
+		fields := strings.Split(strings.TrimSpace(part), ";")
+		name := strings.ToLower(strings.TrimSpace(fields[0]))
+		if name == "" {
+			continue
+		}
+		quality := 1.0
+		for _, field := range fields[1:] {
+			key, value, found := strings.Cut(strings.TrimSpace(field), "=")
+			if !found || !strings.EqualFold(key, "q") {
+				continue
+			}
+			if _, err := fmt.Sscanf(value, "%f", &quality); err != nil {
+				quality = 1
+			}
+		}
+		accepted[name] = quality > 0
+	}
+	for _, candidate := range []struct {
+		name string
+		ext  string
+	}{{"br", ".br"}, {"gzip", ".gz"}} {
+		if !accepted[candidate.name] {
+			continue
+		}
+		encoded := full + candidate.ext
+		if info, err := os.Stat(encoded); err == nil && info.Mode().IsRegular() {
+			return encoded, candidate.name, true
+		}
+	}
+	return "", "", false
 }
