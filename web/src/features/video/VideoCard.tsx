@@ -52,14 +52,14 @@ export function VideoCard({ media }: { media: Media }) {
 		<div
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
-			className="media-card relative"
+			className="media-card relative flex h-full flex-col"
 		>
 			<Link
 				to="/video/$id"
 				params={{ id: String(media.id) }}
-				className="no-underline [color:inherit]"
+				className="flex-1 no-underline [color:inherit]"
 			>
-				<Card withBorder padding="sm" radius="md">
+				<Card withBorder padding="sm" radius="md" h="100%">
 					<Card.Section className="relative">
 						{hasThumb ? (
 							<ThumbImage
@@ -89,7 +89,13 @@ export function VideoCard({ media }: { media: Media }) {
 							</Text>
 						)}
 					</Card.Section>
-					<Text fw={600} size="sm" mt="xs" lineClamp={2}>
+					<Text
+						fw={600}
+						size="sm"
+						mt="xs"
+						lineClamp={2}
+						className="min-h-[2.4rem]"
+					>
 						{media.title}
 					</Text>
 					<Text size="xs" c="dimmed">

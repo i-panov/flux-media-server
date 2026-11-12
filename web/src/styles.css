@@ -57,7 +57,16 @@ body {
 
 @media (min-width: 62em) {
 	.audio-mini-player {
+		/* Не накрываем нижнюю секцию sidebar с «Настройками»: на десктопе
+		   плеер живёт только в области контента. */
+		left: 240px;
 		bottom: 0;
+	}
+}
+
+@media (min-width: 120em) {
+	.audio-mini-player {
+		left: 280px;
 	}
 }
 

@@ -30,7 +30,7 @@ export function CollectionCard({
 		() => onToggle?.(),
 	);
 	return (
-		<div className="relative">
+		<div className="relative flex h-full flex-col">
 			{!readOnly && onToggle !== undefined && (
 				<div
 					ref={selectRef}
@@ -52,33 +52,32 @@ export function CollectionCard({
 				<MemeCard media={media} />
 			)}
 			{!readOnly && (
-				<>
+				<div className="-mt-px flex items-center justify-end gap-1 rounded-b-md border border-t-0 border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)] px-2 py-1">
 					<Tooltip label={t("collections.removeItem")} withArrow>
 						<ActionIcon
-							variant="filled"
+							variant="light"
 							color="red"
-							size="lg"
-							radius="xl"
+							size="md"
+							radius="md"
 							aria-label={t("collections.removeItem")}
-							className="absolute bottom-2 left-2 z-10"
 							onClick={onRemove}
 						>
-							<X size={18} />
+							<X size={16} />
 						</ActionIcon>
 					</Tooltip>
 					<Tooltip label={t("collections.moveItem")} withArrow>
 						<ActionIcon
-							variant="filled"
-							size="lg"
-							radius="xl"
+							variant="light"
+							color="violet"
+							size="md"
+							radius="md"
 							aria-label={t("collections.moveItem")}
-							className="absolute bottom-2 right-2 z-10"
 							onClick={onMove}
 						>
-							<FolderInput size={18} />
+							<FolderInput size={16} />
 						</ActionIcon>
 					</Tooltip>
-				</>
+				</div>
 			)}
 		</div>
 	);
