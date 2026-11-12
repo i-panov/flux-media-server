@@ -111,6 +111,11 @@ export function DevicesCard() {
 									<Text size="sm" fw={600} truncate>
 										{device.device_name}
 									</Text>
+									{device.current && (
+										<Badge size="xs" color="green" variant="light">
+											{t("devices.current")}
+										</Badge>
+									)}
 									<Tooltip label={t("devices.rename")} withArrow>
 										<ActionIcon
 											size="xs"
