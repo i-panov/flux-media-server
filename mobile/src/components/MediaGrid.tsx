@@ -42,6 +42,8 @@ export interface MediaGridProps<T extends MediaGridItem> {
 	onLongPressItem?: (item: T) => void;
 	onFavoriteItem?: (item: T) => void;
 	onMenuItem?: (item: T) => void;
+	/** Кастомная карточка: нужна для авторизованных URL по каждому item. */
+	renderCard?: (item: T, index: number) => ReactElement;
 	onEndReached?: () => void;
 	isPending?: boolean;
 	isFetchingNextPage?: boolean;
@@ -62,6 +64,7 @@ export function MediaGrid<T extends MediaGridItem>({
 	onLongPressItem,
 	onFavoriteItem,
 	onMenuItem,
+	renderCard,
 	onEndReached,
 	isPending = false,
 	isFetchingNextPage = false,
@@ -135,34 +138,38 @@ export function MediaGrid<T extends MediaGridItem>({
 			testID={testID}
 			renderItem={({ item, index }) => (
 				<View style={isTV ? styles.cellTV : styles.cell}>
-					<MediaCard
-						title={item.title}
-						subtitle={item.subtitle}
-						duration={item.duration}
-						badge={item.badge}
-						variant={item.variant}
-						imageSource={item.imageSource}
-						isFavorite={item.isFavorite}
-						download={item.download}
-						onPress={
-							onPressItem === undefined ? undefined : () => onPressItem(item)
-						}
-						onLongPress={
-							onLongPressItem === undefined
-								? undefined
-								: () => onLongPressItem(item)
-						}
-						onFavoritePress={
-							onFavoriteItem === undefined
-								? undefined
-								: () => onFavoriteItem(item)
-						}
-						onMenuPress={
-							onMenuItem === undefined ? undefined : () => onMenuItem(item)
-						}
-						testID={testID === undefined ? undefined : `${testID}-${item.id}`}
-						hasTVPreferredFocus={isTV && index === 0}
-					/>
+					{renderCard === undefined ? (
+						<MediaCard
+							title={item.title}
+							subtitle={item.subtitle}
+							duration={item.duration}
+							badge={item.badge}
+							variant={item.variant}
+							imageSource={item.imageSource}
+							isFavorite={item.isFavorite}
+							download={item.download}
+							onPress={
+								onPressItem === undefined ? undefined : () => onPressItem(item)
+							}
+							onLongPress={
+								onLongPressItem === undefined
+									? undefined
+									: () => onLongPressItem(item)
+							}
+							onFavoritePress={
+								onFavoriteItem === undefined
+									? undefined
+									: () => onFavoriteItem(item)
+							}
+							onMenuPress={
+								onMenuItem === undefined ? undefined : () => onMenuItem(item)
+							}
+							testID={testID === undefined ? undefined : `${testID}-${item.id}`}
+							hasTVPreferredFocus={isTV && index === 0}
+						/>
+					) : (
+						renderCard(item, index)
+					)}
 				</View>
 			)}
 		/>

@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useFavoriteAudioIds } from "../../src/api/favorites";
 import { useAudioList } from "../../src/api/media";
 import { AudioHomeRows } from "../../src/components/HomeRows";
+import { MediaActionsSheet } from "../../src/components/MediaActionsSheet";
 import { MediaList } from "../../src/components/MediaList";
 import { MediaSearchBar } from "../../src/components/MediaSearchBar";
 import { Screen } from "../../src/components/Screen";
@@ -19,6 +20,7 @@ export default function AudioScreen() {
 	useLanguage();
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<SortOrder>("desc");
+	const [actionsMedia, setActionsMedia] = useState<Media | null>(null);
 	const debouncedQuery = useDebouncedValue(query);
 	// Raw-значение нужно только для мгновенного выбора пустого состояния;
 	// сам запрос уходит после debounce.
@@ -87,6 +89,11 @@ export default function AudioScreen() {
 				}
 				emptyTestID={searching ? "audio-search-empty" : "audio-empty"}
 				onPressItem={onPressItem}
+				onMenuItem={setActionsMedia}
+			/>
+			<MediaActionsSheet
+				media={actionsMedia}
+				onClose={() => setActionsMedia(null)}
 			/>
 		</Screen>
 	);

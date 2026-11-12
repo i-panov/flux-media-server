@@ -77,6 +77,7 @@ interface MediaListProps {
 	query: MediaListQuery;
 	/** Optional: без обработчика строка остаётся статичной (аудио-таб). */
 	onPressItem?: (item: Media) => void;
+	onMenuItem?: (item: Media) => void;
 	/** Локальные тексты пустого/ошибочного состояния (экран артиста). */
 	emptyTitle?: string;
 	emptyDescription?: string;
@@ -95,6 +96,7 @@ interface MediaListProps {
 export function MediaList({
 	query,
 	onPressItem,
+	onMenuItem,
 	emptyTitle,
 	emptyDescription,
 	emptyTestID,
@@ -242,8 +244,23 @@ export function MediaList({
 					</View>
 					<RowDownloadIndicator mediaId={item.id} />
 					<Text style={[styles.muted, { color: colors.textMuted }]}>
-						{formatDuration(item.duration)}
+						{item.duration > 0 ? formatDuration(item.duration) : "—"}
 					</Text>
+					{onMenuItem !== undefined && (
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel={t("media.actions")}
+							onPress={() => onMenuItem(item)}
+							hitSlop={8}
+							testID={`media-row-${item.id}-menu`}
+						>
+							<Ionicons
+								name="ellipsis-horizontal"
+								size={20}
+								color={colors.textMuted}
+							/>
+						</Pressable>
+					)}
 				</Pressable>
 			)}
 		/>

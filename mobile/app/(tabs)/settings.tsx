@@ -92,7 +92,7 @@ export default function SettingsScreen() {
 	const health = useHealthQuery();
 	const session = useSession();
 	const language = useLanguage();
-	const { colors, mode, persistedMode, radii, setMode, spacing } = useTheme();
+	const { colors, mode, radii, setMode, spacing } = useTheme();
 	const queryClient = useQueryClient();
 	const [signingOut, setSigningOut] = useState(false);
 
@@ -172,18 +172,6 @@ export default function SettingsScreen() {
 				>
 					{getApiConfig().baseUrl}
 				</Text>
-				<Link href="/server" asChild>
-					<Pressable
-						testID="settings-open-server"
-						accessibilityRole="button"
-						hitSlop={8}
-						style={styles.linkButton}
-					>
-						<Text style={[styles.link, { color: colors.accent }]}>
-							{t("server.open")}
-						</Text>
-					</Pressable>
-				</Link>
 			</View>
 
 			<View
@@ -272,17 +260,6 @@ export default function SettingsScreen() {
 							</Pressable>
 						);
 					})}
-				</View>
-				<View style={styles.persistedRow}>
-					<Text style={[styles.muted, { color: colors.textMuted }]}>
-						{t("settings.themeSaved")}:
-					</Text>
-					<Text
-						testID="settings-theme-persisted"
-						style={[styles.muted, { color: colors.text }]}
-					>
-						{persistedMode === null ? "—" : t(THEME_LABELS[persistedMode])}
-					</Text>
 				</View>
 			</View>
 

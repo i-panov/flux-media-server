@@ -3,6 +3,12 @@
 // русского, поэтому пропущенный перевод не соберётся.
 export const metadataRu = {
 	"metadata.title": "Изменить метаданные",
+	"media.delete": "Удалить",
+	"media.deleteTitle": "Удалить медиа?",
+	"media.deleteConfirm": "Медиа переместится в корзину.",
+	"media.saveFile": "Сохранить как файл",
+	"media.saveError": "Не удалось сохранить файл",
+	"media.saveUnavailable": "Сохранение файлов недоступно на этом устройстве",
 	"metadata.edit": "Редактировать",
 	"metadata.name": "Название",
 	"metadata.artists": "Исполнители",
@@ -50,6 +56,12 @@ export const metadataRu = {
 
 export const metadataEn: Record<keyof typeof metadataRu, string> = {
 	"metadata.title": "Edit metadata",
+	"media.delete": "Delete",
+	"media.deleteTitle": "Delete media?",
+	"media.deleteConfirm": "The media will be moved to trash.",
+	"media.saveFile": "Save as file",
+	"media.saveError": "Could not save the file",
+	"media.saveUnavailable": "Saving files is not available on this device",
 	"metadata.edit": "Edit",
 	"metadata.name": "Title",
 	"metadata.artists": "Artists",

@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { useImageList } from "../../src/api/media";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ListFooter } from "../../src/components/ListFooter";
+import { MediaActionsSheet } from "../../src/components/MediaActionsSheet";
 import { MediaCard } from "../../src/components/MediaCard";
 import { MediaSearchBar } from "../../src/components/MediaSearchBar";
 import { Screen } from "../../src/components/Screen";
@@ -16,18 +17,22 @@ import { useAuthImageSource } from "../../src/media/useAuthImageSource";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
-function MemeTile({ media }: { media: Media }) {
+const NUMERIC_TITLE = /^\d+$/;
+
+function MemeTile({ media, onMenu }: { media: Media; onMenu: () => void }) {
 	const source = useAuthImageSource(
 		media.thumbnail_url === "" ? null : thumbPath(media.id),
 	);
+	const title = NUMERIC_TITLE.test(media.title.trim()) ? "" : media.title;
 	return (
 		<View style={styles.cell}>
 			<MediaCard
-				title={media.title}
+				title={title}
 				imageSource={source}
 				aspectRatio={1}
 				variant="video"
 				onPress={() => router.push(`/meme/${media.id}`)}
+				onMenuPress={onMenu}
 				testID={`meme-card-${media.id}`}
 			/>
 		</View>
@@ -44,6 +49,7 @@ export default function MemesScreen() {
 		() => list.data?.pages.flatMap((page) => page.items) ?? [],
 		[list.data],
 	);
+	const [actionsMedia, setActionsMedia] = useState<Media | null>(null);
 
 	return (
 		<Screen>
@@ -99,10 +105,16 @@ export default function MemesScreen() {
 						}
 					}}
 					onEndReachedThreshold={0.4}
-					renderItem={({ item }) => <MemeTile media={item} />}
+					renderItem={({ item }) => (
+						<MemeTile media={item} onMenu={() => setActionsMedia(item)} />
+					)}
 					testID="memes-list"
 				/>
 			)}
+			<MediaActionsSheet
+				media={actionsMedia}
+				onClose={() => setActionsMedia(null)}
+			/>
 		</Screen>
 	);
 }

@@ -2,20 +2,66 @@ import type { Media } from "@flux/shared";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { StyleSheet } from "react-native";
-import { useFavoriteVideoIds } from "../../src/api/favorites";
+import {
+	useFavoriteVideoIds,
+	useToggleVideoFavorite,
+} from "../../src/api/favorites";
 import { useVideoList } from "../../src/api/media";
 import { VideoHomeRows } from "../../src/components/HomeRows";
-import { MediaList } from "../../src/components/MediaList";
+import { MediaActionsSheet } from "../../src/components/MediaActionsSheet";
+import { MediaCard } from "../../src/components/MediaCard";
+import { MediaGrid } from "../../src/components/MediaGrid";
 import { MediaSearchBar } from "../../src/components/MediaSearchBar";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { UploadAction } from "../../src/components/UploadAction";
+import { useDownloadIndicator } from "../../src/downloads/DownloadProvider";
 import { t, useLanguage } from "../../src/i18n";
 import { normalizeSearchQuery, type SortOrder } from "../../src/media/search";
+import { coverPath, thumbPath } from "../../src/media/source";
+import { useAuthImageSource } from "../../src/media/useAuthImageSource";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
 import { excludeMediaIds } from "../../src/media/visibleMedia";
 import { isTV } from "../../src/tv/profile";
 import { TVVideoList } from "../../src/tv/TVVideoList";
+
+function VideoGridCard({
+	media,
+	onMenu,
+}: {
+	media: Media;
+	onMenu: () => void;
+}) {
+	const favorites = useFavoriteVideoIds();
+	const toggleFavorite = useToggleVideoFavorite();
+	const download = useDownloadIndicator(media.id);
+	const imageSource = useAuthImageSource(
+		media.cover_url === ""
+			? media.thumbnail_url === ""
+				? null
+				: thumbPath(media.id)
+			: coverPath(media.id),
+	);
+	return (
+		<MediaCard
+			title={media.title}
+			duration={media.duration}
+			imageSource={imageSource}
+			isFavorite={favorites.data?.has(media.id) ?? false}
+			download={download ?? undefined}
+			onPress={() => openVideo(media)}
+			onFavoritePress={() =>
+				toggleFavorite.mutate({
+					mediaId: media.id,
+					favorite: favorites.data?.has(media.id) ?? false,
+					media,
+				})
+			}
+			onMenuPress={onMenu}
+			testID={`video-card-${media.id}`}
+		/>
+	);
+}
 
 // Стабильный обработчик: FlatList не получает новую функцию на каждый
 // рендер экрана (набор в поиске перерисовывает его часто).
@@ -34,6 +80,7 @@ export default function VideoScreen() {
 	const searching = debouncedQuery !== "" || normalizeSearchQuery(query) !== "";
 	const list = useVideoList(debouncedQuery, sort);
 	const favorites = useFavoriteVideoIds();
+	const [actionsMedia, setActionsMedia] = useState<Media | null>(null);
 	const allItems = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const tvItems = excludeMediaIds(allItems, favorites.data);
 	// Ряды остаются смонтированными и просто скрываются: сброс поиска не
@@ -60,16 +107,23 @@ export default function VideoScreen() {
 			{isTV ? (
 				<TVVideoList items={tvItems} onPressItem={openVideo} />
 			) : (
-				<MediaList
-					query={list}
-					onPressItem={openVideo}
-					// При поиске home-ряды получают hidden и рендерят null,
-					// не размонтируясь; избранное в результатах не исключается.
+				<MediaGrid
+					items={
+						searching ? allItems : excludeMediaIds(allItems, favorites.data)
+					}
+					renderCard={(item) => (
+						<VideoGridCard media={item} onMenu={() => setActionsMedia(item)} />
+					)}
 					ListHeaderComponent={header}
-					// Избранное исключается только когда оно показано отдельным
-					// рядом; в результатах поиска оно должно находиться.
-					excludedIds={searching ? undefined : favorites.data}
-					searching={searching}
+					isPending={list.isPending}
+					isError={list.isError && allItems.length === 0}
+					isFetchingNextPage={list.isFetchingNextPage}
+					onRetry={() => void list.refetch()}
+					onEndReached={() => {
+						if (list.hasNextPage && !list.isFetchingNextPage) {
+							void list.fetchNextPage();
+						}
+					}}
 					emptyTitle={
 						searching ? t("search.noResults") : t("search.libraryEmpty")
 					}
@@ -78,9 +132,13 @@ export default function VideoScreen() {
 							? t("search.noResultsHint")
 							: t("search.libraryEmptyVideoHint")
 					}
-					emptyTestID={searching ? "video-search-empty" : "video-empty"}
+					testID="video-grid"
 				/>
 			)}
+			<MediaActionsSheet
+				media={actionsMedia}
+				onClose={() => setActionsMedia(null)}
+			/>
 		</Screen>
 	);
 }
