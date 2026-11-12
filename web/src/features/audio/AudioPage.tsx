@@ -8,7 +8,6 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
-import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAudioList } from "../../api/media";
@@ -27,7 +26,6 @@ import { AudioTrackRow } from "./AudioTrackRow";
 
 export function AudioPage() {
 	const { t } = useTranslation();
-	const navigate = useNavigate();
 	const player = useAudioPlayer();
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<"desc" | "asc">("desc");
@@ -134,8 +132,9 @@ export function AudioPage() {
 										player.toggle();
 										return;
 									}
+									// Клик по строке запускает мини-плеер; полный
+									// плеер открывается кликом по названию в нём.
 									player.playQueue(visibleItems, index);
-									void navigate({ to: "/player" });
 								}}
 								showDelete={isAdmin && capabilities.canDelete}
 								isCurrent={player.current?.id === media.id}

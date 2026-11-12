@@ -1,23 +1,31 @@
-import { ActionIcon, Group, Stack, Text, Tooltip } from "@mantine/core";
-import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
-import { Link } from "@tanstack/react-router";
-import { Music, Pause, Play, RotateCw } from "lucide-react";
-import { useId } from "react";
+import {
+	ActionIcon,
+	Button,
+	Group,
+	Menu,
+	Modal,
+	Stack,
+	Text,
+	Tooltip,
+} from "@mantine/core";
+import { MoreVertical, Music, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMediaReload } from "../../api/media";
+import { useDeleteMedia, useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
-import { DeleteMediaButton } from "../media/DeleteMediaButton";
-import { clickFirstLink, clickNode, useTVFocusable } from "../tv/tvFocus";
+import { useAudioPlayer } from "../player/AudioPlayerProvider";
+import { clickNode, useTVFocusable } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
 
-// Плоская строка трека для раздела аудио (как во Flutter): обложка,
-// название, исполнители, длительность и действия в один ряд —
-// никаких карточек с лесенкой кнопок.
+// Строка трека: клик по всей строке запускает/ставит на паузу мини-плеер.
+// Никакой детальной страницы у аудио нет: полный плеер открывается
+// кликом по названию в мини-плеере.
 export function AudioTrackRow({
 	media,
 	onPlay,
-	showDelete,
+	showDelete = false,
 	isCurrent = false,
 	isPlaying = false,
 }: {
@@ -28,128 +36,156 @@ export function AudioTrackRow({
 	isPlaying?: boolean;
 }) {
 	const { t } = useTranslation();
+	const player = useAudioPlayer();
+	const { capabilities } = useTVMode();
 	const reload = useMediaReload(media.id);
-	// ТВ-режим: строка — spatial-цель, Enter открывает детали через ссылку.
-	// Кнопка play внутри остаётся нативной (Tab/мышь).
-	// Суффикс useId: тот же трек бывает сразу в списке и избранном.
-	const instanceKey = useId().replaceAll(":", "");
-	const rowFocusKey = `audio-row-${media.id}-${instanceKey}`;
-	const playFocusKey = `audio-play-${media.id}-${instanceKey}`;
+	const remove = useDeleteMedia();
+	const [deleteOpened, setDeleteOpened] = useState(false);
+	const startPlayback = () => {
+		if (onPlay !== undefined) {
+			onPlay();
+			return;
+		}
+		if (player.current?.id === media.id) {
+			player.toggle();
+			return;
+		}
+		player.playQueue([media], 0);
+	};
+
 	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
-		rowFocusKey,
-		clickFirstLink,
-		(direction) => {
-			// Play лежит поверх широкой строки; обычная геометрия не видит
-			// его справа, поэтому уводим фокус явно.
-			if (direction === "right") {
-				void setFocus(playFocusKey);
-				return false;
-			}
-			return true;
-		},
+		`audio-row-${media.id}`,
+		() => startPlayback(),
 	);
-	const { targetRef: playRef } = useTVFocusable<HTMLButtonElement>(
-		playFocusKey,
+	const { targetRef: menuRef } = useTVFocusable<HTMLButtonElement>(
+		`audio-menu-${media.id}`,
 		clickNode,
 		undefined,
 		{ secondary: true },
 	);
-	// Обложки может не быть (mp3 без тегов): сразу плейсхолдер, без <img src="">.
 	const hasCover = media.cover_url !== "" && !reload.failed;
 	const artists = media.artists.map((artist) => artist.name).join(", ");
+
+	const stop = (event: { stopPropagation: () => void }) => {
+		event.stopPropagation();
+	};
+
 	return (
-		<Group
-			ref={tvRef}
-			tabIndex={tvMode ? -1 : undefined}
-			gap="sm"
-			wrap="nowrap"
-			className={[
-				"media-row rounded-md border px-3 py-2",
-				isCurrent
-					? "border-[var(--mantine-color-violet-5)] bg-[var(--mantine-color-violet-light)]"
-					: "border-[var(--mantine-color-default-border)]",
-			].join(" ")}
-		>
-			<div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded bg-[var(--mantine-color-default-hover)]">
-				{hasCover ? (
-					// biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError здесь — ошибка загрузки, а не интеракция.
-					<img
-						key={reload.nonce}
-						src={media.cover_url}
-						alt=""
-						loading="lazy"
-						onError={reload.handleError}
-						className="h-full w-full object-cover"
-					/>
-				) : (
-					<Music
-						size={20}
-						aria-hidden="true"
-						className="text-[var(--mantine-color-dimmed)]"
-					/>
-				)}
-			</div>
-			<Stack gap={0} className="min-w-0 flex-1">
-				<Link
-					to="/audio/$id"
-					params={{ id: String(media.id) }}
-					className="no-underline [color:inherit]"
-				>
-					<Text fw={600} size="sm" truncate>
+		<>
+			<Group
+				ref={tvRef}
+				tabIndex={tvMode ? -1 : undefined}
+				role="button"
+				gap="sm"
+				wrap="nowrap"
+				onClick={startPlayback}
+				onKeyDown={(event) => {
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						startPlayback();
+					}
+				}}
+				className={[
+					"media-row cursor-pointer rounded-md border px-3 py-2",
+					isCurrent
+						? "border-[var(--mantine-color-violet-5)] bg-[var(--mantine-color-violet-light)]"
+						: "border-[var(--mantine-color-default-border)]",
+				].join(" ")}
+			>
+				<div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded bg-[var(--mantine-color-default-hover)]">
+					{hasCover ? (
+						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError здесь — ошибка загрузки, а не интеракция.
+						<img
+							key={reload.nonce}
+							src={media.cover_url}
+							alt=""
+							loading="lazy"
+							onError={reload.handleError}
+							className="h-full w-full object-cover"
+						/>
+					) : (
+						<Music
+							size={20}
+							aria-hidden="true"
+							className="text-[var(--mantine-color-dimmed)]"
+						/>
+					)}
+				</div>
+				<Stack gap={0} className="min-w-0 flex-1">
+					<Text
+						fw={600}
+						size="sm"
+						truncate
+						c={isCurrent ? "violet" : undefined}
+					>
 						{media.title}
 					</Text>
-				</Link>
-				<Text size="xs" c="dimmed" truncate>
-					{artists === "" ? t("common.emptyFallback") : artists}
-				</Text>
-			</Stack>
-			{media.duration > 0 && (
-				<Text size="xs" c="dimmed" className="shrink-0">
-					{formatDuration(media.duration)}
-				</Text>
-			)}
-			<Group gap={4} wrap="nowrap" className="shrink-0">
-				{onPlay !== undefined && (
-					<Tooltip
-						label={
-							isCurrent && isPlaying ? t("player.pause") : t("player.play")
-						}
-						withArrow
-					>
-						<ActionIcon
-							ref={playRef}
-							variant="filled"
-							radius="xl"
-							size="lg"
-							aria-label={
-								isCurrent && isPlaying ? t("player.pause") : t("player.play")
-							}
-							onClick={onPlay}
-						>
-							{isCurrent && isPlaying ? (
-								<Pause size={18} />
-							) : (
-								<Play size={18} fill="currentColor" />
+					<Text size="xs" c="dimmed" truncate>
+						{artists === "" ? t("common.emptyFallback") : artists}
+					</Text>
+				</Stack>
+				{media.duration > 0 && (
+					<Text size="xs" c="dimmed" className="shrink-0">
+						{formatDuration(media.duration)}
+					</Text>
+				)}
+				<Group gap={2} wrap="nowrap" className="shrink-0" onClick={stop}>
+					<FavoriteButton mediaId={media.id} type="audio" />
+					<Menu position="bottom-end" withinPortal>
+						<Menu.Target>
+							<Tooltip label={t("common.more")} withArrow>
+								<ActionIcon
+									ref={menuRef}
+									variant="subtle"
+									aria-label={t("common.more")}
+								>
+									<MoreVertical size={18} />
+								</ActionIcon>
+							</Tooltip>
+						</Menu.Target>
+						<Menu.Dropdown>
+							<Menu.Item onClick={startPlayback}>
+								{isCurrent && isPlaying ? t("player.pause") : t("player.play")}
+							</Menu.Item>
+							{showDelete && capabilities.canDelete && (
+								<Menu.Item
+									color="red"
+									leftSection={<Trash2 size={16} />}
+									onClick={() => setDeleteOpened(true)}
+								>
+									{t("trash.deleteAction")}
+								</Menu.Item>
 							)}
-						</ActionIcon>
-					</Tooltip>
-				)}
-				<FavoriteButton mediaId={media.id} type="audio" />
-				{showDelete === true && (
-					<DeleteMediaButton mediaId={media.id} iconOnly />
-				)}
-				{reload.failed && (
-					<Tooltip label={t("common.retry")} withArrow>
-						<ActionIcon
-							variant="subtle"
-							aria-label={t("common.retry")}
-							onClick={reload.retry}
-						>
-							<RotateCw size={18} />
-						</ActionIcon>
-					</Tooltip>
-				)}
+						</Menu.Dropdown>
+					</Menu>
+				</Group>
 			</Group>
-		</Group>
+			<Modal
+				opened={deleteOpened}
+				onClose={() => setDeleteOpened(false)}
+				title={t("trash.deleteTitle")}
+				centered
+			>
+				<Stack gap="md">
+					<Text size="sm">{t("trash.deleteConfirm")}</Text>
+					<Group justify="flex-end">
+						<Button variant="default" onClick={() => setDeleteOpened(false)}>
+							{t("common.cancel")}
+						</Button>
+						<Button
+							color="red"
+							loading={remove.isPending}
+							onClick={() => {
+								remove.mutate(media.id, {
+									onSuccess: () => setDeleteOpened(false),
+								});
+							}}
+						>
+							{t("trash.deleteAction")}
+						</Button>
+					</Group>
+				</Stack>
+			</Modal>
+		</>
 	);
 }

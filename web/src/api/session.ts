@@ -19,6 +19,7 @@ import {
 	verifyCode,
 } from "./auth";
 import { ApiError } from "./client";
+import { getWebDeviceId } from "./deviceId";
 
 const sessionQueryKey = ["session"];
 
@@ -131,7 +132,7 @@ export function useApproveDeviceCodeMutation() {
 export function useDevicesQuery() {
 	return useQuery({
 		queryKey: deviceCodeQueryKey,
-		queryFn: () => fetchDevices(),
+		queryFn: () => fetchDevices(getWebDeviceId()),
 	});
 }
 

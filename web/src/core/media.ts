@@ -12,7 +12,6 @@ export {
 	audioListOptions,
 	fetchMediaList,
 	imageListOptions,
-	isSafeImageUrl,
 	mediaOptions,
 	mediaSchema,
 	mediaSubsOptions,

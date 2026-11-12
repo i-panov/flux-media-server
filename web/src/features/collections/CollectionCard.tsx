@@ -1,5 +1,5 @@
-import { ActionIcon, Checkbox, Tooltip } from "@mantine/core";
-import { FolderInput, X } from "lucide-react";
+import { ActionIcon, Checkbox, Menu, Tooltip } from "@mantine/core";
+import { FolderInput, MoreVertical, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Media, MediaType } from "../../core/media";
 import { AudioCard } from "../audio/AudioCard";
@@ -52,32 +52,34 @@ export function CollectionCard({
 				<MemeCard media={media} />
 			)}
 			{!readOnly && (
-				<div className="-mt-px flex items-center justify-end gap-1 rounded-b-md border border-t-0 border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)] px-2 py-1">
-					<Tooltip label={t("collections.removeItem")} withArrow>
-						<ActionIcon
-							variant="light"
+				<Menu position="bottom-end" withinPortal>
+					<Menu.Target>
+						<Tooltip label={t("common.more")} withArrow>
+							<ActionIcon
+								variant="filled"
+								color="dark"
+								size="sm"
+								radius="md"
+								aria-label={t("common.more")}
+								className="absolute top-2 right-10 z-20"
+							>
+								<MoreVertical size={14} />
+							</ActionIcon>
+						</Tooltip>
+					</Menu.Target>
+					<Menu.Dropdown>
+						<Menu.Item
 							color="red"
-							size="md"
-							radius="md"
-							aria-label={t("collections.removeItem")}
+							leftSection={<X size={14} />}
 							onClick={onRemove}
 						>
-							<X size={16} />
-						</ActionIcon>
-					</Tooltip>
-					<Tooltip label={t("collections.moveItem")} withArrow>
-						<ActionIcon
-							variant="light"
-							color="violet"
-							size="md"
-							radius="md"
-							aria-label={t("collections.moveItem")}
-							onClick={onMove}
-						>
-							<FolderInput size={16} />
-						</ActionIcon>
-					</Tooltip>
-				</div>
+							{t("collections.removeItem")}
+						</Menu.Item>
+						<Menu.Item leftSection={<FolderInput size={14} />} onClick={onMove}>
+							{t("collections.moveItem")}
+						</Menu.Item>
+					</Menu.Dropdown>
+				</Menu>
 			)}
 		</div>
 	);

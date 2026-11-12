@@ -201,7 +201,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
 				collapsed: { mobile: true },
 			}
 		: undefined;
-	const footer = authed ? { height: 64, offset: false } : undefined;
+	const footer = authed
+		? {
+				height: { base: 64, md: miniPlayerVisible ? 64 : 0 },
+				offset: false,
+			}
+		: undefined;
 
 	return (
 		<AppShell
@@ -252,6 +257,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
 					<AppShell.Section>
 						<DesktopNavItem item={SETTINGS_NAV} />
 					</AppShell.Section>
+					{miniPlayerVisible && (
+						<div aria-hidden="true" className="hidden h-[72px] md:block" />
+					)}
 				</AppShell.Navbar>
 			)}
 
@@ -276,21 +284,23 @@ export function AppLayout({ children }: { children: ReactNode }) {
 			</AppShell.Main>
 
 			{session != null && (
-				<AppShell.Footer
-					hiddenFrom="md"
-					className="border-t border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)]"
-				>
-					<Group h="100%" gap={0} wrap="nowrap">
-						<nav className="flex h-full w-full" aria-label={t("nav.mobile")}>
-							{[...MAIN_NAV, ...desktopExtra, SETTINGS_NAV].map((item) => (
-								<MobileNavItem key={item.to} item={item} />
-							))}
-						</nav>
-					</Group>
+				<AppShell.Footer className="border-t border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)]">
+					<div className="h-full md:hidden">
+						<Group h="100%" gap={0} wrap="nowrap">
+							<nav className="flex h-full w-full" aria-label={t("nav.mobile")}>
+								{[...MAIN_NAV, ...desktopExtra, SETTINGS_NAV].map((item) => (
+									<MobileNavItem key={item.to} item={item} />
+								))}
+							</nav>
+						</Group>
+					</div>
+					{miniPlayerVisible && (
+						<div className="hidden h-full md:block">
+							<AudioMiniPlayer />
+						</div>
+					)}
 				</AppShell.Footer>
 			)}
-
-			<AudioMiniPlayer />
 		</AppShell>
 	);
 }

@@ -1,6 +1,6 @@
-import { ActionIcon, Card, Text } from "@mantine/core";
+import { Card, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
-import { Film, RotateCw } from "lucide-react";
+import { Film } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
@@ -108,21 +108,6 @@ export function VideoCard({ media }: { media: Media }) {
 				type="video"
 				className="absolute top-2 left-2 z-10"
 			/>
-			{/* Retry — сосед ссылки, а не её потомок: кнопка внутри <a>
-			ломает content model и путает скринридеры. Таб-порядок:
-			ссылка карточки, затем retry. */}
-			{reload.failed && (
-				<ActionIcon
-					variant="filled"
-					size="lg"
-					radius="xl"
-					aria-label={t("common.retry")}
-					className="absolute top-2 right-2"
-					onClick={reload.retry}
-				>
-					<RotateCw size={18} />
-				</ActionIcon>
-			)}
 		</div>
 	);
 }

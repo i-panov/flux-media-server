@@ -50,10 +50,7 @@ export function ExtractAudioSection({ mediaId }: { mediaId: number }) {
 						variant="light"
 						leftSection={<AudioLines size={16} />}
 						onClick={() => {
-							void navigate({
-								to: "/audio/$id",
-								params: { id: String(track.id) },
-							});
+							void navigate({ to: "/audio" });
 						}}
 					>
 						{t("extract.openTrack")}

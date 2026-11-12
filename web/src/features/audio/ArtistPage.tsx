@@ -10,7 +10,7 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeft, Music, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,8 +23,8 @@ import type { Media } from "../../core/media";
 import { ArtistFavoriteButton } from "../favorites/ArtistFavoriteButton";
 import { ChangeCoverButton } from "../media/ChangeCoverButton";
 import { EditMetadataModal } from "../media/EditMetadataModal";
+import { useAudioPlayer } from "../player/AudioPlayerProvider";
 import {
-	clickFirstLink,
 	clickNode,
 	TVButton,
 	TVFocusScope,
@@ -45,11 +45,11 @@ function ArtistTrackRow({
 	canChangeCover: boolean;
 }) {
 	const { t } = useTranslation();
-	// Строка трека — spatial-цель: Enter открывает детали через ссылку,
-	// как в общем списке аудио.
+	const player = useAudioPlayer();
+	// Строка трека — spatial-цель: Enter запускает трек в мини-плеере.
 	const { targetRef: rowRef, tvMode } = useTVFocusable<HTMLDivElement>(
 		`artist-track-${media.id}`,
-		clickFirstLink,
+		() => player.playQueue([media], 0),
 	);
 	return (
 		<Group
@@ -59,10 +59,10 @@ function ArtistTrackRow({
 			wrap="nowrap"
 			className="rounded-md border border-[var(--mantine-color-default-border)] px-3 py-2"
 		>
-			<Link
-				to="/audio/$id"
-				params={{ id: String(media.id) }}
-				className="min-w-0 flex-1 no-underline [color:inherit]"
+			<button
+				type="button"
+				onClick={() => player.playQueue([media], 0)}
+				className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent p-0 text-left [color:inherit]"
 			>
 				<Text fw={600} size="sm" truncate>
 					{media.title}
@@ -70,7 +70,7 @@ function ArtistTrackRow({
 				<Text size="xs" c="dimmed">
 					{media.album === "" ? formatDuration(media.duration) : media.album}
 				</Text>
-			</Link>
+			</button>
 			{canEditMetadata && (
 				<Group gap={4} wrap="nowrap">
 					<Button variant="subtle" size="xs" onClick={onEdit}>

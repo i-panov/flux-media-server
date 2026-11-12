@@ -18,6 +18,8 @@ import { MediaAdminActions } from "../media/MediaAdminActions";
 import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { useTVMode } from "../tv/useTVMode";
 
+const NUMERIC_TITLE = /^\d+$/;
+
 // Просмотрщик мема: оригинал отдаётся стримом (превью — только для
 // сетки), поэтому картинка грузится в исходном качестве.
 function MemeImage({ item }: { item: Media }) {
@@ -134,6 +136,9 @@ export function MemeDetailPage() {
 
 	const item = media.data;
 	const filename = item.filename === "" ? item.title : item.filename;
+	// У мемов часто нет осмысленного названия — сервер подставляет имя
+	// файла вида 1000011340. Это не заголовок для пользователя.
+	const hasHumanTitle = !NUMERIC_TITLE.test(item.title.trim());
 
 	return (
 		<Stack
@@ -171,9 +176,11 @@ export function MemeDetailPage() {
 				</Group>
 				<MemeImage item={item} />
 				<Stack gap={4} align="center">
-					<Title order={1} size="h2" ta="center">
-						{item.title}
-					</Title>
+					{hasHumanTitle && (
+						<Title order={1} size="h2" ta="center">
+							{item.title}
+						</Title>
+					)}
 					{item.description !== "" && (
 						<Text ta="center" c="dimmed">
 							{item.description}

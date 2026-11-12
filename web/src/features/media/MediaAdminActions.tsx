@@ -33,7 +33,8 @@ export function MediaAdminActions({
 		return null;
 	}
 	const canEdit = capabilities.canEditMetadata;
-	const canChangeCover = capabilities.canChangeCover;
+	// У изображений нет отдельной обложки: менять нечего.
+	const canChangeCover = capabilities.canChangeCover && media.type !== "image";
 	const canDelete = capabilities.canDelete;
 	if (!canEdit && !canChangeCover && !canDelete) {
 		return null;

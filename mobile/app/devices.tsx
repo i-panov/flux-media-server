@@ -9,6 +9,7 @@ import {
 	TextInput,
 	View,
 } from "react-native";
+import { getDeviceIdentity } from "../src/auth/deviceInfo";
 import { AuthGate } from "../src/components/AuthGate";
 import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
@@ -20,7 +21,10 @@ export default function DevicesScreen() {
 	const queryClient = useQueryClient();
 	const devices = useQuery({
 		queryKey: ["auth", "devices"],
-		queryFn: fetchDevices,
+		queryFn: async () => {
+			const device = await getDeviceIdentity();
+			return fetchDevices(device.deviceId);
+		},
 	});
 	const revoke = useMutation({
 		mutationFn: (deviceId: string) => revokeDevice(deviceId),
@@ -144,7 +148,11 @@ export default function DevicesScreen() {
 								</Pressable>
 							</View>
 						)}
-						<Text style={{ color: colors.textMuted }}>{device.platform}</Text>
+						<Text style={{ color: colors.textMuted }}>
+							{device.current
+								? `${device.platform} · ${t("devices.current")}`
+								: device.platform}
+						</Text>
 						<Pressable
 							style={[styles.revoke, { borderColor: colors.danger }]}
 							onPress={() => confirmRevoke(device.device_id)}

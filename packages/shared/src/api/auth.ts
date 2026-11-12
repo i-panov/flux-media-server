@@ -137,6 +137,7 @@ const deviceInspectSchema = z.object({
 	device_name: z.string(),
 	platform: z.string(),
 	expires_at: z.string(),
+	current: z.boolean(),
 });
 
 export type DeviceInspectResponse = z.infer<typeof deviceInspectSchema>;
@@ -174,6 +175,7 @@ const deviceSessionSchema = z.object({
 	created_at: z.string(),
 	last_used_at: z.string().nullable(),
 	expires_at: z.string(),
+	current: z.boolean(),
 });
 
 export type DeviceSession = z.infer<typeof deviceSessionSchema>;
@@ -182,8 +184,14 @@ const deviceListSchema = z.object({
 	items: z.array(deviceSessionSchema),
 });
 
-export async function fetchDevices(): Promise<DeviceSession[]> {
-	const body = await apiFetch<unknown>("/auth/devices");
+export async function fetchDevices(
+	deviceId?: string,
+): Promise<DeviceSession[]> {
+	const query =
+		deviceId === undefined || deviceId === ""
+			? ""
+			: `?device_id=${encodeURIComponent(deviceId)}`;
+	const body = await apiFetch<unknown>(`/auth/devices${query}`);
 	return deviceListSchema.parse(body).items;
 }
 

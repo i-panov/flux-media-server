@@ -32,18 +32,19 @@ body {
 
 /* Нижняя навигация на мобильном: контент не должен уезжать под неё.
    Mantine задаёт padding инлайном, поэтому переопределяем по классу. */
+@media (min-width: 62em) {
+	main.app-shell-main-player {
+		/* Футер AppShell с плеером перекрывает контент (offset: false). */
+		padding-bottom: 64px;
+	}
+}
+
 @media (max-width: 61.99em) {
 	main.app-shell-main-mobile {
 		padding-bottom: calc(64px + 1rem);
 	}
 	main.app-shell-main-player {
 		padding-bottom: calc(64px + 1rem + 76px);
-	}
-}
-
-@media (min-width: 62em) {
-	main.app-shell-main-player {
-		padding-bottom: 96px;
 	}
 }
 
@@ -57,16 +58,12 @@ body {
 
 @media (min-width: 62em) {
 	.audio-mini-player {
-		/* Не накрываем нижнюю секцию sidebar с «Настройками»: на десктопе
-		   плеер живёт только в области контента. */
-		left: 240px;
-		bottom: 0;
-	}
-}
-
-@media (min-width: 120em) {
-	.audio-mini-player {
-		left: 280px;
+		/* На десктопе это нижний футер AppShell: полная ширина, а не
+		   обрезанная область контента. Sidebar получает отступ снизу,
+		   поэтому «Настройки» остаются над плеером. */
+		position: static;
+		left: auto;
+		bottom: auto;
 	}
 }
 

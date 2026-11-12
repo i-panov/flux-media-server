@@ -461,6 +461,7 @@ func (h *AuthHandler) ListDevices(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to load devices")
 	}
+	currentID := strings.TrimSpace(c.Query("device_id"))
 	type summary struct {
 		DeviceID   string
 		Name       string
@@ -517,6 +518,7 @@ func (h *AuthHandler) ListDevices(c *fiber.Ctx) error {
 			"created_at":   item.CreatedAt,
 			"last_used_at": item.LastUsedAt,
 			"expires_at":   item.ExpiresAt,
+			"current":      currentID != "" && item.DeviceID == currentID,
 		})
 	}
 	sort.Slice(items, func(i, j int) bool {

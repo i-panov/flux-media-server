@@ -1,12 +1,14 @@
-import { ActionIcon, Card } from "@mantine/core";
+import { Card } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
-import { Image as ImageIcon, RotateCw } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
+
+const NUMERIC_TITLE = /^\d+$/;
 
 // Квадратная плитка галереи: подписи нет, название уходит в aria-label
 // ссылки. Превью — серверный JPEG до 512 px, оригинал грузится только
@@ -34,7 +36,11 @@ export function MemeCard({ media }: { media: Media }) {
 			<Link
 				to="/memes/$id"
 				params={{ id: String(media.id) }}
-				aria-label={media.title}
+				aria-label={
+					NUMERIC_TITLE.test(media.title.trim())
+						? t("memes.title")
+						: media.title
+				}
 				className="block"
 			>
 				<Card withBorder padding={0} radius="md" className="overflow-hidden">
@@ -72,18 +78,6 @@ export function MemeCard({ media }: { media: Media }) {
 				type="image"
 				className="absolute top-2 left-2 z-10"
 			/>
-			{reload.failed && (
-				<ActionIcon
-					variant="filled"
-					size="lg"
-					radius="xl"
-					aria-label={t("common.retry")}
-					className="absolute top-2 right-2"
-					onClick={reload.retry}
-				>
-					<RotateCw size={18} />
-				</ActionIcon>
-			)}
 		</div>
 	);
 }

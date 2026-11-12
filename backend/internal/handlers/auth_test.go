@@ -581,6 +581,15 @@ func TestDeviceCodeLoginFlow(t *testing.T) {
 	assert.Equal(t, "Android TV", first["device_name"])
 	deviceID := first["device_id"].(string)
 
+	req = httptest.NewRequest("GET", "/api/auth/devices?device_id="+deviceID, nil)
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	var currentList map[string]interface{}
+	parseJSONResponse(t, resp, &currentList)
+	currentFirst := currentList["items"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, true, currentFirst["current"])
+
 	renameBody, _ := json.Marshal(map[string]string{"name": "Мой ТВ"})
 	req = httptest.NewRequest("PATCH", "/api/auth/devices/"+deviceID, bytes.NewReader(renameBody))
 	req.Header.Set("Content-Type", "application/json")

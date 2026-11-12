@@ -1,16 +1,17 @@
-import { ActionIcon, Card, Text } from "@mantine/core";
-import { Link } from "@tanstack/react-router";
-import { Music, RotateCw } from "lucide-react";
+import { Card, Text } from "@mantine/core";
+import { Music } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
+import { useAudioPlayer } from "../player/AudioPlayerProvider";
 import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
 
 export function AudioCard({ media }: { media: Media }) {
 	const { t } = useTranslation();
+	const player = useAudioPlayer();
 	const reload = useMediaReload(media.id);
 	// ТВ-режим: карточка — spatial-цель, Enter повторяет клик по ссылке.
 	// Суффикс useId: то же медиа бывает сразу в сетке и избранном.
@@ -28,10 +29,10 @@ export function AudioCard({ media }: { media: Media }) {
 			tabIndex={tvMode ? -1 : undefined}
 			className="media-card relative"
 		>
-			<Link
-				to="/audio/$id"
-				params={{ id: String(media.id) }}
-				className="no-underline [color:inherit]"
+			<button
+				type="button"
+				onClick={() => player.playQueue([media], 0)}
+				className="block w-full cursor-pointer border-0 bg-transparent p-0 text-left [color:inherit]"
 			>
 				<Card withBorder padding="sm" radius="md">
 					<Card.Section className="relative">
@@ -75,26 +76,12 @@ export function AudioCard({ media }: { media: Media }) {
 						{artists === "" ? t("common.emptyFallback") : artists}
 					</Text>
 				</Card>
-			</Link>
+			</button>
 			<FavoriteButton
 				mediaId={media.id}
 				type="audio"
 				className="absolute top-2 left-2 z-10"
 			/>
-			{/* Retry — сосед ссылки, а не её потомок: кнопка внутри <a>
-			ломает content model и путает скринридеры. */}
-			{reload.failed && (
-				<ActionIcon
-					variant="filled"
-					size="lg"
-					radius="xl"
-					aria-label={t("common.retry")}
-					className="absolute top-2 right-2"
-					onClick={reload.retry}
-				>
-					<RotateCw size={18} />
-				</ActionIcon>
-			)}
 		</div>
 	);
 }
