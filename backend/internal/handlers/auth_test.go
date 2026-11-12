@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -175,7 +176,7 @@ func TestAuthRegisterSecondUser(t *testing.T) {
 func newAuthHandlerForTest(t *testing.T, cfg *config.Config) (*handlers.AuthHandler, *services.OTPStore) {
 	t.Helper()
 	otp := services.NewOTPStore(5*time.Minute, 6, 1000)
-	return handlers.NewAuthHandler(nil, nil, otp, nil, nil, cfg), otp
+	return handlers.NewAuthHandler(nil, nil, nil, otp, nil, nil, cfg), otp
 }
 
 func TestAuthRequestCodeNotAllowedEmail(t *testing.T) {
@@ -481,4 +482,118 @@ func TestAuthLogoutClearsCookies(t *testing.T) {
 			(!cleared.Expires.IsZero() && cleared.Expires.Before(time.Now()))
 		assert.True(t, expired, "кука %s должна быть истёкшей", name)
 	}
+}
+
+func TestDeviceCodeLoginFlow(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	// Обычный OTP-вход нужен, чтобы получить пользователя, который
+	// подтвердит устройство.
+	code, err := application.OTPStore.Generate("tv-owner@example.com")
+	require.NoError(t, err)
+	body, _ := json.Marshal(map[string]string{"email": "tv-owner@example.com", "code": code})
+	req := httptest.NewRequest("POST", "/api/auth/verify-code", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var login map[string]interface{}
+	parseJSONResponse(t, resp, &login)
+	access := login["token"].(string)
+
+	// 1. Создаём device-code.
+	createBody, _ := json.Marshal(map[string]string{"device_name": "Android TV", "platform": "androidtv"})
+	req = httptest.NewRequest("POST", "/api/auth/device/code", bytes.NewReader(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var device map[string]interface{}
+	parseJSONResponse(t, resp, &device)
+	deviceCode := device["device_code"].(string)
+	userCode := device["user_code"].(string)
+	require.NotEmpty(t, deviceCode)
+	require.NotEmpty(t, userCode)
+	assert.Contains(t, device["verification_uri"], "/activate")
+
+	// 2. До подтверждения poll возвращает pending.
+	pollBody, _ := json.Marshal(map[string]string{"device_code": deviceCode})
+	req = httptest.NewRequest("POST", "/api/auth/device/token", bytes.NewReader(pollBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var pending map[string]interface{}
+	parseJSONResponse(t, resp, &pending)
+	assert.Equal(t, "pending", pending["status"])
+
+	// 3. Осмотр и подтверждение — только с access token.
+	inspectBody, _ := json.Marshal(map[string]string{"user_code": userCode})
+	req = httptest.NewRequest("POST", "/api/auth/device/inspect", bytes.NewReader(inspectBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var inspected map[string]interface{}
+	parseJSONResponse(t, resp, &inspected)
+	assert.Equal(t, "Android TV", inspected["device_name"])
+
+	req = httptest.NewRequest("POST", "/api/auth/device/approve", bytes.NewReader(inspectBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	// 4. После approve poll выдаёт токены, повторный poll — expired.
+	req = httptest.NewRequest("POST", "/api/auth/device/token", bytes.NewReader(pollBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var tokenResp map[string]interface{}
+	parseJSONResponse(t, resp, &tokenResp)
+	assert.Equal(t, "ok", tokenResp["status"])
+	assert.NotEmpty(t, tokenResp["token"])
+	assert.NotEmpty(t, tokenResp["refresh_token"])
+
+	req = httptest.NewRequest("POST", "/api/auth/device/token", bytes.NewReader(pollBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	var second map[string]interface{}
+	parseJSONResponse(t, resp, &second)
+	assert.Equal(t, "expired", second["status"])
+
+	// 5. Устройство видно в списке и отзывается.
+	req = httptest.NewRequest("GET", "/api/auth/devices", nil)
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	var devices map[string]interface{}
+	parseJSONResponse(t, resp, &devices)
+	items, ok := devices["items"].([]interface{})
+	require.True(t, ok)
+	require.NotEmpty(t, items)
+	first := items[0].(map[string]interface{})
+	assert.Equal(t, "Android TV", first["device_name"])
+	deviceID := uint(first["id"].(float64))
+
+	req = httptest.NewRequest("DELETE", fmt.Sprintf("/api/auth/devices/%d", deviceID), nil)
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	// 6. Отозванный refresh больше не работает.
+	refreshBody, _ := json.Marshal(map[string]string{"refresh_token": tokenResp["refresh_token"].(string)})
+	req = httptest.NewRequest("POST", "/api/auth/refresh", bytes.NewReader(refreshBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode)
 }

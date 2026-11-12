@@ -14,6 +14,7 @@
 | [mobile-release-notes-2026-11-11.md](mobile-release-notes-2026-11-11.md) | актуальный | mobile 0.1.33: мемы, TV-каркас, APK собран, device-smoke ждёт устройства |
 | [web-release-notes-2026-11-11.md](web-release-notes-2026-11-11.md) | исторический | web 0.1.35: TV-OSD, TV-вход, read-only, фикс карточек и «Продолжить просмотр»; реальный ТВ не проверялся |
 | [admin-release-notes-2026-11-11.md](admin-release-notes-2026-11-11.md) | актуальный | web 0.1.36, backend 1.0.30: авточистка из админки, `used_bytes`, подсказка в пользователях |
+| [device-code-auth-2026-11-12.md](device-code-auth-2026-11-12.md) | QR/device-code вход, подтверждение, устройства |
 | [tv-roadmap-2026-11-11.md](tv-roadmap-2026-11-11.md) | план + статус | Android TV, web-TV, read-only, QR/device-code, Fire TV; web 0.1.35 закрыл web-TV P1/P2; реальные ТВ не проверялись |
 | `superpowers/` | локальный архив | старые планы и спеки, **не коммитятся** (`.gitignore`) |
 

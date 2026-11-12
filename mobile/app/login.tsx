@@ -17,6 +17,7 @@ import {
 	View,
 } from "react-native";
 import { sessionQueryKey, useSession } from "../src/auth/session";
+import { TVDeviceLogin } from "../src/auth/TVDeviceLogin";
 import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
 import { secureStore } from "../src/storage/secureStore";
@@ -24,6 +25,7 @@ import { useTheme } from "../src/theme/ThemeProvider";
 import { tvFocusStyle } from "../src/tv/focus";
 import { isTV } from "../src/tv/profile";
 
+// eslint-disable-next-line max-lines-per-function -- экран держит OTP и TV QR-вход.
 export default function LoginScreen() {
 	useLanguage();
 	const { colors } = useTheme();
@@ -33,6 +35,7 @@ export default function LoginScreen() {
 	const [code, setCode] = useState("");
 	const [codeSent, setCodeSent] = useState(false);
 	const [debugCode, setDebugCode] = useState<string | null>(null);
+	const [tvQr, setTvQr] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [focusedField, setFocusedField] = useState<"email" | "code" | null>(
 		null,
@@ -81,6 +84,14 @@ export default function LoginScreen() {
 
 	if (session.data) {
 		return <Redirect href="/" />;
+	}
+
+	if (isTV && tvQr) {
+		return (
+			<Screen testID="auth-entry" contentContainerStyle={styles.screen}>
+				<TVDeviceLogin onUseOtp={() => setTvQr(false)} />
+			</Screen>
+		);
 	}
 
 	const pending = request.isPending || verify.isPending;
@@ -211,6 +222,17 @@ export default function LoginScreen() {
 							)}
 						</Pressable>
 					</>
+				)}
+				{isTV && (
+					<Pressable
+						accessibilityRole="button"
+						style={styles.linkButton}
+						onPress={() => setTvQr(true)}
+					>
+						<Text style={[styles.link, { color: colors.accent }]}>
+							{t("auth.qrUse")}
+						</Text>
+					</Pressable>
 				)}
 				<Pressable
 					testID="login-open-server"

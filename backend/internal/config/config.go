@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -35,6 +36,9 @@ type ServerConfig struct {
 	CookieSecure   bool   `yaml:"cookie_secure"` // Secure-флаг сессионных кук, нужен HTTPS
 	MaxUploadSize  int64  `yaml:"max_upload_size"`
 	WebDist        string `yaml:"web_dist"` // каталог собранного веба (web/dist); пусто — API-only
+	// PublicURL — внешний адрес веб-клиента для QR/device-code. Если пуст,
+	// берётся scheme+Host текущего запроса (нормально для LAN/dev).
+	PublicURL string `yaml:"public_url"`
 }
 
 type DatabaseConfig struct {
@@ -249,6 +253,13 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Server.MaxUploadSize <= 0 {
 		return nil, fmt.Errorf("server.max_upload_size must be > 0, got %d", cfg.Server.MaxUploadSize)
+	}
+	cfg.Server.PublicURL = strings.TrimRight(strings.TrimSpace(cfg.Server.PublicURL), "/")
+	if cfg.Server.PublicURL != "" {
+		u, err := url.Parse(cfg.Server.PublicURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return nil, fmt.Errorf("server.public_url must be an absolute http(s) URL, got %q", cfg.Server.PublicURL)
+		}
 	}
 	if cfg.Auth.CodeLength < 4 || cfg.Auth.CodeLength > 12 {
 		return nil, fmt.Errorf("auth.code_length must be between 4 and 12, got %d", cfg.Auth.CodeLength)

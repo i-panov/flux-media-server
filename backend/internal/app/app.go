@@ -164,6 +164,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	colItemRepo := repository.NewCollectionItemRepository(db)
 	lyricsRepo := repository.NewLyricsRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+	deviceAuthRepo := repository.NewDeviceAuthRepository(db)
 	artistRepo := repository.NewArtistRepository(db)
 	taskRepo := repository.NewTranscodeTaskRepository(db)
 	subRepo := repository.NewSubtitleRepository(db)
@@ -314,7 +315,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	}
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, otpStore, jwtService, smtpClient, cfg)
+	authHandler := handlers.NewAuthHandler(userRepo, refreshTokenRepo, deviceAuthRepo, otpStore, jwtService, smtpClient, cfg)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, streamer, thumbSvc)
 	thumbHandler := handlers.NewThumbHandler(mediaRepo, thumbSvc)
 	uploadHandler := handlers.NewUploadHandler(mediaRepo, uploadQueue, transcodeQueue, cfg.Media, cfg.Storage, handlers.UploadConfig{
@@ -479,6 +480,19 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 
+	// Device-code poll идёт каждые 3 секунды, поэтому общий auth-лимит
+	// (10/мин) его бы душил. 120/мин хватает нескольким ТВ за одним IP.
+	deviceRateLimiter := limiter.New(limiter.Config{
+		Max:          120,
+		Expiration:   time.Minute,
+		KeyGenerator: clientKey,
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
+
 	// Upload limiter — upload-запросы тяжёлые (multipart-тело), их
 	// нужно лимитировать отдельно от auth-роутов.
 	uploadMax := cfg.RateLimiter.UploadMax
@@ -546,12 +560,18 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	auth.Post("/request-code", authRateLimiter, authHandler.RequestCode)
 	auth.Post("/verify-code", authRateLimiter, authHandler.VerifyCode)
 	auth.Post("/refresh", authRateLimiter, authHandler.Refresh)
+	auth.Post("/device/code", authRateLimiter, authHandler.DeviceCode)
+	auth.Post("/device/token", deviceRateLimiter, authHandler.DeviceToken)
 
 	// Protected routes
 	api := fiberApp.Group("/api", middleware.AuthMiddleware(jwtService))
 
 	api.Get("/auth/me", authHandler.Me)
 	api.Post("/auth/logout", authHandler.Logout)
+	api.Get("/auth/devices", authHandler.ListDevices)
+	api.Delete("/auth/devices/:id", authHandler.RevokeDevice)
+	api.Post("/auth/device/inspect", deviceRateLimiter, authHandler.InspectDevice)
+	api.Post("/auth/device/approve", deviceRateLimiter, authHandler.ApproveDevice)
 
 	// Admin-only middleware for destructive/administrative operations.
 	requireAdmin := middleware.RequireAdmin(userRepo)

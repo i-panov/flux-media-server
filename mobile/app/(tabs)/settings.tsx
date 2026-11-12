@@ -19,6 +19,7 @@ import { type Language, setLanguage, t, useLanguage } from "../../src/i18n";
 import { saveLanguage } from "../../src/i18n/languageStorage";
 import { useTheme } from "../../src/theme/ThemeProvider";
 import { THEME_MODES, type ThemeMode } from "../../src/theme/tokens";
+import { isTV } from "../../src/tv/profile";
 
 // Текстовые ключи для трёх режимов: THEME_MODES — единственный список
 // допустимых значений, поэтому UI и типы не расходятся.
@@ -86,6 +87,7 @@ function SettingsButton({
 	);
 }
 
+// eslint-disable-next-line max-lines-per-function -- настройки держат сервер, тему, язык и аккаунт.
 export default function SettingsScreen() {
 	const health = useHealthQuery();
 	const session = useSession();
@@ -283,6 +285,36 @@ export default function SettingsScreen() {
 					</Text>
 				</View>
 			</View>
+
+			{!isTV && session.data !== null && (
+				<View
+					style={[
+						styles.card,
+						{
+							borderColor: colors.borderStrong,
+							backgroundColor: colors.surface,
+						},
+					]}
+				>
+					<Text style={[styles.cardTitle, { color: colors.text }]}>
+						{t("devices.title")}
+					</Text>
+					<Link href="/devices" asChild>
+						<Pressable style={styles.linkButton}>
+							<Text style={[styles.link, { color: colors.accent }]}>
+								{t("devices.title")}
+							</Text>
+						</Pressable>
+					</Link>
+					<Link href="/activate" asChild>
+						<Pressable style={styles.linkButton}>
+							<Text style={[styles.link, { color: colors.accent }]}>
+								{t("auth.activateTitle")}
+							</Text>
+						</Pressable>
+					</Link>
+				</View>
+			)}
 
 			{(session.data || session.isError) && (
 				<SettingsButton

@@ -274,10 +274,22 @@ type SettingRepository interface {
 // RefreshTokenRepository defines data access methods for RefreshToken entities.
 type RefreshTokenRepository interface {
 	Create(ctx context.Context, userID uint, rawToken string, expiresAt time.Time) error
+	CreateSession(ctx context.Context, userID uint, rawToken string, expiresAt time.Time, meta SessionMeta) error
+	ListByUserID(ctx context.Context, userID uint) ([]models.RefreshToken, error)
 	RotateToken(ctx context.Context, oldRawToken string, userID uint, newRawToken string, expiresAt time.Time) (*models.RefreshToken, error)
 	FindByToken(ctx context.Context, rawToken string) (*models.RefreshToken, error)
 	DeleteByToken(ctx context.Context, rawToken string) error
 	DeleteByID(ctx context.Context, id, userID uint) error
 	DeleteByUserID(ctx context.Context, userID uint) error
+	DeleteExpired(ctx context.Context) error
+}
+
+// DeviceAuthRepository stores short-lived device-code login requests.
+type DeviceAuthRepository interface {
+	Create(ctx context.Context, deviceCodeHash, userCodeHash, deviceName, platform string, expiresAt time.Time, intervalSeconds int) (*models.DeviceAuth, error)
+	FindByDeviceCode(ctx context.Context, hash string) (*models.DeviceAuth, error)
+	FindPendingByUserCode(ctx context.Context, hash string) (*models.DeviceAuth, error)
+	Approve(ctx context.Context, userCodeHash string, userID uint) (*models.DeviceAuth, error)
+	Consume(ctx context.Context, deviceCodeHash string) (*models.DeviceAuth, error)
 	DeleteExpired(ctx context.Context) error
 }

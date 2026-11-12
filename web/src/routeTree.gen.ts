@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AudioRouteImport } from './routes/audio'
 import { Route as LoginRouteImport } from './routes/login'
@@ -31,6 +32,11 @@ import { Route as VideoIdRouteImport } from './routes/video.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivateRoute = ActivateRouteImport.update({
+  id: '/activate',
+  path: '/activate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -121,6 +127,7 @@ const VideoIdRoute = VideoIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/audio': typeof AudioRouteWithChildren
   '/login': typeof LoginRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/player': typeof PlayerRoute
@@ -159,6 +167,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/audio': typeof AudioRouteWithChildren
   '/login': typeof LoginRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/activate'
     | '/admin'
     | '/audio'
     | '/login'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/activate'
     | '/admin'
     | '/login'
     | '/player'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/activate'
     | '/admin'
     | '/audio'
     | '/login'
@@ -239,6 +251,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActivateRoute: typeof ActivateRoute
   AdminRoute: typeof AdminRoute
   AudioRoute: typeof AudioRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activate': {
+      id: '/activate'
+      path: '/activate'
+      fullPath: '/activate'
+      preLoaderRoute: typeof ActivateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -421,6 +441,7 @@ const VideoRouteWithChildren = VideoRoute._addFileChildren(VideoRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActivateRoute: ActivateRoute,
   AdminRoute: AdminRoute,
   AudioRoute: AudioRouteWithChildren,
   LoginRoute: LoginRoute,

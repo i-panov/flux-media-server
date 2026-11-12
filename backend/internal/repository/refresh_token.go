@@ -27,12 +27,26 @@ func HashRefreshToken(rawToken string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// SessionMeta — человекочитаемые данные устройства для списка сессий.
+type SessionMeta struct {
+	DeviceID   string
+	DeviceName string
+	Platform   string
+}
+
 // Create stores a new refresh token (as a hash) for the user.
 func (r *RefreshTokenStore) Create(ctx context.Context, userID uint, rawToken string, expiresAt time.Time) error {
+	return r.CreateSession(ctx, userID, rawToken, expiresAt, SessionMeta{})
+}
+
+func (r *RefreshTokenStore) CreateSession(ctx context.Context, userID uint, rawToken string, expiresAt time.Time, meta SessionMeta) error {
 	record := &models.RefreshToken{
-		UserID:    userID,
-		Token:     HashRefreshToken(rawToken),
-		ExpiresAt: expiresAt,
+		UserID:     userID,
+		Token:      HashRefreshToken(rawToken),
+		ExpiresAt:  expiresAt,
+		DeviceID:   meta.DeviceID,
+		DeviceName: meta.DeviceName,
+		Platform:   meta.Platform,
 	}
 	return r.db.WithContext(ctx).Create(record).Error
 }
@@ -51,6 +65,15 @@ func (r *RefreshTokenStore) RotateToken(ctx context.Context, oldRawToken string,
 		ExpiresAt: expiresAt,
 	}
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var old models.RefreshToken
+		if err := tx.Where("token = ? AND user_id = ?", oldHash, userID).First(&old).Error; err != nil {
+			return err
+		}
+		rt.DeviceID = old.DeviceID
+		rt.DeviceName = old.DeviceName
+		rt.Platform = old.Platform
+		now := time.Now()
+		rt.LastUsedAt = &now
 		result := tx.Where("token = ? AND user_id = ?", oldHash, userID).Delete(&models.RefreshToken{})
 		if result.Error != nil {
 			return result.Error
@@ -83,6 +106,16 @@ func (r *RefreshTokenStore) DeleteByToken(ctx context.Context, rawToken string) 
 // prevent IDOR (revoking another user's token).
 func (r *RefreshTokenStore) DeleteByID(ctx context.Context, id, userID uint) error {
 	return r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&models.RefreshToken{}).Error
+}
+
+// ListByUserID returns active sessions for the device/session list.
+func (r *RefreshTokenStore) ListByUserID(ctx context.Context, userID uint) ([]models.RefreshToken, error) {
+	var tokens []models.RefreshToken
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND expires_at > ?", userID, time.Now()).
+		Order("created_at DESC").
+		Find(&tokens).Error
+	return tokens, err
 }
 
 func (r *RefreshTokenStore) DeleteByUserID(ctx context.Context, userID uint) error {

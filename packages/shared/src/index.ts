@@ -1,8 +1,18 @@
 export {
 	type AuthUser,
+	approveDeviceCode,
+	createDeviceCode,
+	type DeviceCodeResponse,
+	type DeviceInspectResponse,
+	type DevicePollResponse,
+	type DeviceSession,
+	fetchDevices,
 	fetchMe,
+	inspectDeviceCode,
 	logout,
+	pollDeviceCode,
 	type RequestCodeResponse,
+	revokeDevice,
 	requestCode,
 	type VerifyCodeResponse,
 	verifyCode,
@@ -87,3 +97,5 @@ export * from "./core/lyricsSync";
 export * from "./core/media";
 export { createQueryClient } from "./query";
 export type { KeyValueStore } from "./storage";
+
+export { type QrMatrix, qrMatrix } from "./qr";

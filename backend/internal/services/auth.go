@@ -1,7 +1,9 @@
 package services
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"sync"
 	"time"
@@ -194,11 +196,18 @@ func (s *JWTManager) GenerateRefreshToken(userID uint, email string) (string, er
 }
 
 func (s *JWTManager) generateToken(userID uint, email, tokenType string, expiry time.Duration) (string, error) {
+	// jti обязателен: без него два логина одного пользователя в одну
+	// секунду дают идентичный refresh JWT и UNIQUE-конфликт в БД.
+	jtiBytes := make([]byte, 16)
+	if _, err := rand.Read(jtiBytes); err != nil {
+		return "", err
+	}
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
 		Type:   tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        hex.EncodeToString(jtiBytes),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},

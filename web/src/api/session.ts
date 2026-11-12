@@ -7,9 +7,14 @@ import {
 import { queryClient } from "../queryClient";
 import {
 	type AuthUser,
+	approveDeviceCode,
+	createDeviceCode,
+	fetchDevices,
 	fetchMe,
+	inspectDeviceCode,
 	logout,
 	requestCode,
+	revokeDevice,
 	verifyCode,
 } from "./auth";
 import { ApiError } from "./client";
@@ -52,6 +57,11 @@ export function clearSessionData() {
 	queryClient.setQueryData(sessionQueryKey, null);
 }
 
+export function adoptSessionUser(user: AuthUser) {
+	queryClient.removeQueries();
+	queryClient.setQueryData(sessionQueryKey, user);
+}
+
 export function useRequestCodeMutation() {
 	return useMutation({
 		mutationFn: (email: string) => requestCode(email),
@@ -83,5 +93,42 @@ export function useLogoutMutation() {
 			queryClient.removeQueries();
 			queryClient.setQueryData(sessionQueryKey, null);
 		},
+	});
+}
+
+const deviceCodeQueryKey = ["auth", "device-code"];
+
+export function useCreateDeviceCodeMutation() {
+	return useMutation({
+		mutationFn: (input?: { deviceName?: string; platform?: string }) =>
+			createDeviceCode(input),
+	});
+}
+
+export function useInspectDeviceCodeMutation() {
+	return useMutation({
+		mutationFn: (userCode: string) => inspectDeviceCode(userCode),
+	});
+}
+
+export function useApproveDeviceCodeMutation() {
+	return useMutation({
+		mutationFn: (userCode: string) => approveDeviceCode(userCode),
+	});
+}
+
+export function useDevicesQuery() {
+	return useQuery({
+		queryKey: deviceCodeQueryKey,
+		queryFn: () => fetchDevices(),
+	});
+}
+
+export function useRevokeDeviceMutation() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) => revokeDevice(id),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: deviceCodeQueryKey }),
 	});
 }

@@ -29,6 +29,7 @@ server:
   # В Docker-образе бандл уже запечён в /app/web (Node-стадия
   # в backend/Dockerfile) — для него достаточно раскомментировать:
   # web_dist: "/app/web"
+  # public_url: "https://flux.example.com"  # внешний URL для QR/device-code
 
 database:
   path: "./data/flux.db"

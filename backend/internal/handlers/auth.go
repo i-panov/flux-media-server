@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"net/mail"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +27,7 @@ import (
 type AuthHandler struct {
 	userRepo       repository.UserRepository
 	refreshTokenDB repository.RefreshTokenRepository
+	deviceAuthRepo repository.DeviceAuthRepository
 	otpStore       services.OTPStoreInterface
 	jwtService     services.JWTService
 	smtpClient     *email.SMTPClient
@@ -32,6 +37,7 @@ type AuthHandler struct {
 func NewAuthHandler(
 	userRepo repository.UserRepository,
 	refreshTokenRepo repository.RefreshTokenRepository,
+	deviceAuthRepo repository.DeviceAuthRepository,
 	otpStore services.OTPStoreInterface,
 	jwtService services.JWTService,
 	smtpClient *email.SMTPClient,
@@ -40,6 +46,7 @@ func NewAuthHandler(
 	return &AuthHandler{
 		userRepo:       userRepo,
 		refreshTokenDB: refreshTokenRepo,
+		deviceAuthRepo: deviceAuthRepo,
 		otpStore:       otpStore,
 		jwtService:     jwtService,
 		smtpClient:     smtpClient,
@@ -52,8 +59,10 @@ type RequestCodeRequest struct {
 }
 
 type VerifyCodeRequest struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+	Email      string `json:"email"`
+	Code       string `json:"code"`
+	DeviceName string `json:"device_name"`
+	Platform   string `json:"platform"`
 }
 
 // checkSameOrigin защищает эндпоинты, выставляющие сессионные куки,
@@ -129,6 +138,306 @@ func (h *AuthHandler) clearSessionCookies(c *fiber.Ctx) {
 			SameSite: fiber.CookieSameSiteLaxMode,
 		})
 	}
+}
+
+const userCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+func randomUserCode() (string, error) {
+	raw := make([]byte, 8)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	out := make([]byte, len(raw))
+	for i, b := range raw {
+		out[i] = userCodeAlphabet[int(b)%len(userCodeAlphabet)]
+	}
+	return string(out), nil
+}
+
+func randomDeviceCode() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func normalizeDeviceLabel(name, platform string) (string, string) {
+	name = strings.TrimSpace(name)
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	if len(name) > 120 {
+		name = name[:120]
+	}
+	if len(platform) > 32 {
+		platform = platform[:32]
+	}
+	if name == "" {
+		switch platform {
+		case "androidtv", "tv":
+			name = "Android TV"
+		case "ios":
+			name = "iPhone / iPad"
+		case "android":
+			name = "Android"
+		default:
+			name = "Устройство"
+		}
+	}
+	if platform == "" {
+		platform = "unknown"
+	}
+	return name, platform
+}
+
+func (h *AuthHandler) issueSession(c *fiber.Ctx, user *models.User, name, platform string) (map[string]any, error) {
+	ctx := c.UserContext()
+	tokens, err := h.jwtService.GenerateTokenPair(user.ID, user.Email)
+	if err != nil {
+		return nil, err
+	}
+	deviceID, err := randomDeviceCode()
+	if err != nil {
+		return nil, err
+	}
+	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
+	if err := h.refreshTokenDB.CreateSession(ctx, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry), repository.SessionMeta{
+		DeviceID:   deviceID,
+		DeviceName: name,
+		Platform:   platform,
+	}); err != nil {
+		return nil, err
+	}
+	h.setSessionCookies(c, tokens.AccessToken, tokens.RefreshToken)
+	return map[string]any{
+		"token":         tokens.AccessToken,
+		"refresh_token": tokens.RefreshToken,
+		"user": fiber.Map{
+			"id":       user.ID,
+			"email":    user.Email,
+			"is_admin": user.IsAdmin,
+		},
+	}, nil
+}
+
+func (h *AuthHandler) verificationBaseURL(c *fiber.Ctx) string {
+	if h.config.Server.PublicURL != "" {
+		return h.config.Server.PublicURL
+	}
+	scheme := c.Protocol()
+	host := c.Get("Host")
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+type DeviceCodeRequest struct {
+	DeviceName string `json:"device_name"`
+	Platform   string `json:"platform"`
+}
+
+// DeviceCode создаёт одноразовый код для входа на ТВ/приставке. Сырые
+// коды возвращаются только здесь; в БД лежат хеши.
+func (h *AuthHandler) DeviceCode(c *fiber.Ctx) error {
+	var req DeviceCodeRequest
+	if err := c.BodyParser(&req); err != nil && len(c.Body()) > 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	name, platform := normalizeDeviceLabel(req.DeviceName, req.Platform)
+	deviceCode, err := randomDeviceCode()
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate device code")
+	}
+	userCode, err := randomUserCode()
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate user code")
+	}
+	expiresIn := h.config.Auth.CodeExpiry
+	if expiresIn < 120 {
+		expiresIn = 120
+	}
+	interval := 3
+	// Ленивая уборка: отдельный воркер для короткоживущих кодов избыточен.
+	_ = h.deviceAuthRepo.DeleteExpired(c.UserContext())
+	_, err = h.deviceAuthRepo.Create(
+		c.UserContext(),
+		repository.HashDeviceCode(deviceCode),
+		repository.HashDeviceCode(userCode),
+		name,
+		platform,
+		time.Now().Add(time.Duration(expiresIn)*time.Second),
+		interval,
+	)
+	if err != nil {
+		log.Printf("device code: create: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to create device code")
+	}
+	base := h.verificationBaseURL(c)
+	verification := base + "/activate"
+	return c.JSON(fiber.Map{
+		"device_code":               deviceCode,
+		"user_code":                 userCode,
+		"verification_uri":          verification,
+		"verification_uri_complete": verification + "?code=" + url.QueryEscape(userCode),
+		"expires_in":                expiresIn,
+		"interval":                  interval,
+	})
+}
+
+type DeviceUserCodeRequest struct {
+	UserCode string `json:"user_code"`
+}
+
+func (h *AuthHandler) InspectDevice(c *fiber.Ctx) error {
+	if _, ok := middleware.GetUserID(c); !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+	var req DeviceUserCodeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	code := strings.ToUpper(strings.TrimSpace(req.UserCode))
+	if code == "" {
+		return response.Error(c, fiber.StatusBadRequest, "user_code is required")
+	}
+	record, err := h.deviceAuthRepo.FindPendingByUserCode(c.UserContext(), repository.HashDeviceCode(code))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.Error(c, fiber.StatusNotFound, "Code not found or already used")
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to inspect code")
+	}
+	if time.Now().After(record.ExpiresAt) {
+		return response.Error(c, fiber.StatusGone, "Code expired")
+	}
+	return c.JSON(fiber.Map{
+		"device_name": record.DeviceName,
+		"platform":    record.Platform,
+		"expires_at":  record.ExpiresAt,
+	})
+}
+
+func (h *AuthHandler) ApproveDevice(c *fiber.Ctx) error {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+	var req DeviceUserCodeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	code := strings.ToUpper(strings.TrimSpace(req.UserCode))
+	if code == "" {
+		return response.Error(c, fiber.StatusBadRequest, "user_code is required")
+	}
+	record, err := h.deviceAuthRepo.Approve(c.UserContext(), repository.HashDeviceCode(code), userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrDeviceCodeInvalid) {
+			return response.Error(c, fiber.StatusNotFound, "Code not found, expired or already used")
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to approve device")
+	}
+	return c.JSON(fiber.Map{
+		"approved":    true,
+		"device_name": record.DeviceName,
+		"platform":    record.Platform,
+	})
+}
+
+type DeviceTokenRequest struct {
+	DeviceCode string `json:"device_code"`
+}
+
+func (h *AuthHandler) DeviceToken(c *fiber.Ctx) error {
+	if !checkSameOrigin(c) {
+		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
+	}
+	var req DeviceTokenRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if req.DeviceCode == "" {
+		return response.Error(c, fiber.StatusBadRequest, "device_code is required")
+	}
+	ctx := c.UserContext()
+	record, err := h.deviceAuthRepo.FindByDeviceCode(ctx, repository.HashDeviceCode(req.DeviceCode))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return reaction(c, fiber.StatusBadRequest, "invalid_grant")
+		}
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to poll device code")
+	}
+	if time.Now().After(record.ExpiresAt) && record.Status != models.DeviceAuthConsumed {
+		return reaction(c, fiber.StatusOK, "expired")
+	}
+	switch record.Status {
+	case models.DeviceAuthPending:
+		return c.JSON(fiber.Map{"status": "pending", "interval": record.IntervalSeconds})
+	case models.DeviceAuthApproved:
+		consumed, err := h.deviceAuthRepo.Consume(ctx, record.DeviceCodeHash)
+		if err != nil {
+			return reaction(c, fiber.StatusOK, "expired")
+		}
+		if consumed.UserID == nil {
+			return reaction(c, fiber.StatusBadRequest, "invalid_grant")
+		}
+		user, err := h.userRepo.FindByID(ctx, *consumed.UserID)
+		if err != nil {
+			return reaction(c, fiber.StatusBadRequest, "invalid_grant")
+		}
+		payload, err := h.issueSession(c, user, consumed.DeviceName, consumed.Platform)
+		if err != nil {
+			log.Printf("device token: issue session: %v", err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
+		}
+		payload["status"] = "ok"
+		return c.JSON(payload)
+	default:
+		return reaction(c, fiber.StatusOK, "expired")
+	}
+}
+
+func reaction(c *fiber.Ctx, status int, code string) error {
+	return c.Status(status).JSON(fiber.Map{"status": code})
+}
+
+func (h *AuthHandler) ListDevices(c *fiber.Ctx) error {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+	tokens, err := h.refreshTokenDB.ListByUserID(c.UserContext(), userID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to load devices")
+	}
+	items := make([]fiber.Map, 0, len(tokens))
+	for _, token := range tokens {
+		name := token.DeviceName
+		if name == "" {
+			name = "Неизвестное устройство"
+		}
+		items = append(items, fiber.Map{
+			"id":           token.ID,
+			"device_name":  name,
+			"platform":     token.Platform,
+			"created_at":   token.CreatedAt,
+			"last_used_at": token.LastUsedAt,
+			"expires_at":   token.ExpiresAt,
+		})
+	}
+	return c.JSON(fiber.Map{"items": items})
+}
+
+func (h *AuthHandler) RevokeDevice(c *fiber.Ctx) error {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
+	if err != nil || id == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid device id")
+	}
+	if err := h.refreshTokenDB.DeleteByID(c.UserContext(), uint(id), userID); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to revoke device")
+	}
+	return c.JSON(fiber.Map{"message": "Device revoked"})
 }
 
 func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
@@ -233,28 +542,13 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 		}
 	}
 
-	tokens, err := h.jwtService.GenerateTokenPair(user.ID, user.Email)
+	name, platform := normalizeDeviceLabel(req.DeviceName, req.Platform)
+	payload, err := h.issueSession(c, user, name, platform)
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate tokens")
-	}
-
-	refreshExpiry := time.Duration(h.config.Auth.RefreshExpiry) * time.Hour
-	if err := h.refreshTokenDB.Create(ctx, user.ID, tokens.RefreshToken, time.Now().Add(refreshExpiry)); err != nil {
-		log.Printf("Failed to store refresh token: %v", err)
+		log.Printf("Failed to create session: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
 	}
-
-	h.setSessionCookies(c, tokens.AccessToken, tokens.RefreshToken)
-
-	return c.JSON(fiber.Map{
-		"token":         tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-		"user": fiber.Map{
-			"id":       user.ID,
-			"email":    user.Email,
-			"is_admin": user.IsAdmin,
-		},
-	})
+	return c.JSON(payload)
 }
 
 func (h *AuthHandler) Me(c *fiber.Ctx) error {

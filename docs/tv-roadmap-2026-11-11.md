@@ -41,7 +41,7 @@ Android TV/QR — впереди.
 | backend | 1.0.30 | API, auth, upload/transcode/extract, trash, collections |
 | shared | 0.1.8 | media, favorites, collections, progress, lyrics, audioQueue |
 | web | 0.1.36 | функционально полный web-клиент; TV P1/P2 закрыты, включая OSD видео и правки ревью; реальный ТВ не проверялся |
-| mobile | 0.1.33 / 51 | Мемы и TV-каркас; APK/AAB собраны, TV emulator: login→список→detail→playback, play/pause и seek с пульта |
+| mobile | 0.1.34 / 52 | Мемы и TV-каркас; APK/AAB собраны, TV emulator: login→список→detail→playback, play/pause и seek с пульта |
 
 Mobile-долги, которые нужно закрыть до ТВ:
 
@@ -413,7 +413,7 @@ SafeArea, Constants и др.
 - [ ] Web закрыт: обычные P1/P2/P3, полный гейт, регрессия сценариев.
 - [x] Web TV-профиль: детект + override, read-only, навигация, OSD
       (web 0.1.35; реальный ТВ не проверялся).
-- [ ] QR/device-code вход работает на web-TV и native TV.
+- [x] QR/device-code вход работает на web-TV и native TV (backend+web+TV; device list/revoke).
 - [ ] Android TV APK/AAB собирается, проходит Play TV checklist.
 - [ ] Read-only: write-экраны недоступны, прогресс/избранное работают.
 - [ ] Проверено на реальном Android TV/приставке.

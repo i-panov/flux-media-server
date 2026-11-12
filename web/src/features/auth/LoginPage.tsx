@@ -19,6 +19,7 @@ import {
 	useVerifyCodeMutation,
 } from "../../api/session";
 import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { DeviceQrLogin } from "./DeviceQrLogin";
 
 type AuthStep = "request" | "verify";
 
@@ -46,6 +47,7 @@ function toAuthError(t: TFunction, error: unknown, step: AuthStep): string {
 	return t("auth.genericError");
 }
 
+// eslint-disable-next-line max-lines-per-function -- экран держит OTP и QR-вход.
 export function LoginPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
@@ -54,6 +56,7 @@ export function LoginPage() {
 	const [code, setCode] = useState("");
 	const [debugCode, setDebugCode] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [qrMode, setQrMode] = useState<"auto" | "on" | "off">("auto");
 
 	const requestMutation = useRequestCodeMutation();
 	const verifyMutation = useVerifyCodeMutation();
@@ -62,6 +65,7 @@ export function LoginPage() {
 	// контент секции.
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>(LOGIN_PAGE_KEY);
+	const showQr = qrMode === "on" || (qrMode === "auto" && tvMode);
 
 	const requestCode = () => {
 		if (pending) {
@@ -150,6 +154,49 @@ export function LoginPage() {
 		setDebugCode(null);
 		setError(null);
 	};
+
+	if (showQr) {
+		return (
+			<Container
+				size="xs"
+				px={{ base: "md", sm: "lg" }}
+				py={{ base: "xl", md: 96, xl: 120 }}
+				ref={tvRef}
+				tabIndex={tvMode ? -1 : undefined}
+				data-tv-page-root="true"
+				data-tv-focus-key={LOGIN_PAGE_KEY}
+			>
+				<TVFocusScope focusKey={LOGIN_PAGE_KEY}>
+					<Card
+						withBorder
+						padding="lg"
+						radius="lg"
+						shadow="sm"
+						maw={480}
+						mx="auto"
+						data-testid="login-card"
+					>
+						<Stack gap="lg">
+							<Title order={1} size="h2" ta="center">
+								{t("auth.qrTitle")}
+							</Title>
+							<Text size="sm" c="dimmed" ta="center">
+								{t("auth.qrSubtitle")}
+							</Text>
+							<DeviceQrLogin />
+							<TVButton
+								focusKey="login-qr-back"
+								variant="subtle"
+								onClick={() => setQrMode("off")}
+							>
+								{t("auth.qrBackToOtp")}
+							</TVButton>
+						</Stack>
+					</Card>
+				</TVFocusScope>
+			</Container>
+		);
+	}
 
 	return (
 		<Container
@@ -257,6 +304,13 @@ export function LoginPage() {
 								</Stack>
 							</form>
 						)}
+						<TVButton
+							focusKey="login-show-qr"
+							variant="subtle"
+							onClick={() => setQrMode("on")}
+						>
+							{t("auth.qrUse")}
+						</TVButton>
 					</Stack>
 				</Card>
 			</TVFocusScope>

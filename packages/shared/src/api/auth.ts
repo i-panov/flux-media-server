@@ -58,3 +58,120 @@ export async function logout(): Promise<void> {
 		body: "{}",
 	});
 }
+
+const deviceCodeSchema = z.object({
+	device_code: z.string(),
+	user_code: z.string(),
+	verification_uri: z.string(),
+	verification_uri_complete: z.string(),
+	expires_in: z.number(),
+	interval: z.number(),
+});
+
+export type DeviceCodeResponse = z.infer<typeof deviceCodeSchema>;
+
+const devicePendingSchema = z.object({
+	status: z.literal("pending"),
+	interval: z.number(),
+});
+
+const deviceExpiredSchema = z.object({
+	status: z.literal("expired"),
+});
+
+const deviceOkSchema = tokenPairSchema.extend({
+	status: z.literal("ok"),
+	user: authUserSchema,
+});
+
+export type DevicePollResponse =
+	| z.infer<typeof devicePendingSchema>
+	| z.infer<typeof deviceExpiredSchema>
+	| z.infer<typeof deviceOkSchema>
+	| { status: "invalid_grant" };
+
+export async function createDeviceCode(input?: {
+	deviceName?: string;
+	platform?: string;
+}): Promise<DeviceCodeResponse> {
+	const body = await apiFetch<unknown>("/auth/device/code", {
+		method: "POST",
+		body: JSON.stringify({
+			device_name: input?.deviceName ?? "",
+			platform: input?.platform ?? "",
+		}),
+	});
+	return deviceCodeSchema.parse(body);
+}
+
+export async function pollDeviceCode(
+	deviceCode: string,
+): Promise<DevicePollResponse> {
+	const body = await apiFetch<unknown>("/auth/device/token", {
+		method: "POST",
+		body: JSON.stringify({ device_code: deviceCode }),
+	});
+	const status = (body as { status?: unknown }).status;
+	if (status === "ok") return deviceOkSchema.parse(body);
+	if (status === "pending") return devicePendingSchema.parse(body);
+	if (status === "expired") return deviceExpiredSchema.parse(body);
+	return { status: "invalid_grant" };
+}
+
+const deviceInspectSchema = z.object({
+	device_name: z.string(),
+	platform: z.string(),
+	expires_at: z.string(),
+});
+
+export type DeviceInspectResponse = z.infer<typeof deviceInspectSchema>;
+
+export async function inspectDeviceCode(
+	userCode: string,
+): Promise<DeviceInspectResponse> {
+	const body = await apiFetch<unknown>("/auth/device/inspect", {
+		method: "POST",
+		body: JSON.stringify({ user_code: userCode }),
+	});
+	return deviceInspectSchema.parse(body);
+}
+
+export async function approveDeviceCode(
+	userCode: string,
+): Promise<{ approved: boolean; device_name: string; platform: string }> {
+	const body = await apiFetch<unknown>("/auth/device/approve", {
+		method: "POST",
+		body: JSON.stringify({ user_code: userCode }),
+	});
+	return z
+		.object({
+			approved: z.boolean(),
+			device_name: z.string(),
+			platform: z.string(),
+		})
+		.parse(body);
+}
+
+const deviceSessionSchema = z.object({
+	id: z.number(),
+	device_name: z.string(),
+	platform: z.string(),
+	created_at: z.string(),
+	last_used_at: z.string().nullable(),
+	expires_at: z.string(),
+});
+
+export type DeviceSession = z.infer<typeof deviceSessionSchema>;
+
+const deviceListSchema = z.object({
+	items: z.array(deviceSessionSchema),
+});
+
+export async function fetchDevices(): Promise<DeviceSession[]> {
+	const body = await apiFetch<unknown>("/auth/devices");
+	return deviceListSchema.parse(body).items;
+}
+
+export async function revokeDevice(id: number): Promise<void> {
+	await apiFetch<unknown>(`/auth/devices/${id}`, { method: "DELETE" });
+}

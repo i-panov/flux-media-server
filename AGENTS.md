@@ -92,14 +92,15 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 ```
 
 - `android/` и `ios/` генерируются (`expo prebuild`) и в git не входят.
-- Сессия (access/refresh) — только SecureStore; OTP-вход; `AuthGate`
+- Сессия (access/refresh) — только SecureStore; OTP-вход и QR/device-code
+  (TV/веб, подтверждение через `/activate`); `AuthGate`
   защищает табы, публичная настройка сервера — `/server` (`app/server.tsx`,
   доступна до входа). Logout очищает query cache, очередь, downloads,
   токены и persisted state.
 - Анализаторы: biome (extends web) + `eslint-config-expo` + sonarjs.
 - `@flux/shared` — единственный источник API/очереди/lyrics-логики;
   не дублировать fetch-контракты в mobile.
-- Поиск и сортировка списков видео/аудио реализованы в mobile 0.1.31, текущий релиз 0.1.33:
+- Поиск и сортировка списков видео/аудио реализованы в mobile 0.1.31, текущий релиз 0.1.34:
   `useVideoList(q, sort)`/`useAudioList(q, sort)`, debounce 300 мс,
   переключатель asc/desc и отдельные пустые состояния.
 - Maestro: 19 flow в `.maestro/` (tabs, theme, video, audio, lyrics,
@@ -151,7 +152,7 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - `app/` — expo-router: `(tabs)/{video,audio,library,settings}`, `index`,
   `login`, `server`, `video/[id]`, `audio/[id]`, `player`,
   `artists/{index,[id]}`, `collections/[id]`, `upload`, `trash`,
-  `downloads`, `media/[id]/edit`.
+  `downloads`, `activate`, `devices`, `media/[id]/edit`.
 - `src/auth/` — сессия, logout, `SessionResetProvider`, `AuthGate`.
 - `src/api/` — shared `CoreFetcher` + query-хуки: media, favorites,
   collections, progress, lyrics, upload, trash, metadata, cover, extract.
@@ -236,4 +237,4 @@ E2E и production build — перед крупными изменениями w
 - `docs/mobile-parity-plan-2026-11-09.md` — план паритета mobile.
 - `docs/mobile-parity-handoff-2026-11-10.md` — исторический handoff и
   актуальный статус mobile.
-- `docs/mobile-release-notes-2026-11-11.md` — release notes mobile 0.1.33.
+- `docs/mobile-release-notes-2026-11-11.md` — release notes mobile 0.1.34.

@@ -118,6 +118,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.CollectionItem{},
 		&models.Lyrics{},
 		&models.RefreshToken{},
+		&models.DeviceAuth{},
 		&models.Artist{},
 		&models.TranscodeTask{},
 		&models.ExtractTask{},

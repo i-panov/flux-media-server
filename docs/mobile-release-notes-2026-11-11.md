@@ -1,7 +1,7 @@
-# Mobile 0.1.33 — release notes (2026-11-11)
+# Mobile 0.1.34 — release notes (2026-11-12)
 
-**Версии:** mobile `0.1.33` / versionCode `51`, shared `0.1.8`,
-backend `1.0.30`, web `0.1.36`.
+**Версии:** mobile `0.1.34` / versionCode `52`, shared `0.1.9`,
+backend `1.0.31`, web `0.1.37`.
 **Ветка:** `master`. **Статус:** версия `0.1.33`/51 зафиксирована, поиск и
 сортировка списков видео/аудио вошли в релиз. Dogfood APK **собран**:
 `0.1.33`/51, ~33 МБ, только `arm64-v8a`. Device-smoke **не выполнен**:
@@ -134,3 +134,15 @@ npm run version:sync -w mobile -- --check
 YAML всех `.maestro/*.yaml` и `.github/workflows/*.yml` был проверен
 парсером локально (Python/PyYAML) в рамках Task 24; отдельного CI-шага
 для YAML нет. Новые зависимости не добавлялись.
+
+## 0.1.34 — QR/device-code вход
+
+- На Android TV логин по умолчанию показывает QR и короткий код; OTP
+  остаётся кнопкой «Войти по email».
+- Мобильное подтверждение устройства: deep link `/activate?code=...`,
+  ввод кода, показ имени/платформы, approve.
+- В настройках телефона — «Активные устройства» с отзывом сессии.
+- QR-матрица рендерится локально (`toqr` через `@flux/shared`), без
+  внешнего сервиса и без токенов в QR.
+- Для self-hosted HTTP сохранён `usesCleartextTraffic`; для QR нужен
+  `server.public_url`, иначе берётся Host запроса.

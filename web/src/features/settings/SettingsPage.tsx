@@ -23,6 +23,7 @@ import { pickLang, SUPPORTED_LANGS, type SupportedLang } from "../../i18n";
 import { useLogout } from "../auth/useLogout";
 import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { useTVMode } from "../tv/useTVMode";
+import { DevicesCard } from "./DevicesCard";
 
 const languageNames: Record<SupportedLang, string> = {
 	ru: "Русский",
@@ -198,6 +199,8 @@ export function SettingsPage() {
 							)}
 						</Stack>
 					</SettingsCard>
+
+					<DevicesCard />
 
 					<SettingsCard title={t("settings.server.title")}>
 						<Stack gap="xs">

@@ -44,6 +44,8 @@ function AppShell({
 			pathname === "/upload" ||
 			pathname === "/trash" ||
 			pathname === "/downloads" ||
+			pathname === "/devices" ||
+			pathname === "/activate" ||
 			pathname.startsWith("/media/")
 		) {
 			router.replace("/video");
@@ -87,6 +89,8 @@ function AppShell({
 							/>
 							<Stack.Screen name="login" />
 							<Stack.Screen name="server" />
+							<Stack.Screen name="activate" />
+							<Stack.Screen name="devices" />
 							<Stack.Screen name="meme/[id]" />
 							<Stack.Screen name="downloads" />
 						</Stack>
