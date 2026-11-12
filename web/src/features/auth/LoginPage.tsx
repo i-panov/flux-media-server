@@ -221,7 +221,7 @@ export function LoginPage() {
 					<Stack gap="lg">
 						<Stack gap="xs" align="center">
 							<img
-								src="/logo-2c.svg"
+								src="/favicon.svg"
 								alt=""
 								className="h-14 w-14 shrink-0"
 								aria-hidden="true"

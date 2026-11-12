@@ -125,7 +125,7 @@ function Brand() {
 			className="flex items-center gap-2 no-underline [color:inherit]"
 		>
 			<img
-				src="/logo-2c.svg"
+				src="/favicon.svg"
 				alt=""
 				className="h-9 w-9 shrink-0"
 				aria-hidden="true"
