@@ -72,7 +72,7 @@ npm run test -w @flux/shared
 ```
 
 - Чистый TS без JSX, DOM, React Native и localStorage.
-- Рантайм-зависимости: `zod`, `@tanstack/react-query`.
+- Рантайм-зависимости: `zod`, `@tanstack/react-query`, `toqr` (QR-матрица).
 - Web-модули `src/core/*` — тонкие именованные реэкспорты shared.
 
 ### Mobile (`mobile/`)
