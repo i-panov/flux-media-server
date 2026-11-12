@@ -5,7 +5,7 @@ import { useMedia } from "../../src/api/media";
 import { AuthGate } from "../../src/components/AuthGate";
 import { ErrorState } from "../../src/components/ErrorState";
 import { t, useLanguage } from "../../src/i18n";
-import { thumbPath } from "../../src/media/source";
+import { streamPath } from "../../src/media/source";
 import { useAuthImageSource } from "../../src/media/useAuthImageSource";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
@@ -22,7 +22,7 @@ function MemeContent() {
 	const id = raw === undefined ? Number.NaN : Number(raw);
 	const valid = Number.isInteger(id) && id > 0;
 	const media = useMedia(valid ? id : 0, valid);
-	const source = useAuthImageSource(valid ? thumbPath(id) : null);
+	const source = useAuthImageSource(valid ? streamPath(id) : null);
 
 	return (
 		<View style={[styles.screen, { backgroundColor: colors.playerChrome }]}>

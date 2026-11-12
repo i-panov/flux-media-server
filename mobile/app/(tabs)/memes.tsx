@@ -17,7 +17,9 @@ import { useDebouncedValue } from "../../src/media/useDebouncedValue";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
 function MemeTile({ media }: { media: Media }) {
-	const source = useAuthImageSource(thumbPath(media.id));
+	const source = useAuthImageSource(
+		media.thumbnail_url === "" ? null : thumbPath(media.id),
+	);
 	return (
 		<View style={styles.cell}>
 			<MediaCard

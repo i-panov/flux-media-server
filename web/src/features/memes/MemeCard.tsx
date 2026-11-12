@@ -23,10 +23,8 @@ export function MemeCard({ media }: { media: Media }) {
 		`meme-card-${media.id}-${instanceKey}`,
 		clickFirstLink,
 	);
-	const src =
-		media.thumbnail_url === ""
-			? `/api/media/${media.id}/stream`
-			: media.thumbnail_url;
+	// Нет превью — показываем заглушку, а не дёргаем оригинал/thumb.
+	const src = media.thumbnail_url;
 	return (
 		<div
 			ref={tvRef}
@@ -45,7 +43,7 @@ export function MemeCard({ media }: { media: Media }) {
 			>
 				<Card withBorder padding={0} radius="md" className="overflow-hidden">
 					<div className="relative aspect-square bg-[var(--mantine-color-default-hover)]">
-						{reload.failed ? (
+						{src === "" || reload.failed ? (
 							<div
 								aria-hidden="true"
 								className="grid h-full w-full place-items-center"

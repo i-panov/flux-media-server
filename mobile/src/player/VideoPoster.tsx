@@ -20,7 +20,7 @@ export function VideoPoster({
 	const { colors } = useTheme();
 	// Cover есть не у всех видео, а файл cover мог быть удалён отдельно:
 	// при ошибке загрузки откатываемся на thumbnail.
-	const thumbnail = thumbPath(media.id);
+	const thumbnail = media.thumbnail_url === "" ? null : thumbPath(media.id);
 	const cover =
 		coverVersion === 0
 			? coverPath(media.id)
@@ -29,10 +29,13 @@ export function VideoPoster({
 	// Cover и thumbnail могут отсутствовать/биться: fallback привязан к
 	// preferred, поэтому смена версии обложки сама возвращает новый путь.
 	const [fallback, setFallback] = useState<{
-		preferred: string;
+		preferred: string | null;
 		path: string;
 	} | null>(null);
-	const path = fallback?.preferred === preferred ? fallback.path : preferred;
+	const path: string | null =
+		fallback !== null && fallback.preferred === preferred
+			? fallback.path
+			: preferred;
 	const [loaded, setLoaded] = useState<{
 		path: string;
 		source: Awaited<ReturnType<typeof imageSource>>;
@@ -41,6 +44,9 @@ export function VideoPoster({
 	const failed = failedPath === path;
 
 	useEffect(() => {
+		if (path === null) {
+			return;
+		}
 		let active = true;
 		imageSource(path).then(
 			(next) => {
@@ -85,15 +91,24 @@ export function VideoPoster({
 					source={source}
 					style={StyleSheet.absoluteFill}
 					contentFit="cover"
-					cachePolicy={path === thumbnail ? "memory-disk" : "none"}
+					cachePolicy={
+						path !== null && path === thumbnail ? "memory-disk" : "none"
+					}
 					transition={150}
 					accessibilityIgnoresInvertColors
 					onError={() => {
-						if (path !== thumbnail) {
-							setFallback({ preferred, path: thumbnail });
+						const fallbackThumb = thumbnail;
+						if (
+							path !== null &&
+							fallbackThumb !== null &&
+							path !== fallbackThumb
+						) {
+							setFallback({ preferred, path: fallbackThumb });
 							return;
 						}
-						setFailedPath(path);
+						if (path !== null) {
+							setFailedPath(path);
+						}
 					}}
 				/>
 			)}

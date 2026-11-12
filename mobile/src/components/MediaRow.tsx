@@ -45,7 +45,12 @@ function RowCard({
 	// битую картинку MediaCard заменит заглушкой. Обложка меняется по тому
 	// же URL, поэтому кеш для неё отключён.
 	const hasCover = item.media.cover_url !== "";
-	const path = hasCover ? coverPath(item.media.id) : thumbPath(item.media.id);
+	const hasThumb = item.media.thumbnail_url !== "";
+	const path = hasCover
+		? coverPath(item.media.id)
+		: hasThumb
+			? thumbPath(item.media.id)
+			: null;
 	const source = useAuthImageSource(path);
 	const download = useDownloadIndicator(item.media.id);
 	const artists = item.media.artists.map((artist) => artist.name).join(", ");
@@ -58,7 +63,7 @@ function RowCard({
 			progress={item.progress}
 			variant={variantOf(item.media)}
 			imageSource={source}
-			imageCachePolicy={hasCover ? "none" : "memory-disk"}
+			imageCachePolicy={hasCover || !hasThumb ? "none" : "memory-disk"}
 			isFavorite={item.isFavorite}
 			download={download ?? undefined}
 			onPress={onPress}

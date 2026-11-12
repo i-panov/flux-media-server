@@ -23,15 +23,17 @@ export function AudioCover({
 }: AudioCoverProps) {
 	useLanguage();
 	const { colors, radii } = useTheme();
-	const thumbnail = thumbPath(media.id);
+	const thumbnail = media.thumbnail_url === "" ? null : thumbPath(media.id);
 	const hasCover = media.cover_url !== "";
 	const preferred = hasCover ? coverPath(media.id) : thumbnail;
 	// Fallback привязан к id: смена трека сама возвращает preferred, без
 	// setState в эффекте (и лишнего каскадного рендера).
-	const [fallback, setFallback] = useState<{ id: number; path: string } | null>(
-		null,
-	);
-	const path = fallback?.id === media.id ? fallback.path : preferred;
+	const [fallback, setFallback] = useState<{
+		id: number;
+		path: string;
+	} | null>(null);
+	const path: string | null =
+		fallback?.id === media.id ? fallback.path : preferred;
 	const [loaded, setLoaded] = useState<{
 		path: string;
 		source: Awaited<ReturnType<typeof imageSource>>;
@@ -40,6 +42,9 @@ export function AudioCover({
 	const failed = failedPath === path;
 
 	useEffect(() => {
+		if (path === null) {
+			return;
+		}
 		let active = true;
 		imageSource(path).then(
 			(next) => {
@@ -88,15 +93,24 @@ export function AudioCover({
 					source={source}
 					style={StyleSheet.absoluteFill}
 					contentFit="cover"
-					cachePolicy={path === thumbnail ? "memory-disk" : "none"}
+					cachePolicy={
+						path !== null && path === thumbnail ? "memory-disk" : "none"
+					}
 					transition={150}
 					accessibilityIgnoresInvertColors
 					onError={() => {
-						if (path !== thumbnail) {
-							setFallback({ id: media.id, path: thumbnail });
+						const fallbackThumb = thumbnail;
+						if (
+							path !== null &&
+							fallbackThumb !== null &&
+							path !== fallbackThumb
+						) {
+							setFallback({ id: media.id, path: fallbackThumb });
 							return;
 						}
-						setFailedPath(path);
+						if (path !== null) {
+							setFailedPath(path);
+						}
 					}}
 				/>
 			)}
