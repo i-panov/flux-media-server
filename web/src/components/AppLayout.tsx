@@ -227,8 +227,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 								<Text
 									size="sm"
 									c="dimmed"
-									maw={220}
-									truncate="end"
+									className="header-email"
+									title={session.email}
 									visibleFrom="sm"
 								>
 									{session.email}

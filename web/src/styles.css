@@ -222,3 +222,16 @@ body {
 		align-self: flex-start;
 	}
 }
+/* Email в шапке: на телефоне обрезаем, на ТВ/десктопе показываем целиком. */
+.header-email {
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@media (min-width: 62em) {
+	.header-email {
+		max-width: none;
+	}
+}
