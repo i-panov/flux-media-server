@@ -65,7 +65,7 @@ export function AdminPage() {
 				</Alert>
 				<Button
 					component={Link}
-					to="/"
+					to="/video"
 					variant="light"
 					w="fit-content"
 					leftSection={<ArrowLeft size={16} />}

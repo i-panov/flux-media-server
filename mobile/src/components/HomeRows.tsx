@@ -197,12 +197,9 @@ export function AudioHomeRows({
 }) {
 	useLanguage();
 	const { spacing } = useTheme();
-	const continueQuery = useContinueWatching("audio");
 	const favorites = useFavoriteMedia("audio");
-	const favoriteIds = useFavoriteMediaIds("audio");
 	const collections = useAudioCollections();
 	const { playQueue } = useAudioActions();
-	const favoriteSet = favoriteIds.data ?? EMPTY_IDS;
 
 	if (hidden) {
 		return null;
@@ -212,14 +209,6 @@ export function AudioHomeRows({
 		playQueue([media], 0);
 	};
 
-	const continueItems: MediaRowItem[] = (continueQuery.data ?? []).map(
-		(entry) => ({
-			media: entry.media,
-			progress: continueProgressRatio(entry, entry.media.duration),
-			isFavorite: favoriteSet.has(entry.media.id),
-			testID: `continue-card-${entry.media.id}`,
-		}),
-	);
 	const favoriteItems: MediaRowItem[] = favorites.map((media) => ({
 		media,
 		isFavorite: true,
@@ -229,13 +218,6 @@ export function AudioHomeRows({
 
 	return (
 		<View style={{ gap: spacing.lg }}>
-			<AudioHomeList
-				title={t("continue.listening")}
-				items={continueItems}
-				testID="continue-row"
-				onPressItem={(item) => play(item.media)}
-				onMenuItem={(item) => onMenuItem(item.media)}
-			/>
 			<AudioHomeList
 				title={t("favorites.title")}
 				items={favoriteItems}

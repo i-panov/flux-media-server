@@ -75,6 +75,8 @@ function isNearEnd(status: AudioStatus): boolean {
 
 export interface AudioControls {
 	playQueue: (items: Media[], startIndex?: number) => void;
+	/** Загрузить очередь без автоплея: мини-плеер появится на паузе. */
+	restoreQueue: (items: Media[], startIndex?: number) => void;
 	enqueue: (media: Media) => void;
 	toggle: () => void;
 	next: () => void;
@@ -89,6 +91,7 @@ export interface AudioControls {
 // Механика транспорта: очередь, переключение и режимы. Провайдер отвечает
 // за элемент, источник и персист; редактирование очереди — в
 // useAudioQueueEditing, чтобы каждый хук оставался в лимите размера.
+// eslint-disable-next-line max-lines-per-function -- транспорт, очередь и режимы в одном хуке.
 export function useAudioQueueControls({
 	queueState,
 	setQueueState,
@@ -121,6 +124,18 @@ export function useAudioQueueControls({
 			const next = startQueue(items, startIndex);
 			setPlayed(new Set([next.index]));
 			changeTrack(next, true);
+		},
+		[changeTrack, setPlayed],
+	);
+
+	const restoreQueue = useCallback(
+		(items: Media[], startIndex = 0) => {
+			if (items.length === 0) {
+				return;
+			}
+			const next = startQueue(items, startIndex);
+			setPlayed(new Set([next.index]));
+			changeTrack(next, false);
 		},
 		[changeTrack, setPlayed],
 	);
@@ -297,6 +312,7 @@ export function useAudioQueueControls({
 
 	return {
 		playQueue,
+		restoreQueue,
 		enqueue,
 		toggle,
 		next,

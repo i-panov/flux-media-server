@@ -20,6 +20,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useContinueWatching } from "../api/progress";
 import { useLocalReset } from "../auth/reset";
 import { useDownloadedPathResolver } from "../downloads/DownloadProvider";
 import { t, useLanguage } from "../i18n";
@@ -94,6 +95,8 @@ function useStableAudioActions(actions: AudioActions): AudioActions {
 		() => ({
 			playQueue: (items, startIndex) =>
 				latest.current.playQueue(items, startIndex),
+			restoreQueue: (items, startIndex) =>
+				latest.current.restoreQueue(items, startIndex),
 			enqueue: (media) => latest.current.enqueue(media),
 			toggle: () => latest.current.toggle(),
 			next: () => latest.current.next(),
@@ -112,6 +115,7 @@ function useStableAudioActions(actions: AudioActions): AudioActions {
 	);
 }
 
+// eslint-disable-next-line max-lines-per-function -- провайдер держит источник, очередь и восстановление.
 export function AudioProvider({ children }: { children: ReactNode }) {
 	useLanguage();
 	// Императивный createAudioPlayer + useReleasingSharedObject: плеер
@@ -133,6 +137,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		setShuffle,
 		setRepeat,
 		markUserAction,
+		hydrated: queueHydrated,
 	} = useAudioQueueState();
 
 	const current = currentMedia(queueState);
@@ -218,6 +223,25 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		resetResumeGuards,
 		setDesiredPlaying,
 	});
+
+	// Незаконченный аудиотрек при пустой очереди: mini-player на паузе.
+	const continueAudio = useContinueWatching("audio");
+	const audioRestoredRef = useRef(false);
+	useEffect(() => {
+		if (!queueHydrated || audioRestoredRef.current) {
+			return;
+		}
+		if (queueState.items.length > 0) {
+			audioRestoredRef.current = true;
+			return;
+		}
+		const entry = continueAudio.data?.[0];
+		if (entry === undefined) {
+			return;
+		}
+		audioRestoredRef.current = true;
+		controls.restoreQueue([entry.media], 0);
+	}, [continueAudio.data, controls, queueHydrated, queueState.items.length]);
 
 	const editing = useAudioQueueEditing({
 		queueState,

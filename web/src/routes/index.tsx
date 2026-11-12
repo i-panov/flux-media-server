@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { HomePage } from "../features/home/HomePage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
-	component: HomePage,
+	beforeLoad: () => {
+		// Отдельного «Главного» больше нет: корень ведёт на видео.
+		// eslint-disable-next-line @typescript-eslint/only-throw-error
+		throw redirect({ to: "/video" });
+	},
 });

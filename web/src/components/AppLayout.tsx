@@ -11,7 +11,6 @@ import {
 import { Link } from "@tanstack/react-router";
 import {
 	Film,
-	Home,
 	Image as ImageIcon,
 	LogOut,
 	Moon,
@@ -40,7 +39,6 @@ interface NavItemConfig {
 }
 
 const MAIN_NAV: NavItemConfig[] = [
-	{ to: "/", labelKey: "nav.home", icon: Home, exact: true },
 	{ to: "/video", labelKey: "nav.video", icon: Film, exact: false },
 	{ to: "/audio", labelKey: "nav.audio", icon: Music, exact: false },
 	{ to: "/memes", labelKey: "nav.memes", icon: ImageIcon, exact: false },
@@ -121,7 +119,7 @@ function Brand() {
 	return (
 		<Link
 			ref={targetRef}
-			to="/"
+			to="/video"
 			className="flex items-center gap-2 no-underline [color:inherit]"
 		>
 			<img

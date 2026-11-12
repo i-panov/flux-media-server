@@ -115,7 +115,7 @@ export function ActivatePage() {
 							<Group>
 								<Button
 									variant="light"
-									onClick={() => void navigate({ to: "/" })}
+									onClick={() => void navigate({ to: "/video" })}
 								>
 									{t("auth.activateDone")}
 								</Button>

@@ -38,8 +38,8 @@ export function isTVReadOnlyPath(pathname: string): boolean {
 	);
 }
 
-export function tvRouteRedirectTarget(pathname: string): "/" | "/video" {
-	return normalizePathname(pathname).startsWith("/memes") ? "/video" : "/";
+export function tvRouteRedirectTarget(): "/video" {
+	return "/video";
 }
 
 // Тот же приоритет, что и у TVModeContext: URL, сохранённый выбор,

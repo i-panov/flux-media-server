@@ -8,7 +8,7 @@ export const Route = createFileRoute("/memes")({
 	beforeLoad: ({ location }) => {
 		if (shouldBlockTVRoute(location.pathname, location.searchStr)) {
 			// eslint-disable-next-line @typescript-eslint/only-throw-error
-			throw redirect({ to: tvRouteRedirectTarget(location.pathname) });
+			throw redirect({ to: tvRouteRedirectTarget() });
 		}
 	},
 	component: () => <Outlet />,

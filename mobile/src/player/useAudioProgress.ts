@@ -37,7 +37,6 @@ export function useAudioProgress({
 	player,
 	sourceReady,
 	sourceLoading,
-	resumeDisabled = false,
 	resumePreemptedRef,
 }: UseAudioProgressOptions): AudioProgressState {
 	const {
@@ -47,12 +46,14 @@ export function useAudioProgress({
 		resetUserStarted,
 		onResumed,
 	} = useAudioProgressTracking({ mediaId, player, sourceReady, sourceLoading });
+	// Аудио всегда начинается с нуля. Прогресс сохраняем только для
+	// восстановления mini-player, но не применяем seek.
 	useAudioServerResume({
 		mediaId,
 		generation,
 		player,
 		sourceReady,
-		resumeDisabled,
+		resumeDisabled: true,
 		userStarted,
 		resumePreemptedRef,
 		onResumed,

@@ -20,6 +20,15 @@ import {
 	useRevokeDeviceMutation,
 } from "../../api/session";
 
+function formatDeviceDate(value: string): string {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return value;
+	return new Intl.DateTimeFormat(undefined, {
+		dateStyle: "medium",
+		timeStyle: "short",
+	}).format(date);
+}
+
 export function DevicesCard() {
 	const { t } = useTranslation();
 	const devices = useDevicesQuery();
@@ -52,11 +61,22 @@ export function DevicesCard() {
 	return (
 		<Card withBorder padding="lg" radius="md" h="100%">
 			<Stack gap="md">
-				<Group justify="space-between" align="center" wrap="nowrap">
+				<Group
+					justify="space-between"
+					align="center"
+					wrap="wrap"
+					className="devices-card-head"
+				>
 					<Title order={2} size="h4">
 						{t("devices.title")}
 					</Title>
-					<Button component={Link} to="/activate" variant="light" size="xs">
+					<Button
+						component={Link}
+						to="/activate"
+						variant="light"
+						size="xs"
+						w={{ base: "100%", sm: "auto" }}
+					>
 						{t("auth.activateTitle")}
 					</Button>
 				</Group>
@@ -75,7 +95,12 @@ export function DevicesCard() {
 					</Text>
 				)}
 				{devices.data?.map((device) => (
-					<Group key={device.device_id} justify="space-between" wrap="nowrap">
+					<Group
+						key={device.device_id}
+						justify="space-between"
+						wrap="wrap"
+						className="devices-row"
+					>
 						<Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
 							{editing === device.device_id ? (
 								<Group gap="xs" wrap="nowrap">
@@ -113,8 +138,8 @@ export function DevicesCard() {
 									</Tooltip>
 								</Group>
 							) : (
-								<Group gap="xs" wrap="nowrap">
-									<Text size="sm" fw={600} truncate>
+								<Group gap="xs" wrap="wrap">
+									<Text size="sm" fw={600} style={{ wordBreak: "break-word" }}>
 										{device.device_name}
 									</Text>
 									{device.current && (
@@ -142,7 +167,7 @@ export function DevicesCard() {
 								</Group>
 							)}
 							<Text size="xs" c="dimmed">
-								{device.last_used_at ?? device.created_at}
+								{formatDeviceDate(device.last_used_at ?? device.created_at)}
 							</Text>
 						</Stack>
 						<Button

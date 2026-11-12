@@ -1,5 +1,7 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { fetchDevices, renameDevice, revokeDevice } from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
 	Alert,
@@ -58,6 +60,21 @@ export default function DevicesScreen() {
 	return (
 		<AuthGate>
 			<Screen scroll testID="devices-screen">
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("common.back")}
+					onPress={() =>
+						router.canGoBack() ? router.back() : router.replace("/settings")
+					}
+					testID="devices-back"
+					hitSlop={8}
+					style={styles.back}
+				>
+					<Ionicons name="chevron-back" size={24} color={colors.text} />
+					<Text style={{ color: colors.text, fontSize: 16 }}>
+						{t("common.back")}
+					</Text>
+				</Pressable>
 				<Text style={[styles.title, { color: colors.text }]}>
 					{t("devices.title")}
 				</Text>
@@ -169,6 +186,7 @@ export default function DevicesScreen() {
 }
 
 const styles = StyleSheet.create({
+	back: { flexDirection: "row", alignItems: "center", minHeight: 44 },
 	title: { fontSize: 26, fontWeight: "700" },
 	card: { borderWidth: 1, gap: 6 },
 	input: { borderWidth: 1, borderRadius: 8, padding: 8 },

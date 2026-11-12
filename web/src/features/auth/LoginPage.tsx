@@ -92,7 +92,7 @@ export function LoginPage() {
 			{ email: email.trim(), code: code.trim(), deviceId: getWebDeviceId() },
 			{
 				onSuccess: () => {
-					void navigate({ to: "/" });
+					void navigate({ to: "/video" });
 				},
 				onError: (verifyError) => {
 					setError(toAuthError(t, verifyError, "verify"));

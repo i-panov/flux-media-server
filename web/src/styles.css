@@ -205,3 +205,20 @@ body {
 		backdrop-filter: blur(6px);
 	}
 }
+@media (max-width: 61.99em) {
+	/* Карточка устройств на телефоне: строки не сжимаются в одну линию. */
+	.devices-card-head {
+		flex-wrap: wrap;
+	}
+	.devices-card-head .mantine-Button-root {
+		width: 100%;
+	}
+	.mantine-Group-root.devices-row {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 8px;
+	}
+	.devices-row .mantine-Button-root {
+		align-self: flex-start;
+	}
+}
