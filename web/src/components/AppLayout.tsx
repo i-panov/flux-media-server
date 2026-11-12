@@ -16,7 +16,6 @@ import {
 	LogOut,
 	Moon,
 	Music,
-	Play,
 	Settings,
 	Shield,
 	Sun,
@@ -125,9 +124,12 @@ function Brand() {
 			to="/"
 			className="flex items-center gap-2 no-underline [color:inherit]"
 		>
-			<div className="flux-brand-gradient grid h-8 w-8 place-items-center rounded-lg text-white">
-				<Play size={16} fill="currentColor" />
-			</div>
+			<img
+				src="/logo-2c.svg"
+				alt=""
+				className="h-9 w-9 shrink-0"
+				aria-hidden="true"
+			/>
 			<Text fw={700} size="lg">
 				Flux
 			</Text>

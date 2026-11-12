@@ -10,7 +10,6 @@ import {
 import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { Play } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
@@ -221,9 +220,12 @@ export function LoginPage() {
 				>
 					<Stack gap="lg">
 						<Stack gap="xs" align="center">
-							<div className="flux-brand-gradient grid h-12 w-12 place-items-center rounded-xl text-white">
-								<Play size={24} fill="currentColor" />
-							</div>
+							<img
+								src="/logo-2c.svg"
+								alt=""
+								className="h-14 w-14 shrink-0"
+								aria-hidden="true"
+							/>
 							<Title order={1} size="h2" ta="center">
 								{t("auth.title")}
 							</Title>
