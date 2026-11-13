@@ -118,6 +118,8 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	}
 	destPath := h.mediaCfg.VideoPath
 	switch mediaType {
+	case models.MediaTypeVideo:
+		destPath = h.mediaCfg.VideoPath
 	case models.MediaTypeAudio:
 		destPath = h.mediaCfg.AudioPath
 	case models.MediaTypeImage:
@@ -128,7 +130,7 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	}
 
 	// Ensure destination directory exists.
-	if err := os.MkdirAll(destPath, 0755); err != nil {
+	if err := os.MkdirAll(destPath, 0750); err != nil {
 		log.Printf("upload: mkdir %s: %v", destPath, err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create directory")
 	}
@@ -201,7 +203,7 @@ func (h *UploadHandler) uploadVideo(c *fiber.Ctx, fileHeader *multipart.FileHead
 	if h.storageCfg.OriginalsDir == "" {
 		return response.Error(c, fiber.StatusInternalServerError, "Originals directory is not configured")
 	}
-	if err := os.MkdirAll(h.storageCfg.OriginalsDir, 0755); err != nil {
+	if err := os.MkdirAll(h.storageCfg.OriginalsDir, 0750); err != nil {
 		log.Printf("upload: mkdir %s: %v", h.storageCfg.OriginalsDir, err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create directory")
 	}
@@ -256,7 +258,7 @@ func saveUploadExclusive(c *fiber.Ctx, fileHeader *multipart.FileHeader, dir, fi
 		if !services.IsSubPath(dir, full) {
 			return "", fmt.Errorf("invalid filename: %s", filename)
 		}
-		out, err := os.OpenFile(full, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		out, err := os.OpenFile(full, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		if err != nil {
 			if os.IsExist(err) {
 				continue

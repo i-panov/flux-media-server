@@ -6,10 +6,10 @@ import "gorm.io/gorm"
 
 // Collection — пользовательская подборка медиа (например, «Хочу посмотреть»).
 type Collection struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uint      `gorm:"index" json:"user_id"`
-	Name      string    `gorm:"size:255" json:"name"`
-	Type      MediaType `gorm:"index;type:text" json:"type"` // video
+	ID     uint      `gorm:"primaryKey" json:"id"`
+	UserID uint      `gorm:"index" json:"user_id"`
+	Name   string    `gorm:"size:255" json:"name"`
+	Type   MediaType `gorm:"index;type:text" json:"type"` // video
 	// ParentID — вложенность (NULL = корень). Индекс с явным именем:
 	// безымянный gorm:"index" при переименовании поля оставляет сироту
 	// в sqlite_master. Каскад удаления детей — в CollectionStore.Delete,

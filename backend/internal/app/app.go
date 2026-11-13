@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -235,16 +236,16 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	}
 
 	// Ensure media directories exist.
-	if err := os.MkdirAll(cfg.Media.VideoPath, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Media.VideoPath, 0750); err != nil {
 		return nil, fmt.Errorf("create video dir: %w", err)
 	}
-	if err := os.MkdirAll(cfg.Media.AudioPath, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Media.AudioPath, 0750); err != nil {
 		return nil, fmt.Errorf("create audio dir: %w", err)
 	}
-	if err := os.MkdirAll(cfg.Storage.OriginalsDir, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Storage.OriginalsDir, 0750); err != nil {
 		return nil, fmt.Errorf("create originals dir: %w", err)
 	}
-	if err := os.MkdirAll(cfg.Storage.TempDir, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Storage.TempDir, 0750); err != nil {
 		return nil, fmt.Errorf("create temp dir: %w", err)
 	}
 	// Каталоги контента не должны пересекаться: иначе сканер
@@ -265,7 +266,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		return nil, fmt.Errorf("validate content dirs: %w", err)
 	}
 	if cfg.Media.ImagePath != "" {
-		if err := os.MkdirAll(cfg.Media.ImagePath, 0755); err != nil {
+		if err := os.MkdirAll(cfg.Media.ImagePath, 0750); err != nil {
 			return nil, fmt.Errorf("create image dir: %w", err)
 		}
 	}
@@ -367,8 +368,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		Concurrency: maxConcurrentConnections,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
-			if e, ok := err.(*fiber.Error); ok {
-				code = e.Code
+			var fiberErr *fiber.Error
+			if errors.As(err, &fiberErr) {
+				code = fiberErr.Code
 			}
 			if code == fiber.StatusRequestEntityTooLarge {
 				return c.Status(code).JSON(fiber.Map{

@@ -494,7 +494,7 @@ func (r *CollectionItemStore) AddItemAtomic(ctx context.Context, collectionID, m
 		if isPositionViolation(err) && attempt < maxPositionRetries {
 			continue
 		}
-		return models.CollectionItem{}, fmt.Errorf("%w: %v", ErrDuplicateItem, err)
+		return models.CollectionItem{}, fmt.Errorf("%w: %w", ErrDuplicateItem, err)
 	}
 }
 
@@ -568,7 +568,7 @@ func (r *CollectionItemStore) MoveItemAtomic(ctx context.Context, sourceID, targ
 		if isPositionViolation(err) && attempt < maxPositionRetries {
 			continue
 		}
-		return models.CollectionItem{}, fmt.Errorf("%w: %v", ErrDuplicateItem, err)
+		return models.CollectionItem{}, fmt.Errorf("%w: %w", ErrDuplicateItem, err)
 	}
 }
 

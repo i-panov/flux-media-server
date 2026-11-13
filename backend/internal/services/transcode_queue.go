@@ -551,11 +551,14 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 	// 4. Место под результат и temp (с авточисткой, если включена).
 	resultEstimate := sourceSize
 	tempNeed := int64(0)
-	if plan.Kind == NormalizeFull || plan.Kind == NormalizeAudio {
+	switch plan.Kind {
+	case NormalizeFull, NormalizeAudio:
 		resultEstimate = int64(float64(sourceSize) * q.cfg.EstimateFactor)
 		tempNeed = resultEstimate
-	} else if plan.Kind == NormalizeRemux {
+	case NormalizeRemux:
 		tempNeed = sourceSize
+	case NormalizeDirect:
+		// Direct: исходник переносится, дополнительное место не нужно.
 	}
 	protect := map[string]bool{task.SourcePath: true}
 	if err := q.ensureFreeSpace(q.cfg.LibraryVideoDir, resultEstimate, protect); err != nil {
@@ -1153,27 +1156,6 @@ func (q *TranscodeQueue) evictionCandidates(protect map[string]bool) ([]Original
 	return candidates, nil
 }
 
-// nextEvictionVictim возвращает первого кандидата на удаление: только
-// оригиналы с готовой нормализованной копией (status done), сначала
-// наименее смотримые, внутри — самые большие.
-func (q *TranscodeQueue) nextEvictionVictim(protect map[string]bool) (OriginalInfo, bool) {
-	originals, err := q.OriginalsStatus()
-	if err != nil {
-		log.Printf("transcode: auto-cleanup list originals: %v", err)
-		return OriginalInfo{}, false
-	}
-	for _, info := range originals {
-		if info.Status != TranscodeTaskDone {
-			continue
-		}
-		if protect[filepath.Join(q.cfg.OriginalsDir, info.Name)] {
-			continue
-		}
-		return info, true
-	}
-	return OriginalInfo{}, false
-}
-
 // OriginalsStatus возвращает файлы карантина со статусами заданий
 // и просмотрами, отсортированные порядком чистки: просмотры по
 // возрастанию, размер по убыванию, имя — для детерминированности.
@@ -1246,7 +1228,7 @@ func (q *TranscodeQueue) OriginalsStatus() ([]OriginalInfo, error) {
 // с O_EXCL. EEXIST означает гонку имён: вызывающий подбирает новое имя
 // (uniquePath) или ретраит — молчаливой перезаписи нет никогда.
 func commitExclusive(src, dst string) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0750); err != nil {
 		return err
 	}
 	if err := os.Link(src, dst); err == nil {
@@ -1265,12 +1247,13 @@ func commitExclusive(src, dst string) error {
 
 // copyFileExclusive копирует файл, отказываясь трогать существующий dst.
 func copyFileExclusive(src, dst string) error {
+	// #nosec G304 -- путь оригинала из очереди/карантина.
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		if os.IsExist(err) {
 			return fmt.Errorf("%w: %s", ErrDestinationExists, dst)

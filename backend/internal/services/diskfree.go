@@ -20,7 +20,7 @@ func checkDiskSpace(dir string, needBytes int64) error {
 	}
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return nil
+		return err
 	}
 	free := diskFreeBytes(abs)
 	if free < 0 {

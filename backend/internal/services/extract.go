@@ -489,7 +489,7 @@ func (q *ExtractService) process(job *ExtractJob) {
 		q.fail(job, fmt.Errorf("path escape for media %d", sourceID), "Invalid filename")
 		return
 	}
-	if err := os.MkdirAll(q.audioPath, 0755); err != nil {
+	if err := os.MkdirAll(q.audioPath, 0750); err != nil {
 		q.fail(job, err, "Failed to create directory")
 		return
 	}

@@ -36,7 +36,8 @@ func (mt *MediaType) Scan(value interface{}) error {
 // Value implements driver.Valuer so that MediaType can be written to a database.
 func (mt MediaType) Value() (driver.Value, error) {
 	if mt == "" {
-		return nil, nil
+		// nil, nil — валидное SQL NULL для driver.Valuer.
+		return nil, nil //nolint:nilnil
 	}
 	return string(mt), nil
 }

@@ -408,15 +408,15 @@ type BulkItemsResult struct {
 func parseBulkItems(c *fiber.Ctx) ([]uint, bool) {
 	var req BulkItemsRequest
 	if err := c.BodyParser(&req); err != nil {
-		response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+		_ = response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 		return nil, false
 	}
 	if len(req.MediaIDs) == 0 {
-		response.Error(c, fiber.StatusBadRequest, "media_ids is required")
+		_ = response.Error(c, fiber.StatusBadRequest, "media_ids is required")
 		return nil, false
 	}
 	if len(req.MediaIDs) > maxBulkItems {
-		response.Error(c, fiber.StatusBadRequest, "too many media_ids")
+		_ = response.Error(c, fiber.StatusBadRequest, "too many media_ids")
 		return nil, false
 	}
 	return req.MediaIDs, true
@@ -573,18 +573,18 @@ func (h *CollectionHandler) RemoveItemsBulk(c *fiber.Ctx) error {
 func (h *CollectionHandler) getOwnedCollection(c *fiber.Ctx, collectionID uint) (*models.Collection, bool) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+		_ = response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
 		return nil, false
 	}
 
 	col, err := h.colRepo.FindByID(c.UserContext(), collectionID)
 	if err != nil {
-		repoError(c, err, "Collection not found", "Failed to fetch collection")
+		_ = repoError(c, err, "Collection not found", "Failed to fetch collection")
 		return nil, false
 	}
 
 	if col.UserID != userID {
-		response.Error(c, fiber.StatusForbidden, "Not your collection")
+		_ = response.Error(c, fiber.StatusForbidden, "Not your collection")
 		return nil, false
 	}
 

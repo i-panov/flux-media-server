@@ -54,7 +54,9 @@ func (w *WatcherService) StartWithPaths(paths []string) error {
 			w.debounce = nil
 		}
 		if w.watcher != nil {
-			w.watcher.Close()
+			if err := w.watcher.Close(); err != nil {
+				log.Printf("watcher: close: %v", err)
+			}
 		}
 		w.watcher = nil
 	}
@@ -115,7 +117,9 @@ func (w *WatcherService) RemovePath(path string) {
 	watcher := w.watcher
 	w.mu.Unlock()
 	if watcher != nil {
-		watcher.Remove(path)
+		if err := watcher.Remove(path); err != nil {
+			log.Printf("watcher: remove %s: %v", path, err)
+		}
 	}
 	log.Printf("watcher: stopped watching %s", path)
 }
@@ -136,7 +140,9 @@ func (w *WatcherService) Stop() {
 	watcher := w.watcher
 	w.mu.Unlock()
 	if watcher != nil {
-		watcher.Close()
+		if err := watcher.Close(); err != nil {
+			log.Printf("watcher: close: %v", err)
+		}
 	}
 	log.Println("watcher: stopped")
 }

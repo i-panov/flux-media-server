@@ -195,7 +195,7 @@ func (h *ThumbHandler) UploadCover(c *fiber.Ctx) error {
 	}
 
 	coverPath := h.thumbSvc.CoverPathForExt(mediaID, actualExt)
-	if err := os.MkdirAll(filepath.Dir(coverPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(coverPath), 0750); err != nil {
 		log.Printf("UploadCover: mkdir: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
 	}

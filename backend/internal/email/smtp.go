@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"net/mail"
@@ -156,7 +157,11 @@ func sendMailWithTimeout(ctx context.Context, cfg SMTPConfig, addr string, auth 
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("smtp: close: %v", err)
+		}
+	}()
 
 	// Deadline ставим сразу после установки соединения, ДО smtp.NewClient —
 	// он должен покрывать и чтение приветствия, и EHLO.
@@ -173,7 +178,7 @@ func sendMailWithTimeout(ctx context.Context, cfg SMTPConfig, addr string, auth 
 		if err := tlsConn.SetDeadline(time.Now().Add(smtpTimeout)); err != nil {
 			return err
 		}
-		if err := tlsConn.Handshake(); err != nil {
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
 			return err
 		}
 		conn = tlsConn
@@ -239,7 +244,9 @@ func sendMailWithTimeout(ctx context.Context, cfg SMTPConfig, addr string, auth 
 	if err := client.Quit(); err != nil {
 		// QUIT не удался — явно закрываем соединение, чтобы не оставлять
 		// ресурсы на сервере и клиенте.
-		client.Close()
+		if err := client.Close(); err != nil {
+			log.Printf("smtp: close client: %v", err)
+		}
 		return err
 	}
 	return nil

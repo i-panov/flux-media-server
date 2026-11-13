@@ -82,6 +82,7 @@ func (e *MetadataExtractor) extractAudio(ctx context.Context, path string) *File
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
+	// #nosec G304 -- путь из библиотеки/карантина, проверен вызывающим.
 	f, err := os.Open(path)
 	if err != nil {
 		log.Printf("metadata: open audio file %s: %v", path, err)

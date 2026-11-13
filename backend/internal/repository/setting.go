@@ -56,7 +56,9 @@ func (r *SettingStore) GetBool(ctx context.Context, key string) (bool, bool, err
 	}
 	value, err := strconv.ParseBool(raw)
 	if err != nil {
-		return false, false, nil
+		// Битая настройка трактуется как «не задана»: сервер продолжает
+		// работать на дефолте, а не падает из-за ручной правки в БД.
+		return false, false, nil //nolint:nilerr
 	}
 	return value, true, nil
 }

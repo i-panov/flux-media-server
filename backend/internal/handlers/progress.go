@@ -61,9 +61,9 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 	return response.Paginated(c, progress, total, limit, offset)
 }
 
-/// GetOne возвращает прогресс текущего пользователя для одного медиа.
-/// Нужен resume-диалогу видеоплеера: тянуть весь список ради одного
-/// mediaId — лишний трафик и задержка перед стартом.
+// / GetOne возвращает прогресс текущего пользователя для одного медиа.
+// / Нужен resume-диалогу видеоплеера: тянуть весь список ради одного
+// / mediaId — лишний трафик и задержка перед стартом.
 func (h *ProgressHandler) GetOne(c *fiber.Ctx) error {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {

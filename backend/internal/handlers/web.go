@@ -100,6 +100,7 @@ func (h *WebHandler) serveFile(c *fiber.Ctx, rel, full string) error {
 	case strings.HasSuffix(rel, ".webmanifest"):
 		// fasthttp не знает этот тип и перезапишет заголовок своим
 		// text/plain — отдаём вручную с правильным типом.
+		// #nosec G304 -- full уже проверен на принадлежность web root (IsSubPath).
 		data, err := os.ReadFile(full)
 		if err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "Manifest read error")

@@ -138,7 +138,7 @@ func (s *ThumbnailService) generateVideoThumbnail(ctx context.Context, mediaID u
 	outPath := s.GetPath(mediaID)
 
 	// Ensure thumbnails directory exists.
-	if err := os.MkdirAll(s.thumbnailsDir, 0755); err != nil {
+	if err := os.MkdirAll(s.thumbnailsDir, 0750); err != nil {
 		log.Printf("thumb: mkdir %s: %v", s.thumbnailsDir, err)
 		return ""
 	}
@@ -193,7 +193,7 @@ const imageThumbMaxSide = 512
 func (s *ThumbnailService) generateImageThumbnail(ctx context.Context, mediaID uint, filePath string) string {
 	outPath := s.GetPath(mediaID)
 
-	if err := os.MkdirAll(s.thumbnailsDir, 0755); err != nil {
+	if err := os.MkdirAll(s.thumbnailsDir, 0750); err != nil {
 		log.Printf("thumb: mkdir %s: %v", s.thumbnailsDir, err)
 		return ""
 	}
@@ -253,7 +253,7 @@ func (s *ThumbnailService) extractEmbeddedArt(ctx context.Context, mediaID uint,
 	// извлекаем во временный файл и переименовываем по фактическому
 	// формату — FindCoverPath поддерживает все варианты.
 	// Ensure thumbnails directory exists.
-	if err := os.MkdirAll(s.thumbnailsDir, 0755); err != nil {
+	if err := os.MkdirAll(s.thumbnailsDir, 0750); err != nil {
 		log.Printf("thumb: mkdir %s: %v", s.thumbnailsDir, err)
 		return ""
 	}
@@ -298,6 +298,7 @@ func (s *ThumbnailService) extractEmbeddedArt(ctx context.Context, mediaID uint,
 
 // detectImageFormat определяет формат изображения по сигнатуре файла.
 func detectImageFormat(path string) string {
+	// #nosec G304 -- путь превью строится из mediaID, не из запроса.
 	f, err := os.Open(path)
 	if err != nil {
 		return ".jpg"

@@ -46,7 +46,7 @@ func main() {
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config %s: %v", configPath, err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
 	if cfg.Server.Debug {

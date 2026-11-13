@@ -14,6 +14,7 @@ func diskFreeBytes(path string) int64 {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return -1
 	}
+	// #nosec G115 -- Statfs values не превышают int64 на поддерживаемых ФС.
 	return int64(stat.Bavail) * int64(stat.Bsize)
 }
 
@@ -23,5 +24,6 @@ func diskTotalBytes(path string) int64 {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return -1
 	}
+	// #nosec G115 -- Statfs values не превышают int64 на поддерживаемых ФС.
 	return int64(stat.Blocks) * int64(stat.Bsize)
 }

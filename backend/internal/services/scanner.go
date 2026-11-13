@@ -764,6 +764,7 @@ func HashFileContext(ctx context.Context, path string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	// #nosec G304 -- путь получен из Walk по настроенной библиотеке.
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -814,6 +815,7 @@ func quickHashFile(ctx context.Context, path string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	// #nosec G304 -- путь получен из Walk по настроенной библиотеке.
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -831,6 +833,7 @@ func quickHashFile(ctx context.Context, path string) (string, error) {
 	sizeBuf := make([]byte, 8)
 	size := stat.Size()
 	for i := 7; i >= 0; i-- {
+		// #nosec G115 -- берём младший байт размера по алгоритму хэша.
 		sizeBuf[i] = byte(size)
 		size >>= 8
 	}
@@ -842,7 +845,7 @@ func quickHashFile(ctx context.Context, path string) (string, error) {
 	if n > 0 {
 		h.Write(head[:n])
 	}
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return "", err
 	}
 
@@ -859,7 +862,7 @@ func quickHashFile(ctx context.Context, path string) (string, error) {
 		if n > 0 {
 			h.Write(tail[:n])
 		}
-		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 			return "", err
 		}
 	}

@@ -53,22 +53,6 @@ func (h *ArtistHandler) artistCoverFile(id uint) (string, error) {
 	return "", nil
 }
 
-// artistHasCover — есть ли у артиста файл обложки на диске.
-func (h *ArtistHandler) artistHasCover(id uint) (bool, error) {
-	path, err := h.artistCoverFile(id)
-	if err != nil || path == "" {
-		return false, err
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return !info.IsDir(), nil
-}
-
 // List returns all artists ordered by name.
 func (h *ArtistHandler) List(c *fiber.Ctx) error {
 	ctx := c.UserContext()
@@ -196,7 +180,7 @@ func (h *ArtistHandler) UploadCover(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid image content. Allowed: JPEG, PNG, WebP")
 	}
 
-	if err := os.MkdirAll(h.coverDir, 0755); err != nil {
+	if err := os.MkdirAll(h.coverDir, 0750); err != nil {
 		log.Printf("ArtistHandler.UploadCover mkdir: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create cover directory")
 	}

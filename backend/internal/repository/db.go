@@ -107,7 +107,9 @@ func isMemoryPath(path string) bool {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	db.SetupJoinTable(&models.Media{}, "Artists", &models.MediaArtist{})
+	if err := db.SetupJoinTable(&models.Media{}, "Artists", &models.MediaArtist{}); err != nil {
+		return err
+	}
 	return db.AutoMigrate(
 		&models.Media{},
 		&models.Metadata{},

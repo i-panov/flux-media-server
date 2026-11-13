@@ -22,6 +22,7 @@ const similarImageDistance = 8
 // ImagePHash считает perceptual hash картинки. Вызывать нужно с превью,
 // а не с оригиналом: декодирование 6000 px JPEG съело бы сотни мегабайт.
 func ImagePHash(filePath string) (int64, error) {
+	// #nosec G304 -- путь принадлежит библиотеке/загрузке, проверен вызывающим.
 	file, err := os.Open(filePath)
 	if err != nil {
 		return 0, err
@@ -36,6 +37,7 @@ func ImagePHash(filePath string) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("perceptual hash: %w", err)
 	}
+	// #nosec G115 -- pHash — opaque 64-bit bitpattern; сохраняем биты.
 	return int64(hash.GetHash()), nil
 }
 
@@ -45,6 +47,7 @@ func IsSimilarImage(a, b int64) bool {
 	if a == 0 || b == 0 {
 		return false
 	}
+	// #nosec G115 -- pHash хранится как int64, важны биты, не знак.
 	return bits.OnesCount64(uint64(a)^uint64(b)) <= similarImageDistance
 }
 
@@ -57,7 +60,7 @@ func FindSimilarImage(
 	excludeID uint,
 ) (*models.Media, error) {
 	if phash == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil // нет pHash — нет кандидата, не ошибка.
 	}
 	candidates, err := mediaRepo.FindImagesWithPHash(ctx, excludeID)
 	if err != nil {
@@ -68,5 +71,5 @@ func FindSimilarImage(
 			return &candidates[i], nil
 		}
 	}
-	return nil, nil
+	return nil, nil //nolint:nilnil // кандидат не найден, не ошибка.
 }

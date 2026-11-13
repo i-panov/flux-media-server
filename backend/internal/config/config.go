@@ -142,6 +142,7 @@ func (m MediaConfig) MediaPaths() []MediaPath {
 }
 
 func Load(path string) (*Config, error) {
+	// #nosec G304 -- путь задан оператором через -config/FLUX_CONFIG.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
