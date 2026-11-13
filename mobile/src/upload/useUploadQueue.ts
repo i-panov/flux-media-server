@@ -268,10 +268,17 @@ export function useUploadQueue() {
 					patchItem(key, { status: "cancelled", progress: null });
 					return;
 				}
+				// Поллинг упал: не оставляем серверное задание жить рядом
+				// с кнопкой retry, иначе повтор создаст второй job.
+				const failedJob = itemsRef.current.find((row) => row.key === key)?.job;
+				if (failedJob !== null && failedJob !== undefined) {
+					void cancelUploadJob(failedJob).catch(() => undefined);
+				}
 				patchItem(key, {
 					status: "error",
 					progress: null,
 					error: errorMessage(error),
+					job: null,
 				});
 			} finally {
 				active.current.delete(key);
