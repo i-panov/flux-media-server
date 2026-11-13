@@ -794,6 +794,23 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 			} else {
 				log.Printf("initial library scan finished")
 			}
+			// scanner.interval больше не мёртвая настройка: периодический
+			// скан ловит пропущенные fsnotify-события и отвалившиеся mount.
+			if cfg.Scanner.Interval <= 0 {
+				return
+			}
+			ticker := time.NewTicker(time.Duration(cfg.Scanner.Interval) * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-scanCtx.Done():
+					return
+				case <-ticker.C:
+					if err := scanner.ScanAll(scanCtx); err != nil {
+						log.Printf("periodic library scan: %v", err)
+					}
+				}
+			}
 		})
 	}
 
