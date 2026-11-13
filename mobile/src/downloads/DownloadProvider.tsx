@@ -49,6 +49,7 @@ export type DownloadIndicatorStatus = "downloading" | "downloaded" | "error";
 export interface DownloadIndicatorState {
 	readonly status: DownloadIndicatorStatus;
 	readonly progress: number | null;
+	readonly failure?: DownloadFailure | null;
 }
 
 export interface DownloadActions {
@@ -95,7 +96,7 @@ export function useDownloadIndicator(
 	if (activeItem !== undefined) {
 		return activeItem.status === "downloading"
 			? { status: "downloading", progress: activeItem.progress }
-			: { status: "error", progress: null };
+			: { status: "error", progress: null, failure: activeItem.failure };
 	}
 	if (findDownloadEntry(entries, mediaId) !== null) {
 		return { status: "downloaded", progress: null };

@@ -14,6 +14,7 @@ import {
 	useDownloadIndicator,
 	useDownloadState,
 } from "../downloads/DownloadProvider";
+import type { DownloadFailure } from "../downloads/downloadStore";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 
@@ -23,6 +24,23 @@ interface DownloadButtonProps {
 	media: Media;
 	/** База testID: к ней добавляется состояние (idle/downloading/done/error). */
 	testID?: string;
+}
+
+function downloadFailureLabel(failure: DownloadFailure | null): string {
+	switch (failure) {
+		case "status":
+			return t("downloads.errorStatus");
+		case "size":
+			return t("downloads.errorSize");
+		case "storage":
+			return t("downloads.errorStorage");
+		case "timeout":
+			return t("downloads.errorTimeout");
+		case "network":
+			return t("downloads.errorNetwork");
+		default:
+			return t("downloads.errorUnknown");
+	}
 }
 
 function buttonLabel(indicator: DownloadIndicatorState | null): string {
@@ -84,17 +102,21 @@ export function DownloadButton({
 				cancel(media.id);
 				return;
 			case "error":
-				Alert.alert(t("downloads.errorTitle"), t("downloads.errorUnknown"), [
-					{
-						text: t("downloads.dismiss"),
-						style: "cancel",
-						onPress: () => cancel(media.id),
-					},
-					{
-						text: t("downloads.retry"),
-						onPress: () => retry(media),
-					},
-				]);
+				Alert.alert(
+					t("downloads.errorTitle"),
+					downloadFailureLabel(indicator.failure ?? null),
+					[
+						{
+							text: t("downloads.dismiss"),
+							style: "cancel",
+							onPress: () => cancel(media.id),
+						},
+						{
+							text: t("downloads.retry"),
+							onPress: () => retry(media),
+						},
+					],
+				);
 				return;
 			default:
 				Alert.alert(t("downloads.deleteTitle"), t("downloads.deleteConfirm"), [
