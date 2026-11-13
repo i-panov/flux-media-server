@@ -46,6 +46,7 @@ function MemesContent() {
 	const [query, setQuery] = useState("");
 	const debounced = useDebouncedValue(query);
 	const list = useImageList(debounced);
+	const searching = debounced.trim() !== "";
 	const items = useMemo(
 		() => list.data?.pages.flatMap((page) => page.items) ?? [],
 		[list.data],
@@ -88,8 +89,10 @@ function MemesContent() {
 					ListEmptyComponent={
 						<EmptyState
 							icon="images-outline"
-							title={t("memes.empty")}
-							description={t("memes.emptyHint")}
+							title={searching ? t("search.noResults") : t("memes.empty")}
+							description={
+								searching ? t("search.noResultsHint") : t("memes.emptyHint")
+							}
 							testID="memes-empty"
 						/>
 					}

@@ -24,10 +24,16 @@ export async function getDeviceIdentity(): Promise<{
 		Model?: string;
 		Brand?: string;
 	} | null;
-	const platform = isTV ? "androidtv" : Platform.OS;
+	const platform = isTV
+		? Platform.OS === "ios"
+			? "appletv"
+			: "androidtv"
+		: Platform.OS;
 	const model = constants?.Model ?? constants?.Brand ?? "";
 	const deviceName = isTV
-		? "Android TV"
+		? Platform.OS === "ios"
+			? "Apple TV"
+			: "Android TV"
 		: model === ""
 			? Platform.OS === "ios"
 				? "iPhone / iPad"

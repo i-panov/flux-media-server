@@ -330,7 +330,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 	// Выход из аккаунта и смена сервера не оставляют очередь прошлого
 	// пользователя/origin. Событие эмитится только на переходе user → null,
 	// поэтому холодный старт без входа сохранённую очередь не стирает.
-	useLocalReset(editing.clear);
+	useLocalReset(() => {
+		audioRestoredRef.current = false;
+		editing.clear();
+	});
 
 	const seek = useAudioSeek(player, handleSeek, markUserStarted);
 
