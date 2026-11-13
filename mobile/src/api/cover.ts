@@ -6,7 +6,7 @@ import {
 } from "@flux/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-export type { CoverAssetInput, CoverUploadFile } from "@flux/shared";
+export type { CoverUploadFile } from "@flux/shared";
 export {
 	coverMimeType,
 	coverUploadFile,

@@ -3,10 +3,10 @@ import type { Media } from "@flux/shared";
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { coverPath, imageSource, thumbPath } from "../media/source";
+import { authSource, coverPath, thumbPath } from "../media/source";
 import { useTheme } from "../theme/ThemeProvider";
 
-// Постер берёт авторизованный source из imageSource: media.cover_url уже
+// Постер берёт авторизованный source из authSource: media.cover_url уже
 // содержит /api и без заголовков отдал бы 401. Cover используем, только
 // если он реально есть, иначе — thumbnail.
 export function VideoPoster({
@@ -38,7 +38,7 @@ export function VideoPoster({
 			: preferred;
 	const [loaded, setLoaded] = useState<{
 		path: string;
-		source: Awaited<ReturnType<typeof imageSource>>;
+		source: Awaited<ReturnType<typeof authSource>>;
 	} | null>(null);
 	const [failedPath, setFailedPath] = useState<string | null>(null);
 	const failed = failedPath === path;
@@ -48,7 +48,7 @@ export function VideoPoster({
 			return;
 		}
 		let active = true;
-		imageSource(path).then(
+		authSource(path).then(
 			(next) => {
 				if (active) {
 					setLoaded({ path, source: next });

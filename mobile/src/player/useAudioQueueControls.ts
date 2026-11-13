@@ -19,7 +19,6 @@ import {
 import {
 	shouldPauseOnToggle,
 	shouldResumeAfterTrackChange,
-	wasPlayingBeforeChange,
 } from "./audioPlaybackPolicy";
 import type { AudioSourceOptions } from "./useAudioSource";
 
@@ -56,7 +55,7 @@ function wasPlayingOnChange(
 	desiredPlayingRef: RefObject<boolean>,
 	sourceLoading: boolean,
 ): boolean {
-	return wasPlayingBeforeChange({
+	return shouldPauseOnToggle({
 		playing: player.playing,
 		buffering: player.isBuffering,
 		loading: sourceLoading,

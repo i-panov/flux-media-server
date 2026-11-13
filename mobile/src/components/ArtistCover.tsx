@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { ArtistEntry } from "../api/metadata";
 import { t, useLanguage } from "../i18n";
-import { artistCoverPath, imageSource } from "../media/source";
+import { artistCoverPath, authSource } from "../media/source";
 import { useTheme } from "../theme/ThemeProvider";
 
 interface ArtistCoverProps {
@@ -30,7 +30,7 @@ export function ArtistCover({
 		: null;
 	const [loaded, setLoaded] = useState<{
 		path: string;
-		source: Awaited<ReturnType<typeof imageSource>>;
+		source: Awaited<ReturnType<typeof authSource>>;
 	} | null>(null);
 	const [failedPath, setFailedPath] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ export function ArtistCover({
 			return;
 		}
 		let active = true;
-		imageSource(path).then(
+		authSource(path).then(
 			(next) => {
 				if (active) {
 					setLoaded({ path, source: next });

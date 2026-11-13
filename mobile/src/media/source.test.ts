@@ -4,7 +4,6 @@ import {
 	artistCoverPath,
 	authSource,
 	coverPath,
-	imageSource,
 	isHttpSourceUrl,
 	streamPath,
 	thumbPath,
@@ -124,16 +123,5 @@ describe("source URL validation", () => {
 		expect(isHttpSourceUrl("https://")).toBe(false);
 		expect(isHttpSourceUrl("https:///path")).toBe(false);
 		expect(isHttpSourceUrl("https://exa mple.com")).toBe(false);
-	});
-});
-
-describe("imageSource", () => {
-	it("возвращает тот же авторизованный source, что authSource", async () => {
-		configure(BASE_URL);
-
-		const source = await imageSource(thumbPath(7));
-
-		expect(source).toEqual(await authSource(thumbPath(7)));
-		expect(source.headers.Authorization).toBe(`Bearer ${TOKEN}`);
 	});
 });

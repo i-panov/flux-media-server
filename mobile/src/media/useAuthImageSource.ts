@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type AuthSource, imageSource } from "./source";
+import { type AuthSource, authSource } from "./source";
 
 // Bearer-заголовки читаются из SecureStore асинхронно, поэтому картинка
 // получает source после загрузки. Path привязан к source: при смене
@@ -15,7 +15,7 @@ export function useAuthImageSource(path: string | null): AuthSource | null {
 			return;
 		}
 		let active = true;
-		imageSource(path).then(
+		authSource(path).then(
 			(next) => {
 				if (active) {
 					setLoaded({ path, source: next });

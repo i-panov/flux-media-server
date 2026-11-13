@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { createDebouncedValue, SEARCH_DEBOUNCE_MS } from "./debounce";
 import { normalizeSearchQuery } from "./search";
 
-export { SEARCH_DEBOUNCE_MS } from "./debounce";
-
 // Поисковый дебаунс: запрос уходит после паузы ввода, а не на каждую
 // букву. Нормализация внутри — чтобы пробельный запрос не создавал
 // отдельный query key, а список оставался полным.

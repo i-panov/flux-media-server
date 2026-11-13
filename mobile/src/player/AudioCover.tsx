@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { t, useLanguage } from "../i18n";
-import { coverPath, imageSource } from "../media/source";
+import { authSource, coverPath } from "../media/source";
 import { useTheme } from "../theme/ThemeProvider";
 
 interface AudioCoverProps {
@@ -27,7 +27,7 @@ export function AudioCover({
 	const path = media.cover_url === "" ? null : coverPath(media.id);
 	const [loaded, setLoaded] = useState<{
 		path: string;
-		source: Awaited<ReturnType<typeof imageSource>>;
+		source: Awaited<ReturnType<typeof authSource>>;
 	} | null>(null);
 	const [failedPath, setFailedPath] = useState<string | null>(null);
 	const failed = failedPath === path;
@@ -37,7 +37,7 @@ export function AudioCover({
 			return;
 		}
 		let active = true;
-		imageSource(path).then(
+		authSource(path).then(
 			(next) => {
 				if (active) {
 					setLoaded({ path, source: next });

@@ -48,7 +48,7 @@
 		"lint": "biome check && eslint .",
 		"version:sync": "node scripts/sync-version.mjs",
 		"test": "vitest run",
-		"lint:deadcode": "knip --no-exit-code"
+		"lint:deadcode": "knip"
 	},
 	"private": true,
 	"knip": {
@@ -62,8 +62,10 @@
 		],
 		"ignore": [],
 		"ignoreDependencies": [
-			"expo-updates",
-			"@expo/config-plugins"
-		]
+			"@expo/config-plugins",
+			"babel-preset-expo",
+			"expo-updates"
+		],
+		"ignoreExportsUsedInFile": true
 	}
 }

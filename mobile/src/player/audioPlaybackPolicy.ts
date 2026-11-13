@@ -25,25 +25,12 @@ export function shouldPauseOnToggle(state: TogglePlaybackState): boolean {
 	);
 }
 
-export interface TrackChangePlaybackState {
-	playing: boolean;
-	loading: boolean;
-	buffering: boolean;
-	desiredPlaying: boolean;
-}
-
 // Продолжать ли звук после ручного next/prev. Буферизация уже начатого
 // воспроизведения — это тоже «играло»: иначе следующий трек встал бы на
 // паузу, хотя пользователь просто переключил буферизующийся трек.
 // После внешней паузы desired сбрасывается sync-эффектом, поэтому stale
 // намерение само по себе не включает звук.
 // Семантика совпадает с shouldPauseOnToggle: «играет или вот-вот заиграет».
-// Отдельное имя нужно вызывающему коду next/prev; общая реализация не
-// дублирует условие и не расходится между двумя сценариями.
-export const wasPlayingBeforeChange: (
-	state: TrackChangePlaybackState,
-) => boolean = shouldPauseOnToggle;
-
 // Нужно ли продолжать звук после смены трека. Конец трека — всегда да
 // (repeat one перезапускает тот же, иначе играет следующий), даже если
 // status уже успел прислать playing=false.

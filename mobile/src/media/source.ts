@@ -30,10 +30,6 @@ export async function authSource(path: string): Promise<AuthSource> {
 	};
 }
 
-// expo-image/video/audio принимают одну и ту же форму { uri, headers };
-// алиас нужен для читаемости вызовов у постеров и обложек.
-export const imageSource = authSource;
-
 // Ссылка на источник открывается только по http(s): javascript:, file:,
 // data: и относительные пути не должны попасть в Linking.openURL.
 // Хост обязателен, поэтому "https://" и пустая строка отсекаются.

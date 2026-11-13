@@ -3,7 +3,6 @@ import {
 	desiredAfterStatus,
 	shouldPauseOnToggle,
 	shouldResumeAfterTrackChange,
-	wasPlayingBeforeChange,
 } from "./audioPlaybackPolicy";
 
 function toggleState(overrides: {
@@ -63,10 +62,10 @@ describe("audio playback toggle policy", () => {
 	});
 });
 
-describe("audio playback track-change policy", () => {
+describe("audio playback external pause policy", () => {
 	it("буферизация при next/prev не ставит на паузу", () => {
 		expect(
-			wasPlayingBeforeChange(
+			shouldPauseOnToggle(
 				toggleState({ buffering: true, desiredPlaying: true }),
 			),
 		).toBe(true);
@@ -74,15 +73,13 @@ describe("audio playback track-change policy", () => {
 
 	it("загрузка с намерением играть продолжает играть", () => {
 		expect(
-			wasPlayingBeforeChange(
-				toggleState({ loading: true, desiredPlaying: true }),
-			),
+			shouldPauseOnToggle(toggleState({ loading: true, desiredPlaying: true })),
 		).toBe(true);
 	});
 
 	it("внешняя пауза не запускает следующий трек", () => {
 		expect(
-			wasPlayingBeforeChange(
+			shouldPauseOnToggle(
 				toggleState({
 					playing: false,
 					loading: false,
@@ -103,7 +100,7 @@ describe("audio playback track-change policy", () => {
 		});
 		expect(desired).toBe(false);
 		expect(
-			wasPlayingBeforeChange(
+			shouldPauseOnToggle(
 				toggleState({ buffering: true, desiredPlaying: desired }),
 			),
 		).toBe(false);
