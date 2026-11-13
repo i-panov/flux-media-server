@@ -549,6 +549,8 @@ func (q *ExtractService) process(job *ExtractJob) {
 	// окно между uniquePath и Link закрываем ретраем: коррупции быть
 	// не может (Link атомарен), максимум — следующий суффикс.
 	finalPath := dstPath
+	releasePath := ReservePublishingPath(finalPath)
+	defer releasePath()
 	committed := false
 	for attempt := 0; attempt < 3 && !committed; attempt++ {
 		finalPath = uniquePath(dstPath)

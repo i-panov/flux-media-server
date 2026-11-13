@@ -4,7 +4,6 @@ import { stubAuthedSession, stubVideoApi, videoItem } from "./video-fixtures";
 
 const VIDEO_LIST_PATTERN = /\/video(\?|$)/;
 const PLAYER_PATTERN = /\/player(\?|$)/;
-const AUDIO_LIST_PATTERN = /\/audio(\?|$)/;
 const VIDEO_DETAIL_ID_PATTERN = /\/video\/2(\?|$)/;
 const PROGRESS_ID_PATTERN = /^\/api\/progress\/\d+$/;
 const LYRICS_PATTERN = /^\/api\/media\/\d+\/lyrics$/;

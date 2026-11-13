@@ -43,6 +43,8 @@ export default defineConfig({
 				start_url: "/",
 				scope: "/",
 				display: "standalone",
+				lang: "ru",
+				dir: "ltr",
 				theme_color: "#0b0b0f",
 				background_color: "#0b0b0f",
 				icons: [
@@ -56,7 +58,7 @@ export default defineConfig({
 						src: "/icon-512.png",
 						sizes: "512x512",
 						type: "image/png",
-						purpose: "any",
+						purpose: "any maskable",
 					},
 				],
 			},

@@ -584,6 +584,11 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 
 	// 6. Нормализация.
 	resultPath, tmpPath, err := q.execute(jobCtx, task, plan)
+	if resultPath != "" {
+		// До Media.Create watcher не должен индексировать результат.
+		releasePath := ReservePublishingPath(resultPath)
+		defer releasePath()
+	}
 	mainTmp = tmpPath
 	cleanupMainTmp := func() {
 		if mainTmp != "" {

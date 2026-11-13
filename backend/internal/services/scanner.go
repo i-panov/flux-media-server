@@ -385,6 +385,9 @@ func (s *ScannerService) removeMediaForPath(ctx context.Context, path string) {
 // Ошибки логируются и не возвращаются: сбой одного файла не должен
 // прерывать ни скан, ни пачку событий.
 func (s *ScannerService) scanFile(ctx context.Context, path string) {
+	if IsPublishingPath(path) {
+		return
+	}
 	s.fileMu.Lock()
 	defer s.fileMu.Unlock()
 	info, err := os.Stat(path)
