@@ -1102,16 +1102,18 @@ func (q *TranscodeQueue) EnsureSpaceForUpload(fileSize int64) error {
 // protect — пути, которые трогать нельзя. Неизвестный остаток (-1,
 // не-unix) — пропуск проверки, как в checkDiskSpace.
 func (q *TranscodeQueue) ensureFreeSpace(dir string, need int64, protect map[string]bool) error {
-	for {
+	// Список кандидатов строим один раз: nextEvictionVictim в цикле читал
+	// весь каталог и БД на каждого удалённого оригинала (O(N²)).
+	candidates, err := q.evictionCandidates(protect)
+	if err != nil {
+		return err
+	}
+	for _, victim := range candidates {
 		free := q.freeBytes(dir)
 		if free < 0 || free >= need {
 			return nil
 		}
 		if !q.AutoCleanup() {
-			return ErrInsufficientSpace
-		}
-		victim, ok := q.nextEvictionVictim(protect)
-		if !ok {
 			return ErrInsufficientSpace
 		}
 		path := filepath.Join(q.cfg.OriginalsDir, victim.Name)
@@ -1121,6 +1123,29 @@ func (q *TranscodeQueue) ensureFreeSpace(dir string, need int64, protect map[str
 		}
 		log.Printf("transcode: auto-cleanup removed %s (%d bytes, %d views)", victim.Name, victim.Size, victim.Views)
 	}
+	if free := q.freeBytes(dir); free < 0 || free >= need {
+		return nil
+	}
+	return ErrInsufficientSpace
+}
+
+func (q *TranscodeQueue) evictionCandidates(protect map[string]bool) ([]OriginalInfo, error) {
+	originals, err := q.OriginalsStatus()
+	if err != nil {
+		log.Printf("transcode: auto-cleanup list originals: %v", err)
+		return nil, err
+	}
+	candidates := make([]OriginalInfo, 0, len(originals))
+	for _, info := range originals {
+		if info.Status != TranscodeTaskDone {
+			continue
+		}
+		if protect[filepath.Join(q.cfg.OriginalsDir, info.Name)] {
+			continue
+		}
+		candidates = append(candidates, info)
+	}
+	return candidates, nil
 }
 
 // nextEvictionVictim возвращает первого кандидата на удаление: только
