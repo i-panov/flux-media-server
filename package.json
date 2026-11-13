@@ -6,5 +6,8 @@
 		"web",
 		"mobile",
 		"packages/shared"
-	]
+	],
+	"devDependencies": {
+		"knip": "^6.45.1"
+	}
 }

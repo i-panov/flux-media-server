@@ -7,9 +7,7 @@ PACKS="${CODEQL_PACKS:-${HOME}/.cache/codeql-packs}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "${PACKS}" "${ROOT}/.codeql/sarif"
 "${CODEQL}" pack download codeql/javascript-queries:javascript-code-scanning --dir="${PACKS}" >/dev/null
-shopt -s nullglob
-SUITE=("${PACKS}"/javascript-queries/*/codeql-suites/javascript-code-scanning.qls)
-shopt -u nullglob
+SUITE=($(find "${PACKS}" -path '*/javascript-queries/*/codeql-suites/javascript-code-scanning.qls' -print -quit))
 if ((${#SUITE[@]} == 0)); then
 	echo "!! [codeql] javascript query suite not found under ${PACKS}" >&2
 	exit 1

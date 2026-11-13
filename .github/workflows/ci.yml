@@ -96,6 +96,8 @@ jobs:
         run: npm run lint -w mobile
       - name: Test mobile
         run: npm run test -w mobile
+      - name: Dead code mobile (report)
+        run: npm run lint:deadcode -w mobile
       # EXPO_OFFLINE обязателен: online-проверка сверяется с последним
       # bundledNativeModules SDK и флагает уже установленные пакеты как
       # устаревшие; offline использует версию из node_modules/expo и

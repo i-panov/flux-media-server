@@ -36,7 +36,8 @@
 		"eslint-config-expo": "^58.0.4",
 		"eslint-plugin-sonarjs": "^4.2.2",
 		"typescript": "~6.0.3",
-		"vitest": "^5.0.5"
+		"vitest": "^5.0.5",
+		"knip": "^6.33.0"
 	},
 	"scripts": {
 		"start": "expo start",
@@ -46,7 +47,23 @@
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check && eslint .",
 		"version:sync": "node scripts/sync-version.mjs",
-		"test": "vitest run"
+		"test": "vitest run",
+		"lint:deadcode": "knip --no-exit-code"
 	},
-	"private": true
+	"private": true,
+	"knip": {
+		"entry": [
+			"app/**/*.{ts,tsx}",
+			"src/**/*.test.ts"
+		],
+		"project": [
+			"app/**/*.{ts,tsx}",
+			"src/**/*.{ts,tsx}"
+		],
+		"ignore": [],
+		"ignoreDependencies": [
+			"expo-updates",
+			"@expo/config-plugins"
+		]
+	}
 }

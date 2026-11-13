@@ -241,8 +241,8 @@ func (h *MediaHandler) Bulk(c *fiber.Ctx) error {
 	seen := make(map[uint]struct{}, len(parts))
 	ids := make([]uint, 0, len(parts))
 	for _, p := range parts {
-		id, err := strconv.ParseUint(strings.TrimSpace(p), 10, 64)
-		if err != nil || id == 0 {
+		id, err := strconv.ParseUint(strings.TrimSpace(p), 10, 32)
+		if err != nil || id == 0 || id > uint64(^uint32(0)) {
 			return response.Error(c, fiber.StatusBadRequest, "invalid id in ids parameter")
 		}
 		u := uint(id)

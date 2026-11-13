@@ -63,6 +63,24 @@ npm run size           # size-limit
 - API same-origin (`/api`), `VITE_API_BASE` не используется.
 - Offline/downloads в web не поддерживаются осознанно.
 
+### Статический анализ
+
+```bash
+make backend-lint        # golangci-lint (bug/security профиль)
+make backend-lint-new    # только изменения от origin/master (CI)
+make semgrep             # локальные правила + security/best-practice
+make semgrep-deep        # полные наборы Semgrep
+make codeql              # локальный CodeQL: Go + web/mobile/shared
+make analyze             # Semgrep + CodeQL
+```
+
+- golangci-lint ставится `make backend-lint-install` (v2.14.0).
+- CodeQL CLI ищется в `~/Apps/codeql/codeql`; пакеты — `~/.cache/codeql-packs`
+  или `CODEQL_PACKS`.
+- `.golangci.yml` намеренно не включает стилевой шум; стиль — gofmt/gci.
+- Semgrep-правила: `.semgrep/rules/flux.yml`; исключения — `.semgrepignore`.
+- CodeQL workflow: `.github/workflows/codeql.yml` (security-extended).
+
 ### Shared (`packages/shared/`)
 
 ```bash

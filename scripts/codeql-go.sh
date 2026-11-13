@@ -8,10 +8,8 @@ DB="${ROOT}/.codeql/go"
 SARIF="${ROOT}/.codeql/sarif/go.sarif"
 mkdir -p "${PACKS}" "$(dirname "${SARIF}")"
 "${CODEQL}" pack download codeql/go-queries:go-code-scanning --dir="${PACKS}" >/dev/null
-shopt -s nullglob
-SUITE=("${PACKS}"/go-queries/*/codeql-suites/go-code-scanning.qls)
-SUPPRESSIONS=("${PACKS}"/go-queries/*/AlertSuppression.ql)
-shopt -u nullglob
+SUITE=($(find "${PACKS}" -path '*/go-queries/*/codeql-suites/go-code-scanning.qls' -print -quit))
+SUPPRESSIONS=($(find "${PACKS}" -path '*/go-queries/*/AlertSuppression.ql' -print -quit))
 if ((${#SUITE[@]} == 0)); then
 	echo "!! [codeql] go query suite not found under ${PACKS}" >&2
 	exit 1
