@@ -47,6 +47,7 @@ function VideoGridCard({
 			title={media.title}
 			duration={media.duration}
 			imageSource={imageSource}
+			imageCachePolicy={media.cover_url === "" ? "memory-disk" : "none"}
 			isFavorite={favorites.data?.has(media.id) ?? false}
 			download={download ?? undefined}
 			onPress={() => openVideo(media)}
