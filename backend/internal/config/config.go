@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"flux/internal/models"
@@ -260,6 +261,9 @@ func Load(path string) (*Config, error) {
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return nil, fmt.Errorf("server.public_url must be an absolute http(s) URL, got %q", cfg.Server.PublicURL)
 		}
+	}
+	if strings.TrimSpace(cfg.Media.ThumbnailPath) == "" {
+		cfg.Media.ThumbnailPath = filepath.Join(".", "data", "thumbnails")
 	}
 	if cfg.Auth.CodeLength < 4 || cfg.Auth.CodeLength > 12 {
 		return nil, fmt.Errorf("auth.code_length must be between 4 and 12, got %d", cfg.Auth.CodeLength)

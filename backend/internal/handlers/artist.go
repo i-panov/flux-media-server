@@ -204,8 +204,16 @@ func (h *ArtistHandler) UploadCover(c *fiber.Ctx) error {
 	dst := filepath.Join(h.coverDir, fmt.Sprintf("artist_%d%s", id, actualExt))
 	// Сохраняем новую обложку; старые (других расширений) удаляем только
 	// после успешного сохранения, чтобы при сбое осталась прежняя.
-	if err := c.SaveFile(fileHeader, dst); err != nil {
+	tmpDst := dst + ".tmp"
+	if err := c.SaveFile(fileHeader, tmpDst); err != nil {
 		log.Printf("ArtistHandler.UploadCover save: %v", err)
+		_ = os.Remove(tmpDst)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
+	}
+	// Rename заменяет саму ссылку, а не файл за symlink-ом.
+	if err := os.Rename(tmpDst, dst); err != nil {
+		_ = os.Remove(tmpDst)
+		log.Printf("ArtistHandler.UploadCover rename: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
 	}
 	// Обновляем updated_at: клиент кеширует обложку по этому значению
