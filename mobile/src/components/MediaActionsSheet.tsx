@@ -12,6 +12,7 @@ import {
 import { saveMediaFile } from "../downloads/saveMediaFile";
 import { t } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvCapabilities } from "../tv/profile";
 import { AddToCollectionSheet } from "./AddToCollectionSheet";
 import { ChangeCoverSheet } from "./ChangeCoverSheet";
 
@@ -85,54 +86,61 @@ export function MediaActionsSheet({
 						<Text style={[styles.title, { color: colors.text }]}>
 							{media.title}
 						</Text>
-						{row(
-							download?.status === "downloaded"
-								? "checkmark-circle-outline"
-								: "cloud-download-outline",
-							download === null
-								? t("downloads.download")
-								: download.status === "downloading"
-									? t("downloads.downloading")
-									: download.status === "error"
-										? t("downloads.retry")
-										: t("downloads.downloaded"),
-							() => {
-								if (download === null) {
-									downloadActions.start(media);
+						{tvCapabilities.canDownload &&
+							row(
+								download?.status === "downloaded"
+									? "checkmark-circle-outline"
+									: "cloud-download-outline",
+								download === null
+									? t("downloads.download")
+									: download.status === "downloading"
+										? t("downloads.downloading")
+										: download.status === "error"
+											? t("downloads.retry")
+											: t("downloads.downloaded"),
+								() => {
+									if (download === null) {
+										downloadActions.start(media);
+										onClose();
+										return;
+									}
+									if (download.status === "downloading") {
+										downloadActions.cancel(media.id);
+										onClose();
+										return;
+									}
+									if (download.status === "error") {
+										downloadActions.retry(media);
+										onClose();
+										return;
+									}
+									downloadActions.remove(media.id);
 									onClose();
-									return;
-								}
-								if (download.status === "downloading") {
-									downloadActions.cancel(media.id);
-									onClose();
-									return;
-								}
-								if (download.status === "error") {
-									downloadActions.retry(media);
-									onClose();
-									return;
-								}
-								downloadActions.remove(media.id);
+								},
+							)}
+						{tvCapabilities.canDownload &&
+							row("download-outline", t("media.saveFile"), () => {
 								onClose();
-							},
-						)}
-						{row("download-outline", t("media.saveFile"), () => {
-							onClose();
-							void saveMediaFile(media);
-						})}
-						{media.type !== "image" &&
+								void saveMediaFile(media);
+							})}
+						{tvCapabilities.canManageCollections &&
+							media.type !== "image" &&
 							row("folder-open-outline", t("collections.addTitle"), () =>
 								setCollectionOpen(true),
 							)}
-						{admin &&
+						{tvCapabilities.canEditMetadata &&
+							admin &&
 							row("create-outline", t("metadata.edit"), () => {
 								onClose();
 								router.push(`/media/${media.id}/edit`);
 							})}
-						{admin &&
+						{tvCapabilities.canChangeCover &&
+							admin &&
 							media.type !== "image" &&
 							row("image-outline", t("cover.change"), () => setCoverOpen(true))}
-						{admin && row("trash-outline", t("media.delete"), confirmDelete)}
+						{tvCapabilities.canDelete &&
+							admin &&
+							row("trash-outline", t("media.delete"), confirmDelete)}
 					</Pressable>
 				</Pressable>
 			</Modal>
