@@ -67,6 +67,7 @@ export {
 	type SaveLyricsInput,
 	saveLyrics,
 } from "./api/lyrics";
+export * from "./api/metadata";
 export {
 	type ContinueEntry,
 	deleteProgress,
@@ -96,12 +97,12 @@ export {
 	resetApiConfig,
 } from "./api/transport";
 export * from "./api/trash";
+export * from "./api/upload";
 export * from "./core/audioQueue";
+export * from "./core/downloads";
 export * from "./core/format";
 export * from "./core/lyricsSync";
 export * from "./core/media";
 export { type QrMatrix, qrMatrix } from "./qr";
 export { createQueryClient } from "./query";
 export type { KeyValueStore } from "./storage";
-export * from "./api/metadata";
-export * from "./api/upload";

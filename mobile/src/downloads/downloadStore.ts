@@ -1,40 +1,20 @@
-import type { Media, MediaType } from "@flux/shared";
+import {
+	DOWNLOAD_DIRECTORY_NAME,
+	DOWNLOAD_INDEX_KEY,
+	DOWNLOAD_INDEX_VERSION,
+	DOWNLOAD_QUOTA_BYTES,
+	DOWNLOAD_TIMEOUT_MS,
+	type DownloadEntry,
+	type DownloadFailure,
+	type DownloadIndex,
+	type Media,
+	type MediaType,
+} from "@flux/shared";
 
 // Офлайн-скачивания: чистые правила индекса, имён файлов, квоты и
 // HTTP-ответов. Модуль намеренно не импортирует React Native/FileSystem/
 // AsyncStorage, чтобы проверяться в Node. Нативные операции — в runner.
-
-export const DOWNLOAD_INDEX_KEY = "flux.downloads.v1";
-export const DOWNLOAD_INDEX_VERSION = 1;
-// Кеш на устройстве ограничен 2 ГиБ. При переполнении вытесняются самые
-// старые завершённые файлы; активные загрузки и свежий файл не трогаем.
-export const DOWNLOAD_QUOTA_BYTES = 2 * 1024 * 1024 * 1024;
-export const DOWNLOAD_DIRECTORY_NAME = "downloads";
-// Час на один файл: зависший сокет не должен оставлять «Скачивание» навсегда.
-export const DOWNLOAD_TIMEOUT_MS = 60 * 60 * 1000;
-
-export type DownloadFailure =
-	| "network"
-	| "status"
-	| "size"
-	| "storage"
-	| "timeout";
-
-export interface DownloadEntry {
-	readonly mediaId: number;
-	readonly title: string;
-	readonly type: MediaType;
-	/** Только имя файла: iOS может сменить UUID контейнера между запусками. */
-	readonly filename: string;
-	readonly size: number;
-	readonly updatedAt: number;
-}
-
-export interface DownloadIndex {
-	/** baseUrl сервера, которому принадлежит индекс; null — legacy-запись. */
-	readonly server: string | null;
-	readonly entries: DownloadEntry[];
-}
+// Типы/константы — в @flux/shared/core/downloads.
 
 // Расширение берём из исходного имени файла: backend может отдать
 // извлечённый .m4a или .webm, и player лучше определяет контейнер по нему.
@@ -83,6 +63,17 @@ const MEDIA_EXTENSIONS: ReadonlySet<string> = new Set([
 // безопасные символы; ".." запрещён, чтобы старый/битый индекс не вывел
 // удаление или чтение за пределы downloads/.
 const SAFE_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
+
+export {
+	DOWNLOAD_DIRECTORY_NAME,
+	DOWNLOAD_INDEX_KEY,
+	DOWNLOAD_INDEX_VERSION,
+	DOWNLOAD_QUOTA_BYTES,
+	DOWNLOAD_TIMEOUT_MS,
+	type DownloadEntry,
+	type DownloadFailure,
+	type DownloadIndex,
+};
 
 export function isSafeDownloadFilename(value: string): boolean {
 	return SAFE_FILENAME.test(value) && !value.includes("..");
