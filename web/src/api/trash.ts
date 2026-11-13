@@ -1,13 +1,8 @@
+import { trashSchema as sharedTrashSchema } from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-import { mediaSchema } from "../core/media";
 import { apiFetch } from "./client";
-import { collectionSchema } from "./collections";
 
-const trashSchema = z.object({
-	collections: z.array(collectionSchema),
-	media: z.array(mediaSchema),
-});
+const trashSchema = sharedTrashSchema;
 
 function useTrashQuery() {
 	return useQuery({

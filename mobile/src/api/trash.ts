@@ -1,10 +1,10 @@
 import {
-	ApiError,
-	apiFetch,
-	type Collection,
-	collectionSchema,
-	type Media,
-	mediaSchema,
+	fetchTrash as fetchSharedTrash,
+	isTrashMissing as isSharedTrashMissing,
+	parseTrash as parseSharedTrash,
+	type TrashData as SharedTrashData,
+	trashErrorKey as sharedTrashErrorKey,
+	trashActions,
 } from "@flux/shared";
 import {
 	type QueryClient,
@@ -16,33 +16,12 @@ import {
 
 export const trashQueryKey = ["trash"] as const;
 
-export interface TrashData {
-	collections: Collection[];
-	media: Media[];
-}
-
-interface SchemaParser<T> {
-	parse: (value: unknown) => T;
-}
-
-function parseList<T>(schema: SchemaParser<T>, value: unknown): T[] {
-	if (!Array.isArray(value)) {
-		throw new Error("Invalid trash response: expected arrays");
-	}
-	return value.map((item) => schema.parse(item));
-}
+export type TrashData = SharedTrashData;
 
 // Корзина — два массива в одном ответе. Собираем схему из shared-схем,
 // чтобы не тянуть zod в mobile как прямую зависимость.
 export function parseTrash(body: unknown): TrashData {
-	if (typeof body !== "object" || body === null) {
-		throw new Error("Invalid trash response");
-	}
-	const record = body as { collections?: unknown; media?: unknown };
-	return {
-		collections: parseList(collectionSchema, record.collections),
-		media: parseList(mediaSchema, record.media),
-	};
+	return parseSharedTrash(body);
 }
 
 // Пустая корзина для экрана, пока данных ещё нет: один литерал вместо
@@ -60,7 +39,7 @@ export function isTrashEmpty(data: TrashData): boolean {
 // 404 — объект уже восстановили/удалили с другого устройства. Это не
 // сетевой сбой: экран должен обновить список, а не повторять запрос.
 export function isTrashMissing(error: unknown): boolean {
-	return error instanceof ApiError && error.status === 404;
+	return isSharedTrashMissing(error);
 }
 
 export type TrashErrorKey =
@@ -73,24 +52,11 @@ export type TrashErrorKey =
 // 404 — запись устарела, 409 — файл недоступен/уже существует,
 // 403 — чужая коллекция или нехватка прав.
 export function trashErrorKey(error: unknown): TrashErrorKey {
-	if (!(error instanceof ApiError)) {
-		return "trash.actionError";
-	}
-	switch (error.status) {
-		case 404:
-			return "trash.missingError";
-		case 409:
-			return "trash.conflictError";
-		case 403:
-			return "trash.forbiddenError";
-		default:
-			return "trash.actionError";
-	}
+	return sharedTrashErrorKey(error);
 }
 
 async function fetchTrash(signal?: AbortSignal): Promise<TrashData> {
-	const body = await apiFetch<unknown>("/trash", { signal });
-	return parseTrash(body);
+	return await fetchSharedTrash(signal);
 }
 
 function trashQueryOptions() {
@@ -135,33 +101,27 @@ export function useTrashActions() {
 
 	return {
 		restoreMedia: useMutation({
-			mutationFn: (id: number) =>
-				apiFetch<unknown>(`/trash/media/${id}/restore`, { method: "POST" }),
+			mutationFn: (id: number) => trashActions.restoreMedia(id),
 			onSuccess: invalidate,
 			onError,
 		}),
 		purgeMedia: useMutation({
-			mutationFn: (id: number) =>
-				apiFetch<unknown>(`/trash/media/${id}`, { method: "DELETE" }),
+			mutationFn: (id: number) => trashActions.purgeMedia(id),
 			onSuccess: invalidate,
 			onError,
 		}),
 		restoreCollection: useMutation({
-			mutationFn: (id: number) =>
-				apiFetch<unknown>(`/trash/collections/${id}/restore`, {
-					method: "POST",
-				}),
+			mutationFn: (id: number) => trashActions.restoreCollection(id),
 			onSuccess: invalidate,
 			onError,
 		}),
 		purgeCollection: useMutation({
-			mutationFn: (id: number) =>
-				apiFetch<unknown>(`/trash/collections/${id}`, { method: "DELETE" }),
+			mutationFn: (id: number) => trashActions.purgeCollection(id),
 			onSuccess: invalidate,
 			onError,
 		}),
 		emptyTrash: useMutation({
-			mutationFn: () => apiFetch<unknown>("/trash", { method: "DELETE" }),
+			mutationFn: () => trashActions.emptyTrash(),
 			onSuccess: invalidate,
 			onError,
 		}),

@@ -94,6 +94,7 @@ export {
 	RefreshError,
 	resetApiConfig,
 } from "./api/transport";
+export * from "./api/trash";
 export * from "./core/audioQueue";
 export * from "./core/format";
 export * from "./core/lyricsSync";
