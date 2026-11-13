@@ -109,7 +109,11 @@ async function requestWithRefresh<T>(
 	parse: ResponseParser<T>,
 ): Promise<T> {
 	const headers = new Headers(init?.headers);
-	if (init?.body !== undefined && !(init.body instanceof FormData)) {
+	if (
+		init?.body !== undefined &&
+		!(init.body instanceof FormData) &&
+		!headers.has("Content-Type")
+	) {
 		headers.set("Content-Type", "application/json");
 	}
 

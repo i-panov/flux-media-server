@@ -82,6 +82,13 @@ func TestWebServesIndexAndFallback(t *testing.T) {
 	}
 }
 
+func TestWebMissingAssetIs404(t *testing.T) {
+	app := webTestApp(t, webTestDist(t))
+	status, _, body := webGet(t, app, "/assets/missing.js")
+	assert.Equal(t, fiber.StatusNotFound, status)
+	assert.NotEqual(t, webIndexBody, body)
+}
+
 func TestWebAssetCaching(t *testing.T) {
 	app := webTestApp(t, webTestDist(t))
 

@@ -62,7 +62,10 @@ func (h *ThumbHandler) Get(c *fiber.Ctx) error {
 	c.Set("Content-Type", contentType)
 	c.Set("Cache-Control", fmt.Sprintf("private, max-age=%d", coverCacheMaxAge))
 
-	return c.SendFile(thumbPath)
+	if err := c.SendFile(thumbPath); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Thumbnail not available")
+	}
+	return nil
 }
 
 // GetCover returns the embedded cover art for a media item.
@@ -105,7 +108,10 @@ func (h *ThumbHandler) GetCover(c *fiber.Ctx) error {
 	// добавляет ?v=updated_at — ему это не мешает.
 	c.Set("Cache-Control", "no-cache")
 
-	return c.SendFile(coverPath)
+	if err := c.SendFile(coverPath); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Cover not available")
+	}
+	return nil
 }
 
 var allowedCoverExtensions = map[string]bool{
