@@ -14,6 +14,7 @@ import {
 	useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { apiFetch } from "../../api/client";
 import { fetchLatestUnfinishedAudio } from "../../api/progress";
 import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
@@ -86,10 +87,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 	const [shuffle, setShuffle] = useState(restoredSettings.shuffle);
 	const [repeat, setRepeat] = useState<RepeatMode>(restoredSettings.repeat);
 	const [error, setError] = useState<string | null>(null);
+	const [sourceNonce, setSourceNonce] = useState(0);
+	const reloadTried = useRef(false);
 	const audioRef = useRef<HTMLAudioElement | null>(null);
 	const shouldPlay = useRef(false);
 	const current = currentMedia(queueState);
 	const currentId = current?.id ?? 0;
+	useEffect(() => {
+		reloadTried.current = false;
+	}, [currentId]);
 	const timings = useAudioTimings(currentId);
 	// Допуск дрейфа автоплея: трек уже играет, пока позиция едет с сервера.
 	const progress = useMediaProgress(currentId, audioRef, current !== null, 2);
@@ -100,6 +106,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 		},
 		[playbackFailed],
 	);
+	// Один раз пробуем восстановить аудиопоток после истечения access-куки:
+	// apiFetch обновит сессию, затем перемонтируем <audio> с новым query.
+	const retryAudio = useCallback(() => {
+		if (current === null || reloadTried.current) {
+			handlePlayError(PLAYBACK_ERROR);
+			return;
+		}
+		reloadTried.current = true;
+		void apiFetch(`/media/${current.id}`).then(
+			() => setSourceNonce((value) => value + 1),
+			() => handlePlayError(PLAYBACK_ERROR),
+		);
+	}, [current, handlePlayError]);
 
 	// Сид мини-плеера: без очереди (и без сохранённой) подтягиваем
 	// последний недослушанный трек с сервера — на паузе, позиция
@@ -219,7 +238,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 			{children}
 			<HiddenAudio
 				audioRef={audioRef}
-				src={current === null ? undefined : `/api/media/${current.id}/stream`}
+				src={
+					current === null
+						? undefined
+						: `/api/media/${current.id}/stream?retry=${sourceNonce}`
+				}
 				onLoadedMetadata={(event) => {
 					timings.markLoaded(event.currentTarget.duration || 0);
 					progress.handleLoadedMetadata();
@@ -235,9 +258,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 				onPlay={() => setPlaying(true)}
 				onPause={() => setPlaying(false)}
 				onEnded={handleTrackEnded}
-				onError={() => {
-					handlePlayError(PLAYBACK_ERROR);
-				}}
+				onError={retryAudio}
 			/>
 		</AudioPlayerContext.Provider>
 	);

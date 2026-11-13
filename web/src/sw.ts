@@ -22,7 +22,16 @@ cleanupOutdatedCaches();
 // vite-plugin-pwa подставляет сюда манифест precache при сборке.
 precacheAndRoute(self.__WB_MANIFEST);
 
-void self.skipWaiting();
-self.addEventListener("activate", (event) => {
-	event.waitUntil(self.clients.claim());
+// Активацию запускает пользователь через PwaUpdatePrompt (SKIP_WAITING).
+(
+	self as unknown as {
+		addEventListener(
+			type: "message",
+			listener: (event: { data?: { type?: string } }) => void,
+		): void;
+	}
+).addEventListener("message", (event) => {
+	if (event.data?.type === "SKIP_WAITING") {
+		void self.skipWaiting();
+	}
 });

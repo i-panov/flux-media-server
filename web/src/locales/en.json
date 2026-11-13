@@ -379,5 +379,10 @@
 	"devices.confirm": "Sign out this device?",
 	"devices.rename": "Rename device",
 	"devices.renameError": "Rename failed: name is taken or device not found",
-	"common.more": "More"
+	"common.more": "More",
+	"pwa": {
+		"updateTitle": "Update available",
+		"updateText": "Reload to get the new version.",
+		"updateAction": "Update"
+	}
 }

@@ -28,6 +28,7 @@ import { useMiniPlayerVisible } from "../features/player/useMiniPlayerVisible";
 import { TVEnableBanner } from "../features/tv/TVEnableBanner";
 import { clickNode, useTVFocusable } from "../features/tv/tvFocus";
 import { useTVMode } from "../features/tv/useTVMode";
+import { PwaUpdatePrompt } from "./PwaUpdatePrompt";
 
 type NavTo = "/" | "/video" | "/audio" | "/memes" | "/settings" | "/admin";
 
@@ -281,6 +282,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 					px={{ base: "md", sm: "lg", xl: "xl" }}
 					py={{ base: "md", md: "lg", xl: "xl" }}
 				>
+					<PwaUpdatePrompt />
 					<TVEnableBanner />
 					{children}
 				</Container>
