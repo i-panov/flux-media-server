@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { apiFetch } from "./client";
+import { ApiError, apiFetch } from "./client";
 
 const authUserSchema = z.object({
 	id: z.number(),
@@ -122,10 +122,22 @@ export async function createDeviceCode(input?: {
 export async function pollDeviceCode(
 	deviceCode: string,
 ): Promise<DevicePollResponse> {
-	const body = await apiFetch<unknown>("/auth/device/token", {
-		method: "POST",
-		body: JSON.stringify({ device_code: deviceCode }),
-	});
+	let body: unknown;
+	try {
+		body = await apiFetch<unknown>("/auth/device/token", {
+			method: "POST",
+			body: JSON.stringify({ device_code: deviceCode }),
+		});
+	} catch (error) {
+		// Backend отдаёт invalid_grant с HTTP 400; apiFetch бросает ApiError.
+		if (error instanceof ApiError && error.status === 400) {
+			return { status: "invalid_grant" };
+		}
+		throw error;
+	}
+	if (body === null || typeof body !== "object") {
+		return { status: "invalid_grant" };
+	}
 	const status = (body as { status?: unknown }).status;
 	if (status === "ok") return deviceOkSchema.parse(body);
 	if (status === "pending") return devicePendingSchema.parse(body);

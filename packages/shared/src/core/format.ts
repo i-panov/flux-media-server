@@ -11,6 +11,9 @@ export function formatDuration(totalSeconds: number): string {
 
 // Размер файла для списка загрузок. Один десятичный знак у KB+.
 export function formatFileSize(bytes: number): string {
+	if (!Number.isFinite(bytes)) {
+		return "—";
+	}
 	const size = Math.max(0, bytes);
 	if (size < 1024) {
 		return `${size} B`;

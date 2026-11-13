@@ -3,6 +3,7 @@ export {
 	approveDeviceCode,
 	createDeviceCode,
 	type DeviceCodeResponse,
+	type DeviceInfoInput,
 	type DeviceInspectResponse,
 	type DevicePollResponse,
 	type DeviceSession,
@@ -90,6 +91,7 @@ export {
 	createWebTransport,
 	getApiConfig,
 	REFRESH_TOKEN_KEY,
+	RefreshError,
 	resetApiConfig,
 } from "./api/transport";
 export * from "./core/audioQueue";
