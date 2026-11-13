@@ -1,11 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export { updateMetadata };
+
+import { type MetadataInput, updateMetadata } from "@flux/shared";
 import { z } from "zod";
-import {
-	type MetadataInput,
-	updateMetadata,
-} from "@flux/shared";
 import { apiFetch } from "./client";
 
 export function useUpdateMetadata(mediaId: number) {
