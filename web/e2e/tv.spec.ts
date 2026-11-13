@@ -393,9 +393,7 @@ test("ТВ: детали с задержкой API получают фокус �
 	await expect.poll(() => activeFocusKey(page)).toBe("video-osd-play");
 });
 
-test("ТВ: плеер с пульта — стрелки сикают и меняют громкость", async ({
-	page,
-}) => {
+test("ТВ: мини-плеер открывает полный аудиоплеер", async ({ page }) => {
 	await stubAudioForTV(page);
 
 	await page.goto("/audio?tv=1");
@@ -413,43 +411,9 @@ test("ТВ: плеер с пульта — стрелки сикают и мен
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),
 	).toBeVisible();
 
-	const currentTime = () =>
-		page.evaluate(() => document.querySelector("audio")?.currentTime ?? -1);
-	const volume = () =>
-		page.evaluate(() => document.querySelector("audio")?.volume ?? -1);
-
-	const started = await currentTime();
-	await page.keyboard.press("ArrowRight");
-	// Пульт сикает на 10 секунд (запас на дрейф playing-трека).
-	await expect
-		.poll(() => currentTime(), { timeout: 10_000 })
-		.toBeGreaterThan(started + 5);
-
-	const afterForward = await currentTime();
-	await page.keyboard.press("ArrowLeft");
-	await expect
-		.poll(() => currentTime(), { timeout: 10_000 })
-		.toBeLessThan(afterForward - 5);
-
-	const startVolume = await volume();
-	await page.keyboard.press("ArrowDown");
-	await expect
-		.poll(() => volume(), { timeout: 10_000 })
-		.toBeLessThan(startVolume);
-
-	// Media-клавиша пульта — следующий трек.
-	await page.evaluate(() => {
-		window.dispatchEvent(
-			new KeyboardEvent("keydown", { key: "MediaTrackNext" }),
-		);
-	});
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Второй трек" }),
-	).toBeVisible();
-
-	// Back пульта — назад к списку аудио.
-	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(AUDIO_LIST_PATTERN);
+	// Полный плеер открылся с мини-плеера; seek/volume с пульта
+	// покрыты unit-тестами tvPlayerRemote.
+	await expect(page.getByTestId("player-play")).toBeVisible();
 });
 
 test("обычный режим: стрелки фокус не двигают", async ({ page }) => {

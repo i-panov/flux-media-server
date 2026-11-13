@@ -66,7 +66,7 @@ test("настройки: ошибка сервера показывает по�
 
 	await expect(page.getByText("Сервер недоступен")).toBeVisible();
 	// Повтор при лежащем сервере: алерт остаётся, запрос уходит снова.
-	await page.getByRole("button", { name: "Повторить" }).click();
+	await page.getByRole("button", { name: "Повторить" }).first().click();
 	await expect(page.getByText("Сервер недоступен")).toBeVisible();
 });
 
