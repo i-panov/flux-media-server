@@ -94,6 +94,18 @@ jobs:
       - name: Validate Expo config and plugins
         working-directory: mobile
         run: npx expo config --type introspect > /dev/null
+      - name: Prebuild Android TV manifest
+        working-directory: mobile
+        env:
+          EXPO_TV: '1'
+        run: |
+          npx expo prebuild --platform android --no-install
+          grep -q "LEANBACK_LAUNCHER" android/app/src/main/AndroidManifest.xml
+      - name: Expo doctor
+        working-directory: mobile
+        env:
+          EXPO_OFFLINE: '1'
+        run: npx expo-doctor
       - name: Check mobile version
         run: npm run version:sync -w mobile -- --check
       - name: Smoke export mobile
