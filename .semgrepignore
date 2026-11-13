@@ -1,0 +1,12 @@
+**/node_modules/**
+**/dist/**
+**/.expo/**
+**/.codeql/**
+**/coverage/**
+**/*.tsbuildinfo
+**/routeTree.gen.ts
+**/*_test.go
+**/*.test.ts
+**/*.test.tsx
+backend/data/**
+backend/configs/config.yaml

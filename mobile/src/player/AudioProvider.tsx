@@ -26,6 +26,7 @@ import { useDownloadedPathResolver } from "../downloads/DownloadProvider";
 import { t, useLanguage } from "../i18n";
 import { desiredAfterStatus } from "./audioPlaybackPolicy";
 import { shouldPreemptResumeOn401 } from "./audioProgress";
+import { setPlayingMediaId } from "./playbackRegistry";
 import { useAudioArtistSync } from "./useAudioArtistSync";
 import { useAudioProgress } from "./useAudioProgress";
 import {
@@ -141,6 +142,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 	} = useAudioQueueState();
 
 	const current = currentMedia(queueState);
+	useEffect(() => {
+		setPlayingMediaId(current?.id ?? null);
+		return () => setPlayingMediaId(null);
+	}, [current?.id]);
 	const getDownloadedPath = useDownloadedPathResolver();
 	const {
 		failed: sourceFailed,

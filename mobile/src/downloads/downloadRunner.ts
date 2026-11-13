@@ -2,6 +2,7 @@ import type { Media } from "@flux/shared";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import { type AuthSource, authSource, streamPath } from "../media/source";
+import { getPlayingMediaId } from "../player/playbackRegistry";
 import {
 	checkDownloadedSize,
 	contentLength,
@@ -157,7 +158,10 @@ export async function hydrateDownloads(
 			present.push(entry);
 		}
 	}
-	const quota = evictDownloads(present, {});
+	const playingId = getPlayingMediaId();
+	const quota = evictDownloads(present, {
+		protectedIds: playingId === null ? new Set() : new Set([playingId]),
+	});
 	for (const evicted of quota.evicted) {
 		const path = pathForEntry(evicted);
 		if (path !== null) {
@@ -388,9 +392,13 @@ async function commitDownload(
 			.filter((item) => item.status === "downloading")
 			.map((item) => item.media.id),
 	);
+	const playingId = getPlayingMediaId();
 	const quota = evictDownloads(next, {
 		activeIds,
-		protectedIds: new Set([media.id]),
+		protectedIds: new Set([
+			media.id,
+			...(playingId === null ? [] : [playingId]),
+		]),
 	});
 	for (const evicted of quota.evicted) {
 		const path = pathForEntry(evicted);

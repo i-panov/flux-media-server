@@ -7,7 +7,7 @@ import {
 	useVideoPlayer,
 	VideoView,
 } from "expo-video";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -20,6 +20,7 @@ import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 import { isTV } from "../tv/profile";
 import { PlayerControls } from "./PlayerControls";
+import { setPlayingMediaId } from "./playbackRegistry";
 import { useTVVideoRemote } from "./useTVVideoRemote";
 import { useVideoProgress } from "./useVideoProgress";
 import { useVideoSource } from "./useVideoSource";
@@ -133,11 +134,16 @@ function ErrorOverlay({ onRetry }: { onRetry: () => void }) {
 	);
 }
 
+/* eslint-disable max-lines-per-function -- компонент держит плеер, OSD и offline-состояние. */
 export function VideoPlayer({
 	media,
 	title,
 	coverVersion = 0,
 }: VideoPlayerProps) {
+	useEffect(() => {
+		setPlayingMediaId(media.id);
+		return () => setPlayingMediaId(null);
+	}, [media.id]);
 	useLanguage();
 	const { colors, radii } = useTheme();
 	const viewRef = useRef<VideoView | null>(null);
