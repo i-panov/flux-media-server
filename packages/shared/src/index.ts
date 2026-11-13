@@ -48,6 +48,7 @@ export {
 	removeFromCollection,
 	renameCollection,
 } from "./api/collections";
+export * from "./api/cover";
 export {
 	type Favorite,
 	favoriteSchema,
