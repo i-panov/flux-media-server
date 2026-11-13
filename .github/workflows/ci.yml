@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main, master, develop]
@@ -96,3 +99,12 @@ jobs:
       - name: Smoke export mobile
         working-directory: mobile
         run: npx expo export --platform android --output-dir dist
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f backend/Dockerfile -t flux-ci .
