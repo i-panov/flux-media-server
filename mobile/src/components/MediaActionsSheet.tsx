@@ -40,7 +40,11 @@ export function MediaActionsSheet({
 				text: t("media.delete"),
 				style: "destructive",
 				onPress: () => {
-					remove.mutate(media.id, { onSuccess: onClose });
+					remove.mutate(media.id, {
+						onSuccess: onClose,
+						onError: () =>
+							Alert.alert(t("common.error"), t("media.deleteError")),
+					});
 				},
 			},
 		]);

@@ -4,6 +4,7 @@
 export const metadataRu = {
 	"metadata.title": "Изменить метаданные",
 	"media.delete": "Удалить",
+	"media.deleteError": "Не удалось удалить медиа.",
 	"media.deleteTitle": "Удалить медиа?",
 	"media.deleteConfirm": "Медиа переместится в корзину.",
 	"media.saveFile": "Скачать",
@@ -57,6 +58,7 @@ export const metadataRu = {
 export const metadataEn: Record<keyof typeof metadataRu, string> = {
 	"metadata.title": "Edit metadata",
 	"media.delete": "Delete",
+	"media.deleteError": "Failed to delete media.",
 	"media.deleteTitle": "Delete media?",
 	"media.deleteConfirm": "The media will be moved to trash.",
 	"media.saveFile": "Download",

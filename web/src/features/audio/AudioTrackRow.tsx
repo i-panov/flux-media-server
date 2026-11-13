@@ -75,12 +75,14 @@ export function AudioTrackRow({
 		<>
 			<Group
 				ref={tvRef}
-				tabIndex={tvMode ? -1 : undefined}
+				tabIndex={tvMode ? -1 : 0}
 				role="button"
 				gap="sm"
 				wrap="nowrap"
 				onClick={startPlayback}
 				onKeyDown={(event) => {
+					// Enter на сердечке/меню не должен запускать трек.
+					if (event.target !== event.currentTarget) return;
 					if (event.key === "Enter" || event.key === " ") {
 						event.preventDefault();
 						startPlayback();
@@ -186,7 +188,13 @@ export function AudioTrackRow({
 							loading={remove.isPending}
 							onClick={() => {
 								remove.mutate(media.id, {
-									onSuccess: () => setDeleteOpened(false),
+									onSuccess: () => {
+										const queueIndex = player.queue.findIndex(
+											(item) => item.id === media.id,
+										);
+										if (queueIndex >= 0) player.removeAt(queueIndex);
+										setDeleteOpened(false);
+									},
 								});
 							}}
 						>

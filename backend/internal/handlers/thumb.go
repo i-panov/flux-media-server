@@ -60,7 +60,7 @@ func (h *ThumbHandler) Get(c *fiber.Ctx) error {
 	}
 
 	c.Set("Content-Type", contentType)
-	c.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", coverCacheMaxAge))
+	c.Set("Cache-Control", fmt.Sprintf("private, max-age=%d", coverCacheMaxAge))
 
 	return c.SendFile(thumbPath)
 }
