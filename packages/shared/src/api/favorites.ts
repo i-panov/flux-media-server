@@ -80,6 +80,16 @@ export async function fetchFavoriteMedia(type: MediaType): Promise<Media[]> {
 // по типу их строки (media_id NULL, artist_id задан) приходят вместе
 // с медиа-избранным — забираем только id артистов.
 export async function fetchFavoriteArtistIds(): Promise<Set<number>> {
+	try {
+		const body = await apiFetch<unknown>("/favorites/artists");
+		const parsed = z.object({ items: z.array(z.number()) }).parse(body);
+		return new Set(parsed.items);
+	} catch (error) {
+		// Старый backend без endpoint: прежний путь через все избранные.
+		if (!(error instanceof ApiError) || error.status !== 404) {
+			throw error;
+		}
+	}
 	const ids = new Set<number>();
 	await fetchFavoritePages(null, (page) => {
 		for (const entry of page.items) {

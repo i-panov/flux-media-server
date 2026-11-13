@@ -130,6 +130,7 @@ type FavoriteRepository interface {
 	FindByUser(ctx context.Context, userID uint, mediaType string, limit, offset int) ([]models.Favorite, int64, error)
 	FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.Favorite, error)
 	FindByUserAndArtist(ctx context.Context, userID, artistID uint) (*models.Favorite, error)
+	FindArtistIDsByUser(ctx context.Context, userID uint) ([]uint, error)
 	IsFavorited(ctx context.Context, userID, mediaID uint) (bool, error)
 	IsArtistFavorited(ctx context.Context, userID, artistID uint) (bool, error)
 	Create(ctx context.Context, favorite *models.Favorite) error

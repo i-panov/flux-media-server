@@ -99,17 +99,23 @@ describe("fetchFavoriteArtistIds", () => {
 	it("забирает только id артистов", async () => {
 		vi.stubGlobal(
 			"fetch",
-			vi.fn().mockResolvedValue(
-				jsonResponse({
-					items: [
-						favoriteEntry(1, null, 5),
-						favoriteEntry(2, 10, null),
-						favoriteEntry(3, null, 6),
-					],
-					total: 3,
-					limit: 200,
-					offset: 0,
-				}),
+			vi.fn().mockImplementation((url: string) =>
+				Promise.resolve(
+					jsonResponse(
+						String(url).includes("/favorites/artists")
+							? { items: [5, 6] }
+							: {
+									items: [
+										favoriteEntry(1, null, 5),
+										favoriteEntry(2, 10, null),
+										favoriteEntry(3, null, 6),
+									],
+									total: 3,
+									limit: 200,
+									offset: 0,
+								},
+					),
+				),
 			),
 		);
 

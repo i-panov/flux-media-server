@@ -81,6 +81,14 @@ func (r *FavoriteStore) FindByUserAndMedia(ctx context.Context, userID, mediaID 
 	return &fav, err
 }
 
+func (r *FavoriteStore) FindArtistIDsByUser(ctx context.Context, userID uint) ([]uint, error) {
+	var ids []uint
+	err := r.db.WithContext(ctx).Model(&models.Favorite{}).
+		Where("user_id = ? AND artist_id IS NOT NULL", userID).
+		Pluck("artist_id", &ids).Error
+	return ids, err
+}
+
 func (r *FavoriteStore) FindByUserAndArtist(ctx context.Context, userID, artistID uint) (*models.Favorite, error) {
 	var fav models.Favorite
 	err := r.db.WithContext(ctx).

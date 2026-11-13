@@ -117,6 +117,23 @@ func (h *FavoriteHandler) ListFavorites(c *fiber.Ctx) error {
 	return response.Paginated(c, favs, total, limit, offset)
 }
 
+// ListFavoriteArtistIDs returns only artist IDs — без тяжёлых Media.
+func (h *FavoriteHandler) ListFavoriteArtistIDs(c *fiber.Ctx) error {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+	ids, err := h.favRepo.FindArtistIDsByUser(c.UserContext(), userID)
+	if err != nil {
+		log.Printf("ListFavoriteArtistIDs: %v", err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to load favorites")
+	}
+	if ids == nil {
+		ids = []uint{}
+	}
+	return c.JSON(fiber.Map{"items": ids})
+}
+
 // AddArtistFavorite adds an artist to the user's favorites.
 func (h *FavoriteHandler) AddArtistFavorite(c *fiber.Ctx) error {
 	userID, ok := middleware.GetUserID(c)

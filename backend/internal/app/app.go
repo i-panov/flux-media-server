@@ -697,6 +697,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Post("/media/:id/favorite", favoriteHandler.AddFavorite)
 	api.Delete("/media/:id/favorite", favoriteHandler.RemoveFavorite)
 	api.Get("/favorites", readRateLimiter, favoriteHandler.ListFavorites)
+	api.Get("/favorites/artists", readRateLimiter, favoriteHandler.ListFavoriteArtistIDs)
 	api.Post("/favorites/artist", favoriteHandler.AddArtistFavorite)
 	api.Delete("/favorites/artist", favoriteHandler.RemoveArtistFavorite)
 
