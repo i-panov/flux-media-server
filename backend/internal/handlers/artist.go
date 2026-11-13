@@ -262,5 +262,5 @@ func (h *ArtistHandler) GetCover(c *fiber.Ctx) error {
 	// Кеширование как у media-обложек: замена файла инвалидируется
 	// cache-buster'ом ?v=updated_at в URL (Touch при UploadCover).
 	c.Set("Cache-Control", fmt.Sprintf("private, max-age=%d", coverCacheMaxAge))
-	return c.SendFile(path)
+	return sendFile(c, path, "Cover not available")
 }

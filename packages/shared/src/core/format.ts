@@ -43,38 +43,41 @@ export function splitSubLang(lang: string): { base: string; label: string } {
 	return { base, label: `${base} (${lang.slice(base.length)})` };
 }
 
-const FILENAME_TITLE_YEAR_PATTERN = /^(.+)\.(\d{4})\.[^.]+$/;
-const FILENAME_TITLE_PAREN_YEAR_PATTERN = /^(.+)\s*\((\d{4})\)\.[^.]+$/;
-const FILENAME_TITLE_EPISODE_PATTERN = /^(.+)\.S(\d{2})E(\d{2})\..+$/;
+const FILENAME_EPISODE_PATTERN =
+	/^(.*?)[. _-](?:S(\d{1,2})E(\d{1,2})|(\d{1,2})x(\d{1,2}))(?:[. _-].*)?$/i;
+const FILENAME_YEAR_PATTERN = /(?:^|[. _(-])((?:18|19|20)\d{2})(?=$|[. _)-])/g;
 
-// Название и год из имени файла — зеркало Flutter FilenameParser:
-// Title.Year.ext, Title (Year).ext, Title.S01E05.ext, иначе имя без
-// расширения с точками вместо пробелов.
+// Название и год из имени файла. Год — последний валидный 4-значный
+// сегмент (18xx..20xx), а не «1080»/«2160»; сериалы S1E1 и 1x01
+// распознаются до года, чтобы «Show.S01E05.2020» не стал годом шоу.
 export function parseFilename(filename: string): {
 	title: string;
 	year: number | null;
 } {
-	const dot = FILENAME_TITLE_YEAR_PATTERN.exec(filename);
-	if (dot?.[1] !== undefined && dot[2] !== undefined) {
-		return {
-			title: dot[1].replace(/\./g, " "),
-			year: Number(dot[2]),
-		};
-	}
-	const paren = FILENAME_TITLE_PAREN_YEAR_PATTERN.exec(filename);
-	if (paren?.[1] !== undefined && paren[2] !== undefined) {
-		return {
-			title: paren[1].trim().replace(/\./g, " "),
-			year: Number(paren[2]),
-		};
-	}
-	const episode = FILENAME_TITLE_EPISODE_PATTERN.exec(filename);
+	const stem = filename.replace(/\.[^.]+$/, "");
+	const episode = FILENAME_EPISODE_PATTERN.exec(stem);
 	if (episode?.[1] !== undefined) {
-		return { title: episode[1].replace(/\./g, " "), year: null };
+		return { title: episode[1].trim().replace(/[._]+/g, " "), year: null };
 	}
-	const parts = filename.split(".");
-	if (parts.length > 1) {
-		parts.pop();
+	let year: number | null = null;
+	let yearIndex = -1;
+	for (const match of stem.matchAll(FILENAME_YEAR_PATTERN)) {
+		const value = Number(match[1]);
+		const now = new Date().getFullYear();
+		if (value >= 1888 && value <= now + 2) {
+			year = value;
+			yearIndex = match.index;
+		}
 	}
-	return { title: parts.join(" "), year: null };
+	if (year !== null && yearIndex >= 0) {
+		return {
+			title: stem
+				.slice(0, yearIndex)
+				.replace(/[. _-]+$/g, "")
+				.replace(/[._]+/g, " ")
+				.trim(),
+			year,
+		};
+	}
+	return { title: stem.replace(/[._]+/g, " ").trim(), year: null };
 }

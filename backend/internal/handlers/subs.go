@@ -88,7 +88,7 @@ func (h *SubsHandler) ServeSub(c *fiber.Ctx) error {
 				return response.Error(c, fiber.StatusNotFound, "Subtitle not available")
 			}
 			c.Set("Content-Type", "text/vtt; charset=utf-8")
-			return c.SendFile(sub.Path)
+			return sendFile(c, sub.Path, "Subtitle not found")
 		}
 	}
 	return response.Error(c, fiber.StatusNotFound, "Subtitle not available")

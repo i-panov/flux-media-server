@@ -82,6 +82,11 @@ func isUploadPath(method, path string) bool {
 	if path == apiMediaRoute+uploadRouteSuffix {
 		return method == fiber.MethodPost
 	}
+	if method == fiber.MethodPost &&
+		strings.HasPrefix(path, "/api/artists/") &&
+		strings.HasSuffix(path, "/cover") {
+		return true
+	}
 	return method == fiber.MethodPut &&
 		strings.HasPrefix(path, apiMediaRoute+"/") && strings.HasSuffix(path, coverRouteSuffix)
 }

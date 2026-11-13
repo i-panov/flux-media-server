@@ -225,7 +225,7 @@ func (h *AdminHandler) OriginalDownload(c *fiber.Ctx) error {
 	// её только для заголовка, файл на диске не трогаем.
 	safeName := strings.ReplaceAll(st.Name(), `"`, "_")
 	c.Set("Content-Disposition", "attachment; filename=\""+safeName+"\"")
-	return c.SendFile(full)
+	return sendFile(c, full, "File not found")
 }
 
 // OriginalDelete удаляет оригинал из карантина. Активное задание
