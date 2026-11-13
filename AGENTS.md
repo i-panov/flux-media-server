@@ -193,7 +193,9 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - Mobile-запросы — через shared `apiFetch`/`CoreFetcher`; очередь, progress
   и lyrics-логика не дублируются в mobile.
 - Shared не импортирует React/DOM/RN; платформенные различия — через
-  `AuthTransport`/`KeyValueStore`.
+  `AuthTransport`/`KeyValueStore`. Контракты и чистая логика trash/cover/
+  metadata/upload/downloads живут в `packages/shared/src/api|core`; XHR,
+  FileSystem, SecureStore, React Query hooks и UI остаются в клиентах.
 
 ## Версионирование
 
