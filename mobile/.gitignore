@@ -42,3 +42,6 @@ yarn-error.*
 
 # Machine-specific SDK paths (prebuild never generates this)
 local.properties
+# release keystore/credentials
+*.jks
+keystore.properties

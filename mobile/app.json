@@ -74,7 +74,8 @@
           "androidTVIcon": "./assets/tv-icon.png"
         }
       ],
-      "./plugins/withCleartextTraffic"
+      "./plugins/withCleartextTraffic",
+      "./plugins/withReleaseSigning"
     ]
   }
 }

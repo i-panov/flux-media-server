@@ -113,6 +113,9 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - Dogfood-APK (arm64, ~30 МБ вместо ~92 МБ universal):
   `EXPO_PUBLIC_API_BASE=<url> ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a ./gradlew assembleRelease`
   из `mobile/android` (JDK 17 + `local.properties` с SDK/NDK локально).
+  Release-подпись: `FLUX_KEYSTORE_PATH`, `FLUX_KEYSTORE_PASSWORD`,
+  `FLUX_KEY_ALIAS`, `FLUX_KEY_PASSWORD` (без пути остаётся debug-подпись
+  для dogfood).
 
 ## Архитектура
 
