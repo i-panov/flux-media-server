@@ -1,5 +1,6 @@
 const HTTP_SCHEME = /^https?:\/\//i;
 const ANY_SCHEME = /^([a-z][a-z0-9+.-]*):\/\//i;
+const IPV6_BRACKET = /^\[[^\]]+\]/;
 const PRIVATE_10 = /^10\./;
 const PRIVATE_192 = /^192\.168\./;
 const PRIVATE_172 = /^172\.(1[6-9]|2\d|3[0-1])\./;
@@ -8,7 +9,11 @@ const PRIVATE_172 = /^172\.(1[6-9]|2\d|3[0-1])\./;
 // Иначе ввод «flux.example.com» уходил бы на http и не логинился,
 // а «192.168.1.10:8080» — на https, где TLS обычно нет.
 function defaultScheme(value: string): "http" | "https" {
-	const host = value.split("/")[0]?.toLowerCase() ?? "";
+	// hostname без порта: myhost.local:8080 должен остаться локальным.
+	const rawHost = value.split("/")[0]?.toLowerCase() ?? "";
+	const host = rawHost.startsWith("[")
+		? (rawHost.match(IPV6_BRACKET)?.[0] ?? rawHost)
+		: (rawHost.split(":")[0] ?? rawHost);
 	if (
 		host === "localhost" ||
 		host.startsWith("localhost:") ||

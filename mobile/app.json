@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.lib.flux"
+      "bundleIdentifier": "app.lib.flux",
+      "buildNumber": "62",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Flux обращается к вашему домашнему медиа-серверу в локальной сети."
+      }
     },
     "android": {
       "adaptiveIcon": {

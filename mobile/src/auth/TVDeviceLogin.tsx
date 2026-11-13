@@ -21,6 +21,7 @@ import { secureStore } from "../storage/secureStore";
 import { useTheme } from "../theme/ThemeProvider";
 import { tvFocusStyle } from "../tv/focus";
 import { getDeviceIdentity } from "./deviceInfo";
+import { emitLocalReset } from "./reset";
 import { sessionQueryKey } from "./session";
 
 function QrGrid({ value }: { value: string }) {
@@ -95,6 +96,7 @@ export function TVDeviceLogin({ onUseOtp }: { onUseOtp: () => void }) {
 				const result = await pollDeviceCode(data.device_code);
 				if (cancelled) return;
 				if (result.status === "ok") {
+					emitLocalReset();
 					await secureStore.set(ACCESS_TOKEN_KEY, result.token);
 					await secureStore.set(REFRESH_TOKEN_KEY, result.refresh_token);
 					queryClient.removeQueries();
