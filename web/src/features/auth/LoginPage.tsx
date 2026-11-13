@@ -8,7 +8,7 @@ import {
 	Title,
 } from "@mantine/core";
 import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -51,6 +51,7 @@ function toAuthError(t: TFunction, error: unknown, step: AuthStep): string {
 export function LoginPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
+	const { redirect: redirectTo } = useSearch({ from: "/login" });
 	const [email, setEmail] = useState("");
 	const [codeSent, setCodeSent] = useState(false);
 	const [code, setCode] = useState("");
@@ -92,6 +93,10 @@ export function LoginPage() {
 			{ email: email.trim(), code: code.trim(), deviceId: getWebDeviceId() },
 			{
 				onSuccess: () => {
+					if (redirectTo !== undefined && redirectTo.startsWith("/")) {
+						window.location.assign(redirectTo);
+						return;
+					}
 					void navigate({ to: "/video" });
 				},
 				onError: (verifyError) => {

@@ -111,10 +111,14 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 			revalidateIfStale: true,
 		});
 		if (session === null && location.pathname !== "/login") {
+			// Сохраняем исходный адрес, включая hash с кодом активации.
 			// TanStack Router управляет редиректами брошенными объектами,
 			// а не Error: точечно гасим only-throw-error.
 			// eslint-disable-next-line @typescript-eslint/only-throw-error
-			throw redirect({ to: "/login" });
+			throw redirect({
+				to: "/login",
+				search: { redirect: location.href },
+			});
 		}
 	},
 	component: RootDocument,

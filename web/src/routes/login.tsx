@@ -1,8 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { z } from "zod";
 import { sessionQueryOptions } from "../api/session";
 import { LoginPage } from "../features/auth/LoginPage";
 
 export const Route = createFileRoute("/login")({
+	validateSearch: z.object({ redirect: z.string().optional() }),
 	beforeLoad: async ({ context }) => {
 		const session = await context.queryClient.ensureQueryData(
 			sessionQueryOptions(),
