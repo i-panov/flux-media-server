@@ -79,6 +79,7 @@ func (h *TranscodeHandler) TranscodeCancel(c *fiber.Ctx) error {
 func transcodeStatusResponse(c *fiber.Ctx, mediaRepo repository.MediaRepository, id int, st services.TranscodeJobStatus) fiber.Map {
 	resp := fiber.Map{
 		"id":          id,
+		"job_type":    "transcode",
 		"status":      st.Status,
 		"error":       nil,
 		"media":       nil,

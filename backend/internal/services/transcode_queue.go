@@ -648,6 +648,11 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 		return
 	}
 	title, year := metadata.ParseFilename(filepath.Base(resultPath))
+	width, height := probe.Width, probe.Height
+	if plan.NeedScale && height > q.cfg.MaxHeight && height > 0 {
+		width = int(float64(width) * float64(q.cfg.MaxHeight) / float64(height))
+		height = q.cfg.MaxHeight
+	}
 	media := &models.Media{
 		Title:      title,
 		Filename:   filepath.Base(resultPath),
@@ -659,8 +664,8 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 		SourceHash: hash,
 		QuickHash:  resultQuick,
 		Duration:   int(probe.DurationSec),
-		Width:      probe.Width,
-		Height:     probe.Height,
+		Width:      width,
+		Height:     height,
 	}
 	if err := q.media.Create(context.Background(), media); err != nil {
 		q.fail(task, err, "Failed to save media record", true)

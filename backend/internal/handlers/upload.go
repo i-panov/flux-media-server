@@ -303,10 +303,11 @@ func (h *UploadHandler) UploadStatus(c *fiber.Ctx) error {
 	}
 
 	resp := fiber.Map{
-		"id":     id,
-		"status": status.Status,
-		"error":  nil,
-		"media":  nil,
+		"id":       id,
+		"job_type": "upload",
+		"status":   status.Status,
+		"error":    nil,
+		"media":    nil,
 	}
 	if status.Error != "" {
 		resp["error"] = status.Error
