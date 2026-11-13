@@ -24,8 +24,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.lib.flux",
-      "versionCode": 62,
-      "usesCleartextTraffic": true
+      "versionCode": 62
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -60,7 +59,9 @@
       [
         "expo-image-picker",
         {
-          "microphonePermission": false
+          "microphonePermission": false,
+          "photosPermission": "Flux открывает выбранное фото для обложки.",
+          "cameraPermission": false
         }
       ],
       "expo-image",
