@@ -36,6 +36,7 @@ export const downloadsRu = {
 	"downloads.progressLabel": "Прогресс скачивания",
 	"downloads.back": "Назад",
 	"downloads.export": "Экспорт",
+	"downloads.openItem": "Открыть: {{title}}",
 	"downloads.exportItem": "Экспорт: {{title}}",
 	"downloads.deleteItem": "Удалить: {{title}}",
 	// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
@@ -88,6 +89,7 @@ export const downloadsEn: Record<keyof typeof downloadsRu, string> = {
 	"downloads.progressLabel": "Download progress",
 	"downloads.back": "Back",
 	"downloads.export": "Export",
+	"downloads.openItem": "Open: {{title}}",
 	"downloads.exportItem": "Export: {{title}}",
 	"downloads.deleteItem": "Delete: {{title}}",
 	"downloads.exportHint": "Opens the system share sheet",

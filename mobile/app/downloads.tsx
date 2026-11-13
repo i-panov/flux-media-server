@@ -1,5 +1,6 @@
+/* eslint-disable max-lines -- экран держит очередь, ошибки и офлайн-строки. */
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { MediaType } from "@flux/shared";
+import type { Media, MediaType } from "@flux/shared";
 import * as FileSystem from "expo-file-system/legacy";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
@@ -26,6 +27,7 @@ import type {
 import { exportDownload } from "../src/downloads/exportDownload";
 import type { DownloadExportFailure } from "../src/downloads/exportStore";
 import { t, useLanguage } from "../src/i18n";
+import { useAudioActions } from "../src/player/AudioProvider";
 import { useTheme } from "../src/theme/ThemeProvider";
 
 function closeDownloads(): void {
@@ -260,6 +262,7 @@ interface EntryRowProps {
 	/** Один share sheet на экран: остальные кнопки экспорта ждут. */
 	readonly exportBusy: boolean;
 	readonly onExport: (entry: DownloadEntry) => void;
+	readonly onOpen: (entry: DownloadEntry) => void;
 }
 
 function EntryRow({
@@ -268,6 +271,7 @@ function EntryRow({
 	exporting,
 	exportBusy,
 	onExport,
+	onOpen,
 }: EntryRowProps) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
@@ -319,6 +323,21 @@ function EntryRow({
 				</Text>
 			</View>
 			<View style={[styles.rowActions, { gap: spacing.xs }]}>
+				{entry.type === "audio" && (
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel={t("downloads.openItem", { title: entry.title })}
+						onPress={() => onOpen(entry)}
+						testID={`download-open-${entry.mediaId}`}
+						hitSlop={8}
+						style={({ pressed }) => [
+							styles.actionButton,
+							pressed && styles.pressed,
+						]}
+					>
+						<Ionicons name="play" size={20} color={colors.accent} />
+					</Pressable>
+				)}
 				<Pressable
 					accessibilityRole="button"
 					accessibilityLabel={t("downloads.exportItem", {
@@ -367,6 +386,31 @@ function EntryRow({
 
 function DownloadsContent() {
 	useLanguage();
+	const { playQueue } = useAudioActions();
+	const handleOpen = (entry: DownloadEntry) => {
+		const media: Media = {
+			id: entry.mediaId,
+			title: entry.title,
+			filename: entry.filename,
+			year: 0,
+			description: "",
+			type: "audio",
+			artists: [],
+			album: "",
+			genre: "",
+			duration: 0,
+			width: 0,
+			height: 0,
+			file_size: entry.size,
+			thumbnail_url: "",
+			cover_url: "",
+			view_count: 0,
+			source_url: "",
+			created_at: "",
+		};
+		playQueue([media], 0);
+		router.push("/player");
+	};
 	const { colors, spacing } = useTheme();
 	const { entries, active } = useDownloadState();
 	const [exportingId, setExportingId] = useState<number | null>(null);
@@ -446,6 +490,7 @@ function DownloadsContent() {
 							exporting={exportingId === entry.mediaId}
 							exportBusy={exportingId !== null}
 							onExport={handleExport}
+							onOpen={handleOpen}
 						/>
 					))}
 				</View>
