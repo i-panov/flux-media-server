@@ -613,6 +613,12 @@ func (q *UploadQueue) checkAndCreateMedia(job *UploadJob, hash string) (*models.
 		if ownMediaID != 0 && existing.ID == ownMediaID {
 			return existing, false
 		}
+		// Watcher успел проиндексировать файл, который мы только что
+		// сохранили: это наша же загрузка, а не чужой дубль. Не удаляем
+		// файл и не плодим вторую запись.
+		if existing.FilePath == job.filePath {
+			return existing, false
+		}
 		// Дубль по хэшу из корзины: не 409, а восстановление —
 		// пользователь явно вернул тот же файл. Но только если файл
 		// реально на месте: иначе зальёт заново, удалит хорошую копию
