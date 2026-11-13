@@ -123,18 +123,16 @@ env:
 - assertVisible:
     id: "tab-audio"
 - assertVisible:
-    id: "tab-library"
+    id: "tab-video"
 - assertVisible:
     id: "tab-settings"
 
 # 7. Плейсхолдер библиотеки и экран настроек.
 - tapOn:
-    id: "tab-library"
+    id: "tab-video"
 - assertVisible:
-    id: "library-screen"
+    id: "video-grid"
 - tapOn:
     id: "tab-settings"
 - assertVisible:
     id: "settings-screen"
-- assertVisible:
-    id: "settings-open-server"

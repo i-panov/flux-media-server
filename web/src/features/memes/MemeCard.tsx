@@ -18,7 +18,7 @@ export function MemeCard({ media }: { media: Media }) {
 	const reload = useMediaReload(media.id);
 	// ТВ-режим: плитка — spatial-цель, Enter повторяет клик по ссылке.
 	// Суффикс useId: то же медиа бывает сразу в сетке и избранном.
-	const instanceKey = useId().replaceAll(":", "");
+	const instanceKey = useId().replace(/:/g, "");
 	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
 		`meme-card-${media.id}-${instanceKey}`,
 		clickFirstLink,

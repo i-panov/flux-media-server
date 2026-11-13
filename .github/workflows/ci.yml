@@ -7,12 +7,17 @@ on:
   push:
     branches: [main, master, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -22,6 +27,7 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+          cache-dependency-path: backend/go.sum
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y gcc libc6-dev
       - name: Build
@@ -32,6 +38,7 @@ jobs:
   web:
     name: Web
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: web
@@ -63,6 +70,7 @@ jobs:
   shared-mobile:
     name: Shared & Mobile
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -101,6 +109,7 @@ jobs:
         run: |
           npx expo prebuild --platform android --no-install
           grep -q "LEANBACK_LAUNCHER" android/app/src/main/AndroidManifest.xml
+          grep -q 'System.getenv("FLUX_KEYSTORE_PATH") ? signingConfigs.release' android/app/build.gradle
       - name: Expo doctor
         working-directory: mobile
         env:
@@ -120,3 +129,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build image
         run: docker build -f backend/Dockerfile -t flux-ci .
+      - name: Run healthcheck
+        run: |
+          docker run -d --name flux-smoke -p 18095:8080 \
+            -v "$PWD/backend/configs/config.example.yaml:/app/configs/config.yaml:ro" \
+            --tmpfs /app/data flux-ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18095/api/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs flux-smoke
+          exit 1

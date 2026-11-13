@@ -395,7 +395,8 @@ export function AudioPlayerPage() {
 	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
 		"player-back",
 		clickNode,
-		() => false,
+		undefined,
+		{ secondary: true },
 	);
 	const navigateBack = () => {
 		void navigate({ to: "/audio" });

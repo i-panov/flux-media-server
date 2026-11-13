@@ -40,7 +40,7 @@ export function VideoCard({ media }: { media: Media }) {
 	// В обычном режиме focusable=false, поведение не меняется.
 	// Суффикс useId: то же медиа бывает сразу в сетке, избранном
 	// и продолжении — ключи обязаны быть уникальны на странице.
-	const instanceKey = useId().replaceAll(":", "");
+	const instanceKey = useId().replace(/:/g, "");
 	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
 		`video-card-${media.id}-${instanceKey}`,
 		clickFirstLink,

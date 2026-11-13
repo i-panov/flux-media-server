@@ -91,7 +91,7 @@ env:
 - assertVisible:
     id: "tab-audio"
 - assertVisible:
-    id: "tab-library"
+    id: "tab-video"
 - assertVisible:
     id: "tab-settings"
 - tapOn:

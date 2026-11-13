@@ -19,7 +19,16 @@ let serverConfigured = ENV_BASE_URL !== null;
 configureApi({
 	baseUrl: ENV_BASE_URL ?? "",
 	transport: createTokenTransport(secureStore),
+	onAuthFailure: () => authFailureHandler?.(),
 });
+
+let authFailureHandler: (() => void | Promise<void>) | null = null;
+
+export function setAuthFailureHandler(
+	handler: (() => void | Promise<void>) | null,
+): void {
+	authFailureHandler = handler;
+}
 
 export function isServerConfigured(): boolean {
 	return serverConfigured;

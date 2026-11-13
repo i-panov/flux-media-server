@@ -9,14 +9,23 @@ services:
       dockerfile: backend/Dockerfile
     container_name: flux-media-server
     restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
     ports:
       - "127.0.0.1:${HOST_PORT:-8095}:8080"
     volumes:
-      - ${MEDIA_PATH}:/mnt/media/Flux:rw
+      # Данные сервера (SQLite, настройки, оригиналы, превью) — named
+      # volume, иначе docker compose down создаёт новый пустой том.
+      - flux-data:/app/data
+      # Медиатека хоста в те же пути, что в config.example.yaml
+      # (./data/video|audio|images относительно /app).
+      - ${MEDIA_PATH:?set MEDIA_PATH in backend/.env}/video:/app/data/video:rw
+      - ${MEDIA_PATH:?set MEDIA_PATH in backend/.env}/audio:/app/data/audio:rw
+      - ${MEDIA_PATH:?set MEDIA_PATH in backend/.env}/images:/app/data/images:rw
       - ./configs/config.yaml:/app/configs/config.yaml:ro
     environment:
       - CONFIG_PATH=/app/configs/config.yaml
       - TZ=${TZ:-UTC}
-    # Note: the server binds server.host from config.yaml. For container use
-    # it must be "0.0.0.0" (publishing the port above only reaches a process
-    # bound to all interfaces inside the container).
+
+volumes:
+  flux-data:

@@ -17,7 +17,7 @@ export function FavoriteButton({
 	className?: string;
 }) {
 	const { t } = useTranslation();
-	const instanceKey = useId().replaceAll(":", "");
+	const instanceKey = useId().replace(/:/g, "");
 	const ids = useFavoriteIds(type);
 	const toggle = useToggleFavorite(type);
 	const active = ids.data?.has(mediaId) ?? false;

@@ -7,7 +7,7 @@ import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
 
 export function CollectionTile({ collection }: { collection: Collection }) {
 	// ТВ-режим: плитка — spatial-цель, Enter повторяет клик по ссылке.
-	const instanceKey = useId().replaceAll(":", "");
+	const instanceKey = useId().replace(/:/g, "");
 	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
 		`collection-tile-${collection.id}-${instanceKey}`,
 		clickFirstLink,

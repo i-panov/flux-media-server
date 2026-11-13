@@ -102,6 +102,12 @@ async function parseJSON<T>(response: Response): Promise<T> {
 	}
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+	if (signal?.aborted === true) {
+		throw signal.reason ?? new Error("Aborted");
+	}
+}
+
 async function requestWithRefresh<T>(
 	path: string,
 	init: RequestInit | undefined,
@@ -148,14 +154,15 @@ async function requestWithRefresh<T>(
 					refreshError instanceof RefreshError &&
 					(refreshError.status === 401 || refreshError.status === 400)
 				) {
-					init?.signal?.throwIfAborted();
+					await getApiConfig().onAuthFailure?.();
+					throwIfAborted(init?.signal ?? undefined);
 					return requestWithRefresh<T>(path, init, false, parse);
 				}
 				throw refreshError;
 			}
 			// Ушёл со страницы во время refresh — молча отменяемся,
 			// TanStack такое глотает.
-			init?.signal?.throwIfAborted();
+			throwIfAborted(init?.signal ?? undefined);
 			return requestWithRefresh<T>(path, init, false, parse);
 		}
 		throw error;

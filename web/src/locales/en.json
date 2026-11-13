@@ -384,5 +384,10 @@
 		"updateTitle": "Update available",
 		"updateText": "Reload to get the new version.",
 		"updateAction": "Update"
+	},
+	"common": {
+		"cancel": "Cancel",
+		"save": "Save",
+		"error": "Error"
 	}
 }

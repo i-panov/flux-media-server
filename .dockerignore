@@ -23,3 +23,8 @@ backend/configs/config.yaml
 web/node_modules/
 web/.cache/
 mobile/.expo/
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example

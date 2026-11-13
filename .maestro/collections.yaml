@@ -30,10 +30,10 @@ env:
 
 # Библиотека: чистим прежние тестовые коллекции через их экран.
 - tapOn:
-    id: "tab-library"
+    id: "tab-video"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 
 - runFlow:
@@ -59,7 +59,7 @@ env:
                 id: "delete-collection-confirm"
             - extendedWaitUntil:
                 visible:
-                  id: "library-screen"
+                  id: "video-grid"
                 timeout: 20000
 
 - runFlow:
@@ -85,7 +85,7 @@ env:
                 id: "delete-collection-confirm"
             - extendedWaitUntil:
                 visible:
-                  id: "library-screen"
+                  id: "video-grid"
                 timeout: 20000
 
 # Создаём две коллекции. Тип по умолчанию — видео.
@@ -126,15 +126,15 @@ env:
     id: "tab-video"
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*"
+      id: "(video-card|audio-row)-.*"
     timeout: 20000
 - scrollUntilVisible:
     element:
-      id: "media-row-.*"
+      id: "(video-card|audio-row)-.*"
     direction: DOWN
     timeout: 20000
 - tapOn:
-    id: "media-row-.*"
+    id: "(video-card|audio-row)-.*"
 - extendedWaitUntil:
     visible:
       id: "video-detail-title"
@@ -164,7 +164,7 @@ env:
 
 # Открываем «Maestro A»: видео на месте. Переносим его в «Maestro B».
 - tapOn:
-    id: "tab-library"
+    id: "tab-video"
 - scrollUntilVisible:
     element:
       text: "Maestro A"
@@ -200,7 +200,7 @@ env:
     id: "collection-detail-back"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 10000
 - scrollUntilVisible:
     element:
@@ -232,7 +232,7 @@ env:
     id: "delete-collection-confirm"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 
 - tapOn: "Maestro A"
@@ -250,7 +250,7 @@ env:
     id: "delete-collection-confirm"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 - extendedWaitUntil:
     notVisible: "Maestro A"

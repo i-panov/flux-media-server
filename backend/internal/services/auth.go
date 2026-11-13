@@ -29,13 +29,14 @@ type OTPEntry struct {
 }
 
 type OTPStore struct {
-	mu         sync.RWMutex
-	entries    map[string]*OTPEntry
-	failures   map[string]int
-	ttl        time.Duration
-	codeLength int
-	maxEntries int
-	stopChan   chan struct{}
+	mu            sync.RWMutex
+	entries       map[string]*OTPEntry
+	failures      map[string]int
+	failureExpiry map[string]time.Time
+	ttl           time.Duration
+	codeLength    int
+	maxEntries    int
+	stopChan      chan struct{}
 }
 
 func NewOTPStore(ttl time.Duration, codeLength int, maxEntries int) *OTPStore {
@@ -43,12 +44,13 @@ func NewOTPStore(ttl time.Duration, codeLength int, maxEntries int) *OTPStore {
 		maxEntries = 10000
 	}
 	s := &OTPStore{
-		entries:    make(map[string]*OTPEntry),
-		failures:   make(map[string]int),
-		ttl:        ttl,
-		codeLength: codeLength,
-		maxEntries: maxEntries,
-		stopChan:   make(chan struct{}),
+		entries:       make(map[string]*OTPEntry),
+		failures:      make(map[string]int),
+		failureExpiry: make(map[string]time.Time),
+		ttl:           ttl,
+		codeLength:    codeLength,
+		maxEntries:    maxEntries,
+		stopChan:      make(chan struct{}),
 	}
 	go s.cleanupLoop()
 	return s
@@ -78,6 +80,12 @@ func (s *OTPStore) cleanup() {
 			delete(s.entries, email)
 		}
 	}
+	for email, until := range s.failureExpiry {
+		if now.After(until) {
+			delete(s.failures, email)
+			delete(s.failureExpiry, email)
+		}
+	}
 }
 
 // Stop останавливает фоновую горутину очистки истёкших кодов.
@@ -102,7 +110,11 @@ func (s *OTPStore) Generate(addr string) (string, error) {
 	// Счётчик неудач живёт на email, а не на конкретном коде:
 	// перевыпуск кода не должен сбрасывать защиту от перебора.
 	if s.failures[addr] >= MaxOTPAttempts {
-		return "", ErrOTPTooManyAttempts
+		if until, ok := s.failureExpiry[addr]; ok && time.Now().Before(until) {
+			return "", ErrOTPTooManyAttempts
+		}
+		delete(s.failures, addr)
+		delete(s.failureExpiry, addr)
 	}
 	// Allow overwriting existing entry for the same address. Проверка
 	// переполнения ДО генерации кода: не тратим crypto/rand впустую.
@@ -155,6 +167,7 @@ func (s *OTPStore) Verify(email, code string) bool {
 	if subtle.ConstantTimeCompare([]byte(entry.Code), []byte(code)) != 1 {
 		entry.Attempts++
 		s.failures[email]++
+		s.failureExpiry[email] = time.Now().Add(15 * time.Minute)
 		if entry.Attempts >= MaxOTPAttempts || s.failures[email] >= MaxOTPAttempts {
 			// Invalidate the code after too many failed attempts.
 			delete(s.entries, email)
@@ -164,6 +177,7 @@ func (s *OTPStore) Verify(email, code string) bool {
 
 	delete(s.entries, email)
 	delete(s.failures, email)
+	delete(s.failureExpiry, email)
 	return true
 }
 

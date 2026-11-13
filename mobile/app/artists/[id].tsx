@@ -29,6 +29,7 @@ import { Screen } from "../../src/components/Screen";
 import { t, useLanguage } from "../../src/i18n";
 import { useAudioActions } from "../../src/player/AudioProvider";
 import { useTheme } from "../../src/theme/ThemeProvider";
+import { tvCapabilities } from "../../src/tv/profile";
 
 // Deep link может открыть артиста первым — назад ведёт к списку артистов.
 function closeArtist(): void {
@@ -99,7 +100,7 @@ function ArtistHero({
 						testID="artist-detail-favorite"
 						onPress={onToggleFavorite}
 					/>
-					{isAdmin && (
+					{isAdmin && tvCapabilities.canEditMetadata && (
 						<Pressable
 							accessibilityRole="button"
 							accessibilityLabel={t("artists.rename")}

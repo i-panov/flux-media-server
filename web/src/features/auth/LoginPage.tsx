@@ -93,9 +93,18 @@ export function LoginPage() {
 			{ email: email.trim(), code: code.trim(), deviceId: getWebDeviceId() },
 			{
 				onSuccess: () => {
-					if (redirectTo?.startsWith("/")) {
-						window.location.assign(redirectTo);
-						return;
+					if (redirectTo !== undefined) {
+						try {
+							const target = new URL(redirectTo, window.location.origin);
+							if (target.origin === window.location.origin) {
+								window.location.assign(
+									`${target.pathname}${target.search}${target.hash}`,
+								);
+								return;
+							}
+						} catch {
+							// некорректный redirect — уходим в обычный раздел
+						}
 					}
 					void navigate({ to: "/video" });
 				},

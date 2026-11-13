@@ -11,9 +11,9 @@ module.exports = function withReleaseSigning(config) {
 				"signingConfigs {",
 				`signingConfigs {
         // fluxReleaseSigning: реальный ключ только из окружения.
-        if (System.getenv("FLUX_KEYSTORE_PATH")) {
+        if (process.env.FLUX_KEYSTORE_PATH) {
             release {
-                storeFile file(System.getenv("FLUX_KEYSTORE_PATH"))
+                storeFile file(process.env.FLUX_KEYSTORE_PATH)
                 storePassword System.getenv("FLUX_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("FLUX_KEY_ALIAS")
                 keyPassword System.getenv("FLUX_KEY_PASSWORD")
@@ -21,14 +21,31 @@ module.exports = function withReleaseSigning(config) {
         }`,
 			);
 		}
+		if (process.env.FLUX_KEYSTORE_PATH) {
+			for (const key of [
+				"FLUX_KEYSTORE_PASSWORD",
+				"FLUX_KEY_ALIAS",
+				"FLUX_KEY_PASSWORD",
+			]) {
+				if (!process.env[key]) {
+					throw new Error(`withReleaseSigning: ${key} is required with FLUX_KEYSTORE_PATH`);
+				}
+			}
+		}
+		const releaseRe = /(\n\s*release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug([\s\S]*?\n\s*\})/;
+		if (!releaseRe.test(contents)) {
+			throw new Error("withReleaseSigning: release buildType block not found");
+		}
 		contents = contents.replace(
-			"signingConfig signingConfigs.debug\n            def enableShrinkResources",
-			`signingConfig System.getenv("FLUX_KEYSTORE_PATH") ? signingConfigs.release : signingConfigs.debug
-            if (!System.getenv("FLUX_KEYSTORE_PATH")) {
+			releaseRe,
+			`$1signingConfig process.env.FLUX_KEYSTORE_PATH ? signingConfigs.release : signingConfigs.debug
+            if (!process.env.FLUX_KEYSTORE_PATH) {
                 logger.warn("fluxReleaseSigning: FLUX_KEYSTORE_PATH is not set; release is signed with debug.keystore")
-            }
-            def enableShrinkResources`,
+            }$2`,
 		);
+		if (!contents.includes('process.env.FLUX_KEYSTORE_PATH ? signingConfigs.release')) {
+			throw new Error("withReleaseSigning: failed to replace release signingConfig");
+		}
 		cfg.modResults.contents = contents;
 		return cfg;
 	});

@@ -25,10 +25,10 @@ env:
 - evalScript: ${output.trashAdminCollection = "Trash admin " + Date.now()}
 
 - tapOn:
-    id: "tab-library"
+    id: "tab-video"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 
 - tapOn:
@@ -65,7 +65,7 @@ env:
     id: "delete-collection-confirm"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 
 - scrollUntilVisible:

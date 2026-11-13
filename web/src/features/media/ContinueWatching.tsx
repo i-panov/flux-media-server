@@ -22,7 +22,7 @@ function ContinueCard({ entry }: { entry: ContinueEntry }) {
 	const media = entry.media;
 	const reload = useMediaReload(media.id);
 	// ТВ-режим: карточка — spatial-цель, Enter повторяет клик по ссылке.
-	const instanceKey = useId().replaceAll(":", "");
+	const instanceKey = useId().replace(/:/g, "");
 	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
 		`continue-card-${entry.id}-${instanceKey}`,
 		clickFirstLink,

@@ -31,10 +31,10 @@ env:
     id: "tab-video"
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*-title"
+      id: "(video-card|audio-row)-.*-title"
     timeout: 20000
 - copyTextFrom:
-    id: "media-row-.*-title"
+    id: "(video-card|audio-row)-.*-title"
 - evalScript: ${output.videoTitle = maestro.copiedText}
 - tapOn:
     id: "video-search-input"
@@ -46,7 +46,7 @@ env:
     timeout: 10000
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*-title"
+      id: "(video-card|audio-row)-.*-title"
     timeout: 20000
 - assertVisible:
     text: ${output.videoTitle}
@@ -94,10 +94,10 @@ env:
     id: "tab-audio"
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*-title"
+      id: "(video-card|audio-row)-.*-title"
     timeout: 20000
 - copyTextFrom:
-    id: "media-row-.*-title"
+    id: "(video-card|audio-row)-.*-title"
 - evalScript: ${output.audioTitle = maestro.copiedText}
 - tapOn:
     id: "audio-search-input"

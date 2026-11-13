@@ -113,6 +113,8 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 export interface ApiConfig {
 	baseUrl: string;
 	transport: AuthTransport;
+	/** Терминальный refresh 401/400: платформа сбрасывает сессию. */
+	onAuthFailure?: () => void | Promise<void>;
 }
 
 const defaultConfig: ApiConfig = {

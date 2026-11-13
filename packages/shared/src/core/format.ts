@@ -57,20 +57,20 @@ export function parseFilename(filename: string): {
 	const dot = FILENAME_TITLE_YEAR_PATTERN.exec(filename);
 	if (dot?.[1] !== undefined && dot[2] !== undefined) {
 		return {
-			title: dot[1].replaceAll(".", " "),
+			title: dot[1].replace(/\./g, " "),
 			year: Number(dot[2]),
 		};
 	}
 	const paren = FILENAME_TITLE_PAREN_YEAR_PATTERN.exec(filename);
 	if (paren?.[1] !== undefined && paren[2] !== undefined) {
 		return {
-			title: paren[1].trim().replaceAll(".", " "),
+			title: paren[1].trim().replace(/\./g, " "),
 			year: Number(paren[2]),
 		};
 	}
 	const episode = FILENAME_TITLE_EPISODE_PATTERN.exec(filename);
 	if (episode?.[1] !== undefined) {
-		return { title: episode[1].replaceAll(".", " "), year: null };
+		return { title: episode[1].replace(/\./g, " "), year: null };
 	}
 	const parts = filename.split(".");
 	if (parts.length > 1) {

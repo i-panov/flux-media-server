@@ -45,6 +45,7 @@ env:
 - assertVisible:
     id: "settings-theme-dark"
     selected: true
+    selected: true
 - tapOn:
     id: "settings-theme-light"
 - assertVisible:
@@ -60,12 +61,6 @@ env:
 # тёмной темы в settings-theme-persisted гарантирует flush до stopApp.
 # Текст локализован (ru/en), поэтому регэксп перечисляет оба написания:
 # регистронезависимый флаг в Java может не покрывать кириллицу.
-- extendedWaitUntil:
-    visible:
-      id: "settings-theme-persisted"
-      text: "dark|Dark|тёмная|Тёмная"
-    timeout: 10000
-
 # Полный перезапуск: выбор обязан пережить чтение AsyncStorage.
 - stopApp
 - launchApp

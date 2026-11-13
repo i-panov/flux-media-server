@@ -617,6 +617,13 @@ func (q *UploadQueue) checkAndCreateMedia(job *UploadJob, hash string) (*models.
 		// сохранили: это наша же загрузка, а не чужой дубль. Не удаляем
 		// файл и не плодим вторую запись.
 		if existing.FilePath == job.filePath {
+			// Это наша запись, созданная watcher'ом. Зафиксировать ID
+			// обязательно: иначе pHash-дедуп с excludeID=0 найдёт сам себя
+			// и cleanup удалит единственный файл.
+			q.mu.Lock()
+			job.MediaID = existing.ID
+			q.mu.Unlock()
+			q.saveStatus(job)
 			return existing, false
 		}
 		// Дубль по хэшу из корзины: не 409, а восстановление —

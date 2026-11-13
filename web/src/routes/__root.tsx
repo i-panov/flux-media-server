@@ -114,10 +114,14 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 			// Сохраняем исходный адрес, включая hash с кодом активации.
 			// TanStack Router управляет редиректами брошенными объектами,
 			// а не Error: точечно гасим only-throw-error.
+			const hash = location.href.split("#")[1] ?? "";
+			if (hash.startsWith("code=")) {
+				window.sessionStorage.setItem("flux.activate.code", hash.slice(5));
+			}
 			// eslint-disable-next-line @typescript-eslint/only-throw-error
 			throw redirect({
 				to: "/login",
-				search: { redirect: location.href },
+				search: { redirect: location.href.split("#")[0] },
 			});
 		}
 	},

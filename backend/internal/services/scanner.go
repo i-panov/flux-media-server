@@ -134,6 +134,7 @@ func (s *ScannerService) GetScanStatus(key string) *ScanStatus {
 const maxScanStatuses = 64
 
 func (s *ScannerService) ScanPath(ctx context.Context, path string) error {
+	path = filepath.Clean(path)
 	// Reject concurrent scans of the same path.
 	s.mu.Lock()
 	if st, ok := s.statuses[path]; ok && st.Running {
@@ -304,6 +305,7 @@ func (s *ScannerService) HandleFSEvents(ctx context.Context, events []FSEvent) {
 		if err := ctx.Err(); err != nil {
 			return
 		}
+		ev.Path = filepath.Clean(ev.Path)
 		if ev.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
 			s.removeMediaForPath(ctx, ev.Path)
 			continue
@@ -385,6 +387,7 @@ func (s *ScannerService) removeMediaForPath(ctx context.Context, path string) {
 // Ошибки логируются и не возвращаются: сбой одного файла не должен
 // прерывать ни скан, ни пачку событий.
 func (s *ScannerService) scanFile(ctx context.Context, path string) {
+	path = filepath.Clean(path)
 	if IsPublishingPath(path) {
 		return
 	}

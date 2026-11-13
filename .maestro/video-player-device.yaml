@@ -31,7 +31,7 @@ env:
 
 # Снова открываем первое видео: после video-player.yaml мы на списке.
 - tapOn:
-    id: "media-row-.*"
+    id: "(video-card|audio-row)-.*"
 - extendedWaitUntil:
     visible:
       id: "video-detail-title"

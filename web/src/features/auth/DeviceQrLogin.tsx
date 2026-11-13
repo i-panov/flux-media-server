@@ -1,5 +1,5 @@
 import { Alert, Button, Code, Group, Loader, Stack, Text } from "@mantine/core";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DeviceCodeResponse } from "../../api/auth";
@@ -16,6 +16,7 @@ import { QrCode } from "./QrCode";
 export function DeviceQrLogin() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
+	const { redirect: redirectTo } = useSearch({ from: "/login" });
 	const create = useCreateDeviceCodeMutation();
 	const [data, setData] = useState<DeviceCodeResponse | null>(null);
 	const [status, setStatus] = useState<
@@ -53,7 +54,20 @@ export function DeviceQrLogin() {
 				if (cancelled) return;
 				if (result.status === "ok") {
 					adoptSessionUser(result.user);
-					void navigate({ to: "/" });
+					if (redirectTo !== undefined) {
+						try {
+							const target = new URL(redirectTo, window.location.origin);
+							if (target.origin === window.location.origin) {
+								window.location.assign(
+									`${target.pathname}${target.search}${target.hash}`,
+								);
+								return;
+							}
+						} catch {
+							// fallback ниже
+						}
+					}
+					void navigate({ to: "/video" });
 					return;
 				}
 				if (result.status === "pending") {
@@ -70,7 +84,7 @@ export function DeviceQrLogin() {
 			cancelled = true;
 			if (timer !== undefined) clearTimeout(timer);
 		};
-	}, [data, status, navigate]);
+	}, [data, status, navigate, redirectTo]);
 
 	if (status === "loading" || create.isPending) {
 		return (

@@ -436,8 +436,14 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		if token == "" {
 			return false
 		}
-		_, err := jwtService.ValidateToken(token)
-		return err == nil
+		claims, err := jwtService.ValidateToken(token)
+		if err != nil {
+			return false
+		}
+		// Большой upload-лимит — только админам: requireAdmin выполняется
+		// после чтения тела, поэтому роль проверяем здесь.
+		user, err := userRepo.FindByID(context.Background(), claims.UserID)
+		return err == nil && user.IsAdmin
 	}
 	fiberApp.Server().HeaderReceived = func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		var u fasthttp.URI
@@ -451,7 +457,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 			}
 			return fasthttp.RequestConfig{
 				MaxRequestBodySize: int(cfg.Server.MaxUploadSize),
-				ReadTimeout:        min(uploadReadTimeout(cfg.Server.MaxUploadSize), 15*time.Minute),
+				ReadTimeout:        uploadReadTimeout(cfg.Server.MaxUploadSize),
 			}
 		}
 		return fasthttp.RequestConfig{MaxRequestBodySize: maxAPIBodySize}

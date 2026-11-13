@@ -145,7 +145,7 @@ function LyricsHeader({
 			<Text style={[styles.headerTitle, { color: colors.textMuted }]}>
 				{t("audio.lyrics.title")}
 			</Text>
-			{isAdmin ? (
+			{canEdit && isAdmin ? (
 				<HeaderButton
 					icon="create-outline"
 					label={canEdit ? t("audio.lyrics.edit") : t("audio.lyrics.add")}

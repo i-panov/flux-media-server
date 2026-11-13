@@ -30,11 +30,11 @@ env:
     id: "tab-video"
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*"
+      id: "(video-card|audio-row)-.*"
     timeout: 20000
 
 - tapOn:
-    id: "media-row-.*"
+    id: "(video-card|audio-row)-.*"
 - extendedWaitUntil:
     visible:
       id: "video-detail-title"
@@ -137,7 +137,7 @@ env:
     id: "video-detail-back"
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*"
+      id: "(video-card|audio-row)-.*"
     timeout: 20000
 - assertVisible:
     id: "tab-video"

@@ -28,10 +28,10 @@ env:
     id: "tab-audio"
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*"
+      id: "(video-card|audio-row)-.*"
     timeout: 20000
 - tapOn:
-    id: "media-row-.*"
+    id: "(video-card|audio-row)-.*"
 - extendedWaitUntil:
     visible:
       id: "audio-bar"

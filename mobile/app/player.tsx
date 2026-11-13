@@ -25,6 +25,7 @@ import { AudioPlayerControls } from "../src/player/AudioPlayerControls";
 import { useAudioActions, useAudioState } from "../src/player/AudioProvider";
 import { AudioQueueSheet } from "../src/player/AudioQueueSheet";
 import { useTheme } from "../src/theme/ThemeProvider";
+import { tvCapabilities } from "../src/tv/profile";
 
 // Deep link может открыть плеер без истории: возвращаемся на вкладку аудио.
 function closePlayer(): void {
@@ -187,29 +188,37 @@ function AudioPlayerContent() {
 					</Text>
 				)}
 			</View>
-			<DownloadButton media={current} testID="audio-player-download" />
-			<Pressable
-				accessibilityRole="button"
-				accessibilityLabel={t("collections.addButton")}
-				onPress={() => setCollectionOpen(true)}
-				testID="audio-player-add-collection"
-				style={({ pressed }) => [
-					styles.collectionButton,
-					{
-						borderColor: colors.borderStrong,
-						backgroundColor: colors.surface,
-						borderRadius: radii.pill,
-						gap: spacing.xs,
-						paddingHorizontal: spacing.md,
-					},
-					pressed && styles.pressed,
-				]}
-			>
-				<Ionicons name="folder-open-outline" size={18} color={colors.accent} />
-				<Text style={[styles.collectionLabel, { color: colors.accent }]}>
-					{t("collections.addButton")}
-				</Text>
-			</Pressable>
+			{tvCapabilities.canDownload && (
+				<DownloadButton media={current} testID="audio-player-download" />
+			)}
+			{tvCapabilities.canManageCollections && (
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("collections.addButton")}
+					onPress={() => setCollectionOpen(true)}
+					testID="audio-player-add-collection"
+					style={({ pressed }) => [
+						styles.collectionButton,
+						{
+							borderColor: colors.borderStrong,
+							backgroundColor: colors.surface,
+							borderRadius: radii.pill,
+							gap: spacing.xs,
+							paddingHorizontal: spacing.md,
+						},
+						pressed && styles.pressed,
+					]}
+				>
+					<Ionicons
+						name="folder-open-outline"
+						size={18}
+						color={colors.accent}
+					/>
+					<Text style={[styles.collectionLabel, { color: colors.accent }]}>
+						{t("collections.addButton")}
+					</Text>
+				</Pressable>
+			)}
 			<AudioPlayerControls
 				position={currentTime}
 				duration={duration}

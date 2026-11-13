@@ -12,6 +12,7 @@ import { MoreVertical, Music, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDeleteMedia, useMediaReload } from "../../api/media";
+import { useSession } from "../../api/session";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 import { FavoriteButton } from "../favorites/FavoriteButton";
@@ -38,6 +39,8 @@ export function AudioTrackRow({
 	const { t } = useTranslation();
 	const player = useAudioPlayer();
 	const { capabilities } = useTVMode();
+	const session = useSession();
+	const isAdmin = session.data?.is_admin === true;
 	const reload = useMediaReload(media.id);
 	const remove = useDeleteMedia();
 	const [deleteOpened, setDeleteOpened] = useState(false);
@@ -147,7 +150,7 @@ export function AudioTrackRow({
 							</Tooltip>
 						</Menu.Target>
 						<Menu.Dropdown>
-							{capabilities.canEditMetadata && (
+							{isAdmin && capabilities.canEditMetadata && (
 								<Menu.Item
 									leftSection={<Pencil size={16} />}
 									onClick={() => setEditOpened(true)}
@@ -155,7 +158,7 @@ export function AudioTrackRow({
 									{t("metadata.edit")}
 								</Menu.Item>
 							)}
-							{capabilities.canChangeCover && (
+							{isAdmin && capabilities.canChangeCover && (
 								<ChangeCoverButton mediaId={media.id} asMenuItem />
 							)}
 							{showDelete && capabilities.canDelete && (

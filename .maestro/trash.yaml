@@ -37,10 +37,10 @@ env:
 - evalScript: ${output.trashCollection = "Trash " + Date.now()}
 
 - tapOn:
-    id: "tab-library"
+    id: "tab-video"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 
 # 1. Уникальная коллекция — единственный элемент, который мы контролируем.
@@ -80,7 +80,7 @@ env:
     id: "delete-collection-confirm"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 
 # 3. Открываем корзину из библиотеки и находим свою строку.
@@ -114,7 +114,7 @@ env:
     id: "trash-back"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 - scrollUntilVisible:
     element:
@@ -139,7 +139,7 @@ env:
     id: "delete-collection-confirm"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 - scrollUntilVisible:
     element:

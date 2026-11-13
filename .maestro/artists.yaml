@@ -60,10 +60,10 @@ env:
 # Ссылка на артиста из полного плеера.
 - extendedWaitUntil:
     visible:
-      id: "media-row-.*"
+      id: "(video-card|audio-row)-.*"
     timeout: 20000
 - tapOn:
-    id: "media-row-.*"
+    id: "(video-card|audio-row)-.*"
 - extendedWaitUntil:
     visible:
       id: "audio-bar"
@@ -90,7 +90,7 @@ env:
     id: "artist-detail-cover"
 - extendedWaitUntil:
     visible:
-      id: "(media-row-.*|artist-tracks-empty)"
+      id: "((video-card|audio-row)-.*|artist-tracks-empty)"
     timeout: 20000
 
 # Избранное артиста: состояние заранее неизвестно, поэтому проверяем
@@ -162,9 +162,9 @@ env:
 
 # Вход в список из библиотеки и переход к артисту.
 - tapOn:
-    id: "tab-library"
+    id: "tab-video"
 - assertVisible:
-    id: "library-screen"
+    id: "video-grid"
 - tapOn:
     id: "library-artists"
 - extendedWaitUntil:
@@ -185,15 +185,15 @@ env:
 # Треки артиста: если они есть, тап запускает очередь этих треков.
 - extendedWaitUntil:
     visible:
-      id: "(media-row-.*|artist-tracks-empty)"
+      id: "((video-card|audio-row)-.*|artist-tracks-empty)"
     timeout: 20000
 - runFlow:
     when:
       visible:
-        id: "media-row-.*"
+        id: "(video-card|audio-row)-.*"
     commands:
       - tapOn:
-          id: "media-row-.*"
+          id: "(video-card|audio-row)-.*"
 
 # Мини-бар и таб-бар живут в (tabs), а не на стековом экране артиста:
 # сначала возвращаемся в библиотеку и только там проверяем очередь.
@@ -207,7 +207,7 @@ env:
     id: "artists-back"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 10000
 
 - runFlow:

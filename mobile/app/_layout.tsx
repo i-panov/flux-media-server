@@ -7,8 +7,9 @@ import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 // Импорт ради побочного эффекта (дефолт configureApi) и initApiConfig:
 // модуль должен выполниться до любых запросов.
-import { initApiConfig } from "../src/api/setup";
+import { initApiConfig, setAuthFailureHandler } from "../src/api/setup";
 import { SessionResetProvider } from "../src/auth/SessionResetProvider";
+import { markSessionSignedOut } from "../src/auth/session";
 import { DownloadProvider } from "../src/downloads/DownloadProvider";
 import { setLanguage } from "../src/i18n";
 import { loadLanguage } from "../src/i18n/languageStorage";
@@ -35,6 +36,11 @@ function AppShell({
 	const ready = apiReady && hydrated;
 	const pathname = usePathname();
 	const router = useRouter();
+
+	useEffect(() => {
+		setAuthFailureHandler(() => markSessionSignedOut(client));
+		return () => setAuthFailureHandler(null);
+	}, [client]);
 
 	useEffect(() => {
 		if (!isTV) {

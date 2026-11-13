@@ -28,7 +28,11 @@ function initialCode(searchCode?: string): string {
 		window.location.hash.replace(HASH_PREFIX, ""),
 	);
 	const fromHash = hash.get("code") ?? "";
-	const raw = fromHash === "" ? (searchCode ?? "") : fromHash;
+	const stored =
+		typeof window === "undefined"
+			? ""
+			: (window.sessionStorage.getItem("flux.activate.code") ?? "");
+	const raw = fromHash === "" ? (searchCode ?? stored) : fromHash;
 	return raw.replace(NON_DIGITS, "").slice(0, 6);
 }
 

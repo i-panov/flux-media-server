@@ -38,10 +38,10 @@ env:
 
 # tabs.yaml заканчивается на экране настроек.
 - tapOn:
-    id: "tab-library"
+    id: "tab-video"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 20000
 - scrollUntilVisible:
     element:
@@ -66,5 +66,5 @@ env:
     id: "upload-back"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      id: "video-grid"
     timeout: 10000
