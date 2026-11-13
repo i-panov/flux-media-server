@@ -146,11 +146,9 @@ export function ChangeCoverSheet({
 	const previewPath = hasCover ? `${coverPath(media.id)}?v=${version}` : null;
 	const preview = useAuthImageSource(previewPath);
 	const busy = upload.isPending;
-	const close = () => {
-		if (!busy) {
-			onClose();
-		}
-	};
+	// Закрыть можно и во время загрузки: сеть могла зависнуть, а
+	// пользователь не должен оказаться заперт в модалке.
+	const close = () => onClose();
 
 	const choose = async (): Promise<void> => {
 		if (busy) {
@@ -213,8 +211,7 @@ export function ChangeCoverSheet({
 				<Pressable
 					accessibilityRole="button"
 					accessibilityLabel={t("common.close")}
-					accessibilityState={{ disabled: busy }}
-					disabled={busy}
+					accessibilityState={{ disabled: false }}
 					onPress={close}
 					testID="change-cover-backdrop"
 					style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]}
@@ -276,8 +273,7 @@ export function ChangeCoverSheet({
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel={uploaded ? t("cover.done") : t("common.cancel")}
-						accessibilityState={{ disabled: busy }}
-						disabled={busy}
+						accessibilityState={{ disabled: false }}
 						onPress={close}
 						testID="change-cover-close"
 						style={({ pressed }) => [
