@@ -172,7 +172,17 @@ export function useAudioSource(
 			try {
 				// Ошибка lock screen (нет разрешения/платформы) не должна
 				// помечать источник сломанным: звук при этом уже загружен.
-				const artwork = await lockScreenArtwork(media);
+				// Обложка не должна задерживать старт звука: на медленной
+				// сети/офлайне играем без неё, metadata обновится позже.
+				const artwork = await Promise.race([
+					lockScreenArtwork(media),
+					new Promise<undefined>((resolve) =>
+						setTimeout(() => resolve(undefined), 1500),
+					),
+				]);
+				if (token !== tokenRef.current) {
+					return;
+				}
 				player.setActiveForLockScreen(
 					true,
 					{
