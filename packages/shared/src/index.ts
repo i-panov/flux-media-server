@@ -103,3 +103,4 @@ export * from "./core/media";
 export { type QrMatrix, qrMatrix } from "./qr";
 export { createQueryClient } from "./query";
 export type { KeyValueStore } from "./storage";
+export * from "./api/metadata";

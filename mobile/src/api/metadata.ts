@@ -1,24 +1,27 @@
 import {
 	apiFetch,
+	buildMetadataBody,
 	type CoreFetcher,
 	type Media,
+	type MetadataInput,
 	mediaSchema,
 } from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+export async function updateMetadata(
+	mediaId: number,
+	input: MetadataInput,
+): Promise<Media> {
+	const response = await apiFetch<unknown>(`/metadata/${mediaId}`, {
+		method: "PUT",
+		body: JSON.stringify(buildMetadataBody(input)),
+	});
+	return mediaSchema.parse(response);
+}
+
 // Справочник артистов живёт отдельно от медиа: GET /artists отдаёт только
 // id/имя/обложку, а треки артиста запрашиваются через artist_id.
 const fetcher: CoreFetcher = (path, init) => apiFetch(path, init);
-
-export interface MetadataInput {
-	title: string;
-	artists: string[];
-	album?: string;
-	genre?: string;
-	year?: number;
-	description?: string;
-	sourceUrl?: string;
-}
 
 // Черновик редактора: все поля — строки, чтобы TextInput не терял ввод
 // (пустой год и «0» различаются до валидации).
@@ -168,35 +171,6 @@ export function isMetadataDraftDirty(
 // PUT с PATCH-семантикой: undefined — поле не трогать, пустая строка/0 —
 // очистить. Редактор mobile всегда присылает все поля текущими значениями,
 // поэтому очистка работает, а чужие поля остаются нетронутыми.
-export async function updateMetadata(
-	mediaId: number,
-	input: MetadataInput,
-): Promise<Media> {
-	const body: Record<string, unknown> = {
-		title: input.title,
-		artists: input.artists,
-	};
-	if (input.album !== undefined) {
-		body.album = input.album;
-	}
-	if (input.genre !== undefined) {
-		body.genre = input.genre;
-	}
-	if (input.year !== undefined) {
-		body.year = input.year;
-	}
-	if (input.description !== undefined) {
-		body.description = input.description;
-	}
-	if (input.sourceUrl !== undefined) {
-		body.source_url = input.sourceUrl;
-	}
-	const response = await apiFetch<unknown>(`/metadata/${mediaId}`, {
-		method: "PUT",
-		body: JSON.stringify(body),
-	});
-	return mediaSchema.parse(response);
-}
 
 export function useUpdateMetadata(mediaId: number) {
 	const queryClient = useQueryClient();

@@ -1,50 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+export { updateMetadata };
 import { z } from "zod";
-import { type Media, mediaSchema } from "../core/media";
+import {
+	type MetadataInput,
+	updateMetadata,
+} from "@flux/shared";
 import { apiFetch } from "./client";
-
-export interface MetadataInput {
-	title: string;
-	artists: string[];
-	album?: string;
-	genre?: string;
-	year?: number;
-	description?: string;
-	sourceUrl?: string;
-}
-
-// Бэкенд различает «не передано» и «пусто» указателями: undefined —
-// поле не трогать, пустая строка/0 — осознанная очистка. Редактор всегда
-// присылает текущие значения, поэтому пустые поля очищают запись.
-export async function updateMetadata(
-	mediaId: number,
-	input: MetadataInput,
-): Promise<Media> {
-	const body: Record<string, unknown> = {
-		title: input.title,
-		artists: input.artists,
-	};
-	if (input.album !== undefined) {
-		body.album = input.album;
-	}
-	if (input.genre !== undefined) {
-		body.genre = input.genre;
-	}
-	if (input.year !== undefined) {
-		body.year = input.year;
-	}
-	if (input.description !== undefined) {
-		body.description = input.description;
-	}
-	if (input.sourceUrl !== undefined) {
-		body.source_url = input.sourceUrl;
-	}
-	const response = await apiFetch<unknown>(`/metadata/${mediaId}`, {
-		method: "PUT",
-		body: JSON.stringify(body),
-	});
-	return mediaSchema.parse(response);
-}
 
 export function useUpdateMetadata(mediaId: number) {
 	const queryClient = useQueryClient();
