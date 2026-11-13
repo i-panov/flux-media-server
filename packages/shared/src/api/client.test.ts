@@ -99,14 +99,15 @@ describe("apiFetch", () => {
 		const fetchMock = vi
 			.fn()
 			.mockResolvedValueOnce(jsonResponse({ error: "expired" }, 401))
-			.mockResolvedValueOnce(jsonResponse({ error: "revoked" }, 401));
+			.mockResolvedValueOnce(jsonResponse({ error: "revoked" }, 401))
+			.mockResolvedValueOnce(jsonResponse({ error: "expired" }, 401));
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(apiFetch("/x")).rejects.toMatchObject({
 			status: 401,
 			message: "expired",
 		});
-		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenCalledTimes(3);
 	});
 
 	it("apiFetchBlob проходит refresh и отдаёт бинарный ответ", async () => {

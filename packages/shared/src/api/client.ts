@@ -137,14 +137,15 @@ async function requestWithRefresh<T>(
 			try {
 				await scheduleRefresh();
 			} catch (refreshError) {
-				// 401/400 на refresh — сессия действительно мертва, отдаём
-				// исходный 401. Сеть/5xx/битый ответ — транзиентная ошибка,
-				// её нельзя маскировать под «нет сессии».
+				// 401/400 на refresh: в другой вкладке куки могли уже
+				// обновиться. Один раз повторяем исходный запрос — если
+				// сессия действительно мертва, получим тот же 401.
 				if (
 					refreshError instanceof RefreshError &&
 					(refreshError.status === 401 || refreshError.status === 400)
 				) {
-					throw error;
+					init?.signal?.throwIfAborted();
+					return requestWithRefresh<T>(path, init, false, parse);
 				}
 				throw refreshError;
 			}
