@@ -246,3 +246,9 @@ body {
 		display: none;
 	}
 }
+
+/* Mantine light dimmed (gray-6) даёт ~3.6:1 на белом — мало для
+   мелких подписей. gray-7 сохраняет иерархию, но проходит AA. */
+:root[data-mantine-color-scheme="light"] {
+	--mantine-color-dimmed: var(--mantine-color-gray-7);
+}

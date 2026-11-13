@@ -740,6 +740,13 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// Веб-клиент: same-origin раздача web/dist (SPA) — последним
 	// маршрутом, после всех /api. Пустой web_dist — API-only режим
 	// (мобильные клиенты, разработка через Vite).
+	// Docker-образ кладёт web в /app/web, а YAML может не задавать
+	// web_dist: не оставляем контейнер API-only по умолчанию.
+	if cfg.Server.WebDist == "" {
+		if info, err := os.Stat("/app/web"); err == nil && info.IsDir() {
+			cfg.Server.WebDist = "/app/web"
+		}
+	}
 	if cfg.Server.WebDist != "" {
 		webHandler, err := handlers.NewWebHandler(cfg.Server.WebDist)
 		if err != nil {
