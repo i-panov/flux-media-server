@@ -173,11 +173,13 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 // их после размонтирования нечем, а серверные задания отменяются явно.
 // Системных уведомлений нет: lastCompleted — in-app баннер, который виден
 // только на открытом экране и не догоняет пользователя после ухода.
+/* eslint-disable max-lines-per-function -- очередь держит XHR, поллинг и отмену. */
 export function useUploadQueue() {
 	const queryClient = useQueryClient();
 	const [items, setItems] = useState<UploadQueueItem[]>([]);
 	const [completed, setCompleted] = useState<UploadCompleted | null>(null);
 	const itemsRef = useRef<UploadQueueItem[]>([]);
+	const cancelOnLeave = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const counter = useRef(0);
 	const tokens = useRef(new Map<string, number>());
 	const cancelled = useRef(new Set<string>());
@@ -293,6 +295,10 @@ export function useUploadQueue() {
 	// второй setup (StrictMode) возвращает её в работу.
 	useEffect(() => {
 		stopped.current = false;
+		if (cancelOnLeave.current !== null) {
+			clearTimeout(cancelOnLeave.current);
+			cancelOnLeave.current = null;
+		}
 		const abortHandles = aborts.current;
 		const tokenMap = tokens.current;
 		return () => {
@@ -304,6 +310,16 @@ export function useUploadQueue() {
 			for (const key of tokenMap.keys()) {
 				tokenMap.set(key, (tokenMap.get(key) ?? 0) + 1);
 			}
+			// StrictMode сразу перезапустит effect и отменит таймер; при
+			// реальном уходе с экрана серверные processing-задания отменяем.
+			cancelOnLeave.current = setTimeout(() => {
+				if (!stopped.current) return;
+				for (const item of itemsRef.current) {
+					if (item.job !== null) {
+						void cancelUploadJob(item.job).catch(() => undefined);
+					}
+				}
+			}, 300);
 		};
 	}, []);
 
