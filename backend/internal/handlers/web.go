@@ -77,6 +77,11 @@ func (h *WebHandler) serve(c *fiber.Ctx) error {
 	if info, err := os.Stat(full); err == nil && info.Mode().IsRegular() {
 		return h.serveFile(c, rel, full)
 	}
+	// Хэшированные ассеты не должны получать index.html с 200: это
+	// маскирует рассинхрон деплоя и ломает MIME/nosniff.
+	if strings.HasPrefix(path, "/assets/") {
+		return response.Error(c, fiber.StatusNotFound, "Asset not found")
+	}
 	// Нет файла — адрес SPA: всегда свежий index.html.
 	c.Set("Cache-Control", webCacheNoStore)
 	return c.SendFile(filepath.Join(h.root, "index.html"))

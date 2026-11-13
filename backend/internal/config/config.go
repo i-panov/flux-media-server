@@ -267,6 +267,18 @@ func Load(path string) (*Config, error) {
 	if cfg.Auth.JWTExpiry <= 0 {
 		return nil, fmt.Errorf("auth.jwt_expiry must be > 0, got %d", cfg.Auth.JWTExpiry)
 	}
+	if cfg.Auth.RefreshExpiry <= 0 {
+		return nil, fmt.Errorf("auth.refresh_expiry must be > 0, got %d", cfg.Auth.RefreshExpiry)
+	}
+	if cfg.Auth.CodeExpiry <= 0 {
+		return nil, fmt.Errorf("auth.code_expiry must be > 0, got %d", cfg.Auth.CodeExpiry)
+	}
+	if cfg.Auth.MaxOTPEntries <= 0 {
+		return nil, fmt.Errorf("auth.max_otp_entries must be > 0, got %d", cfg.Auth.MaxOTPEntries)
+	}
+	if cfg.Server.MaxUploadSize <= 0 {
+		return nil, fmt.Errorf("server.max_upload_size must be > 0, got %d", cfg.Server.MaxUploadSize)
+	}
 	if cfg.RateLimiter.Max <= 0 {
 		return nil, fmt.Errorf("rate_limiter.max must be > 0, got %d", cfg.RateLimiter.Max)
 	}

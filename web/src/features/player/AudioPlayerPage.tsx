@@ -34,6 +34,7 @@ import { useLyrics, useSaveLyrics } from "../../api/lyrics";
 import { useSession } from "../../api/session";
 import { formatDuration } from "../../core/format";
 import { clickNode, TVFocusScope, TVTab, useTVFocusable } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
 import { QueueTab } from "./QueueTab";
@@ -49,6 +50,7 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 	const save = useSaveLyrics(current?.id ?? 0);
 	const [editing, setEditing] = useState(false);
 	const [value, setValue] = useState("");
+	const { capabilities } = useTVMode();
 
 	if (current === null) {
 		return null;
@@ -63,6 +65,7 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 			? parseSyncedLyrics(lyrics.data?.sync_data ?? "")
 			: [];
 	const isAdmin = session.data?.is_admin === true;
+	const canEditLyrics = isAdmin && capabilities.canEditMetadata;
 
 	const startEditing = () => {
 		setValue(text);
@@ -97,7 +100,7 @@ function LyricsTab({ kind }: { kind: "lyrics" | "translation" }) {
 				<Text size="sm" c="dimmed">
 					{kind === "lyrics" ? t("player.lyrics") : t("player.translation")}
 				</Text>
-				{isAdmin && lyrics.isSuccess && !editing && (
+				{canEditLyrics && lyrics.isSuccess && !editing && (
 					<Button variant="light" size="xs" onClick={startEditing}>
 						{text === "" ? t("player.addText") : t("player.edit")}
 					</Button>

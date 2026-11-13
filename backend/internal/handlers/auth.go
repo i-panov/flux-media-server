@@ -11,6 +11,7 @@ import (
 	"net/mail"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -76,19 +77,26 @@ type VerifyCodeRequest struct {
 // Сравнение идёт с Host запроса: предполагается прямое подключение без
 // переписывающего Host прокси (поддержки прокси в сервере пока нет);
 // при её появлении проверку нужно пересмотреть.
-func checkSameOrigin(c *fiber.Ctx) bool {
-	if origin := c.Get("Origin"); origin != "" {
-		u, err := url.Parse(origin)
-		if err != nil || u.Host == "" || !strings.EqualFold(u.Host, c.Get(fiber.HeaderHost)) {
+func (h *AuthHandler) checkSameOrigin(c *fiber.Ctx) bool {
+	publicHost := ""
+	if h.config.Server.PublicURL != "" {
+		if u, err := url.Parse(h.config.Server.PublicURL); err == nil {
+			publicHost = u.Host
+		}
+	}
+	match := func(raw string) bool {
+		u, err := url.Parse(raw)
+		if err != nil || u.Host == "" {
 			return false
 		}
-		return true
+		return strings.EqualFold(u.Host, c.Get(fiber.HeaderHost)) ||
+			(publicHost != "" && strings.EqualFold(u.Host, publicHost))
+	}
+	if origin := c.Get("Origin"); origin != "" {
+		return match(origin)
 	}
 	if referer := c.Get("Referer"); referer != "" {
-		u, err := url.Parse(referer)
-		if err != nil || u.Host == "" || !strings.EqualFold(u.Host, c.Get(fiber.HeaderHost)) {
-			return false
-		}
+		return match(referer)
 	}
 	return true
 }
@@ -433,7 +441,7 @@ type DeviceTokenRequest struct {
 }
 
 func (h *AuthHandler) DeviceToken(c *fiber.Ctx) error {
-	if !checkSameOrigin(c) {
+	if !h.checkSameOrigin(c) {
 		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
 	}
 	var req DeviceTokenRequest
@@ -578,6 +586,16 @@ func (h *AuthHandler) RevokeDevice(c *fiber.Ctx) error {
 	if deviceID == "" {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid device id")
 	}
+	if strings.HasPrefix(deviceID, "legacy-") {
+		id, err := strconv.ParseUint(strings.TrimPrefix(deviceID, "legacy-"), 10, 32)
+		if err != nil {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid device id")
+		}
+		if err := h.refreshTokenDB.DeleteByID(c.UserContext(), uint(id), userID); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to revoke device")
+		}
+		return c.JSON(fiber.Map{"message": "Device revoked"})
+	}
 	if err := h.refreshTokenDB.DeleteByDeviceID(c.UserContext(), deviceID, userID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.Error(c, fiber.StatusNotFound, "Device not found")
@@ -662,8 +680,8 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 
 	code, err := h.otpStore.Generate(req.Email)
 	if err != nil {
-		if errors.Is(err, services.ErrOTPStoreFull) {
-			return response.Error(c, fiber.StatusTooManyRequests, "Too many pending codes, please try again later")
+		if errors.Is(err, services.ErrOTPStoreFull) || errors.Is(err, services.ErrOTPTooManyAttempts) {
+			return response.Error(c, fiber.StatusTooManyRequests, "Too many attempts, please try again later")
 		}
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to generate code")
 	}
@@ -695,7 +713,7 @@ func (h *AuthHandler) RequestCode(c *fiber.Ctx) error {
 func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 	// Первой — до разбора тела и проверки кода: кросс-сайтовый запрос
 	// не должен ни тратить чужой OTP, ни получать сессионные куки.
-	if !checkSameOrigin(c) {
+	if !h.checkSameOrigin(c) {
 		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
 	}
 
@@ -744,7 +762,13 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 	user, err := h.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "User not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Сессия ссылается на удалённого пользователя: для клиента
+			// это мёртвая сессия, а не «сервер недоступен».
+			return response.Error(c, fiber.StatusUnauthorized, "Session is no longer valid")
+		}
+		log.Printf("Me: find user %d: %v", userID, err)
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to load user")
 	}
 
 	return c.JSON(fiber.Map{
@@ -760,7 +784,7 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 // Токен передаётся в теле или в httpOnly-куке; чужой/неизвестный токен
 // не раскрывается — ответ всегда одинаковый.
 func (h *AuthHandler) LogoutByRefresh(c *fiber.Ctx) error {
-	if !checkSameOrigin(c) {
+	if !h.checkSameOrigin(c) {
 		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
 	}
 	var req struct {
@@ -857,7 +881,7 @@ type RefreshRequest struct {
 func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	// Как и verify-code, выставляет сессионные куки на публичном роуте —
 	// без проверки это второй вход для login CSRF.
-	if !checkSameOrigin(c) {
+	if !h.checkSameOrigin(c) {
 		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
 	}
 

@@ -17,3 +17,9 @@ backend/tmp/
 backend/*.db
 backend/flux-server
 backend/configs/config.yaml
+.android-sdk/
+.android-user/
+.artifacts/
+web/node_modules/
+web/.cache/
+mobile/.expo/

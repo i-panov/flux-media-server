@@ -19,6 +19,7 @@ import {
 	useRenameDeviceMutation,
 	useRevokeDeviceMutation,
 } from "../../api/session";
+import { useTVMode } from "../../features/tv/useTVMode";
 
 function formatDeviceDate(value: string): string {
 	const date = new Date(value);
@@ -31,6 +32,7 @@ function formatDeviceDate(value: string): string {
 
 export function DevicesCard() {
 	const { t } = useTranslation();
+	const { capabilities } = useTVMode();
 	const devices = useDevicesQuery();
 	const revoke = useRevokeDeviceMutation();
 	const rename = useRenameDeviceMutation();
@@ -70,20 +72,36 @@ export function DevicesCard() {
 					<Title order={2} size="h4">
 						{t("devices.title")}
 					</Title>
-					<Button
-						component={Link}
-						to="/activate"
-						variant="light"
-						size="xs"
-						w={{ base: "100%", sm: "auto" }}
-					>
-						{t("auth.activateTitle")}
-					</Button>
+					{capabilities.canEditMetadata && (
+						<Button
+							component={Link}
+							to="/activate"
+							variant="light"
+							size="xs"
+							w={{ base: "100%", sm: "auto" }}
+						>
+							{t("auth.activateTitle")}
+						</Button>
+					)}
 				</Group>
 				<Text size="sm" c="dimmed">
 					{t("devices.hint")}
 				</Text>
 				{devices.isPending && <Text size="sm">{t("common.loading")}</Text>}
+				{devices.isError && !devices.data && (
+					<Group gap="xs">
+						<Text size="sm" c="dimmed">
+							{t("common.error")}
+						</Text>
+						<Button
+							size="xs"
+							variant="light"
+							onClick={() => void devices.refetch()}
+						>
+							{t("common.retry")}
+						</Button>
+					</Group>
+				)}
 				{devices.data?.length === 0 && (
 					<Text size="sm" c="dimmed">
 						{t("devices.empty")}
@@ -147,18 +165,20 @@ export function DevicesCard() {
 											{t("devices.current")}
 										</Badge>
 									)}
-									<Tooltip label={t("devices.rename")} withArrow>
-										<ActionIcon
-											size="xs"
-											variant="subtle"
-											aria-label={t("devices.rename")}
-											onClick={() =>
-												startRename(device.device_id, device.device_name)
-											}
-										>
-											<Pencil size={12} />
-										</ActionIcon>
-									</Tooltip>
+									{capabilities.canEditMetadata && (
+										<Tooltip label={t("devices.rename")} withArrow>
+											<ActionIcon
+												size="xs"
+												variant="subtle"
+												aria-label={t("devices.rename")}
+												onClick={() =>
+													startRename(device.device_id, device.device_name)
+												}
+											>
+												<Pencil size={12} />
+											</ActionIcon>
+										</Tooltip>
+									)}
 									{device.platform !== "" && device.platform !== "unknown" && (
 										<Badge size="xs" variant="light">
 											{device.platform}
@@ -170,21 +190,23 @@ export function DevicesCard() {
 								{formatDeviceDate(device.last_used_at ?? device.created_at)}
 							</Text>
 						</Stack>
-						<Button
-							variant="subtle"
-							color="red"
-							size="xs"
-							loading={
-								revoke.isPending && revoke.variables === device.device_id
-							}
-							onClick={() => {
-								if (window.confirm(t("devices.confirm"))) {
-									revoke.mutate(device.device_id);
+						{capabilities.canEditMetadata && (
+							<Button
+								variant="subtle"
+								color="red"
+								size="xs"
+								loading={
+									revoke.isPending && revoke.variables === device.device_id
 								}
-							}}
-						>
-							{t("devices.revoke")}
-						</Button>
+								onClick={() => {
+									if (window.confirm(t("devices.confirm"))) {
+										revoke.mutate(device.device_id);
+									}
+								}}
+							>
+								{t("devices.revoke")}
+							</Button>
+						)}
 					</Group>
 				))}
 			</Stack>

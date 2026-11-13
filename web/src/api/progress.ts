@@ -30,6 +30,9 @@ export function useSaveProgress() {
 		mutationFn: saveProgress,
 		onSuccess: (progress) => {
 			queryClient.setQueryData(["progress", progress.media_id], progress);
+			void queryClient.invalidateQueries({
+				queryKey: ["progress", "continue"],
+			});
 		},
 	});
 }
@@ -40,6 +43,9 @@ export function useDeleteProgress() {
 		mutationFn: deleteProgress,
 		onSuccess: (_data, mediaId) => {
 			queryClient.setQueryData(["progress", mediaId], null);
+			void queryClient.invalidateQueries({
+				queryKey: ["progress", "continue"],
+			});
 		},
 	});
 }

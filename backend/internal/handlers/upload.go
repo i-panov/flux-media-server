@@ -157,16 +157,20 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 			}
 			return response.Error(c, fiber.StatusConflict, "File already exists")
 		}
-		if err := os.Remove(dstPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("upload: remove orphaned file %s: %v", dstPath, err)
-			return response.Error(c, fiber.StatusInternalServerError, "Failed to replace file")
-		}
+		// Ничья строка: файл может принадлежать активному заданию.
+		// Не удаляем и не перезаписываем — ниже O_EXCL сохранит под
+		// следующим свободным именем.
 	}
 
-	if err := c.SaveFile(fileHeader, dstPath); err != nil {
-		log.Printf("upload: save file: %v", err)
+	// O_EXCL + уникальное имя: параллельные загрузки не перезаписывают
+	// друг друга и не удаляют файл активного задания.
+	savedPath, saveErr := saveUploadExclusive(c, fileHeader, destPath, filename)
+	if saveErr != nil {
+		log.Printf("upload: save file: %v", saveErr)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to save file")
 	}
+	dstPath = savedPath
+	filename = filepath.Base(dstPath)
 
 	jobID, err := h.queue.Enqueue(services.UploadJobInput{
 		FilePath:  dstPath,

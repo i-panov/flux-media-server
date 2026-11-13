@@ -600,13 +600,25 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 
+	// Refresh/logout — отдельный bucket: автоматический refresh не должен
+	// выжигать лимит OTP-входа при нескольких вкладках/NAT.
+	refreshRateLimiter := limiter.New(limiter.Config{
+		Max:          cfg.RateLimiter.Max,
+		Expiration:   time.Duration(cfg.RateLimiter.Expiration) * time.Second,
+		KeyGenerator: clientKey,
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
 	// Public auth routes. All of them are rate-limited: verify-code without a
 	// limiter would allow brute-forcing the 6-digit OTP within its TTL.
 	auth := fiberApp.Group("/api/auth")
 	auth.Post("/request-code", authRateLimiter, authHandler.RequestCode)
 	auth.Post("/verify-code", authRateLimiter, authHandler.VerifyCode)
-	auth.Post("/refresh", authRateLimiter, authHandler.Refresh)
-	auth.Post("/logout-refresh", authRateLimiter, authHandler.LogoutByRefresh)
+	auth.Post("/refresh", refreshRateLimiter, authHandler.Refresh)
+	auth.Post("/logout-refresh", refreshRateLimiter, authHandler.LogoutByRefresh)
 	auth.Post("/device/code", authRateLimiter, authHandler.DeviceCode)
 	auth.Post("/device/token", deviceRateLimiter, authHandler.DeviceToken)
 

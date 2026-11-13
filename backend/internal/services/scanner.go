@@ -79,6 +79,10 @@ type ScannerService struct {
 
 	mu       sync.RWMutex
 	statuses map[string]*ScanStatus
+
+	// scanFile сериализует обработку одного файла: watcher и полный скан
+	// могут прийти одновременно и создать две записи на один путь.
+	fileMu sync.Mutex
 }
 
 func NewScannerService(
@@ -246,8 +250,13 @@ func (s *ScannerService) scanPathWalk(ctx context.Context, scanPath string) (map
 		}
 
 		if err != nil {
-			log.Printf("Walk error for %s: %v", path, err)
-			return nil
+			// Ошибка доступа/сети — не доказательство отсутствия файла.
+			// Прерываем скан без sweep, чтобы не отправить всё поддерево
+			// в корзину из-за временно отвалившегося mount.
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return fmt.Errorf("walk %s: %w", path, err)
 		}
 
 		if info.IsDir() {
@@ -376,6 +385,8 @@ func (s *ScannerService) removeMediaForPath(ctx context.Context, path string) {
 // Ошибки логируются и не возвращаются: сбой одного файла не должен
 // прерывать ни скан, ни пачку событий.
 func (s *ScannerService) scanFile(ctx context.Context, path string) {
+	s.fileMu.Lock()
+	defer s.fileMu.Unlock()
 	info, err := os.Stat(path)
 	if err != nil {
 		// Файл исчез между событием и обработкой — не ошибка.

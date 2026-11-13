@@ -164,11 +164,6 @@ func NewExtractService(
 		limit = DefaultExtractQueueLimit
 	}
 	qctx, cancel := context.WithCancel(ctx)
-	absAudioPath, err := filepath.Abs(audioPath)
-	if err != nil {
-		log.Printf("extract queue: absolutize %s: %v", audioPath, err)
-		absAudioPath = audioPath
-	}
 	// Наличие бинарников — флагом, а не fail-fast конструктора: сервер
 	// обязан стартовать и без ffmpeg (библиотека работает), а хендлер
 	// отдаёт 503 по Available(). Fail-fast в app.go уронил бы и app-тесты
@@ -188,7 +183,7 @@ func NewExtractService(
 		tasks:     tasks,
 		thumbSvc:  thumbSvc,
 		extract:   NewMetadataExtractor(),
-		audioPath: absAudioPath,
+		audioPath: audioPath,
 		available: ffmpegErr == nil && ffprobeErr == nil,
 	}
 	for i := 0; i < workers; i++ {
@@ -538,7 +533,7 @@ func (q *ExtractService) process(job *ExtractJob) {
 		q.fail(job, err, "Failed to hash file")
 		return
 	}
-	if existing, err := q.media.FindByHash(jobCtx, hash); err == nil && existing != nil && existing.ID != 0 {
+	if existing, err := q.media.FindByHash(jobCtx, hash); err == nil && existing != nil && existing.ID != 0 && !existing.DeletedAt.Valid {
 		os.Remove(tmpPath)
 		q.fail(job, fmt.Errorf("duplicate file"), "File already exists")
 		return

@@ -13,7 +13,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var ErrOTPStoreFull = errors.New("otp store is full")
+var (
+	ErrOTPStoreFull       = errors.New("otp store is full")
+	ErrOTPTooManyAttempts = errors.New("too many otp attempts")
+)
 
 // MaxOTPAttempts is the number of failed verification attempts after which
 // the code is invalidated (anti brute-force).
@@ -28,6 +31,7 @@ type OTPEntry struct {
 type OTPStore struct {
 	mu         sync.RWMutex
 	entries    map[string]*OTPEntry
+	failures   map[string]int
 	ttl        time.Duration
 	codeLength int
 	maxEntries int
@@ -40,6 +44,7 @@ func NewOTPStore(ttl time.Duration, codeLength int, maxEntries int) *OTPStore {
 	}
 	s := &OTPStore{
 		entries:    make(map[string]*OTPEntry),
+		failures:   make(map[string]int),
 		ttl:        ttl,
 		codeLength: codeLength,
 		maxEntries: maxEntries,
@@ -94,6 +99,11 @@ func (s *OTPStore) Generate(addr string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Счётчик неудач живёт на email, а не на конкретном коде:
+	// перевыпуск кода не должен сбрасывать защиту от перебора.
+	if s.failures[addr] >= MaxOTPAttempts {
+		return "", ErrOTPTooManyAttempts
+	}
 	// Allow overwriting existing entry for the same address. Проверка
 	// переполнения ДО генерации кода: не тратим crypto/rand впустую.
 	if _, exists := s.entries[addr]; !exists && len(s.entries) >= s.maxEntries {
@@ -144,7 +154,8 @@ func (s *OTPStore) Verify(email, code string) bool {
 	// Constant-time comparison to avoid timing attacks.
 	if subtle.ConstantTimeCompare([]byte(entry.Code), []byte(code)) != 1 {
 		entry.Attempts++
-		if entry.Attempts >= MaxOTPAttempts {
+		s.failures[email]++
+		if entry.Attempts >= MaxOTPAttempts || s.failures[email] >= MaxOTPAttempts {
 			// Invalidate the code after too many failed attempts.
 			delete(s.entries, email)
 		}
@@ -152,6 +163,7 @@ func (s *OTPStore) Verify(email, code string) bool {
 	}
 
 	delete(s.entries, email)
+	delete(s.failures, email)
 	return true
 }
 
