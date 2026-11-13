@@ -93,6 +93,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 	const shouldPlay = useRef(false);
 	const current = currentMedia(queueState);
 	const currentId = current?.id ?? 0;
+	// biome-ignore lint/correctness/useExhaustiveDependencies: сброс при смене трека.
 	useEffect(() => {
 		reloadTried.current = false;
 	}, [currentId]);

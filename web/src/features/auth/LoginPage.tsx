@@ -93,7 +93,7 @@ export function LoginPage() {
 			{ email: email.trim(), code: code.trim(), deviceId: getWebDeviceId() },
 			{
 				onSuccess: () => {
-					if (redirectTo !== undefined && redirectTo.startsWith("/")) {
+					if (redirectTo?.startsWith("/")) {
 						window.location.assign(redirectTo);
 						return;
 					}
