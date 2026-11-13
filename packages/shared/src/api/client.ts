@@ -52,11 +52,13 @@ const AUTH_PUBLIC_PATHS = [
 // гонку refresh-запросов.
 let refreshInflight: Promise<void> | null = null;
 
-function scheduleRefresh(signal?: AbortSignal): Promise<void> {
+function scheduleRefresh(): Promise<void> {
 	if (refreshInflight === null) {
 		// Сырой вызов транспорта без рекурсии в apiFetch: refresh сам себя обновлять не должен.
+		// Не привязываем общий refresh к signal первого запроса: его отмена
+		// не должна отменять refresh для всех ожидающих.
 		refreshInflight = getApiConfig()
-			.transport.refresh(getApiConfig().baseUrl, signal)
+			.transport.refresh(getApiConfig().baseUrl)
 			.finally(() => {
 				refreshInflight = null;
 			});
@@ -133,7 +135,7 @@ async function requestWithRefresh<T>(
 			!AUTH_PUBLIC_PATHS.includes(path)
 		) {
 			try {
-				await scheduleRefresh(init?.signal ?? undefined);
+				await scheduleRefresh();
 			} catch (refreshError) {
 				// 401/400 на refresh — сессия действительно мертва, отдаём
 				// исходный 401. Сеть/5xx/битый ответ — транзиентная ошибка,
