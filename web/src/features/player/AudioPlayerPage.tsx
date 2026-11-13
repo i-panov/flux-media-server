@@ -374,7 +374,23 @@ export function AudioPlayerPage() {
 	const { targetRef: tvRef, tvMode } = useTVFocusable<HTMLDivElement>(
 		"player-page",
 		undefined,
-		() => false,
+		(direction) => {
+			// На корне плеера стрелки — seek/volume, а не переход фокуса.
+			if (direction === "left") {
+				player.seek(Math.max(player.currentTime - 10, 0));
+			} else if (direction === "right") {
+				player.seek(
+					player.duration > 0
+						? Math.min(player.currentTime + 10, player.duration)
+						: player.currentTime + 10,
+				);
+			} else if (direction === "up") {
+				player.setVolume(player.volume + 0.05);
+			} else if (direction === "down") {
+				player.setVolume(player.volume - 0.05);
+			}
+			return false;
+		},
 	);
 	const { targetRef: tvBackRef } = useTVFocusable<HTMLButtonElement>(
 		"player-back",
