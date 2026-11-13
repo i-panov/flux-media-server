@@ -24,7 +24,12 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.lib.flux",
-      "versionCode": 62
+      "versionCode": 62,
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
