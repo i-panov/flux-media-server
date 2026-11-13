@@ -323,7 +323,7 @@ function EntryRow({
 				</Text>
 			</View>
 			<View style={[styles.rowActions, { gap: spacing.xs }]}>
-				{entry.type === "audio" && (
+				{entry.type !== "image" && (
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel={t("downloads.openItem", { title: entry.title })}
@@ -388,6 +388,10 @@ function DownloadsContent() {
 	useLanguage();
 	const { playQueue } = useAudioActions();
 	const handleOpen = (entry: DownloadEntry) => {
+		if (entry.type === "video") {
+			router.push(`/downloads/${entry.mediaId}` as never);
+			return;
+		}
 		const media: Media = {
 			id: entry.mediaId,
 			title: entry.title,
