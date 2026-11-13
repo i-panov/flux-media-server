@@ -82,7 +82,9 @@ export default function VideoScreen() {
 	const favorites = useFavoriteVideoIds();
 	const [actionsMedia, setActionsMedia] = useState<Media | null>(null);
 	const allItems = list.data?.pages.flatMap((page) => page.items) ?? [];
-	const tvItems = excludeMediaIds(allItems, favorites.data);
+	const tvItems = searching
+		? allItems
+		: excludeMediaIds(allItems, favorites.data);
 	// Ряды остаются смонтированными и просто скрываются: сброс поиска не
 	// создаёт заново их запросы.
 	const header = useMemo(
@@ -105,7 +107,19 @@ export default function VideoScreen() {
 				testID="video-search"
 			/>
 			{isTV ? (
-				<TVVideoList items={tvItems} onPressItem={openVideo} />
+				<TVVideoList
+					items={tvItems}
+					onPressItem={openVideo}
+					onEndReached={() => {
+						if (list.hasNextPage && !list.isFetchingNextPage) {
+							void list.fetchNextPage();
+						}
+					}}
+					isPending={list.isPending}
+					isError={list.isError && allItems.length === 0}
+					isFetchingNextPage={list.isFetchingNextPage}
+					onRetry={() => void list.refetch()}
+				/>
 			) : (
 				<MediaGrid
 					items={

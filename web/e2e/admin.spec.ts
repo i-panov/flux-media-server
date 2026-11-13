@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { stubEmptyLibraryMeta } from "./stubs";
 
-const HOME_URL_PATTERN = /\/$/;
+const HOME_URL_PATTERN = /\/video$/;
 
 function sessionBody(isAdmin: boolean): string {
 	return JSON.stringify({

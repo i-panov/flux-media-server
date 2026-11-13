@@ -36,7 +36,7 @@ async function stubSettings(
 			});
 		},
 	);
-	await page.route("**/api/auth/logout", (route) =>
+	await page.route("**/api/auth/logout-refresh", (route) =>
 		route.fulfill({
 			status: 200,
 			contentType: "application/json",

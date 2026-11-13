@@ -43,13 +43,11 @@ test("главная показывает приложение и статус �
 		}),
 	);
 
-	await page.goto("/");
+	await page.goto("/video");
 
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
-	await expect(page.getByText("1.0.8")).toBeVisible();
-	await expect(page.getByText("Онлайн")).toBeVisible();
 });
 
 test("настройки открываются из шапки", async ({ page }) => {
@@ -62,7 +60,7 @@ test("настройки открываются из шапки", async ({ page 
 		}),
 	);
 
-	await page.goto("/");
+	await page.goto("/video");
 	await page.getByRole("link", { name: "Настройки" }).click();
 
 	await expect(
@@ -74,7 +72,7 @@ test("настройки открываются из шапки", async ({ page 
 test("каркас адаптируется под мобильный, десктоп и ТВ", async ({ page }) => {
 	await stubAuthedSession(page);
 
-	await page.goto("/");
+	await page.goto("/video");
 	const desktopNav = page.getByRole("navigation", {
 		name: "Основная навигация",
 	});
@@ -104,7 +102,7 @@ test("неизвестный маршрут показывает страниц�
 
 	await page.getByRole("button", { name: "На главную" }).click();
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 });
 
@@ -187,9 +185,9 @@ test("главная: «Продолжить просмотр» открывае
 		}),
 	);
 
-	await page.goto("/");
+	await page.goto("/video");
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 	await expect(
 		page.getByRole("heading", { name: "Продолжить просмотр" }),

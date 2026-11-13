@@ -1,7 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { stubEmptyLibraryMeta } from "./stubs";
 
-const AUDIO_DETAIL_ID_PATTERN = /\/audio\/1(\?|$)/;
 const FAVORITE_LABEL_PATTERN = /избранное/;
 
 function artistAudioItem(id: number, title: string) {
@@ -162,5 +161,5 @@ test("ТВ: страница артиста read-only, треки и load-more �
 	await pressUntilFocusKey(page, "ArrowUp", (key) => key === "artist-track-1");
 	await expect.poll(() => activeFocusKey(page)).toBe("artist-track-1");
 	await page.keyboard.press("Enter");
-	await expect(page).toHaveURL(AUDIO_DETAIL_ID_PATTERN);
+	await expect(page.locator(".audio-mini-player")).toBeVisible();
 });

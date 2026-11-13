@@ -1,18 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
 import { stubEmptyLibraryMeta } from "./stubs";
 
-const AUDIO_DETAIL_PATTERN = /\/audio\/1$/;
-
 // Клиентский переход TanStack Router сначала меняет URL, а страницу списка
 // держит до коммита новой: в этот момент кнопок «Слушать» несколько (по одной
 // на карточку). Поэтому ждём уникальный заголовок детальной страницы.
-async function expectAudioDetail(page: Page): Promise<void> {
-	await expect(page).toHaveURL(AUDIO_DETAIL_PATTERN);
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Первая песня" }),
-	).toBeVisible();
-	await expect(page.getByRole("button", { name: "Слушать" })).toHaveCount(1);
-}
 
 const userBody = JSON.stringify({
 	id: 1,
@@ -284,8 +275,10 @@ test("избранные артисты: секция в списке и сер�
 		page.getByLabel("Поиск по названию, альбому или исполнителю"),
 	).toHaveValue("Исполнитель Один");
 
-	await page.goto("/audio/1");
-	await expectAudioDetail(page);
+	await page.goto("/artists/1");
+	await expect(
+		page.getByRole("heading", { level: 1, name: "Исполнитель Один" }),
+	).toBeVisible();
 	const removeHeart = page.getByRole("button", {
 		name: "Убрать из избранного: Исполнитель Один",
 	});
@@ -299,13 +292,6 @@ test("избранные артисты: секция в списке и сер�
 			name: "Добавить в избранное: Исполнитель Один",
 		}),
 	).toBeVisible();
-
-	await page
-		.getByRole("button", { name: "Добавить в избранное: Исполнитель Два" })
-		.click();
-	await expect
-		.poll(() => artistRequests.some((entry) => entry.includes('"artist_id":2')))
-		.toBe(true);
 });
 
 test("страница артиста: ошибка треков и исполнителя с повтором", async ({

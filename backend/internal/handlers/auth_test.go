@@ -462,6 +462,26 @@ func TestAuthRefreshCrossOriginFormRejected(t *testing.T) {
 	assert.Nil(t, findCookie(resp.Cookies(), middleware.CookieRefreshToken))
 }
 
+func TestAuthLogoutByRefreshWithoutAccess(t *testing.T) {
+	application := newTestAppForAuth(t)
+
+	_, refreshToken, _ := loginWithCookies(t, application, "logout-refresh@example.com")
+
+	body, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req := httptest.NewRequest("POST", "/api/auth/logout-refresh", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	// Повторный refresh тем же токеном должен быть отвергнут.
+	req = httptest.NewRequest("POST", "/api/auth/refresh", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = application.Fiber.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode)
+}
+
 func TestAuthLogoutClearsCookies(t *testing.T) {
 	application := newTestAppForAuth(t)
 

@@ -291,7 +291,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 					style={{ zIndex: 300 }}
 					className="border-t border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)]"
 				>
-					<div className="h-full md:hidden">
+					<div className="app-mobile-nav h-full">
 						<Group h="100%" gap={0} wrap="nowrap">
 							<nav className="flex h-full w-full" aria-label={t("nav.mobile")}>
 								{[...visibleMainNav, ...desktopExtra, SETTINGS_NAV].map(
@@ -303,7 +303,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 						</Group>
 					</div>
 					{miniPlayerVisible && (
-						<div className="hidden h-full md:block">
+						<div className="h-full">
 							<AudioMiniPlayer />
 						</div>
 					)}

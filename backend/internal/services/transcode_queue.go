@@ -616,9 +616,6 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 			handleCancel()
 			return
 		}
-		if plan.Kind == NormalizeRemux {
-			os.Remove(task.SourcePath)
-		}
 	}
 
 	// 8. Запись Media (полный объект до Create — ассоциаций нет,
@@ -670,26 +667,41 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 		for _, p := range movedSubs {
 			os.Remove(p)
 		}
-		q.removeResult(media)
-		q.fail(task, moveErr, "Failed to save subtitles", true)
+		// Direct уже перенёс исходник: результат — единственная копия.
+		// Не удаляем его; фиксируем ошибку без ретрая.
+		if _, statErr := os.Stat(task.SourcePath); statErr == nil {
+			q.removeResult(media)
+			q.fail(task, moveErr, "Failed to save subtitles", true)
+		} else {
+			q.fail(task, moveErr, "Failed to save subtitles", false)
+		}
 		return
 	}
 	subRows := make([]models.Subtitle, 0, len(movedSubs))
 	for i, p := range movedSubs {
 		subRows = append(subRows, models.Subtitle{Lang: subLangs[i], Path: p})
 	}
-	if err := q.subs.ReplaceForMedia(context.Background(), media.ID, subRows); err != nil {
-		for _, p := range movedSubs {
-			os.Remove(p)
+	// Пустой ReplaceForMedia — лишняя транзакция и лишний шанс упасть
+	// после того, как Direct уже забрал единственный исходник.
+	if len(subRows) > 0 {
+		if err := q.subs.ReplaceForMedia(context.Background(), media.ID, subRows); err != nil {
+			for _, p := range movedSubs {
+				os.Remove(p)
+			}
+			if _, statErr := os.Stat(task.SourcePath); statErr == nil {
+				q.removeResult(media)
+				q.fail(task, err, "Failed to save subtitles", true)
+			} else {
+				q.fail(task, err, "Failed to save subtitles", false)
+			}
+			return
 		}
-		q.removeResult(media)
-		q.fail(task, err, "Failed to save subtitles", true)
-		return
 	}
 	if cancelled() {
-		// Файл и запись уже созданы отменённым заданием: сносим оба,
-		// иначе останется сирота без владельца.
-		q.removeResult(media)
+		// Не удаляем единственную копию, если Direct уже перенёс исходник.
+		if _, statErr := os.Stat(task.SourcePath); statErr == nil {
+			q.removeResult(media)
+		}
 		handleCancel()
 		return
 	}
@@ -727,6 +739,13 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 		log.Printf("transcode: task %d finished after cancel, keeping result", task.ID)
 		handleCancel()
 		return
+	}
+	// Remux больше не нужен: результат успешно записан. Для Direct
+	// исходник уже перенесён внутри execute.
+	if plan.Kind == NormalizeRemux {
+		if err := os.Remove(task.SourcePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("transcode: remove remux source %d: %v", task.ID, err)
+		}
 	}
 }
 

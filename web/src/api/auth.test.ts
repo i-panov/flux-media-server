@@ -97,7 +97,7 @@ describe("logout", () => {
 
 		await expect(logout()).resolves.toBeUndefined();
 		expect(fetchMock).toHaveBeenCalledWith(
-			"/api/auth/logout",
+			"/api/auth/logout-refresh",
 			expect.objectContaining({
 				method: "POST",
 				body: JSON.stringify({ refresh_token: "" }),

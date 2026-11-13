@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const VIDEO_URL = /\/video$/;
 const SIX_DIGITS = /^\d{6}$/;
+const DEVICE_NAME = /Web TV|Fake TV/;
 
 // Два независимых браузерных контекста: один уже вошёл, второй
 // подтверждает вход по коду. Это ровно сценарий TV + телефон/ПК.
@@ -30,7 +31,7 @@ test("вход по device-code из второго браузера", async ({ 
 		expect(code).toMatch(SIX_DIGITS);
 
 		await ownerPage.goto(`/activate#code=${code}`);
-		await expect(ownerPage.getByText(/Web TV|Fake TV/)).toBeVisible();
+		await expect(ownerPage.getByText(DEVICE_NAME)).toBeVisible();
 		await ownerPage.getByRole("button", { name: "Подтвердить вход" }).click();
 		await expect(ownerPage.getByText("Устройство подтверждено")).toBeVisible();
 

@@ -754,6 +754,44 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	})
 }
 
+// LogoutByRefresh завершает конкретную сессию по refresh-токену без
+// требования живого access-токена. Нужен мобильному клиенту: access мог
+// истечь, но refresh ещё позволяет корректно отозвать устройство.
+// Токен передаётся в теле или в httpOnly-куке; чужой/неизвестный токен
+// не раскрывается — ответ всегда одинаковый.
+func (h *AuthHandler) LogoutByRefresh(c *fiber.Ctx) error {
+	if !checkSameOrigin(c) {
+		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
+	}
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := c.BodyParser(&req); err != nil && len(c.Body()) > 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	refreshToken := strings.TrimSpace(req.RefreshToken)
+	if refreshToken == "" {
+		refreshToken = c.Cookies(middleware.CookieRefreshToken)
+	}
+	if refreshToken != "" {
+		ctx := c.UserContext()
+		record, err := h.refreshTokenDB.FindByToken(ctx, refreshToken)
+		if err == nil {
+			if record.DeviceID == "" {
+				err = h.refreshTokenDB.DeleteByToken(ctx, refreshToken)
+			} else {
+				err = h.refreshTokenDB.DeleteByDeviceID(ctx, record.DeviceID, record.UserID)
+			}
+			if err != nil {
+				log.Printf("logout-refresh: delete: %v", err)
+				return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+			}
+		}
+	}
+	h.clearSessionCookies(c)
+	return c.JSON(fiber.Map{"message": "Logged out successfully"})
+}
+
 // Logout revokes refresh tokens. If refresh_token_id is provided only that
 // specific token is revoked; otherwise all tokens of the current user are
 // deleted (full logout). Тело опционально: невалидный JSON приравнивается

@@ -66,7 +66,7 @@ export async function fetchMe(signal?: AbortSignal): Promise<AuthUser> {
 }
 
 export async function logout(refreshToken?: string): Promise<void> {
-	await apiFetch<unknown>("/auth/logout", {
+	await apiFetch<unknown>("/auth/logout-refresh", {
 		method: "POST",
 		body: JSON.stringify({ refresh_token: refreshToken ?? "" }),
 	});
@@ -137,7 +137,8 @@ const deviceInspectSchema = z.object({
 	device_name: z.string(),
 	platform: z.string(),
 	expires_at: z.string(),
-	current: z.boolean(),
+	// Старые backend не отдавали флаг; inspect — не сессия.
+	current: z.boolean().default(false),
 });
 
 export type DeviceInspectResponse = z.infer<typeof deviceInspectSchema>;
@@ -175,7 +176,8 @@ const deviceSessionSchema = z.object({
 	created_at: z.string(),
 	last_used_at: z.string().nullable(),
 	expires_at: z.string(),
-	current: z.boolean(),
+	// Старые backend не отдавали флаг; inspect — не сессия.
+	current: z.boolean().default(false),
 });
 
 export type DeviceSession = z.infer<typeof deviceSessionSchema>;
@@ -196,21 +198,17 @@ export async function fetchDevices(
 }
 
 export async function revokeDevice(deviceId: string): Promise<void> {
-	await apiFetch<unknown>(
-		`/auth/devices/${encodeURIComponent(deviceId)}`,
-		{ method: "DELETE" },
-	);
+	await apiFetch<unknown>(`/auth/devices/${encodeURIComponent(deviceId)}`, {
+		method: "DELETE",
+	});
 }
 
 export async function renameDevice(
 	deviceId: string,
 	name: string,
 ): Promise<void> {
-	await apiFetch<unknown>(
-		`/auth/devices/${encodeURIComponent(deviceId)}`,
-		{
-			method: "PATCH",
-			body: JSON.stringify({ name }),
-		},
-	);
+	await apiFetch<unknown>(`/auth/devices/${encodeURIComponent(deviceId)}`, {
+		method: "PATCH",
+		body: JSON.stringify({ name }),
+	});
 }

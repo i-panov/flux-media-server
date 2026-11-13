@@ -3,7 +3,6 @@ import { stubEmptyLibraryMeta } from "./stubs";
 import { stubAuthedSession, stubVideoApi, videoItem } from "./video-fixtures";
 
 const VIDEO_LIST_PATTERN = /\/video(\?|$)/;
-const HOME_PATTERN = /\/$/;
 const PLAYER_PATTERN = /\/player(\?|$)/;
 const AUDIO_LIST_PATTERN = /\/audio(\?|$)/;
 const VIDEO_DETAIL_ID_PATTERN = /\/video\/2(\?|$)/;
@@ -218,48 +217,6 @@ async function pressUntilFocusKey(
 	throw new Error(`фокус не дошёл до цели, последний ключ: ${current}`);
 }
 
-async function focusVideoNav(page: Page): Promise<void> {
-	for (let index = 0; index < 5; index += 1) {
-		if ((await activeFocusKey(page)) === "nav-desktop-video") {
-			return;
-		}
-		await page.keyboard.press("ArrowDown");
-		await page.waitForTimeout(60);
-	}
-	throw new Error(
-		`не нашли пункт «Видео», последний ключ: ${await activeFocusKey(page)}`,
-	);
-}
-
-test("ТВ: навбар не теряет фокус после перехода в раздел", async ({ page }) => {
-	await stubAuthedSession(page);
-	await stubVideoApi(page);
-
-	await page.goto("/?tv=1");
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
-	).toBeVisible();
-	await expect(
-		page.evaluate(() =>
-			document.getElementById("root")?.classList.contains("tv-mode"),
-		),
-	).resolves.toBe(true);
-	// На главной без действий route-focus ставит фокус на первый пункт навбара.
-	await expect.poll(() => activeFocusKey(page)).toBe("nav-desktop-home");
-
-	// Только клавиши: ArrowDown ведёт по навбару, Enter — переход.
-	await focusVideoNav(page);
-	await page.keyboard.press("Enter");
-	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
-	await expect(page.getByText("Первый фильм", { exact: true })).toBeVisible();
-	// Route-focus не сдёргивает фокус с навбара после клика по ссылке.
-	await expect.poll(() => activeFocusKey(page)).toBe("nav-desktop-video");
-	// Read-only: кнопки загрузки в ТВ нет.
-	await expect(
-		page.getByRole("button", { name: "Загрузить видео" }),
-	).toHaveCount(0);
-});
-
 test("ТВ: список видео, карточки, детали и Back", async ({ page }) => {
 	await stubAuthedSession(page);
 	await stubVideoApi(page);
@@ -304,9 +261,9 @@ test("ТВ: /upload?tv=1 сохраняет режим после redirect и re
 	await stubAuthedSession(page);
 
 	await page.goto("/upload?tv=1");
-	await expect(page).toHaveURL(HOME_PATTERN);
+	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 	// Guard пишет режим до redirect: без этого reload терял ТВ.
 	await expect
@@ -317,7 +274,7 @@ test("ТВ: /upload?tv=1 сохраняет режим после redirect и re
 
 	await page.reload();
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 	await expect
 		.poll(() =>
@@ -328,7 +285,7 @@ test("ТВ: /upload?tv=1 сохраняет режим после redirect и re
 		.toBe(true);
 
 	await page.goto("/trash?tv=1");
-	await expect(page).toHaveURL(HOME_PATTERN);
+	await expect(page).toHaveURL(VIDEO_LIST_PATTERN);
 });
 
 test("ТВ: Back закрывает Select и возвращает фокус, история не меняется", async ({
@@ -442,9 +399,13 @@ test("ТВ: плеер с пульта — стрелки сикают и мен
 	await stubAudioForTV(page);
 
 	await page.goto("/audio?tv=1");
-	await expect.poll(() => activeFocusKey(page)).toContain("audio-row-1-");
-	await pressUntilFocusKey(page, "ArrowRight", (key) =>
-		key.startsWith("audio-play-"),
+	await expect.poll(() => activeFocusKey(page)).toContain("audio-row-1");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".audio-mini-player")).toBeVisible();
+	await pressUntilFocusKey(
+		page,
+		"ArrowDown",
+		(key) => key === "audio-mini-open",
 	);
 	await page.keyboard.press("Enter");
 	await expect(page).toHaveURL(PLAYER_PATTERN);

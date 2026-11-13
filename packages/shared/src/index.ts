@@ -13,8 +13,8 @@ export {
 	pollDeviceCode,
 	type RequestCodeResponse,
 	renameDevice,
-	revokeDevice,
 	requestCode,
+	revokeDevice,
 	type VerifyCodeResponse,
 	verifyCode,
 } from "./api/auth";
@@ -96,7 +96,6 @@ export * from "./core/audioQueue";
 export * from "./core/format";
 export * from "./core/lyricsSync";
 export * from "./core/media";
+export { type QrMatrix, qrMatrix } from "./qr";
 export { createQueryClient } from "./query";
 export type { KeyValueStore } from "./storage";
-
-export { type QrMatrix, qrMatrix } from "./qr";

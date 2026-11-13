@@ -44,6 +44,7 @@ const AUTH_PUBLIC_PATHS = [
 	"/auth/request-code",
 	"/auth/verify-code",
 	"/auth/refresh",
+	"/auth/logout-refresh",
 	"/health",
 ];
 

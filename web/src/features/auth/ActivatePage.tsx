@@ -41,13 +41,18 @@ export function ActivatePage() {
 	const approve = useApproveDeviceCodeMutation();
 	const [code, setCode] = useState(() => initialCode(search.code));
 	const [done, setDone] = useState(false);
+	const [inspectedCode, setInspectedCode] = useState<string | null>(null);
+	const [approveError, setApproveError] = useState<string | null>(null);
 	const inspectedRef = useRef(false);
 
 	const runInspect = useCallback(
 		(value: string) => {
 			const normalized = value.replace(NON_DIGITS, "").slice(0, 6);
 			if (normalized.length !== 6) return;
-			inspect.mutate(normalized);
+			setApproveError(null);
+			inspect.mutate(normalized, {
+				onSuccess: () => setInspectedCode(normalized),
+			});
 		},
 		[inspect],
 	);
@@ -65,6 +70,7 @@ export function ActivatePage() {
 	}, [code, runInspect]);
 
 	const codeDigits = code.replace(/\D/g, "").slice(0, 6);
+	const canApprove = inspectedCode !== null && inspectedCode === codeDigits;
 	const displayCode =
 		codeDigits.length > 3
 			? `${codeDigits.slice(0, 3)} ${codeDigits.slice(3)}`
@@ -107,6 +113,11 @@ export function ActivatePage() {
 							{t("auth.activateInvalid")}
 						</Alert>
 					)}
+					{approveError !== null && (
+						<Alert color="red" variant="light">
+							{approveError}
+						</Alert>
+					)}
 					{done ? (
 						<>
 							<Alert color="green" variant="light">
@@ -134,13 +145,17 @@ export function ActivatePage() {
 									<TextInput
 										label={t("auth.activateCode")}
 										value={displayCode}
-										onChange={(event) =>
-											setCode(
-												event.currentTarget.value
-													.replace(/\D/g, "")
-													.slice(0, 6),
-											)
-										}
+										onChange={(event) => {
+											const next = event.currentTarget.value
+												.replace(/\D/g, "")
+												.slice(0, 6);
+											if (next !== inspectedCode) {
+												setInspectedCode(null);
+												setApproveError(null);
+												inspect.reset();
+											}
+											setCode(next);
+										}}
 										inputMode="numeric"
 										autoComplete="one-time-code"
 										autoFocus
@@ -152,7 +167,7 @@ export function ActivatePage() {
 									</Button>
 								</Stack>
 							</form>
-							{device !== undefined && (
+							{device !== undefined && canApprove && (
 								<Card withBorder padding="md" radius="md">
 									<Stack gap="xs">
 										<Text fw={600}>
@@ -167,6 +182,8 @@ export function ActivatePage() {
 											onClick={() =>
 												approve.mutate(codeDigits, {
 													onSuccess: () => setDone(true),
+													onError: () =>
+														setApproveError(t("auth.activateInvalid")),
 												})
 											}
 										>

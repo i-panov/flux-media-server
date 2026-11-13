@@ -2,18 +2,10 @@ import { expect, type Page, test } from "@playwright/test";
 import { stubEmptyLibraryMeta } from "./stubs";
 
 const AUDIO_LIST_PATTERN = /\/audio$/;
-const AUDIO_DETAIL_PATTERN = /\/audio\/1$/;
 
 // Клиентский переход TanStack Router сначала меняет URL, а страницу списка
 // держит до коммита новой: в этот момент кнопок «Слушать» несколько (по одной
 // на карточку). Поэтому ждём уникальный заголовок детальной страницы.
-async function expectAudioDetail(page: Page): Promise<void> {
-	await expect(page).toHaveURL(AUDIO_DETAIL_PATTERN);
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Первая песня" }),
-	).toBeVisible();
-	await expect(page.getByRole("button", { name: "Слушать" })).toHaveCount(1);
-}
 
 const userBody = JSON.stringify({
 	id: 1,
@@ -171,20 +163,13 @@ test("аудио: список, поиск и переход в детали с 
 	await page.getByLabel("Поиск по названию, альбому или исполнителю").fill("");
 	await expect(page.getByText("Первая песня", { exact: true })).toBeVisible();
 
-	await page.getByRole("link", { name: "Первая песня" }).click();
-	await expectAudioDetail(page);
+	await page.getByText("Первая песня", { exact: true }).click();
+	await expect(page.locator(".audio-mini-player")).toBeVisible();
 	await expect(
-		page.getByText("Исполнитель Один", { exact: true }),
+		page
+			.locator(".audio-mini-player")
+			.getByText("Исполнитель Один, Исполнитель Два"),
 	).toBeVisible();
-	await expect(
-		page.getByText("Исполнитель Два", { exact: true }),
-	).toBeVisible();
-	await expect(page.getByText("Альбом Один")).toBeVisible();
-	await expect(page.getByText("Рок")).toBeVisible();
-	await expect(page.getByText("3:45")).toBeVisible();
-	await expect(page.getByText("Описание Первая песня")).toBeVisible();
-	// Обложка — декоративный фон, отдельного <img> на странице нет.
-	await expect(page.locator('div[style*="/api/media/1/cover"]')).toHaveCount(1);
 });
 
 test("аудио: недослушанный трек поднимается мини-плеером на паузе", async ({
@@ -295,7 +280,13 @@ test("админ удаляет трек из списка", async ({ page }) =>
 
 	await page.goto("/audio");
 	await expect(page.getByText("Первая песня", { exact: true })).toBeVisible();
-	await page.getByRole("button", { name: "Удалить" }).first().click();
+	await page
+		.locator(".media-row")
+		.first()
+		.getByRole("button", { name: "Ещё" })
+		.click();
+	await expect(page.getByRole("menu")).toBeVisible();
+	await page.getByText("Удалить", { exact: true }).click();
 	await page
 		.getByRole("dialog")
 		.getByRole("button", { name: "Удалить" })

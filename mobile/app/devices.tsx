@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { getDeviceIdentity } from "../src/auth/deviceInfo";
 import { AuthGate } from "../src/components/AuthGate";
+import { ErrorState } from "../src/components/ErrorState";
 import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
 import { useTheme } from "../src/theme/ThemeProvider";
@@ -81,6 +82,13 @@ export default function DevicesScreen() {
 				<Text style={{ color: colors.textMuted }}>{t("devices.hint")}</Text>
 				{devices.isPending && (
 					<Text style={{ color: colors.textMuted }}>{t("common.loading")}</Text>
+				)}
+				{devices.isError && !devices.data && (
+					<ErrorState
+						testID="devices-error"
+						retryTestID="devices-retry"
+						onRetry={() => void devices.refetch()}
+					/>
 				)}
 				{devices.data?.length === 0 && (
 					<Text style={{ color: colors.textMuted }}>{t("devices.empty")}</Text>

@@ -104,7 +104,7 @@ test("вход по коду и выход", async ({ page }) => {
 			}),
 		});
 	});
-	await page.route("**/api/auth/logout", (route) => {
+	await page.route("**/api/auth/logout-refresh", (route) => {
 		authed = false;
 		return route.fulfill({
 			status: 200,
@@ -124,10 +124,10 @@ test("вход по коду и выход", async ({ page }) => {
 	await expect(page.getByText("123456")).toBeVisible();
 
 	await page.getByLabel("Код из письма").fill("123456");
-	await page.getByRole("button", { name: "Войти" }).click();
+	await page.getByRole("button", { name: "Войти", exact: true }).click();
 
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 	await expect(page.getByText("user@example.com")).toBeVisible();
 
@@ -161,7 +161,7 @@ test("неверный код показывает ошибку", async ({ page 
 	await page.getByLabel("Электронная почта").fill("user@example.com");
 	await page.getByRole("button", { name: "Получить код" }).click();
 	await page.getByLabel("Код из письма").fill("000000");
-	await page.getByRole("button", { name: "Войти" }).click();
+	await page.getByRole("button", { name: "Войти", exact: true }).click();
 
 	await expect(page.getByText("Неверный или просроченный код")).toBeVisible();
 });
@@ -216,7 +216,7 @@ test("повтор после ошибки перепроверяет сесси
 
 	// Повтор ушёл в сеть и после восстановления привёл на главную.
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 	expect(meCalls).toBeGreaterThanOrEqual(2);
 });
@@ -224,7 +224,7 @@ test("повтор после ошибки перепроверяет сесси
 test("выход при недоступном сервере показывает ошибку", async ({ page }) => {
 	await stubMe(page, () => true);
 	await stubHealth(page);
-	await page.route("**/api/auth/logout", (route) =>
+	await page.route("**/api/auth/logout-refresh", (route) =>
 		route.fulfill({
 			status: 500,
 			contentType: "application/json",
@@ -235,7 +235,7 @@ test("выход при недоступном сервере показывае
 	await page.goto("/");
 
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "Выйти" }).click();
 
@@ -247,7 +247,7 @@ test("выход с истёкшей сессией ведёт на логин",
 	await stubMe(page, () => true);
 	await stubHealth(page);
 	await stubRefreshUnauthorized(page);
-	await page.route("**/api/auth/logout", (route) =>
+	await page.route("**/api/auth/logout-refresh", (route) =>
 		route.fulfill({
 			status: 401,
 			contentType: "application/json",
@@ -258,7 +258,7 @@ test("выход с истёкшей сессией ведёт на логин",
 	await page.goto("/");
 
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Flux" }),
+		page.getByRole("heading", { level: 1, name: "Видео" }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "Выйти" }).click();
 

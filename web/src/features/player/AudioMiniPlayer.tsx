@@ -1,12 +1,4 @@
-import {
-	ActionIcon,
-	Group,
-	Progress,
-	Slider,
-	Stack,
-	Text,
-	Tooltip,
-} from "@mantine/core";
+import { Group, Progress, Slider, Stack, Text, Tooltip } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import {
 	Pause,
@@ -19,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatDuration } from "../../core/format";
+import { clickNode, TVActionIcon, useTVFocusable } from "../tv/tvFocus";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
 import { useMiniPlayerVisible } from "./useMiniPlayerVisible";
@@ -27,6 +20,10 @@ export function AudioMiniPlayer() {
 	const { t } = useTranslation();
 	const player = useAudioPlayer();
 	const visible = useMiniPlayerVisible();
+	const { targetRef: openRef, tvMode } = useTVFocusable<HTMLAnchorElement>(
+		"audio-mini-open",
+		clickNode,
+	);
 	const current = player.current;
 	if (!visible || current === null) {
 		return null;
@@ -39,7 +36,9 @@ export function AudioMiniPlayer() {
 			<Progress value={Math.min(progress, 100)} size={2} radius={0} />
 			<Group gap="sm" wrap="nowrap" px="md" py={6}>
 				<Link
+					ref={openRef}
 					to="/player"
+					tabIndex={tvMode ? -1 : undefined}
 					className="flex min-w-0 flex-1 items-center gap-3 no-underline [color:inherit]"
 				>
 					<div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded bg-[var(--mantine-color-default-hover)]">
@@ -87,20 +86,22 @@ export function AudioMiniPlayer() {
 				</Group>
 				<Group gap={4} wrap="nowrap">
 					<Tooltip label={t("player.previous")} withArrow>
-						<ActionIcon
+						<TVActionIcon
+							focusKey="audio-mini-prev"
 							variant="subtle"
 							aria-label={t("player.previous")}
 							data-testid="player-prev"
 							onClick={player.previous}
 						>
 							<SkipBack size={18} />
-						</ActionIcon>
+						</TVActionIcon>
 					</Tooltip>
 					<Tooltip
 						label={player.playing ? t("player.pause") : t("player.play")}
 						withArrow
 					>
-						<ActionIcon
+						<TVActionIcon
+							focusKey="audio-mini-toggle"
 							variant="filled"
 							radius="xl"
 							size="lg"
@@ -113,26 +114,28 @@ export function AudioMiniPlayer() {
 							) : (
 								<Play size={18} fill="currentColor" />
 							)}
-						</ActionIcon>
+						</TVActionIcon>
 					</Tooltip>
 					<Tooltip label={t("player.next")} withArrow>
-						<ActionIcon
+						<TVActionIcon
+							focusKey="audio-mini-next"
 							variant="subtle"
 							aria-label={t("player.next")}
 							data-testid="player-next"
 							onClick={player.next}
 						>
 							<SkipForward size={18} />
-						</ActionIcon>
+						</TVActionIcon>
 					</Tooltip>
 					<Tooltip label={t("player.close")} withArrow>
-						<ActionIcon
+						<TVActionIcon
+							focusKey="audio-mini-close"
 							variant="subtle"
 							aria-label={t("player.close")}
 							onClick={player.clear}
 						>
 							<X size={18} />
-						</ActionIcon>
+						</TVActionIcon>
 					</Tooltip>
 				</Group>
 			</Group>

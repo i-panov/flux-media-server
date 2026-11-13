@@ -3,7 +3,7 @@ import { stubEmptyLibraryMeta } from "./stubs";
 
 const VIDEO_LIST_PATTERN = /\/video$/;
 const VIDEO_DETAIL_PATTERN = /\/video\/1$/;
-const AUDIO_TRACK_PATTERN = /\/audio\/9$/;
+const AUDIO_TRACK_PATTERN = /\/audio$/;
 const COLLECTION_DETAIL_PATTERN = /\/collections\/1$/;
 
 const PIXEL_PNG = Buffer.from(
@@ -424,8 +424,9 @@ test("перенос элемента в другую коллекцию", async
 	await page.goto("/collections/1");
 	await expect(page).toHaveURL(COLLECTION_DETAIL_PATTERN);
 	await expect(page.getByText("Первый фильм")).toBeVisible();
+	await page.getByRole("button", { name: "Ещё" }).click();
 	await page
-		.getByRole("button", { name: "Перенести в другую коллекцию" })
+		.getByRole("menuitem", { name: "Перенести в другую коллекцию" })
 		.click();
 	await page.getByRole("button", { name: "Целевая" }).click();
 

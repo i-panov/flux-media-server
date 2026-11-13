@@ -3,8 +3,8 @@ import { qrMatrix } from "./qr";
 
 describe("qrMatrix", () => {
 	it("returns a square matrix and is deterministic", () => {
-		const first = qrMatrix("https://flux.example.com/activate?code=ABCD2345");
-		const second = qrMatrix("https://flux.example.com/activate?code=ABCD2345");
+		const first = qrMatrix("https://example.com/activate");
+		const second = qrMatrix("https://example.com/activate");
 		expect(first.size).toBeGreaterThan(0);
 		expect(first.cells).toHaveLength(first.size * first.size);
 		expect(first).toEqual(second);

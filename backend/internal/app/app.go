@@ -412,13 +412,46 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	// ReadTimeout тоже per-route: глобальные 10 с режут ЧТЕНИЕ ТЕЛА
 	// целиком, и заливка большого файла обрывалась на середине —
 	// клиент видел Connection reset by peer / Write failed.
+	// До чтения тела проверяем access-токен для upload/cover: иначе
+	// неаутентифицированный клиент может держать соединение с телом до
+	// MaxUploadSize часами. Валидному клиенту оставляем большой лимит,
+	// но с разумным потолком времени.
+	uploadAuthorized := func(h *fasthttp.RequestHeader) bool {
+		token := ""
+		if auth := string(h.Peek("Authorization")); auth != "" {
+			parts := strings.SplitN(auth, " ", 2)
+			if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+				token = parts[1]
+			}
+		}
+		if token == "" {
+			for _, part := range strings.Split(string(h.Peek("Cookie")), ";") {
+				key, value, found := strings.Cut(strings.TrimSpace(part), "=")
+				if found && key == middleware.CookieAccessToken {
+					token = value
+					break
+				}
+			}
+		}
+		if token == "" {
+			return false
+		}
+		_, err := jwtService.ValidateToken(token)
+		return err == nil
+	}
 	fiberApp.Server().HeaderReceived = func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		var u fasthttp.URI
 		_ = u.Parse(nil, h.RequestURI()) // при ошибке path пуст → лимит 4 МБ (безопасный дефолт)
 		if isUploadPath(string(h.Method()), string(u.Path())) {
+			if !uploadAuthorized(h) {
+				return fasthttp.RequestConfig{
+					MaxRequestBodySize: maxAPIBodySize,
+					ReadTimeout:        30 * time.Second,
+				}
+			}
 			return fasthttp.RequestConfig{
 				MaxRequestBodySize: int(cfg.Server.MaxUploadSize),
-				ReadTimeout:        uploadReadTimeout(cfg.Server.MaxUploadSize),
+				ReadTimeout:        min(uploadReadTimeout(cfg.Server.MaxUploadSize), 15*time.Minute),
 			}
 		}
 		return fasthttp.RequestConfig{MaxRequestBodySize: maxAPIBodySize}
@@ -573,6 +606,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	auth.Post("/request-code", authRateLimiter, authHandler.RequestCode)
 	auth.Post("/verify-code", authRateLimiter, authHandler.VerifyCode)
 	auth.Post("/refresh", authRateLimiter, authHandler.Refresh)
+	auth.Post("/logout-refresh", authRateLimiter, authHandler.LogoutByRefresh)
 	auth.Post("/device/code", authRateLimiter, authHandler.DeviceCode)
 	auth.Post("/device/token", deviceRateLimiter, authHandler.DeviceToken)
 

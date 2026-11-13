@@ -79,22 +79,23 @@ export default function TabsLayout() {
 						),
 					}}
 				/>
-				{!isTV && (
-					<Tabs.Screen
-						name="memes"
-						options={{
-							title: t("memes.title"),
-							tabBarButtonTestID: "tab-memes",
-							tabBarIcon: ({ color, size, focused }) => (
-								<TabIcon
-									name={focused ? "images" : "images-outline"}
-									color={color}
-									size={size}
-								/>
-							),
-						}}
-					/>
-				)}
+				<Tabs.Screen
+					name="memes"
+					options={{
+						// На TV маршрут остаётся в дереве Expo Router, но не
+						// попадает в таб-бар; экран дополнительно редиректит.
+						href: isTV ? null : undefined,
+						title: t("memes.title"),
+						tabBarButtonTestID: "tab-memes",
+						tabBarIcon: ({ color, size, focused }) => (
+							<TabIcon
+								name={focused ? "images" : "images-outline"}
+								color={color}
+								size={size}
+							/>
+						),
+					}}
+				/>
 
 				<Tabs.Screen
 					name="settings"

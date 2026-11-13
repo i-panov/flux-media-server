@@ -235,3 +235,14 @@ body {
 		max-width: none;
 	}
 }
+/* Единый breakpoint 62em: Mantine md (992px). Tailwind md (768px)
+   оставлял окно 768–991 без навигации. */
+.app-mobile-nav {
+	display: block;
+}
+
+@media (min-width: 62em) {
+	.app-mobile-nav {
+		display: none;
+	}
+}

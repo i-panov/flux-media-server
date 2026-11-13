@@ -1,5 +1,14 @@
 import { formatDuration, type Media } from "@flux/shared";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+	ActivityIndicator,
+	FlatList,
+	Pressable,
+	StyleSheet,
+	Text,
+	View,
+} from "react-native";
+import { EmptyState } from "../components/EmptyState";
+import { ErrorState } from "../components/ErrorState";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 import { tvFocusStyle } from "./focus";
@@ -7,6 +16,11 @@ import { tvFocusStyle } from "./focus";
 interface TVVideoListProps {
 	items: readonly Media[];
 	onPressItem: (media: Media) => void;
+	onEndReached?: () => void;
+	isPending?: boolean;
+	isError?: boolean;
+	isFetchingNextPage?: boolean;
+	onRetry?: () => void;
 	testID?: string;
 }
 
@@ -16,33 +30,57 @@ interface TVVideoListProps {
 export function TVVideoList({
 	items,
 	onPressItem,
+	onEndReached,
+	isPending = false,
+	isError = false,
+	isFetchingNextPage = false,
+	onRetry,
 	testID = "tv-video-list",
 }: TVVideoListProps) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
 
+	if (isPending && items.length === 0) {
+		return (
+			<View style={styles.empty} testID="tv-video-loading">
+				<ActivityIndicator color={colors.accent} />
+				<Text style={{ color: colors.textMuted }}>{t("common.loading")}</Text>
+			</View>
+		);
+	}
+	if (isError && items.length === 0) {
+		return <ErrorState onRetry={onRetry} testID="tv-video-error" />;
+	}
 	if (items.length === 0) {
 		return (
-			<View style={styles.empty}>
-				<Text style={[styles.emptyTitle, { color: colors.text }]}>
-					{t("media.empty")}
-				</Text>
-				<Text style={{ color: colors.textMuted }}>
-					{t("search.libraryEmptyVideoHint")}
-				</Text>
-			</View>
+			<EmptyState
+				title={t("media.empty")}
+				description={t("search.libraryEmptyVideoHint")}
+				testID="tv-video-empty"
+			/>
 		);
 	}
 
 	return (
-		<ScrollView
+		<FlatList
 			style={styles.fill}
-			contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.xl }}
+			data={items}
+			keyExtractor={(item) => String(item.id)}
+			ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+			contentContainerStyle={{ paddingBottom: spacing.xl }}
 			testID={testID}
-		>
-			{items.map((item, index) => (
+			onEndReached={onEndReached}
+			onEndReachedThreshold={0.4}
+			ListFooterComponent={
+				isFetchingNextPage ? (
+					<ActivityIndicator
+						color={colors.accent}
+						style={{ padding: spacing.lg }}
+					/>
+				) : undefined
+			}
+			renderItem={({ item, index }) => (
 				<Pressable
-					key={item.id}
 					accessibilityRole="button"
 					accessibilityLabel={item.title}
 					hasTVPreferredFocus={index === 0}
@@ -75,8 +113,8 @@ export function TVVideoList({
 						{formatDuration(item.duration)}
 					</Text>
 				</Pressable>
-			))}
-		</ScrollView>
+			)}
+		/>
 	);
 }
 
@@ -93,6 +131,5 @@ const styles = StyleSheet.create({
 	title: { fontSize: 22, fontWeight: "700" },
 	duration: { fontSize: 16 },
 	empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
-	emptyTitle: { fontSize: 22, fontWeight: "700" },
 	pressed: { opacity: 0.75 },
 });

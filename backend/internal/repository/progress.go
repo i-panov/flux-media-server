@@ -34,6 +34,10 @@ func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, mediaType m
 		typed := r.db.Model(&models.Media{}).Where("type = ?", mediaType).Select("id")
 		query = query.Where("media_id IN (?)", typed)
 	}
+	// «Продолжить» — только незавершённые записи. Фильтр в БД обязателен:
+	// иначе 20 свежих completed вытесняют более старые незавершённые.
+	query = query.Where("completed = ?", false).
+		Where("(duration <= 0 OR position * 10 < duration * 9)")
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

@@ -168,11 +168,19 @@ async function stubPlayer(
 	);
 }
 
+async function startFirstTrack(page: Page): Promise<void> {
+	await page.getByText("Первый трек", { exact: true }).first().click();
+	const mini = page.locator(".audio-mini-player");
+	await expect(mini).toBeVisible();
+	await mini.getByRole("link").click();
+	await expect(page).toHaveURL(PLAYER_PATTERN);
+}
+
 test("аудиоплеер: очередь, мини-плеер и текст", async ({ page }) => {
 	await stubPlayer(page);
 	await page.goto("/audio");
 
-	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await startFirstTrack(page);
 	await expect(page).toHaveURL(PLAYER_PATTERN);
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),
@@ -216,7 +224,7 @@ test("текст: пустое значение сохраняется как о
 	);
 
 	await page.goto("/audio");
-	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await startFirstTrack(page);
 	await expect(page).toHaveURL(PLAYER_PATTERN);
 	await expect(page.getByText("Строка текста")).toBeVisible();
 
@@ -258,7 +266,7 @@ test("текст: пока текст не загружен, редактор н
 	);
 
 	await page.goto("/audio");
-	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await startFirstTrack(page);
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),
 	).toBeVisible();
@@ -396,7 +404,7 @@ test("аудио продолжает с сохранённой позиции",
 	);
 
 	await page.goto("/audio");
-	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await startFirstTrack(page);
 	await expect(page).toHaveURL(PLAYER_PATTERN);
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),
@@ -428,7 +436,7 @@ test("текст: синхронные строки подсвечиваются
 	);
 
 	await page.goto("/audio");
-	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await startFirstTrack(page);
 	await expect(page).toHaveURL(PLAYER_PATTERN);
 	await expect(page.getByRole("listitem").first()).toBeVisible();
 	// Позиция тикает: первая строка становится текущей почти сразу.
@@ -486,7 +494,7 @@ test("сид не затирает очередь, начатую до отве�
 	);
 
 	await page.goto("/audio");
-	await page.getByRole("button", { name: "Слушать" }).first().click();
+	await startFirstTrack(page);
 	await expect(page).toHaveURL(PLAYER_PATTERN);
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),

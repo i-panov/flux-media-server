@@ -12,7 +12,6 @@ import {
 	View,
 } from "react-native";
 import { formatFileSize } from "../src/api/upload";
-import { AuthGate } from "../src/components/AuthGate";
 import { EmptyState } from "../src/components/EmptyState";
 import { Screen } from "../src/components/Screen";
 import {
@@ -464,11 +463,9 @@ function DownloadsContent() {
 }
 
 export default function DownloadsScreen() {
-	return (
-		<AuthGate>
-			<DownloadsContent />
-		</AuthGate>
-	);
+	// Скачанные файлы — локальные: экран должен открываться без сети и
+	// без живой серверной сессии.
+	return <DownloadsContent />;
 }
 
 const styles = StyleSheet.create({

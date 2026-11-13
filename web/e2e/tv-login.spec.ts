@@ -68,6 +68,8 @@ test.describe("ТВ-автодетект Tizen", () => {
 		);
 
 		await page.goto("/login");
+		// На ТВ по умолчанию QR; переключаемся на email-код.
+		await page.getByRole("button", { name: "Войти по email" }).click();
 		// Автодетект по UA включает ТВ без ?tv=1.
 		await expect
 			.poll(() =>

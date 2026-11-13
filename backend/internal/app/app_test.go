@@ -331,24 +331,24 @@ func TestBodySizeLimitAllowsNormalBodies(t *testing.T) {
 func TestBodySizeLimitUploadRouteExempt(t *testing.T) {
 	application := newTestApp(t)
 
-	// Большое тело на upload-роуте пропускается body-size middleware и
-	// отклоняется дальше AuthMiddleware (401), а не 413.
+	// Без access-токена upload-роут получает обычный лимит API уже
+	// на чтении тела: 413, а не часы буферизации до 401.
 	body := bytes.NewReader(make([]byte, 5<<20))
 	req := testReq("POST", "/api/media/upload", body)
-	resp, err := application.Fiber.Test(req)
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode)
+	_, err := application.Fiber.Test(req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "body size exceeds")
 }
 
 func TestBodySizeLimitCoverRouteExempt(t *testing.T) {
 	application := newTestApp(t)
 
-	// Большое тело на cover-роуте также пропускается middleware.
+	// Cover без access-токена тоже ограничен на чтении.
 	body := bytes.NewReader(make([]byte, 5<<20))
 	req := testReq("PUT", "/api/media/1/cover", body)
-	resp, err := application.Fiber.Test(req)
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode)
+	_, err := application.Fiber.Test(req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "body size exceeds")
 }
 
 // Per-route лимиты через HeaderReceived: upload-роут принимает тела
@@ -362,10 +362,9 @@ func TestHeaderReceivedPerRouteBodyLimits(t *testing.T) {
 	body := bytes.NewReader(make([]byte, 26<<20))
 
 	req := testReq("POST", "/api/media/upload", body)
-	resp, err := application.Fiber.Test(req)
-	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode,
-		"upload route must accept bodies above the global fallback limit")
+	_, err := application.Fiber.Test(req)
+	require.Error(t, err, "unauthenticated upload must be limited before auth")
+	assert.Contains(t, err.Error(), "body size exceeds")
 
 	body = bytes.NewReader(make([]byte, 26<<20))
 	req = testReq("POST", "/api/auth/request-code", body)

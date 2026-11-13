@@ -18,7 +18,7 @@ test("вход через реальный прокси: Host совпадает
 		page.getByText("Код отправлен на user@example.com"),
 	).toBeVisible();
 	await page.getByLabel("Код из письма").fill("123456");
-	await page.getByRole("button", { name: "Войти" }).click();
+	await page.getByRole("button", { name: "Войти", exact: true }).click();
 
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Flux" }),
