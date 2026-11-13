@@ -16,6 +16,12 @@ describe("normalizeServerUrl", () => {
 		);
 	});
 
+	it("myhost.local с портом остаётся http", () => {
+		expect(normalizeServerUrl("myhost.local:8080")).toBe(
+			"http://myhost.local:8080/api",
+		);
+	});
+
 	it("не дублирует /api и режет хвостовой слэш", () => {
 		expect(normalizeServerUrl(`${HOST}/api/`)).toBe(`${HOST}/api`);
 		expect(normalizeServerUrl(`${HOST}/api`)).toBe(`${HOST}/api`);
