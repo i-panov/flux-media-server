@@ -158,9 +158,18 @@ export function useVideoSource({
 
 	const retry = useCallback(() => {
 		retriedFor.current = null;
-		resumeRef.current = null;
+		// После сетевой ошибки сохраняем последнюю позицию: иначе retry
+		// начнёт с нуля и progress удалит сохранённое место просмотра.
+		if (resumeRef.current === null) {
+			resumeRef.current = {
+				mediaId,
+				position: Number.isFinite(player.currentTime) ? player.currentTime : 0,
+				playing: player.playing,
+				rate: player.playbackRate,
+			};
+		}
 		reloadSource();
-	}, [reloadSource]);
+	}, [mediaId, player, reloadSource]);
 
 	// На первую ошибку плеера не полагаемся на текст (iOS может не отдать 401):
 	// один раз бьём preflight в общий слой. apiFetch сам обновит токен на 401,

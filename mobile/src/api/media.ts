@@ -84,6 +84,9 @@ export function useDeleteMedia() {
 			void queryClient.invalidateQueries({ queryKey: ["media"] });
 			void queryClient.invalidateQueries({ queryKey: ["trash"] });
 			void queryClient.invalidateQueries({ queryKey: ["collections"] });
+			void queryClient.invalidateQueries({ queryKey: ["favorites"] });
+			void queryClient.invalidateQueries({ queryKey: ["progress"] });
+			void queryClient.invalidateQueries({ queryKey: ["lyrics"] });
 		},
 	});
 }
