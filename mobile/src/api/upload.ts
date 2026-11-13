@@ -2,9 +2,12 @@ import {
 	ApiError,
 	apiFetch,
 	getApiConfig,
+	MAX_UPLOAD_BYTES,
 	type Media,
 	type MediaType,
 	mediaSchema,
+	UPLOAD_POLL_INTERVAL_MS,
+	type UploadJobKind,
 } from "@flux/shared";
 
 // Загрузка файла в mobile идёт мимо apiFetch: fetch в React Native не умеет
@@ -12,8 +15,6 @@ import {
 // Всё остальное (job status/cancel) остаётся на apiFetch — включая refresh
 // токена на 401. Для XHR 401 обрабатывается одной предварительной проверкой
 // через apiFetch и повтором запроса с новыми заголовками.
-
-export const UPLOAD_POLL_INTERVAL_MS = 900;
 
 // Таймаут одного XHR-POST: 30 минут. Backend буферизует тело целиком в RAM,
 // поэтому таймаут не должен рубить большие файлы, но зависший сокет надо
@@ -24,9 +25,8 @@ export const UPLOAD_TIMEOUT_MS = 30 * 60 * 1000;
 // конфиг сервера, поэтому pre-check использует дефолтный лимит: файлы
 // больше него отсекаются до POST. Фактическую проверку всё равно делает
 // backend, поэтому неизвестный/нулевой size не блокируем.
-export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
-export type UploadJobKind = "upload" | "transcode";
+export { MAX_UPLOAD_BYTES, UPLOAD_POLL_INTERVAL_MS, type UploadJobKind };
 
 export interface UploadJobRef {
 	readonly id: number;
