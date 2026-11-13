@@ -11,7 +11,6 @@ import {
 	bulkMoveCollectionItems,
 	bulkRemoveCollectionItems,
 	type Collection,
-	collectionSchema,
 	createCollection,
 	deleteCollection,
 	fetchCollectionItems,
@@ -24,7 +23,7 @@ import {
 } from "./client";
 
 export type { Collection };
-export { collectionSchema, moveCollection, moveCollectionItem };
+export { moveCollection, moveCollectionItem };
 
 function collectionsQueryOptions() {
 	return queryOptions({
