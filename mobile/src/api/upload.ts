@@ -5,7 +5,9 @@ import {
 	MAX_UPLOAD_BYTES,
 	type Media,
 	type MediaType,
-	mediaSchema,
+	parseEnqueueResponse as parseSharedEnqueue,
+	uploadJobPath as sharedUploadJobPath,
+	uploadJobSchema as sharedUploadJobSchema,
 	UPLOAD_POLL_INTERVAL_MS,
 	type UploadJobKind,
 } from "@flux/shared";
@@ -255,79 +257,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
-function positiveInteger(value: unknown): number | null {
-	if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-		return null;
-	}
-	return value;
-}
-
 export function parseEnqueueResponse(
 	body: unknown,
 	mediaType: MediaType,
 ): UploadJobRef {
-	if (!isRecord(body)) {
+	try {
+		const parsed = parseSharedEnqueue(body, mediaType);
+		return { id: parsed.jobId, kind: parsed.jobType };
+	} catch {
 		throw new ApiError(202, "Invalid upload response", body);
 	}
-	const id = positiveInteger(body.job_id);
-	if (id === null) {
-		throw new ApiError(202, "Invalid upload response", body);
-	}
-	const rawKind = body.job_type;
-	const kind: UploadJobKind =
-		rawKind === "transcode" || rawKind === "upload"
-			? rawKind
-			: mediaType === "video"
-				? "transcode"
-				: "upload";
-	return { id, kind };
-}
-
-function nullableNumber(value: unknown): number | null {
-	return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function parseDuplicate(value: unknown): UploadDuplicate | null {
-	if (!isRecord(value)) {
-		return null;
-	}
-	const id = positiveInteger(value.id);
-	if (id === null || typeof value.title !== "string") {
-		return null;
-	}
-	return { id, title: value.title };
 }
 
 export function parseUploadJob(body: unknown): UploadJob {
-	if (!isRecord(body)) {
-		throw new Error("Invalid upload status");
-	}
-	const id = positiveInteger(body.id);
-	if (id === null || typeof body.status !== "string") {
-		throw new Error("Invalid upload status");
-	}
+	const parsed = sharedUploadJobSchema.parse(body);
 	return {
-		id,
-		status: body.status,
-		error: typeof body.error === "string" ? body.error : null,
-		duplicate: parseDuplicate(body.duplicate),
-		media:
-			body.media === null || body.media === undefined
-				? null
-				: mediaSchema.parse(body.media),
-		progress:
-			body.progress === null || body.progress === undefined
-				? null
-				: nullableNumber(body.progress),
-		speed: nullableNumber(body.speed),
-		etaSeconds: nullableNumber(body.eta_seconds),
+		id: parsed.id,
+		status: parsed.status,
+		error: parsed.error ?? null,
+		duplicate: parsed.duplicate ?? null,
+		media: parsed.media ?? null,
+		progress: parsed.progress ?? null,
+		speed: parsed.speed ?? null,
+		etaSeconds: parsed.eta_seconds ?? null,
 	};
 }
 
 export function uploadJobPath(job: UploadJobRef): string {
-	return job.kind === "transcode"
-		? `/media/transcodes/${job.id}`
-		: `/media/uploads/${job.id}`;
+	return sharedUploadJobPath(job.kind, job.id);
 }
 
 export async function fetchUploadJob(job: UploadJobRef): Promise<UploadJob> {

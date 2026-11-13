@@ -1,6 +1,7 @@
-import { ActionIcon, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { Group, Stack, Text, Tooltip } from "@mantine/core";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { TVActionIcon, TVButton } from "../tv/tvFocus";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 
 export function QueueTab() {
@@ -15,7 +16,8 @@ export function QueueTab() {
 			{player.queue.map((media, index) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: один трек может стоять в очереди несколько раз.
 				<Group key={`${media.id}-${index}`} gap="sm" wrap="nowrap">
-					<Button
+					<TVButton
+						focusKey={`queue-track-${index}`}
 						variant={index === player.index ? "light" : "subtle"}
 						justify="flex-start"
 						className="min-w-0 flex-1"
@@ -25,32 +27,35 @@ export function QueueTab() {
 							{index === player.index ? currentPrefix : ""}
 							{media.title}
 						</Text>
-					</Button>
-					<ActionIcon
+					</TVButton>
+					<TVActionIcon
+						focusKey={`queue-up-${index}`}
 						variant="subtle"
 						aria-label={t("player.moveUp")}
 						disabled={index === 0}
 						onClick={() => player.move(index, index - 1)}
 					>
 						<ArrowUp size={16} />
-					</ActionIcon>
-					<ActionIcon
+					</TVActionIcon>
+					<TVActionIcon
+						focusKey={`queue-down-${index}`}
 						variant="subtle"
 						aria-label={t("player.moveDown")}
 						disabled={index === player.queue.length - 1}
 						onClick={() => player.move(index, index + 1)}
 					>
 						<ArrowDown size={16} />
-					</ActionIcon>
+					</TVActionIcon>
 					<Tooltip label={t("player.removeFromQueue")} withArrow>
-						<ActionIcon
+						<TVActionIcon
+							focusKey={`queue-remove-${index}`}
 							variant="subtle"
 							color="red"
 							aria-label={t("player.removeFromQueue")}
 							onClick={() => player.removeAt(index)}
 						>
 							<Trash2 size={16} />
-						</ActionIcon>
+						</TVActionIcon>
 					</Tooltip>
 				</Group>
 			))}

@@ -10,7 +10,13 @@ import { markSessionSignedOut } from "./session";
 export async function signOutLocal(queryClient: QueryClient): Promise<void> {
 	// Передаём refresh текущего устройства: сервер удалит только его
 	// сессии, а не все устройства пользователя.
-	const refreshToken = await secureStore.get(REFRESH_TOKEN_KEY);
+	let refreshToken: string | null = null;
+	try {
+		refreshToken = await secureStore.get(REFRESH_TOKEN_KEY);
+	} catch {
+		// Хранилище недоступно — серверный logout best-effort, локальный
+		// выход всё равно обязан завершиться.
+	}
 	void logout(refreshToken ?? undefined).catch(() => undefined);
 	// Висящие запросы (включая /auth/me) не должны вернуть user уже после
 	// session=null. Заодно отменяем возможный refresh до удаления токенов.

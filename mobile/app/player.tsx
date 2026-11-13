@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
 	ActivityIndicator,
@@ -53,6 +53,10 @@ function CloseButton() {
 }
 
 export default function AudioPlayerScreen() {
+	const { offline } = useLocalSearchParams<{ offline?: string }>();
+	if (offline === "1") {
+		return <AudioPlayerContent />;
+	}
 	return (
 		<AuthGate>
 			<AudioPlayerContent />

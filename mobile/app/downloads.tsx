@@ -413,7 +413,7 @@ function DownloadsContent() {
 			created_at: "",
 		};
 		playQueue([media], 0);
-		router.push("/player");
+		router.push("/player?offline=1" as never);
 	};
 	const { colors, spacing } = useTheme();
 	const { entries, active } = useDownloadState();

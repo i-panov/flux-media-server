@@ -13,12 +13,10 @@ export const enqueueSchema = z.object({
 });
 
 export const uploadJobSchema = z.object({
-	id: z.number(),
-	status: z.string(),
+	id: z.number().int().positive(),
+	status: z.string().min(1),
 	error: z.string().nullish(),
-	duplicate: z
-		.object({ id: z.number(), title: z.string() })
-		.nullish(),
+	duplicate: z.object({ id: z.number(), title: z.string() }).nullish(),
 	media: mediaSchema.nullish(),
 	progress: z.number().nullish(),
 	speed: z.number().nullish(),
