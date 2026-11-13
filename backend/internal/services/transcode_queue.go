@@ -583,10 +583,8 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 	}
 
 	// 6. Нормализация.
-	resultPath, tmpPath, err := q.execute(jobCtx, task, plan)
-	if resultPath != "" {
-		// До Media.Create watcher не должен индексировать результат.
-		releasePath := ReservePublishingPath(resultPath)
+	resultPath, tmpPath, releasePath, err := q.execute(jobCtx, task, plan)
+	if releasePath != nil {
 		defer releasePath()
 	}
 	mainTmp = tmpPath
@@ -834,27 +832,30 @@ func (q *TranscodeQueue) checkHashMatch(ctx context.Context, task *models.Transc
 // execute выполняет план и возвращает путь результата в библиотеке
 // плюс путь главного tmp ("" для direct). Исходник не удаляет:
 // удаление — только после проверки результата.
-func (q *TranscodeQueue) execute(jobCtx context.Context, task *models.TranscodeTask, plan NormalizePlan) (dst, tmp string, err error) {
+func (q *TranscodeQueue) execute(jobCtx context.Context, task *models.TranscodeTask, plan NormalizePlan) (dst, tmp string, release func(), err error) {
 	filename := truncateFilename(task.Filename)
 	switch plan.Kind {
 	case NormalizeDirect:
 		dst := uniquePath(filepath.Join(q.cfg.LibraryVideoDir, filename))
+		// Резерв ДО commit: watcher не должен увидеть файл без Media.
+		release = ReservePublishingPath(dst)
 		if err := commitExclusive(task.SourcePath, dst); err != nil {
-			return "", "", err
+			release()
+			return "", "", nil, err
 		}
-		return dst, "", nil
+		return dst, "", release, nil
 	case NormalizeRemux, NormalizeAudio, NormalizeFull:
 		stem := strings.TrimSuffix(filename, filepath.Ext(filename))
 		tmp = filepath.Join(q.cfg.TempDir, fmt.Sprintf("transcode-%d.mp4", task.ID))
 		switch plan.Kind {
 		case NormalizeRemux:
 			if err := q.runner.RemuxCopy(jobCtx, task.SourcePath, tmp, plan); err != nil {
-				return "", tmp, err
+				return "", tmp, nil, err
 			}
 		case NormalizeAudio:
 			cb := q.progressCallback(task)
 			if err := q.runner.FixAudio(jobCtx, task.SourcePath, tmp, plan, transcodeTimeoutCap, cb); err != nil {
-				return "", tmp, err
+				return "", tmp, nil, err
 			}
 		default:
 			cb := q.progressCallback(task)
@@ -864,20 +865,22 @@ func (q *TranscodeQueue) execute(jobCtx context.Context, task *models.TranscodeT
 				MaxHeight:  q.cfg.MaxHeight,
 				TimeoutCap: transcodeTimeoutCap,
 			}, cb); err != nil {
-				return "", tmp, err
+				return "", tmp, nil, err
 			}
 		}
 		info, err := os.Stat(tmp)
 		if err != nil || info.Size() == 0 {
-			return "", tmp, fmt.Errorf("transcode produced empty result")
+			return "", tmp, nil, fmt.Errorf("transcode produced empty result")
 		}
 		dst := uniquePath(filepath.Join(q.cfg.LibraryVideoDir, stem+".mp4"))
+		release = ReservePublishingPath(dst)
 		if err := commitExclusive(tmp, dst); err != nil {
-			return "", tmp, err
+			release()
+			return "", tmp, nil, err
 		}
-		return dst, "", nil
+		return dst, "", release, nil
 	default:
-		return "", "", fmt.Errorf("unknown normalize kind %q", plan.Kind)
+		return "", "", nil, fmt.Errorf("unknown normalize kind %q", plan.Kind)
 	}
 }
 
