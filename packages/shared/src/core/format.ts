@@ -11,20 +11,21 @@ export function formatDuration(totalSeconds: number): string {
 
 // Размер файла для списка загрузок. Один десятичный знак у KB+.
 export function formatFileSize(bytes: number): string {
-	if (!Number.isFinite(bytes)) {
-		return "—";
+	if (!Number.isFinite(bytes) || bytes <= 0) {
+		return "0 B";
 	}
-	const size = Math.max(0, bytes);
-	if (size < 1024) {
-		return `${size} B`;
+	const units = ["B", "KB", "MB", "GB", "TB"];
+	let value = bytes;
+	let unit = 0;
+	while (value >= 1024 && unit < units.length - 1) {
+		value /= 1024;
+		unit += 1;
 	}
-	if (size < 1024 * 1024) {
-		return `${(size / 1024).toFixed(1)} KB`;
-	}
-	if (size < 1024 * 1024 * 1024) {
-		return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-	}
-	return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+	const rounded =
+		value >= 10 || Number.isInteger(value)
+			? Math.round(value)
+			: Math.round(value * 10) / 10;
+	return `${rounded} ${units[unit]}`;
 }
 
 const SUB_LANG_SUFFIX_PATTERN = /\d+$/;

@@ -233,23 +233,7 @@ export function isFileTooLarge(size: number | null | undefined): boolean {
 
 // Единицы латинские: подпись одинаково читается в ru/en и не требует
 // отдельного словаря для каждого размера.
-export function formatFileSize(bytes: number): string {
-	if (!Number.isFinite(bytes) || bytes <= 0) {
-		return "0 B";
-	}
-	const units = ["B", "KB", "MB", "GB", "TB"];
-	let value = bytes;
-	let unit = 0;
-	while (value >= 1024 && unit < units.length - 1) {
-		value /= 1024;
-		unit += 1;
-	}
-	const rounded =
-		value >= 10 || Number.isInteger(value)
-			? Math.round(value)
-			: Math.round(value * 10) / 10;
-	return `${rounded} ${units[unit]}`;
-}
+export { formatFileSize } from "@flux/shared";
 
 export function clampPercent(value: number): number {
 	if (!Number.isFinite(value)) {
