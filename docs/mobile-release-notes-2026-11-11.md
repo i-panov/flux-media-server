@@ -1,6 +1,6 @@
 # Mobile 0.1.36 — release notes (2026-11-12)
 
-**Версии:** mobile `0.1.36` / versionCode `54`, shared `0.1.11`,
+**Версии:** mobile `0.1.44` / versionCode `62`, shared `0.1.12`,
 backend `1.0.33`, web `0.1.41`.
 **Ветка:** `master`. **Статус:** версия `0.1.34`/52; добавлен QR/device-code
 вход. TV device-smoke выполнен на Android TV emulator (server → QR →
