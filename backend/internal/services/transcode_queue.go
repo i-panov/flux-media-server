@@ -609,6 +609,11 @@ func (q *TranscodeQueue) process(task *models.TranscodeTask) {
 	// валидация сделана probe исходника.
 	if plan.Kind != NormalizeDirect {
 		if ok := q.verifyResult(jobCtx, resultPath); !ok {
+			// Результат уже в библиотеке, но Media ещё нет: иначе
+			// watcher/scanner подберёт битый файл как отдельное видео.
+			if rmErr := os.Remove(resultPath); rmErr != nil && !os.IsNotExist(rmErr) {
+				log.Printf("transcode: remove invalid result %d: %v", task.ID, rmErr)
+			}
 			q.fail(task, fmt.Errorf("result verification failed"), "Failed to normalize file", true)
 			return
 		}

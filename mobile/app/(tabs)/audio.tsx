@@ -15,6 +15,8 @@ import { normalizeSearchQuery, type SortOrder } from "../../src/media/search";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
 import { excludeMediaIds } from "../../src/media/visibleMedia";
 import { useAudioActions } from "../../src/player/AudioProvider";
+import { isTV } from "../../src/tv/profile";
+import { TVVideoList } from "../../src/tv/TVVideoList";
 
 export default function AudioScreen() {
 	useLanguage();
@@ -74,23 +76,39 @@ export default function AudioScreen() {
 				placeholder={t("audio.search")}
 				testID="audio-search"
 			/>
-			<MediaList
-				query={list}
-				ListHeaderComponent={header}
-				excludedIds={searching ? undefined : favorites.data}
-				searching={searching}
-				emptyTitle={
-					searching ? t("search.noResults") : t("search.libraryEmpty")
-				}
-				emptyDescription={
-					searching
-						? t("search.noResultsHint")
-						: t("search.libraryEmptyAudioHint")
-				}
-				emptyTestID={searching ? "audio-search-empty" : "audio-empty"}
-				onPressItem={onPressItem}
-				onMenuItem={setActionsMedia}
-			/>
+			{isTV ? (
+				<TVVideoList
+					items={items}
+					onPressItem={onPressItem}
+					onEndReached={() => {
+						if (list.hasNextPage && !list.isFetchingNextPage) {
+							void list.fetchNextPage();
+						}
+					}}
+					isPending={list.isPending}
+					isError={list.isError && items.length === 0}
+					isFetchingNextPage={list.isFetchingNextPage}
+					onRetry={() => void list.refetch()}
+				/>
+			) : (
+				<MediaList
+					query={list}
+					ListHeaderComponent={header}
+					excludedIds={searching ? undefined : favorites.data}
+					searching={searching}
+					emptyTitle={
+						searching ? t("search.noResults") : t("search.libraryEmpty")
+					}
+					emptyDescription={
+						searching
+							? t("search.noResultsHint")
+							: t("search.libraryEmptyAudioHint")
+					}
+					emptyTestID={searching ? "audio-search-empty" : "audio-empty"}
+					onPressItem={onPressItem}
+					onMenuItem={setActionsMedia}
+				/>
+			)}
 			<MediaActionsSheet
 				media={actionsMedia}
 				onClose={() => setActionsMedia(null)}

@@ -18,6 +18,12 @@ const apiProxy = {
 };
 
 export default defineConfig({
+	// Tizen 6.5 — Chromium 76; без явного target Vite оставляет
+	// синтаксис современных браузеров и ТВ-клиент ломается.
+	build: {
+		target: "chrome76",
+		cssTarget: "chrome76",
+	},
 	plugins: [
 		tanstackRouter({ target: "react", autoCodeSplitting: true }),
 		react(),
