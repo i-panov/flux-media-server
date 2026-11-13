@@ -12,6 +12,7 @@ import {
 	View,
 } from "react-native";
 import { getDeviceIdentity } from "../src/auth/deviceInfo";
+import { signOutLocal } from "../src/auth/logout";
 import { AuthGate } from "../src/components/AuthGate";
 import { ErrorState } from "../src/components/ErrorState";
 import { Screen } from "../src/components/Screen";
@@ -31,8 +32,14 @@ export default function DevicesScreen() {
 	});
 	const revoke = useMutation({
 		mutationFn: (deviceId: string) => revokeDevice(deviceId),
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: ["auth", "devices"] }),
+		onSuccess: async (_data, deviceId) => {
+			const current = devices.data?.find((item) => item.device_id === deviceId);
+			await queryClient.invalidateQueries({ queryKey: ["auth", "devices"] });
+			if (current?.current === true) {
+				await signOutLocal(queryClient);
+				router.replace("/login");
+			}
+		},
 		onError: () => Alert.alert(t("devices.revokeError")),
 	});
 	const rename = useMutation({
