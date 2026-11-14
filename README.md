@@ -96,26 +96,6 @@ docker compose up -d
 - Образ собирает backend и web, включает ffmpeg.
 - Локальный `web/dist` можно смонтировать поверх `/app/web`.
 
-### Серверное скачивание (media-loader)
-
-В compose входит `ghcr.io/i-panov/media-loader:0.1.0`:
-
-- `media-loader` — API и UI на `http://127.0.0.1:${MEDIA_LOADER_PORT:-8097}/ui`;
-- `media-loader-worker` — очередь yt-dlp/ffmpeg;
-- `media-loader-redis` — очередь и кэш;
-- данные — named volume `media-loader-data`.
-
-Сервис запускается без авторизации и слушает только loopback. Для доступа
-из LAN включите `AUTH_ENABLED=true` и создайте токен:
-
-```bash
-docker compose exec media-loader media-loader-auth create --name flux
-```
-
-Файлы, скачанные media-loader, лежат в его томе и не импортируются в
-библиотеку Flux автоматически. Это отдельный сервис; интеграция импорта
-в библиотеку — следующий шаг.
-
 ### Память при загрузке
 
 HTTP-движок буферизует тело загрузки в RAM. Одна загрузка занимает до
