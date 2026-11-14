@@ -65,6 +65,10 @@ func (h *DownloadHandler) Create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(job)
 }
 
+func (h *DownloadHandler) List(c *fiber.Ctx) error {
+	return c.JSON(h.loader.List())
+}
+
 func (h *DownloadHandler) Status(c *fiber.Ctx) error {
 	job, ok := h.loader.Get(c.Params("id"))
 	if !ok {

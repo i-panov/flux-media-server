@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -141,6 +142,27 @@ func (m *MediaLoader) Submit(req MediaLoaderRequest) (MediaLoaderJob, error) {
 	m.cleanupOnce.Do(func() { go m.cleanupLoop() })
 	go m.run(ctx, job, req)
 	return m.snapshot(job), nil
+}
+
+// List возвращает последние задания, сначала новые. Нужен UI, чтобы
+// восстановить очередь после перезагрузки страницы (задания живут в памяти).
+func (m *MediaLoader) List() []MediaLoaderJob {
+	m.mu.Lock()
+	jobs := make([]MediaLoaderJob, 0, len(m.jobs))
+	for _, job := range m.jobs {
+		jobs = append(jobs, *job)
+	}
+	m.mu.Unlock()
+	for i := range jobs {
+		jobs[i].cancel = nil
+	}
+	sort.Slice(jobs, func(i, j int) bool {
+		return jobs[i].CreatedAt.After(jobs[j].CreatedAt)
+	})
+	if len(jobs) > 50 {
+		jobs = jobs[:50]
+	}
+	return jobs
 }
 
 func (m *MediaLoader) Get(id string) (MediaLoaderJob, bool) {

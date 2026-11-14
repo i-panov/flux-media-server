@@ -669,6 +669,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	admin.Get("/transcodes", readRateLimiter, adminHandler.TranscodesList)
 	admin.Post("/transcodes/:id/retry", adminHandler.TranscodeRetry)
 	admin.Post("/downloads", uploadRateLimiter, downloadHandler.Create)
+	admin.Get("/downloads", readRateLimiter, downloadHandler.List)
 	admin.Get("/downloads/:id", readRateLimiter, downloadHandler.Status)
 	admin.Delete("/downloads/:id", downloadHandler.Cancel)
 	admin.Get("/users", readRateLimiter, adminHandler.UsersList)

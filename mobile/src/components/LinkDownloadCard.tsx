@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function -- карточка формы, статуса и отмены загрузки. */
+/* eslint-disable max-lines-per-function -- карточка формы и списка заданий. */
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
 import {
@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import {
 	cancelMediaLoaderJob,
-	fetchMediaLoaderJob,
+	fetchMediaLoaderJobs,
 	type MediaLoaderJob,
 	startMediaLoader,
 } from "../api/mediaLoader";
@@ -21,8 +21,74 @@ import { useTheme } from "../theme/ThemeProvider";
 const VIDEO_FORMATS = ["mp4", "mkv"];
 const AUDIO_FORMATS = ["mp3", "m4a", "opus"];
 const QUALITIES = ["max", "1080p", "720p", "480p"];
-
 const TERMINAL = new Set(["done", "error", "cancelled"]);
+
+function activeJob(job: MediaLoaderJob): boolean {
+	return !TERMINAL.has(job.status);
+}
+
+function JobCard({
+	job,
+	onCancel,
+}: {
+	job: MediaLoaderJob;
+	onCancel: (id: string) => void;
+}) {
+	const { colors, radii, spacing } = useTheme();
+	const active = activeJob(job);
+	return (
+		<View
+			testID={`upload-link-job-${job.id}`}
+			style={[
+				styles.status,
+				{
+					borderColor: colors.border,
+					borderRadius: radii.sm,
+					padding: spacing.sm,
+					gap: spacing.xs,
+				},
+			]}
+		>
+			<View style={styles.statusRow}>
+				<Text style={[styles.statusText, { color: colors.text }]}>
+					{job.title ?? job.filename ?? t("upload.link.title")}
+				</Text>
+				{active && (
+					<Pressable
+						accessibilityRole="button"
+						onPress={() => onCancel(job.id)}
+						hitSlop={8}
+					>
+						<Text style={{ color: colors.danger }}>
+							{t("upload.link.cancel")}
+						</Text>
+					</Pressable>
+				)}
+			</View>
+			{job.status === "importing" || job.status === "processing" ? (
+				<View style={[styles.statusRow, { gap: spacing.xs }]}>
+					<ActivityIndicator size="small" color={colors.accent} />
+					<Text style={{ color: colors.textMuted }}>
+						{t(`upload.link.status.${job.status}`)}
+					</Text>
+				</View>
+			) : (
+				<Text style={{ color: colors.textMuted }}>
+					{t(`upload.link.status.${job.status}`)}
+					{job.stage !== undefined && job.stage !== "" ? ` · ${job.stage}` : ""}
+				</Text>
+			)}
+			{job.status === "downloading" && job.progress !== undefined && (
+				<Text style={{ color: colors.textMuted }}>
+					{Math.round(job.progress)}%
+				</Text>
+			)}
+			{job.error !== undefined && (
+				<Text style={{ color: colors.danger }}>{job.error}</Text>
+			)}
+		</View>
+	);
+}
 
 export function LinkDownloadCard({
 	type,
@@ -33,31 +99,39 @@ export function LinkDownloadCard({
 	const [url, setUrl] = useState("");
 	const [format, setFormat] = useState(type === "audio" ? "mp3" : "mp4");
 	const [quality, setQuality] = useState("max");
-	const [job, setJob] = useState<MediaLoaderJob | null>(null);
+	const [jobs, setJobs] = useState<MediaLoaderJob[]>([]);
 	const [starting, setStarting] = useState(false);
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const active = job !== null && !TERMINAL.has(job.status);
+	const hasActive = jobs.some(activeJob);
 
 	useEffect(() => {
-		if (job === null || TERMINAL.has(job.status)) {
-			return;
-		}
 		let cancelled = false;
-		const id = job.id;
-		const timer = setInterval(() => {
-			void fetchMediaLoaderJob(id)
-				.then((next) => {
-					if (!cancelled) setJob(next);
-				})
-				.catch(() => {
-					if (!cancelled) setError(t("upload.link.failed"));
-				});
-		}, 2000);
+		const load = async (): Promise<void> => {
+			try {
+				const next = await fetchMediaLoaderJobs();
+				if (!cancelled) {
+					setJobs(next);
+					setError(null);
+				}
+			} catch {
+				if (!cancelled) setError(t("upload.link.failed"));
+			} finally {
+				if (!cancelled) setLoading(false);
+			}
+		};
+		void load();
+		if (!hasActive) {
+			return () => {
+				cancelled = true;
+			};
+		}
+		const timer = setInterval(() => void load(), 2000);
 		return () => {
 			cancelled = true;
 			clearInterval(timer);
 		};
-	}, [job]);
+	}, [hasActive]);
 
 	if (type === "image") {
 		return null;
@@ -75,7 +149,8 @@ export function LinkDownloadCard({
 				format,
 				quality,
 			});
-			setJob(created);
+			setJobs((current) => [created, ...current]);
+			setUrl("");
 		} catch (cause) {
 			setError(
 				cause instanceof Error ? cause.message : t("upload.link.failed"),
@@ -85,11 +160,13 @@ export function LinkDownloadCard({
 		}
 	};
 
-	const cancel = (): void => {
-		if (job !== null) {
-			void cancelMediaLoaderJob(job.id).catch(() => undefined);
-			setJob({ ...job, status: "cancelled" });
-		}
+	const cancel = (id: string): void => {
+		void cancelMediaLoaderJob(id).catch(() => undefined);
+		setJobs((current) =>
+			current.map((job) =>
+				job.id === id ? { ...job, status: "cancelled" } : job,
+			),
+		);
 	};
 
 	const formats = type === "audio" ? AUDIO_FORMATS : VIDEO_FORMATS;
@@ -125,7 +202,7 @@ export function LinkDownloadCard({
 				autoCapitalize="none"
 				autoCorrect={false}
 				keyboardType="url"
-				editable={!starting && !active}
+				editable={!starting}
 				style={[
 					styles.input,
 					{
@@ -204,7 +281,7 @@ export function LinkDownloadCard({
 			<Pressable
 				accessibilityRole="button"
 				testID="upload-link-submit"
-				disabled={starting || active || url.trim() === ""}
+				disabled={starting || url.trim() === ""}
 				onPress={() => void submit()}
 				style={[
 					styles.submit,
@@ -213,7 +290,7 @@ export function LinkDownloadCard({
 						borderRadius: radii.md,
 						paddingHorizontal: spacing.md,
 					},
-					(starting || active || url.trim() === "") && styles.pressed,
+					(starting || url.trim() === "") && styles.pressed,
 				]}
 			>
 				{starting ? (
@@ -230,44 +307,22 @@ export function LinkDownloadCard({
 					{error}
 				</Text>
 			)}
-			{job !== null && (
-				<View
-					testID="upload-link-status"
-					style={[
-						styles.status,
-						{
-							borderColor: colors.border,
-							borderRadius: radii.sm,
-							padding: spacing.sm,
-							gap: spacing.xs,
-						},
-					]}
-				>
-					<View style={styles.statusRow}>
-						<Text style={[styles.statusText, { color: colors.text }]}>
-							{job.title ?? job.filename ?? t("upload.link.title")}
-						</Text>
-						{active && (
-							<Pressable
-								accessibilityRole="button"
-								onPress={cancel}
-								hitSlop={8}
-							>
-								<Text style={{ color: colors.danger }}>
-									{t("upload.link.cancel")}
-								</Text>
-							</Pressable>
-						)}
-					</View>
+			{loading && (
+				<View style={[styles.statusRow, { gap: spacing.xs }]}>
+					<ActivityIndicator size="small" color={colors.accent} />
 					<Text style={{ color: colors.textMuted }}>
-						{t(`upload.link.status.${job.status}`)}
-						{job.stage !== undefined && job.stage !== ""
-							? ` · ${job.stage}`
-							: ""}
+						{t("upload.link.starting")}
 					</Text>
-					{job.error !== undefined && (
-						<Text style={{ color: colors.danger }}>{job.error}</Text>
-					)}
+				</View>
+			)}
+			{jobs.length > 0 && (
+				<View style={{ gap: spacing.xs }}>
+					<Text style={[styles.label, { color: colors.textMuted }]}>
+						{t("upload.link.queue")}
+					</Text>
+					{jobs.map((job) => (
+						<JobCard key={job.id} job={job} onCancel={cancel} />
+					))}
 				</View>
 			)}
 		</View>

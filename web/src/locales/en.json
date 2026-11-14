@@ -410,7 +410,8 @@
 				"done": "Done",
 				"error": "Error",
 				"cancelled": "Cancelled"
-			}
+			},
+			"queue": "Upload queue"
 		}
 	}
 }

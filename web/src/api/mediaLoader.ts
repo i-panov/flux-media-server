@@ -46,29 +46,26 @@ async function startMediaLoader(
 	return jobSchema.parse(body);
 }
 
-async function fetchMediaLoaderJob(id: string): Promise<MediaLoaderJob> {
-	return jobSchema.parse(await apiFetch<unknown>(`/admin/downloads/${id}`));
+const listSchema = z.array(jobSchema);
+
+async function fetchMediaLoaderJobs(): Promise<MediaLoaderJob[]> {
+	return listSchema.parse(await apiFetch<unknown>("/admin/downloads"));
 }
 
 export async function cancelMediaLoaderJob(id: string): Promise<void> {
 	await apiFetch<unknown>(`/admin/downloads/${id}`, { method: "DELETE" });
 }
 
-export function useMediaLoaderJob(id: string | null) {
+const ACTIVE = new Set(["queued", "downloading", "importing", "processing"]);
+
+export function useMediaLoaderJobs() {
 	return useQuery({
-		queryKey: ["media-loader", id],
-		queryFn: () => fetchMediaLoaderJob(id ?? ""),
-		enabled: id !== null,
-		refetchInterval: (query) => {
-			const status = query.state.data?.status;
-			return status === undefined ||
-				status === "queued" ||
-				status === "downloading" ||
-				status === "importing" ||
-				status === "processing"
+		queryKey: ["media-loader"],
+		queryFn: fetchMediaLoaderJobs,
+		refetchInterval: (query) =>
+			(query.state.data ?? []).some((job) => ACTIVE.has(job.status))
 				? 2000
-				: false;
-		},
+				: false,
 	});
 }
 
@@ -76,8 +73,8 @@ export function useStartMediaLoader() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: startMediaLoader,
-		onSuccess: (job) => {
-			queryClient.setQueryData(["media-loader", job.id], job);
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["media-loader"] });
 		},
 	});
 }

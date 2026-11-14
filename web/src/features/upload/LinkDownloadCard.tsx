@@ -11,12 +11,14 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { Download, Link2, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	cancelMediaLoaderJob,
-	useMediaLoaderJob,
+	type MediaLoaderJob,
+	useMediaLoaderJobs,
 	useStartMediaLoader,
 } from "../../api/mediaLoader";
 import type { UploadType } from "../../api/upload";
@@ -43,15 +45,68 @@ const QUALITIES = [
 
 const TERMINAL = new Set(["done", "error", "cancelled"]);
 
+function JobCard({ job }: { job: MediaLoaderJob }) {
+	const { t } = useTranslation();
+	const queryClient = useQueryClient();
+	const active = !TERMINAL.has(job.status);
+	const cancel = () => {
+		void cancelMediaLoaderJob(job.id).finally(() => {
+			void queryClient.invalidateQueries({ queryKey: ["media-loader"] });
+		});
+	};
+	return (
+		<Card withBorder padding="sm" radius="sm">
+			<Stack gap="xs">
+				<Group justify="space-between">
+					<Text size="sm" fw={500}>
+						{job.title ?? job.filename ?? t("upload.link.job")}
+					</Text>
+					{active && (
+						<Button
+							variant="subtle"
+							color="red"
+							size="compact-sm"
+							leftSection={<X size={14} />}
+							onClick={cancel}
+						>
+							{t("upload.link.cancel")}
+						</Button>
+					)}
+				</Group>
+				{job.status === "importing" || job.status === "processing" ? (
+					<Group gap="xs">
+						<Loader size="xs" />
+						<Text size="xs" c="dimmed">
+							{t(`upload.link.status.${job.status}`)}
+						</Text>
+					</Group>
+				) : (
+					<Progress
+						value={job.status === "done" ? 100 : (job.progress ?? 0)}
+						animated={active}
+					/>
+				)}
+				<Text size="xs" c="dimmed">
+					{t(`upload.link.status.${job.status}`)}
+					{job.stage !== undefined && job.stage !== "" ? ` · ${job.stage}` : ""}
+				</Text>
+				{job.error !== undefined && (
+					<Alert color="red" variant="light">
+						{job.error}
+					</Alert>
+				)}
+			</Stack>
+		</Card>
+	);
+}
+
 export function LinkDownloadCard({ type }: { type: UploadType }) {
 	const { t } = useTranslation();
 	const [url, setUrl] = useState("");
 	const [format, setFormat] = useState(type === "audio" ? "mp3" : "mp4");
 	const [quality, setQuality] = useState("max");
-	const [jobId, setJobId] = useState<string | null>(null);
 	const start = useStartMediaLoader();
-	const job = useMediaLoaderJob(jobId);
-	const current = job.data;
+	const jobs = useMediaLoaderJobs();
 
 	if (type === "image") {
 		return null;
@@ -62,15 +117,8 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 		if (trimmed === "") return;
 		start.mutate(
 			{ url: trimmed, audioOnly: type === "audio", format, quality },
-			{ onSuccess: (created) => setJobId(created.id) },
+			{ onSuccess: () => setUrl("") },
 		);
-	};
-
-	const cancel = () => {
-		if (jobId !== null) {
-			void cancelMediaLoaderJob(jobId);
-			setJobId(null);
-		}
 	};
 
 	return (
@@ -91,12 +139,7 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 						placeholder="https://..."
 						value={url}
 						onChange={(event) => setUrl(event.currentTarget.value)}
-						disabled={
-							start.isPending ||
-							(jobId !== null &&
-								current !== undefined &&
-								!TERMINAL.has(current.status))
-						}
+						disabled={start.isPending}
 						w={{ base: "100%", sm: 360 }}
 					/>
 					<Select
@@ -120,12 +163,7 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 					<Button
 						leftSection={<Download size={16} />}
 						loading={start.isPending}
-						disabled={
-							url.trim() === "" ||
-							(jobId !== null &&
-								current !== undefined &&
-								!TERMINAL.has(current.status))
-						}
+						disabled={url.trim() === "" || start.isPending}
 						onClick={submit}
 					>
 						{t("upload.link.submit")}
@@ -140,60 +178,27 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 					</Alert>
 				)}
 
-				{jobId !== null && current === undefined && (
+				{jobs.isPending && (
 					<Group gap="sm">
 						<Loader size="sm" />
 						<Text size="sm">{t("upload.link.starting")}</Text>
 					</Group>
 				)}
+				{jobs.isError && (
+					<Alert color="red" variant="light">
+						{t("upload.link.failed")}
+					</Alert>
+				)}
 
-				{current !== undefined && (
-					<Card withBorder padding="sm" radius="sm">
-						<Stack gap="xs">
-							<Group justify="space-between">
-								<Text size="sm" fw={500}>
-									{current.title ?? current.filename ?? t("upload.link.job")}
-								</Text>
-								{!TERMINAL.has(current.status) && (
-									<Button
-										variant="subtle"
-										color="red"
-										size="compact-sm"
-										leftSection={<X size={14} />}
-										onClick={cancel}
-									>
-										{t("upload.link.cancel")}
-									</Button>
-								)}
-							</Group>
-							{current.status === "importing" ||
-							current.status === "processing" ? (
-								<Group gap="xs">
-									<Loader size="xs" />
-									<Text size="xs" c="dimmed">
-										{t(`upload.link.status.${current.status}`)}
-									</Text>
-								</Group>
-							) : (
-								<Progress
-									value={
-										current.status === "done" ? 100 : (current.progress ?? 0)
-									}
-									animated={!TERMINAL.has(current.status)}
-								/>
-							)}
-							<Text size="xs" c="dimmed">
-								{t(`upload.link.status.${current.status}`, {
-									stage: current.stage ?? "",
-								})}
-							</Text>
-							{current.error !== undefined && (
-								<Alert color="red" variant="light">
-									{current.error}
-								</Alert>
-							)}
-						</Stack>
-					</Card>
+				{(jobs.data ?? []).length > 0 && (
+					<Stack gap="xs">
+						<Text size="sm" fw={600}>
+							{t("upload.link.queue")}
+						</Text>
+						{(jobs.data ?? []).map((job) => (
+							<JobCard key={job.id} job={job} />
+						))}
+					</Stack>
 				)}
 			</Stack>
 		</Card>
