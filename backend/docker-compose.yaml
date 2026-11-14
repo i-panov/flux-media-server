@@ -31,7 +31,12 @@ services:
   # Серверный загрузчик медиа. Тот же образ используется для API и worker:
   # API принимает POST /videos, worker выполняет yt-dlp/ffmpeg.
   media-loader:
-    image: ghcr.io/i-panov/media-loader:0.1.0
+    image: flux-media-loader:local
+    build:
+      context: .
+      dockerfile: media-loader.Dockerfile
+      args:
+        MEDIA_LOADER_REF: ${MEDIA_LOADER_REF:-main}
     container_name: flux-media-loader
     restart: unless-stopped
     init: true
@@ -54,7 +59,12 @@ services:
       - media-loader-data:/data
 
   media-loader-worker:
-    image: ghcr.io/i-panov/media-loader:0.1.0
+    image: flux-media-loader:local
+    build:
+      context: .
+      dockerfile: media-loader.Dockerfile
+      args:
+        MEDIA_LOADER_REF: ${MEDIA_LOADER_REF:-main}
     container_name: flux-media-loader-worker
     restart: unless-stopped
     init: true

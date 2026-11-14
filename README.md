@@ -98,7 +98,9 @@ docker compose up -d
 
 ### Серверное скачивание (media-loader)
 
-В compose входит `ghcr.io/i-panov/media-loader:0.1.0`:
+Образ media-loader собирается локально из исходников
+`https://github.com/i-panov/media-loader` (`backend/media-loader.Dockerfile`).
+Ветка/тег/commit задаётся `MEDIA_LOADER_REF` (по умолчанию `main`).
 
 - `media-loader` — API и UI на `http://127.0.0.1:${MEDIA_LOADER_PORT:-8097}/ui`;
 - `media-loader-worker` — очередь yt-dlp/ffmpeg;
