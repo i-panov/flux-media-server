@@ -3,14 +3,14 @@
     "name": "Flux",
     "slug": "mobile",
     "scheme": "flux",
-    "version": "0.1.44",
+    "version": "0.1.45",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.lib.flux",
-      "buildNumber": "62",
+      "buildNumber": "63",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Flux обращается к вашему домашнему медиа-серверу в локальной сети."
       }
@@ -24,7 +24,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.lib.flux",
-      "versionCode": 62,
+      "versionCode": 63,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",

@@ -491,7 +491,7 @@ test("загрузка сразу кладёт файл в выбранную к
 	);
 
 	await page.goto("/upload?type=video");
-	await page.getByRole("combobox").click();
+	await page.getByRole("combobox", { name: "Коллекция" }).click();
 	await page.getByRole("option", { name: "Пачка" }).click();
 	// biome-ignore lint/security/noSecrets: CSS-селектор, не секрет.
 	await page.locator('input[type="file"]').setInputFiles({

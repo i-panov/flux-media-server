@@ -107,3 +107,10 @@ transcode:
   estimate_factor: 1.5
   # Попыток на файл (первая + ретраи), дальше — статус error и ручной ретрай.
   max_attempts: 3
+
+# Внешний media-loader (серверное скачивание по URL).
+# Пустой url отключает кнопку/эндпоинт.
+media_loader:
+  url: ""
+  token: ""
+  timeout: 30

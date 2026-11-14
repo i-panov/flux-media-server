@@ -314,6 +314,16 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	uploadQueue := services.NewUploadQueue(context.Background(), mediaRepo, repository.NewUploadTaskRepository(db), thumbSvc,
 		services.DefaultUploadQueueWorkers, services.DefaultUploadQueueLimit)
 
+	mediaLoader := services.NewMediaLoader(
+		cfg.MediaLoader.URL,
+		cfg.MediaLoader.Token,
+		cfg.Storage.OriginalsDir,
+		cfg.Server.MaxUploadSize,
+		time.Duration(cfg.MediaLoader.Timeout)*time.Second,
+		uploadQueue,
+	)
+	downloadHandler := handlers.NewDownloadHandler(mediaLoader)
+
 	// File watcher for automatic library monitoring.
 	var watcherService *services.WatcherService
 	if cfg.Scanner.WatchEnabled {
@@ -658,6 +668,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	admin.Delete("/originals/:name", adminHandler.OriginalDelete)
 	admin.Get("/transcodes", readRateLimiter, adminHandler.TranscodesList)
 	admin.Post("/transcodes/:id/retry", adminHandler.TranscodeRetry)
+	admin.Post("/downloads", uploadRateLimiter, downloadHandler.Create)
+	admin.Get("/downloads/:id", readRateLimiter, downloadHandler.Status)
+	admin.Delete("/downloads/:id", downloadHandler.Cancel)
 	admin.Get("/users", readRateLimiter, adminHandler.UsersList)
 	admin.Put("/users/:id", adminHandler.UserUpdateRole)
 	admin.Delete("/users/:id", adminHandler.UserDelete)

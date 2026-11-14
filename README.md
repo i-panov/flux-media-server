@@ -96,6 +96,32 @@ docker compose up -d
 - Образ собирает backend и web, включает ffmpeg.
 - Локальный `web/dist` можно смонтировать поверх `/app/web`.
 
+### Серверное скачивание (media-loader)
+
+В compose входит `ghcr.io/i-panov/media-loader:0.1.0`:
+
+- `media-loader` — API и UI на `http://127.0.0.1:${MEDIA_LOADER_PORT:-8097}/ui`;
+- `media-loader-worker` — очередь yt-dlp/ffmpeg;
+- `media-loader-redis` — очередь и кэш;
+- данные — named volume `media-loader-data`.
+
+Сервис запускается без авторизации и слушает только loopback. Для доступа
+из LAN включите `AUTH_ENABLED=true` и создайте токен:
+
+```bash
+docker compose exec media-loader media-loader-auth create --name flux
+```
+
+Во Flux: **Загрузить → Загрузить по ссылке** (только админ). Backend
+проксирует запрос в media-loader, скачивает готовый файл в карантин и
+ставит его в обычную upload-очередь: дальше transcode, метаданные и
+появление в библиотеке идут штатным путём.
+
+API: `POST /api/admin/downloads`, `GET /api/admin/downloads/:id`,
+`DELETE /api/admin/downloads/:id`. Задания импорта живут в памяти: после
+рестарта Flux незавершённый импорт нужно запустить снова, media-loader
+при этом переиспользует свой кэш.
+
 ### Память при загрузке
 
 HTTP-движок буферизует тело загрузки в RAM. Одна загрузка занимает до
@@ -110,6 +136,8 @@ HTTP-движок буферизует тело загрузки в RAM. Одн�
 - `auth.allow_unknown_email: true` + `debug: true` — OTP без SMTP.
 - `server.max_upload_size`, `media.*_path`, `scanner.*`.
 - `server.trusted_proxies` — CIDR/IP прокси для корректного XFF/rate limit.
+- `media_loader.url` / `FLUX_MEDIA_LOADER_URL` — адрес media-loader
+  (в compose — `http://media-loader:8000`; пусто отключает функцию).
 
 ## Проверки
 

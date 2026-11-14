@@ -14,6 +14,7 @@ import { formatFileSize, MAX_UPLOAD_BYTES } from "../src/api/upload";
 import { useSession } from "../src/auth/session";
 import { AuthGate } from "../src/components/AuthGate";
 import { EmptyState } from "../src/components/EmptyState";
+import { LinkDownloadCard } from "../src/components/LinkDownloadCard";
 import { Screen } from "../src/components/Screen";
 import { UploadQueueRow } from "../src/components/UploadQueueRow";
 import { t, useLanguage } from "../src/i18n";
@@ -198,6 +199,8 @@ function UploadContent() {
 					{t("upload.add")}
 				</Text>
 			</Pressable>
+
+			<LinkDownloadCard key={uploadType} type={uploadType} />
 
 			{pickerError !== null && (
 				<Text

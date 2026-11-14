@@ -20,6 +20,7 @@ import { useSession } from "../../api/session";
 import type { UploadType } from "../../api/upload";
 import { CreateCollectionModal } from "../collections/CreateCollectionModal";
 import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
+import { LinkDownloadCard } from "./LinkDownloadCard";
 import { UploadItemCard } from "./UploadItemCard";
 import { useUploadQueue } from "./useUploadQueue";
 
@@ -199,6 +200,8 @@ export function UploadPage() {
 						</Button>
 					)}
 				</FileButton>
+
+				<LinkDownloadCard key={type} type={type} />
 
 				{items.length === 0 ? (
 					<Card withBorder padding="xl" radius="md">

@@ -23,6 +23,7 @@ type Config struct {
 	Media       MediaConfig       `yaml:"media"`
 	Storage     StorageConfig     `yaml:"storage"`
 	Transcode   TranscodeConfig   `yaml:"transcode"`
+	MediaLoader MediaLoaderConfig `yaml:"media_loader"`
 }
 
 type ServerConfig struct {
@@ -115,6 +116,14 @@ type StorageConfig struct {
 
 // TranscodeConfig — параметры нормализации видео в домашний формат
 // (MP4 + H.264, потолок — MaxHeight).
+// MediaLoaderConfig — внешний сервис media-loader: yt-dlp/ffmpeg за
+// пределами Flux. Пустой URL отключает интеграцию.
+type MediaLoaderConfig struct {
+	URL     string `yaml:"url"`
+	Token   string `yaml:"token"`
+	Timeout int    `yaml:"timeout"` // seconds; 0 → 30
+}
+
 type TranscodeConfig struct {
 	// CRF — указатель, чтобы отличать «не задано» (nil → 20) от
 	// явного 0: lossless-CRF 0 противоречит задаче (огромные файлы,
@@ -164,6 +173,12 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("FLUX_SMTP_PASSWORD"); v != "" {
 		cfg.Auth.SMTP.Password = v
+	}
+	if v := os.Getenv("FLUX_MEDIA_LOADER_URL"); v != "" {
+		cfg.MediaLoader.URL = v
+	}
+	if v := os.Getenv("FLUX_MEDIA_LOADER_TOKEN"); v != "" {
+		cfg.MediaLoader.Token = v
 	}
 
 	// Set defaults
@@ -237,6 +252,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Transcode.MaxAttempts == 0 {
 		cfg.Transcode.MaxAttempts = 3
+	}
+	if cfg.MediaLoader.Timeout == 0 {
+		cfg.MediaLoader.Timeout = 30
 	}
 	// По умолчанию TLS обязателен: без явного require_tls:false OTP-письма
 	// не должны уходить по plaintext (см. smtp.go — при отсутствии STARTTLS

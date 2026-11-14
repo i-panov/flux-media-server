@@ -26,6 +26,65 @@ services:
     environment:
       - CONFIG_PATH=/app/configs/config.yaml
       - TZ=${TZ:-UTC}
+      - FLUX_MEDIA_LOADER_URL=http://media-loader:8000
+
+  # Серверный загрузчик медиа. Тот же образ используется для API и worker:
+  # API принимает POST /videos, worker выполняет yt-dlp/ffmpeg.
+  media-loader:
+    image: ghcr.io/i-panov/media-loader:0.1.0
+    container_name: flux-media-loader
+    restart: unless-stopped
+    init: true
+    depends_on:
+      media-loader-redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MEDIA_LOADER_PORT:-8097}:8000"
+    environment:
+      - REDIS_URL=redis://media-loader-redis:6379/0
+      - DATA_DIR=/data
+      - SERVER_TIMEZONE=${TZ:-Europe/Moscow}
+      # Без byedpi: прямой yt-dlp. Для YouTube добавьте byedpi sidecar и
+      # укажите PROXY_URL=socks5://byedpi:1080.
+      - PROXY_URL=
+      # Сервис доступен только на loopback. Для доступа из LAN включите
+      # AUTH_ENABLED=true и создайте токен через media-loader-auth.
+      - AUTH_ENABLED=false
+    volumes:
+      - media-loader-data:/data
+
+  media-loader-worker:
+    image: ghcr.io/i-panov/media-loader:0.1.0
+    container_name: flux-media-loader-worker
+    restart: unless-stopped
+    init: true
+    depends_on:
+      media-loader-redis:
+        condition: service_healthy
+    command: ["arq", "media_loader.worker.WorkerSettings"]
+    environment:
+      - REDIS_URL=redis://media-loader-redis:6379/0
+      - DATA_DIR=/data
+      - SERVER_TIMEZONE=${TZ:-Europe/Moscow}
+      - PROXY_URL=
+      - AUTH_ENABLED=false
+    volumes:
+      - media-loader-data:/data
+
+  media-loader-redis:
+    image: redis:7-alpine
+    container_name: flux-media-loader-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - media-loader-redis:/data
 
 volumes:
   flux-data:
+  media-loader-data:
+  media-loader-redis:

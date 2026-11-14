@@ -389,5 +389,28 @@
 		"cancel": "Cancel",
 		"save": "Save",
 		"error": "Error"
+	},
+	"upload": {
+		"link": {
+			"title": "Upload by URL",
+			"hint": "The server will upload video or audio through media-loader and add it to the library.",
+			"url": "Video URL",
+			"format": "Format",
+			"quality": "Quality",
+			"submit": "Upload",
+			"failed": "Failed to start download",
+			"starting": "Starting…",
+			"job": "Download job",
+			"cancel": "Cancel",
+			"status": {
+				"queued": "Queued",
+				"downloading": "Downloading",
+				"importing": "Saving to library",
+				"processing": "Processing",
+				"done": "Done",
+				"error": "Error",
+				"cancelled": "Cancelled"
+			}
+		}
 	}
 }
