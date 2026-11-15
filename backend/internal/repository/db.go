@@ -106,7 +106,45 @@ func isMemoryPath(path string) bool {
 		strings.Contains(path, "mode=memory")
 }
 
+// guardLegacyCatalogSchema не даёт AutoMigrate молча пересобрать
+// seasons/work_items со старыми именами FK (fk_works_seasons,
+// fk_seasons_items, fk_works_items): DROP TABLE с foreign_keys=on
+// каскадно удаляет эпизоды. Лучше отказать в старте и потребовать backup.
+func guardLegacyCatalogSchema(db *gorm.DB) error {
+	var rows []struct {
+		Name string
+		SQL  string
+	}
+	if err := db.Raw(`SELECT name, sql FROM sqlite_master
+		WHERE type = 'table' AND name IN ('seasons','work_items','franchise_entries')`).
+		Scan(&rows).Error; err != nil {
+		return fmt.Errorf("check catalog schema: %w", err)
+	}
+	for _, row := range rows {
+		if name := legacyCatalogFK(row.SQL); name != "" {
+			return fmt.Errorf(
+				"найдена устаревшая FK-связь каталога %q в таблице %s. Запуск остановлен, "+
+					"чтобы не потерять work_items. Сделайте backup БД и пересоздайте seasons/work_items "+
+					"с актуальными FK (fk_seasons_work, fk_work_items_work, fk_work_items_season)", name, row.Name)
+		}
+	}
+	return nil
+}
+
+func legacyCatalogFK(ddl string) string {
+	legacy := []string{"fk_works_seasons", "fk_works_items", "fk_seasons_items"}
+	for _, name := range legacy {
+		if strings.Contains(ddl, name) {
+			return name
+		}
+	}
+	return ""
+}
+
 func AutoMigrate(db *gorm.DB) error {
+	if err := guardLegacyCatalogSchema(db); err != nil {
+		return err
+	}
 	if err := db.SetupJoinTable(&models.Media{}, "Artists", &models.MediaArtist{}); err != nil {
 		return err
 	}
@@ -205,6 +243,9 @@ func createCatalogIndexes(db *gorm.DB) error {
 // транзакционно, обрыв внутри версии откатывается целиком. Обрыв между
 // версиями безопасен: следующая версия продолжит с записанной schema_migrations.
 func RunMigrations(db *gorm.DB) error {
+	if err := guardLegacyCatalogSchema(db); err != nil {
+		return err
+	}
 	if err := runMigrationsV1(db); err != nil {
 		return err
 	}

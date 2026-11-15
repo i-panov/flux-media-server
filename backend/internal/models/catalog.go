@@ -37,18 +37,24 @@ type Work struct {
 	Year        int       `gorm:"index" json:"year"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	// Заполняются репозиторием вручную: has-many associations с GORM
+	// заставляли AutoMigrate пересоздавать существующие seasons/work_items
+	// и терять эпизоды. gorm:"-" не даёт AutoMigrate трогать схему.
+	Seasons []Season   `gorm:"-" json:"seasons,omitempty"`
+	Items   []WorkItem `gorm:"-" json:"items,omitempty"`
 }
 
 // Season — сезон сериала. Работает только для WorkKindSeries.
 type Season struct {
-	ID           uint      `gorm:"primaryKey" json:"id"`
-	WorkID       uint      `gorm:"not null;uniqueIndex:idx_seasons_work_number;index:idx_seasons_work_position,priority:1" json:"work_id"`
-	SeasonNumber int       `gorm:"not null;uniqueIndex:idx_seasons_work_number" json:"season_number"`
-	Title        string    `json:"title"`
-	Position     int       `gorm:"index:idx_seasons_work_position,priority:2" json:"position"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Work         *Work     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	ID           uint       `gorm:"primaryKey" json:"id"`
+	WorkID       uint       `gorm:"not null;uniqueIndex:idx_seasons_work_number;index:idx_seasons_work_position,priority:1" json:"work_id"`
+	SeasonNumber int        `gorm:"not null;uniqueIndex:idx_seasons_work_number" json:"season_number"`
+	Title        string     `json:"title"`
+	Position     int        `gorm:"index:idx_seasons_work_position,priority:2" json:"position"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	Work         *Work      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	Items        []WorkItem `gorm:"-" json:"items,omitempty"`
 }
 
 // WorkItem — фильм в film_series или эпизод в season.
@@ -65,7 +71,7 @@ type WorkItem struct {
 	// удаление Work не удаляет Media.
 	Work   *Work   `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
 	Season *Season `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
-	Media  *Media  `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	Media  *Media  `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"media,omitempty"`
 }
 
 // Franchise — глобальная франшиза/вселенная. Может содержать сериалы,
