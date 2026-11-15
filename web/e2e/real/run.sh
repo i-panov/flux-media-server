@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Полный e2e: настоящий Flux backend + транскод, реальный media-loader
 # в Docker, локальный HTTP-сервер с MP4 и браузер.
-# Требования: go, node, docker compose, ffmpeg/ffprobe в PATH.
+# Требования: go, node, python3, docker compose, ffmpeg/ffprobe в PATH.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WEB="$ROOT/web"
 OUT="$ROOT/.artifacts/e2e-real"
 DOCKER_BIN="${DOCKER_BIN:-docker}"
-PORT=18080
-VITE_PORT=5174
+PORT="${FLUX_E2E_PORT:-$((19000 + RANDOM % 500))}"
+VITE_PORT="${FLUX_E2E_VITE_PORT:-$((PORT + 1))}"
+export FLUX_E2E_BASE_URL="http://127.0.0.1:$VITE_PORT"
 COMPOSE="$WEB/e2e/real/compose.yaml"
 PIDS=()
 
@@ -23,6 +24,10 @@ trap cleanup EXIT INT TERM
 
 if ! command -v ffmpeg >/dev/null 2>&1; then
 	echo "ffmpeg not found; set PATH to ffmpeg/ffprobe" >&2
+	exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+	echo "python3 not found; нужен для seed каталога" >&2
 	exit 1
 fi
 
@@ -91,6 +96,9 @@ for url in "http://127.0.0.1:$PORT/api/health" "http://127.0.0.1:$VITE_PORT" "ht
 	done
 	curl -fsS "$url" >/dev/null || { echo "not ready: $url" >&2; exit 1; }
 done
+
+echo ">> seeding catalog"
+python3 "$WEB/e2e/real/seed-catalog.py" "$OUT/flux.db"
 
 echo ">> running Playwright"
 (cd "$WEB" && npx playwright test -c playwright.real.config.ts)

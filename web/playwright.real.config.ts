@@ -10,7 +10,7 @@ export default defineConfig({
 	timeout: 180_000,
 	reporter: "list",
 	use: {
-		baseURL: "http://127.0.0.1:5174",
+		baseURL: process.env.FLUX_E2E_BASE_URL ?? "http://127.0.0.1:5176",
 		locale: "ru-RU",
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
