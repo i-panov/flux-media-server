@@ -5,7 +5,8 @@
 		"vite.config.ts",
 		"vitest.setup.ts",
 		"playwright.config.ts",
-		"playwright.proxy.config.ts"
+		"playwright.proxy.config.ts",
+		"playwright.real.config.ts"
 	],
 	"compilerOptions": {
 		"target": "ES2022",

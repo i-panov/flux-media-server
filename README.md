@@ -70,6 +70,17 @@ npx expo start
 npx expo export --platform android --output-dir dist
 ```
 
+Полный e2e серверной загрузки (нужны Docker, ffmpeg/ffprobe в PATH):
+
+```bash
+cd web
+npm run test:e2e:real
+```
+
+Стенд поднимает настоящий media-loader в Docker, Redis, backend и Vite,
+скачивает локальный MP4 по ссылке через media-loader, затем проверяет
+исчезновение задания из очереди и воспроизведение карточки.
+
 Проверки mobile:
 
 ```bash

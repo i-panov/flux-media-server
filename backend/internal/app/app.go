@@ -321,6 +321,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		cfg.Server.MaxUploadSize,
 		time.Duration(cfg.MediaLoader.Timeout)*time.Second,
 		uploadQueue,
+		transcodeQueue,
 	)
 	downloadHandler := handlers.NewDownloadHandler(mediaLoader)
 

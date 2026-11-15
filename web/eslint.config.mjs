@@ -101,6 +101,7 @@ export default defineConfig([
 			"postcss.config.mjs",
 			"playwright.config.ts",
 			"playwright.proxy.config.ts",
+			"playwright.real.config.ts",
 			"e2e/**/*.ts",
 			"e2e/**/*.mjs",
 		],

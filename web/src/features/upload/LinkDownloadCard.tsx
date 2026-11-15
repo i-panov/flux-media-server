@@ -55,7 +55,7 @@ function JobCard({ job }: { job: MediaLoaderJob }) {
 		});
 	};
 	return (
-		<Card withBorder padding="sm" radius="sm">
+		<Card withBorder padding="sm" radius="sm" data-testid="upload-link-job">
 			<Stack gap="xs">
 				<Group justify="space-between">
 					<Text size="sm" fw={500}>
@@ -122,7 +122,7 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 	};
 
 	return (
-		<Card withBorder padding="lg" radius="md">
+		<Card withBorder padding="lg" radius="md" data-testid="upload-link-card">
 			<Stack gap="sm">
 				<Group gap="xs">
 					<Link2 size={18} />
@@ -135,6 +135,7 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 				</Text>
 				<Group align="flex-end" wrap="wrap">
 					<TextInput
+						data-testid="upload-link-url"
 						label={t("upload.link.url")}
 						placeholder="https://..."
 						value={url}
@@ -161,6 +162,7 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 						/>
 					)}
 					<Button
+						data-testid="upload-link-submit"
 						leftSection={<Download size={16} />}
 						loading={start.isPending}
 						disabled={url.trim() === "" || start.isPending}

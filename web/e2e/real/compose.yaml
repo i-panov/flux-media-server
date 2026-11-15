@@ -1,0 +1,41 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  media-loader:
+    image: flux-media-loader:local
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - AUTH_ENABLED=false
+      - PROXY_URL=
+    depends_on:
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "18081:8000"
+    volumes:
+      - media-loader-data:/data
+
+  media-loader-worker:
+    image: flux-media-loader:local
+    command: ["arq", "media_loader.worker.WorkerSettings"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - AUTH_ENABLED=false
+      - PROXY_URL=
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - media-loader-data:/data
+
+volumes:
+  media-loader-data:

@@ -31,7 +31,8 @@
 		"lint:fix": "biome check --write",
 		"lint:eslint": "eslint .",
 		"lint:deadcode": "knip",
-		"size": "size-limit"
+		"size": "size-limit",
+		"test:e2e:real": "bash e2e/real/run.sh"
 	},
 	"dependencies": {
 		"@flux/shared": "0.1.12",

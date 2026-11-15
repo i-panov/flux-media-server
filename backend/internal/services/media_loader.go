@@ -34,6 +34,7 @@ type MediaLoader struct {
 	originals   string
 	maxBytes    int64
 	queue       uploadEnqueuer
+	transcode   transcodeEnqueuer
 	mu          sync.Mutex
 	jobs        map[string]*MediaLoaderJob
 	nextID      atomic.Uint64
@@ -44,6 +45,14 @@ type MediaLoader struct {
 type uploadEnqueuer interface {
 	Enqueue(UploadJobInput) (uint64, error)
 	Status(uint64) (UploadJobStatus, bool)
+	Cancel(uint64) error
+}
+
+// transcodeEnqueuer — видео идёт через нормализацию в библиотеку, а не
+// напрямую в upload-очередь (та оставила бы файл в карантине).
+type transcodeEnqueuer interface {
+	Enqueue(sourcePath, filename string) (uint64, error)
+	Get(uint64) (TranscodeJobStatus, bool)
 	Cancel(uint64) error
 }
 
@@ -91,7 +100,7 @@ var (
 	ErrMediaLoaderJobGone  = errors.New("media loader job not found")
 )
 
-func NewMediaLoader(cfgURL, token, originals string, maxBytes int64, timeout time.Duration, queue uploadEnqueuer) *MediaLoader {
+func NewMediaLoader(cfgURL, token, originals string, maxBytes int64, timeout time.Duration, queue uploadEnqueuer, transcode transcodeEnqueuer) *MediaLoader {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
@@ -111,6 +120,7 @@ func NewMediaLoader(cfgURL, token, originals string, maxBytes int64, timeout tim
 		originals: originals,
 		maxBytes:  maxBytes,
 		queue:     queue,
+		transcode: transcode,
 		jobs:      make(map[string]*MediaLoaderJob),
 	}
 	return m
@@ -158,6 +168,11 @@ func (m *MediaLoader) List() []MediaLoaderJob {
 	m.mu.Lock()
 	jobs := make([]MediaLoaderJob, 0, len(m.jobs))
 	for _, job := range m.jobs {
+		// Успешные и отменённые задания не засоряют очередь: медиа уже
+		// в библиотеке (или импорт отменён). Ошибки оставляем для retry.
+		if job.Status == "done" || job.Status == "cancelled" {
+			continue
+		}
 		jobs = append(jobs, *job)
 	}
 	m.mu.Unlock()
@@ -199,7 +214,11 @@ func (m *MediaLoader) Cancel(id string) error {
 		cancel()
 	}
 	if job.UploadJobID != 0 {
-		_ = m.queue.Cancel(job.UploadJobID)
+		if job.mediaType.IsVideo() && m.transcode != nil {
+			_ = m.transcode.Cancel(job.UploadJobID)
+		} else {
+			_ = m.queue.Cancel(job.UploadJobID)
+		}
 	}
 	return nil
 }
@@ -423,6 +442,21 @@ func (m *MediaLoader) importFile(ctx context.Context, job *MediaLoaderJob, out l
 		_ = os.Remove(final)
 		return ctx.Err()
 	}
+	if mediaType.IsVideo() && m.transcode != nil {
+		taskID, err := m.transcode.Enqueue(final, filepath.Base(final))
+		if err != nil {
+			_ = os.Remove(final)
+			return err
+		}
+		m.mu.Lock()
+		job.UploadJobID = taskID
+		job.Status = "processing"
+		job.Stage = "transcoding"
+		job.UpdatedAt = time.Now()
+		m.mu.Unlock()
+		m.monitorTranscode(job, taskID)
+		return nil
+	}
 	uploadID, err := m.queue.Enqueue(UploadJobInput{
 		FilePath: final, Filename: filepath.Base(final), MediaType: mediaType,
 	})
@@ -438,6 +472,35 @@ func (m *MediaLoader) importFile(ctx context.Context, job *MediaLoaderJob, out l
 	m.mu.Unlock()
 	m.monitorUpload(job, uploadID)
 	return nil
+}
+
+func (m *MediaLoader) monitorTranscode(job *MediaLoaderJob, taskID uint64) {
+	deadline := time.Now().Add(12 * time.Hour)
+	for time.Now().Before(deadline) {
+		snap, ok := m.transcode.Get(taskID)
+		if ok {
+			switch snap.Status {
+			case TranscodeTaskDone:
+				m.mu.Lock()
+				job.Status = "done"
+				job.Stage = "done"
+				job.Progress = 100
+				job.MediaID = snap.MediaID
+				job.UpdatedAt = time.Now()
+				m.mu.Unlock()
+				return
+			case TranscodeTaskError, TranscodeTaskCancelled:
+				msg := snap.Error
+				if msg == "" {
+					msg = snap.Status
+				}
+				m.fail(job, errors.New(msg))
+				return
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+	m.fail(job, errors.New("transcode processing timeout"))
 }
 
 func (m *MediaLoader) monitorUpload(job *MediaLoaderJob, uploadID uint64) {

@@ -59,7 +59,7 @@ func TestMediaLoaderImportsFileAndEnqueues(t *testing.T) {
 
 	queue := &fakeLoaderQueue{status: UploadJobStatus{Status: UploadJobDone, MediaID: 7}}
 	dir := t.TempDir()
-	loader := NewMediaLoader(srv.URL, "", dir, 1024, 5*time.Second, queue)
+	loader := NewMediaLoader(srv.URL, "", dir, 1024, 5*time.Second, queue, nil)
 	job, err := loader.Submit(MediaLoaderRequest{URL: "https://example.com/video", Format: "mp4"})
 	require.NoError(t, err)
 	require.Equal(t, "queued", job.Status)
@@ -85,13 +85,13 @@ func TestMediaLoaderImportsFileAndEnqueues(t *testing.T) {
 }
 
 func TestMediaLoaderRejectsInvalidURL(t *testing.T) {
-	loader := NewMediaLoader("http://127.0.0.1:1", "", t.TempDir(), 1024, time.Second, &fakeLoaderQueue{})
+	loader := NewMediaLoader("http://127.0.0.1:1", "", t.TempDir(), 1024, time.Second, &fakeLoaderQueue{}, nil)
 	_, err := loader.Submit(MediaLoaderRequest{URL: "file:///etc/passwd"})
 	require.Error(t, err)
 }
 
 func TestMediaLoaderDisabled(t *testing.T) {
-	loader := NewMediaLoader("", "", t.TempDir(), 1024, time.Second, &fakeLoaderQueue{})
+	loader := NewMediaLoader("", "", t.TempDir(), 1024, time.Second, &fakeLoaderQueue{}, nil)
 	_, err := loader.Submit(MediaLoaderRequest{URL: "https://example.com"})
 	require.ErrorIs(t, err, ErrMediaLoaderDisabled)
 }
@@ -142,7 +142,7 @@ func TestMediaLoaderRetriesConnectionReset(t *testing.T) {
 	defer srv.Close()
 
 	queue := &fakeLoaderQueue{status: UploadJobStatus{Status: UploadJobDone, MediaID: 3}}
-	loader := NewMediaLoader(srv.URL, "", t.TempDir(), 1024, 5*time.Second, queue)
+	loader := NewMediaLoader(srv.URL, "", t.TempDir(), 1024, 5*time.Second, queue, nil)
 	job, err := loader.Submit(MediaLoaderRequest{URL: "https://example.com/retry", Format: "mp4"})
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
@@ -150,4 +150,46 @@ func TestMediaLoaderRetriesConnectionReset(t *testing.T) {
 		return ok && got.Status == "done"
 	}, 15*time.Second, 10*time.Millisecond)
 	require.GreaterOrEqual(t, calls, 3)
+}
+
+type fakeTranscodeQueue struct {
+	enqueued []string
+	status   TranscodeJobStatus
+}
+
+func (f *fakeTranscodeQueue) Enqueue(sourcePath, filename string) (uint64, error) {
+	f.enqueued = append(f.enqueued, sourcePath)
+	return 77, nil
+}
+
+func (f *fakeTranscodeQueue) Get(uint64) (TranscodeJobStatus, bool) {
+	return f.status, true
+}
+
+func (f *fakeTranscodeQueue) Cancel(uint64) error { return nil }
+
+func TestMediaLoaderVideoUsesTranscodeQueue(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/videos", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"download_url":"/downloads/token","filename":"Video.mp4","content_type":"video/mp4"}`))
+	})
+	mux.HandleFunc("/downloads/token", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("video-bytes"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	transcode := &fakeTranscodeQueue{status: TranscodeJobStatus{Status: TranscodeTaskDone, MediaID: 11}}
+	loader := NewMediaLoader(srv.URL, "", t.TempDir(), 1024, 5*time.Second, &fakeLoaderQueue{}, transcode)
+	job, err := loader.Submit(MediaLoaderRequest{URL: "https://example.com/video", Format: "mp4"})
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		got, ok := loader.Get(job.ID)
+		return ok && got.Status == "done"
+	}, 5*time.Second, 10*time.Millisecond)
+
+	got, _ := loader.Get(job.ID)
+	require.Equal(t, uint(11), got.MediaID)
+	require.Len(t, transcode.enqueued, 1)
 }
