@@ -109,3 +109,45 @@ func TestMediaLoaderJobJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(data), "mediaType")
 }
+
+func TestMediaLoaderRetriesConnectionReset(t *testing.T) {
+	var calls int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/videos", func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			if hj, ok := w.(http.Hijacker); ok {
+				conn, _, err := hj.Hijack()
+				if err == nil {
+					_ = conn.Close()
+					return
+				}
+			}
+			http.Error(w, "reset", http.StatusInternalServerError)
+			return
+		}
+		if calls == 2 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"status":"downloading","retry_after":1}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"download_url":"/downloads/token","filename":"retry.mp4","content_type":"video/mp4"}`))
+	})
+	mux.HandleFunc("/downloads/token", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	queue := &fakeLoaderQueue{status: UploadJobStatus{Status: UploadJobDone, MediaID: 3}}
+	loader := NewMediaLoader(srv.URL, "", t.TempDir(), 1024, 5*time.Second, queue)
+	job, err := loader.Submit(MediaLoaderRequest{URL: "https://example.com/retry", Format: "mp4"})
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		got, ok := loader.Get(job.ID)
+		return ok && got.Status == "done"
+	}, 15*time.Second, 10*time.Millisecond)
+	require.GreaterOrEqual(t, calls, 3)
+}

@@ -95,10 +95,18 @@ func NewMediaLoader(cfgURL, token, originals string, maxBytes int64, timeout tim
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
+	// Uvicorn закрывает idle keep-alive соединения; Go не повторяет POST
+	// после connection reset. Для поллинга открываем соединение на запрос.
+	baseTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		baseTransport = &http.Transport{}
+	}
+	pollTransport := baseTransport.Clone()
+	pollTransport.DisableKeepAlives = true
 	m := &MediaLoader{
 		baseURL:   strings.TrimRight(cfgURL, "/"),
 		token:     token,
-		client:    &http.Client{Timeout: timeout},
+		client:    &http.Client{Timeout: timeout, Transport: pollTransport},
 		download:  &http.Client{Timeout: 0},
 		originals: originals,
 		maxBytes:  maxBytes,
@@ -237,6 +245,7 @@ func (m *MediaLoader) fail(job *MediaLoaderJob, err error) {
 }
 
 func (m *MediaLoader) run(ctx context.Context, job *MediaLoaderJob, req MediaLoaderRequest) {
+	networkRetries := 0
 	for {
 		if ctx.Err() != nil {
 			return
@@ -264,15 +273,35 @@ func (m *MediaLoader) run(ctx context.Context, job *MediaLoaderJob, req MediaLoa
 			if ctx.Err() != nil {
 				return
 			}
+			if networkRetries < 3 {
+				networkRetries++
+				m.set(job, "queued", "retry", 0)
+				if !sleepContext(ctx, time.Duration(networkRetries)*time.Second) {
+					return
+				}
+				continue
+			}
 			m.fail(job, err)
 			return
 		}
 		data, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		resp.Body.Close()
 		if readErr != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			if networkRetries < 3 {
+				networkRetries++
+				m.set(job, "queued", "retry", 0)
+				if !sleepContext(ctx, time.Duration(networkRetries)*time.Second) {
+					return
+				}
+				continue
+			}
 			m.fail(job, readErr)
 			return
 		}
+		networkRetries = 0
 		var out loaderResponse
 		_ = json.Unmarshal(data, &out)
 		switch resp.StatusCode {
