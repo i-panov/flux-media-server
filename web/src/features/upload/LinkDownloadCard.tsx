@@ -13,7 +13,7 @@ import {
 } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, Link2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	cancelMediaLoaderJob,
@@ -86,10 +86,19 @@ function JobCard({ job }: { job: MediaLoaderJob }) {
 						animated={active}
 					/>
 				)}
-				<Text size="xs" c="dimmed">
-					{t(`upload.link.status.${job.status}`)}
-					{job.stage !== undefined && job.stage !== "" ? ` · ${job.stage}` : ""}
-				</Text>
+				<Group justify="space-between" gap="xs">
+					<Text size="xs" c="dimmed">
+						{t(`upload.link.status.${job.status}`)}
+						{job.stage !== undefined && job.stage !== ""
+							? ` · ${job.stage}`
+							: ""}
+					</Text>
+					{typeof job.progress === "number" && active && (
+						<Text size="xs" c="dimmed">
+							{Math.round(job.progress)}%
+						</Text>
+					)}
+				</Group>
 				{job.error !== undefined && (
 					<Alert color="red" variant="light">
 						{job.error}
@@ -107,6 +116,31 @@ export function LinkDownloadCard({ type }: { type: UploadType }) {
 	const [quality, setQuality] = useState("max");
 	const start = useStartMediaLoader();
 	const jobs = useMediaLoaderJobs();
+	const queryClient = useQueryClient();
+	const previousActive = useRef<Set<string>>(new Set());
+
+	useEffect(() => {
+		const currentActive = new Set(
+			(jobs.data ?? [])
+				.filter((job) => !TERMINAL.has(job.status))
+				.map((job) => job.id),
+		);
+		let finished = false;
+		for (const id of previousActive.current) {
+			if (
+				!currentActive.has(id) &&
+				!(jobs.data ?? []).some((job) => job.id === id)
+			) {
+				finished = true;
+				break;
+			}
+		}
+		previousActive.current = currentActive;
+		if (finished) {
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["progress"] });
+		}
+	}, [jobs.data, queryClient]);
 
 	if (type === "image") {
 		return null;

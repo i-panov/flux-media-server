@@ -138,6 +138,7 @@ test("загрузка по ссылке: done уходит из очереди,
 
 	// Пока задание активно, оно видно в очереди.
 	await expect(page.getByTestId("upload-link-job")).toBeVisible();
+	await expect(page.getByText("40%")).toBeVisible();
 	// После done backend больше не отдаёт его в списке.
 	await expect(page.getByTestId("upload-link-job")).toHaveCount(0, {
 		timeout: 5_000,

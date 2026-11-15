@@ -1,6 +1,7 @@
 /* eslint-disable max-lines-per-function -- карточка формы и списка заданий. */
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Pressable,
@@ -79,9 +80,32 @@ function JobCard({
 				</Text>
 			)}
 			{job.status === "downloading" && job.progress !== undefined && (
-				<Text style={{ color: colors.textMuted }}>
-					{Math.round(job.progress)}%
-				</Text>
+				<View style={[styles.progressRow, { gap: spacing.xs }]}>
+					<View
+						testID="upload-link-progress"
+						style={[
+							styles.progressTrack,
+							{
+								backgroundColor: colors.surfaceMuted,
+								borderRadius: radii.pill,
+							},
+						]}
+					>
+						<View
+							style={[
+								styles.progressFill,
+								{
+									width: `${Math.max(0, Math.min(100, job.progress))}%`,
+									backgroundColor: colors.accent,
+									borderRadius: radii.pill,
+								},
+							]}
+						/>
+					</View>
+					<Text style={{ color: colors.textMuted }}>
+						{Math.round(job.progress)}%
+					</Text>
+				</View>
 			)}
 			{job.error !== undefined && (
 				<Text style={{ color: colors.danger }}>{job.error}</Text>
@@ -103,7 +127,27 @@ export function LinkDownloadCard({
 	const [starting, setStarting] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const queryClient = useQueryClient();
 	const hasActive = jobs.some(activeJob);
+	// Завершённые задания backend уже не отдаёт в списке. Переход
+	// «было активным → исчезло из списка» означает, что медиа появилось
+	// в библиотеке; инвалидируем грид, иначе он ждёт рестарта приложения.
+	const previousActive = useRef<Set<string>>(new Set());
+	useEffect(() => {
+		const currentActive = new Set(jobs.filter(activeJob).map((job) => job.id));
+		let finished = false;
+		for (const id of previousActive.current) {
+			if (!currentActive.has(id) && !jobs.some((job) => job.id === id)) {
+				finished = true;
+				break;
+			}
+		}
+		previousActive.current = currentActive;
+		if (finished) {
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["progress"] });
+		}
+	}, [jobs, queryClient]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -348,6 +392,9 @@ const styles = StyleSheet.create({
 	submitText: { fontSize: 15, fontWeight: "600" },
 	status: { borderWidth: 1 },
 	statusRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+	progressRow: { flexDirection: "row", alignItems: "center" },
+	progressTrack: { flex: 1, height: 6, overflow: "hidden" },
+	progressFill: { height: 6 },
 	statusText: { flex: 1, fontWeight: "600" },
 	pressed: { opacity: 0.6 },
 });
