@@ -9,8 +9,8 @@ import (
 // их не показывает, они остаются внутри контейнера для VLC/скачивания.
 type Subtitle struct {
 	ID      uint   `gorm:"primaryKey" json:"id"`
-	MediaID uint   `gorm:"index" json:"media_id"`
-	Lang    string `json:"lang"`
+	MediaID uint   `gorm:"index;uniqueIndex:idx_subtitles_media_lang" json:"media_id"`
+	Lang    string `gorm:"uniqueIndex:idx_subtitles_media_lang" json:"lang"`
 	Path    string `json:"-"`
 	// FK-ассоциация с каскадным удалением, как у Lyrics.
 	Media     *Media    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`

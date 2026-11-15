@@ -252,7 +252,10 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV2(db); err != nil {
 		return err
 	}
-	return runMigrationsV3(db)
+	if err := runMigrationsV3(db); err != nil {
+		return err
+	}
+	return runMigrationsV4(db)
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
@@ -547,6 +550,62 @@ func runMigrationsV3(db *gorm.DB) error {
 			}
 			if err := repairVideoKind(tx); err != nil {
 				return fmt.Errorf("repair media.video_kind v3: %w", err)
+			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV4 — нормализация прогресса и субтитров.
+func runMigrationsV4(db *gorm.DB) error {
+	const schemaVersion = 4
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 4: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		hasProgress, err := tableExists(tx, "watch_progresses")
+		if err != nil {
+			return fmt.Errorf("check watch_progresses: %w", err)
+		}
+		if hasProgress {
+			hasOld, err := tableHasColumn(tx, "watch_progresses", "duration")
+			if err != nil {
+				return fmt.Errorf("check watch_progresses.duration: %w", err)
+			}
+			hasNew, err := tableHasColumn(tx, "watch_progresses", "reported_duration")
+			if err != nil {
+				return fmt.Errorf("check watch_progresses.reported_duration: %w", err)
+			}
+			if hasOld && !hasNew {
+				if err := tx.Exec("ALTER TABLE watch_progresses RENAME COLUMN duration TO reported_duration").Error; err != nil {
+					return fmt.Errorf("rename watch_progresses.duration: %w", err)
+				}
+			}
+		}
+		hasSubtitles, err := tableExists(tx, "subtitles")
+		if err != nil {
+			return fmt.Errorf("check subtitles: %w", err)
+		}
+		if hasSubtitles {
+			// Оставляем новейшую дорожку на язык: дубликаты старого сканера.
+			if err := tx.Exec(`DELETE FROM subtitles WHERE id NOT IN (
+				SELECT MAX(id) FROM subtitles GROUP BY media_id, lang)`).Error; err != nil {
+				return fmt.Errorf("dedupe subtitles: %w", err)
+			}
+			if err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_subtitles_media_lang
+				ON subtitles(media_id, lang)`).Error; err != nil {
+				return fmt.Errorf("create subtitles unique index: %w", err)
 			}
 		}
 		return tx.Create(&models.SchemaMigration{

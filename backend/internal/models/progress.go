@@ -12,8 +12,8 @@ type WatchProgress struct {
 	// по недавно просмотренному).
 	UserID    uint `gorm:"uniqueIndex:idx_progress_user_media;index:idx_progress_user_updated,priority:1" json:"user_id"`
 	MediaID   uint `gorm:"uniqueIndex:idx_progress_user_media" json:"media_id"`
-	Position  int  `json:"position"` // seconds
-	Duration  int  `json:"duration"` // общая длительность в секундах (присылает клиент)
+	Position  int  `json:"position"`                                 // seconds
+	Duration  int  `gorm:"column:reported_duration" json:"duration"` // снимок длительности от клиента
 	Completed bool `json:"completed"`
 	// FK-ассоциации с каскадным удалением (для новых инсталляций).
 	User *User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`

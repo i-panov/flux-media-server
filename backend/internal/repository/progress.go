@@ -37,7 +37,7 @@ func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, mediaType m
 	// «Продолжить» — только незавершённые записи. Фильтр в БД обязателен:
 	// иначе 20 свежих completed вытесняют более старые незавершённые.
 	query = query.Where("completed = ?", false).
-		Where("(duration <= 0 OR position * 10 < duration * 9)")
+		Where("(reported_duration <= 0 OR position * 10 < reported_duration * 9)")
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -65,7 +65,7 @@ func (r *ProgressStore) FindByUserAndMedia(ctx context.Context, userID, mediaID 
 func (r *ProgressStore) Upsert(ctx context.Context, progress *models.WatchProgress) error {
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}, {Name: "media_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"position", "duration", "completed", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"position", "reported_duration", "completed", "updated_at"}),
 	}).Create(progress).Error
 }
 

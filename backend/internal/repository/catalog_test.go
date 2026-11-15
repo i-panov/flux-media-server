@@ -85,7 +85,7 @@ func TestMigrationV2PreservesChildren(t *testing.T) {
 	require.Nil(t, gotAudio.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(3), versions)
+	require.Equal(t, int64(4), versions)
 }
 
 func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
@@ -106,7 +106,7 @@ func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
 	require.Equal(t, models.VideoKindMovie, *got.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(3), versions)
+	require.Equal(t, int64(4), versions)
 }
 
 func TestWorkItemRequiresExactlyOneTarget(t *testing.T) {
@@ -330,7 +330,7 @@ func TestMigrationV3RepairsInvalidVideoKind(t *testing.T) {
 	require.NoError(t, db.Model(&rows[1]).Update("deleted_at", time.Now().UTC()).Error)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(3), versions)
+	require.Equal(t, int64(4), versions)
 }
 
 func TestVideoKindTriggerAllowsClearingOnTypeChange(t *testing.T) {
@@ -348,4 +348,34 @@ func TestVideoKindTriggerAllowsClearingOnTypeChange(t *testing.T) {
 	require.NoError(t, db.First(&got, media.ID).Error)
 	require.Equal(t, models.MediaTypeAudio, got.Type)
 	require.Nil(t, got.VideoKind)
+}
+
+func TestMigrationV4RenamesProgressDurationAndDedupesSubtitles(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	user := models.User{Email: "v4@example.com"}
+	require.NoError(t, db.Create(&user).Error)
+	media := models.Media{Title: "Video", Type: models.MediaTypeVideo, FilePath: "/v4.mp4"}
+	require.NoError(t, db.Create(&media).Error)
+	require.NoError(t, db.Create(&models.WatchProgress{
+		UserID: user.ID, MediaID: media.ID, Position: 4, Duration: 100,
+	}).Error)
+	require.NoError(t, db.Exec("DROP INDEX IF EXISTS idx_subtitles_media_lang").Error)
+	require.NoError(t, db.Exec(`INSERT INTO subtitles (media_id, lang, path) VALUES (?, 'en', '/a.vtt')`, media.ID).Error)
+	require.NoError(t, db.Exec(`INSERT INTO subtitles (media_id, lang, path) VALUES (?, 'en', '/b.vtt')`, media.ID).Error)
+
+	require.NoError(t, db.Exec("ALTER TABLE watch_progresses RENAME COLUMN reported_duration TO duration").Error)
+	require.NoError(t, RunMigrations(db))
+
+	var progress models.WatchProgress
+	require.NoError(t, db.First(&progress).Error)
+	require.Equal(t, 100, progress.Duration)
+	var count int64
+	require.NoError(t, db.Model(&models.Subtitle{}).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+	var duplicate models.Subtitle
+	require.NoError(t, db.First(&duplicate).Error)
+	require.Equal(t, "/b.vtt", duplicate.Path, "kept newest subtitle")
 }
