@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useFranchise } from "../../api/catalog";
 import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
+import { FranchiseAdminPanel } from "./admin/FranchiseAdminPanel";
 
 function EntryCard({
 	title,
@@ -110,6 +111,7 @@ export function FranchiseDetailPage({ id }: { id: number }) {
 					})}
 				</Stack>
 			)}
+			<FranchiseAdminPanel franchise={data} />
 		</Stack>
 	);
 }

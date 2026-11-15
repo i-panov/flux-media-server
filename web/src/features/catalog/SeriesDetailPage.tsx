@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useWork } from "../../api/catalog";
 import { formatDuration } from "../../core/format";
 import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
+import { WorkAdminPanel } from "./admin/WorkAdminPanel";
 
 function EpisodeLink({
 	mediaId,
@@ -127,6 +128,7 @@ export function SeriesDetailPage({ id }: { id: number }) {
 					</Stack>
 				))
 			)}
+			<WorkAdminPanel work={data} />
 		</Stack>
 	);
 }

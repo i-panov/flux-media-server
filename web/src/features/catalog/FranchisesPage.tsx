@@ -1,9 +1,20 @@
-import { Alert, Card, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import {
+	Alert,
+	Card,
+	Group,
+	SimpleGrid,
+	Stack,
+	Text,
+	Title,
+} from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Clapperboard } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useFranchises } from "../../api/catalog";
+import { useSession } from "../../api/session";
 import { clickFirstLink, useTVFocusable } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
+import { CreateFranchiseButton } from "./admin/CreateFranchiseButton";
 
 function FranchiseCard({
 	id,
@@ -52,6 +63,10 @@ function FranchiseCard({
 export function FranchisesPage() {
 	const { t } = useTranslation();
 	const franchises = useFranchises();
+	const session = useSession();
+	const { capabilities } = useTVMode();
+	const canManage =
+		session.data?.is_admin === true && capabilities.canAccessAdmin;
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("franchises-page");
 	return (
@@ -62,9 +77,12 @@ export function FranchisesPage() {
 			data-tv-page-root="true"
 			data-tv-focus-key="franchises-page"
 		>
-			<Title order={1} size="h2">
-				{t("catalog.franchises")}
-			</Title>
+			<Group justify="space-between">
+				<Title order={1} size="h2">
+					{t("catalog.franchises")}
+				</Title>
+				{canManage && <CreateFranchiseButton />}
+			</Group>
 			{franchises.isPending ? (
 				<Text c="dimmed">{t("common.loading")}</Text>
 			) : franchises.isError ? (

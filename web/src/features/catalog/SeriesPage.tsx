@@ -1,13 +1,20 @@
-import { Alert, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { Alert, Group, SimpleGrid, Stack, Text, Title } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { useWorks } from "../../api/catalog";
+import { useSession } from "../../api/session";
 import { useTVFocusable } from "../tv/tvFocus";
+import { useTVMode } from "../tv/useTVMode";
+import { CreateWorkButton } from "./admin/CreateWorkButton";
 import { WorkCard } from "./WorkCard";
 
 export function SeriesPage() {
 	const { t } = useTranslation();
 	const series = useWorks("series");
 	const films = useWorks("film_series");
+	const session = useSession();
+	const { capabilities } = useTVMode();
+	const canManage =
+		session.data?.is_admin === true && capabilities.canAccessAdmin;
 	const { targetRef: tvRef, tvMode } =
 		useTVFocusable<HTMLDivElement>("series-page");
 
@@ -19,9 +26,12 @@ export function SeriesPage() {
 			data-tv-page-root="true"
 			data-tv-focus-key="series-page"
 		>
-			<Title order={1} size="h2">
-				{t("catalog.seriesAndFilms")}
-			</Title>
+			<Group justify="space-between">
+				<Title order={1} size="h2">
+					{t("catalog.seriesAndFilms")}
+				</Title>
+				{canManage && <CreateWorkButton />}
+			</Group>
 			{series.isError || films.isError ? (
 				<Alert color="red">{t("catalog.error")}</Alert>
 			) : (

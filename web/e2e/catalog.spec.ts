@@ -6,6 +6,7 @@ const FRANCHISE_TITLE = /Тестовая франшиза/;
 const FILM_SERIES_TITLE = /Тестовая серия фильмов/;
 const PILOT_TITLE = /Пилот/;
 const FILM_SERIES_LINK = /Тестовая серия фильмов/;
+const FIRST_FILM_LINK = /Первый фильм/;
 const FRANCHISE_MOVIE_LINK = /Полнометражный фильм/;
 const FILM_SERIES_URL = /\/series\/9$/;
 const SERIES_DETAIL_URL = /\/series\/9$/;
@@ -167,8 +168,8 @@ test("каталог: сериал с сезоном и эпизодом", async
 		page.getByRole("heading", { name: "Сериалы и фильмы" }),
 	).toBeVisible();
 	await page.getByRole("link", { name: SERIES_TITLE }).click();
-	await expect(page.getByText("Сезон 1")).toBeVisible();
-	await expect(page.getByText(PILOT_TITLE)).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Сезон 1" })).toBeVisible();
+	await expect(page.getByRole("link", { name: PILOT_TITLE })).toBeVisible();
 });
 
 test("каталог: film_series доступна вне франшизы", async ({ page }) => {
@@ -176,7 +177,7 @@ test("каталог: film_series доступна вне франшизы", asy
 	await page.goto("/series");
 	await page.getByRole("link", { name: FILM_SERIES_TITLE }).click();
 	await expect(page).toHaveURL(FILM_SERIES_URL);
-	await expect(page.getByText("Первый фильм")).toBeVisible();
+	await expect(page.getByRole("link", { name: FIRST_FILM_LINK })).toBeVisible();
 });
 
 test("каталог: франшиза со смешанными элементами", async ({ page }) => {
@@ -184,7 +185,7 @@ test("каталог: франшиза со смешанными элемент�
 	await page.goto("/franchises");
 	await expect(page.getByRole("heading", { name: "Франшизы" })).toBeVisible();
 	await page.getByRole("link", { name: FRANCHISE_TITLE }).click();
-	await expect(page.getByText("Тестовый сериал")).toBeVisible();
+	await expect(page.getByRole("link", { name: SERIES_TITLE })).toBeVisible();
 	await expect(
 		page.getByRole("link", { name: FILM_SERIES_LINK }),
 	).toHaveAttribute("href", "/series/9");
