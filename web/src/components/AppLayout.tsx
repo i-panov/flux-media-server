@@ -10,6 +10,7 @@ import {
 } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import {
+	Clapperboard,
 	Film,
 	Image as ImageIcon,
 	LogOut,
@@ -18,6 +19,7 @@ import {
 	Settings,
 	Shield,
 	Sun,
+	Tv,
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,7 +32,15 @@ import { clickNode, useTVFocusable } from "../features/tv/tvFocus";
 import { useTVMode } from "../features/tv/useTVMode";
 import { PwaUpdatePrompt } from "./PwaUpdatePrompt";
 
-type NavTo = "/" | "/video" | "/audio" | "/memes" | "/settings" | "/admin";
+type NavTo =
+	| "/"
+	| "/video"
+	| "/series"
+	| "/franchises"
+	| "/audio"
+	| "/memes"
+	| "/settings"
+	| "/admin";
 
 interface NavItemConfig {
 	to: NavTo;
@@ -41,6 +51,13 @@ interface NavItemConfig {
 
 const MAIN_NAV: NavItemConfig[] = [
 	{ to: "/video", labelKey: "nav.video", icon: Film, exact: false },
+	{ to: "/series", labelKey: "nav.series", icon: Tv, exact: false },
+	{
+		to: "/franchises",
+		labelKey: "nav.franchises",
+		icon: Clapperboard,
+		exact: false,
+	},
 	{ to: "/audio", labelKey: "nav.audio", icon: Music, exact: false },
 	{ to: "/memes", labelKey: "nav.memes", icon: ImageIcon, exact: false },
 ];
@@ -83,7 +100,7 @@ function DesktopNavItem({ item }: { item: NavItemConfig }) {
 			activeOptions={{ exact: item.exact ?? true }}
 		>
 			<Icon size={18} />
-			<span>{t(item.labelKey)}</span>
+			<span className="max-w-full truncate">{t(item.labelKey)}</span>
 		</Link>
 	);
 }
@@ -100,14 +117,14 @@ function MobileNavItem({ item }: { item: NavItemConfig }) {
 		<Link
 			ref={targetRef}
 			to={item.to}
-			className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium text-[var(--mantine-color-dimmed)]"
+			className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1 text-[10px] font-medium text-[var(--mantine-color-dimmed)]"
 			activeProps={{
 				className: "text-[var(--mantine-color-violet-5)]",
 			}}
 			activeOptions={{ exact: item.exact ?? true }}
 		>
 			<Icon size={20} />
-			<span>{t(item.labelKey)}</span>
+			<span className="max-w-full truncate">{t(item.labelKey)}</span>
 		</Link>
 	);
 }

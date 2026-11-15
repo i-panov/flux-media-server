@@ -413,5 +413,23 @@
 			},
 			"queue": "Upload queue"
 		}
-	}
+	},
+	"nav.series": "Series",
+	"nav.franchises": "Franchises",
+	"catalog.series": "Series",
+	"catalog.filmSeries": "Film series",
+	"catalog.franchises": "Franchises",
+	"catalog.movie": "Movie",
+	"catalog.error": "Failed to load catalog",
+	"catalog.emptySeries": "No series yet",
+	"catalog.emptyFranchises": "No franchises yet",
+	"catalog.emptyFranchise": "Franchise is empty",
+	"catalog.noSeasons": "No seasons",
+	"catalog.noEpisodes": "No episodes in this season",
+	"catalog.noFilms": "No films yet",
+	"catalog.season": "Season {{number}}",
+	"catalog.seriesAndFilms": "Series and films",
+	"catalog.filmSeriesPlural": "Film series",
+	"catalog.emptyFilms": "No film series yet",
+	"catalog.seriesOne": "Series"
 }

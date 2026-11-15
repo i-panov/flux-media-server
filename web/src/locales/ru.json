@@ -413,5 +413,23 @@
 			},
 			"queue": "Очередь загрузок"
 		}
-	}
+	},
+	"nav.series": "Сериалы",
+	"nav.franchises": "Франшизы",
+	"catalog.series": "Сериалы",
+	"catalog.filmSeries": "Серия фильмов",
+	"catalog.franchises": "Франшизы",
+	"catalog.movie": "Фильм",
+	"catalog.error": "Не удалось загрузить каталог",
+	"catalog.emptySeries": "Сериалов пока нет",
+	"catalog.emptyFranchises": "Франшиз пока нет",
+	"catalog.emptyFranchise": "Франшиза пока пуста",
+	"catalog.noSeasons": "У сериала нет сезонов",
+	"catalog.noEpisodes": "В сезоне нет эпизодов",
+	"catalog.noFilms": "В серии пока нет фильмов",
+	"catalog.season": "Сезон {{number}}",
+	"catalog.seriesAndFilms": "Сериалы и фильмы",
+	"catalog.filmSeriesPlural": "Серии фильмов",
+	"catalog.emptyFilms": "Серий фильмов пока нет",
+	"catalog.seriesOne": "Сериал"
 }

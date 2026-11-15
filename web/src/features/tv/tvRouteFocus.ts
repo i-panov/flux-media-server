@@ -54,6 +54,17 @@ function findTVContentTarget(root: ParentNode): HTMLElement | null {
 	return null;
 }
 
+function findTVPageRoot(root: ParentNode): HTMLElement | null {
+	for (const node of root.querySelectorAll<HTMLElement>(
+		`[${TV_PAGE_ROOT_ATTRIBUTE}]`,
+	)) {
+		if (node.hasAttribute(TV_FOCUS_KEY_ATTRIBUTE)) {
+			return node;
+		}
+	}
+	return null;
+}
+
 // Навбар — резервная цель для страниц без действий (главная): пульт
 // сразу оказывается на переключателе разделов, а не на пустом корне.
 function findTVNavTarget(): HTMLElement | null {
@@ -133,6 +144,7 @@ export function useTVRouteFocus(tvMode: boolean): void {
 			}
 			const target =
 				findTVContentTarget(main) ??
+				findTVPageRoot(main) ??
 				findTVNavTarget() ??
 				findTVFocusTarget(main);
 			if (target === null) {

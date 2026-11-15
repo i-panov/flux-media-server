@@ -13,9 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AudioRouteImport } from './routes/audio'
+import { Route as FranchisesRouteImport } from './routes/franchises'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MemesRouteImport } from './routes/memes'
 import { Route as PlayerRouteImport } from './routes/player'
+import { Route as SeriesRouteImport } from './routes/series'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TrashRouteImport } from './routes/trash'
 import { Route as UploadRouteImport } from './routes/upload'
@@ -24,8 +26,12 @@ import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as AudioIndexRouteImport } from './routes/audio.index'
 import { Route as AudioIdRouteImport } from './routes/audio.$id'
 import { Route as CollectionsIdRouteImport } from './routes/collections.$id'
+import { Route as FranchisesIndexRouteImport } from './routes/franchises.index'
+import { Route as FranchisesIdRouteImport } from './routes/franchises.$id'
 import { Route as MemesIndexRouteImport } from './routes/memes.index'
 import { Route as MemesIdRouteImport } from './routes/memes.$id'
+import { Route as SeriesIndexRouteImport } from './routes/series.index'
+import { Route as SeriesIdRouteImport } from './routes/series.$id'
 import { Route as VideoIndexRouteImport } from './routes/video.index'
 import { Route as VideoIdRouteImport } from './routes/video.$id'
 
@@ -49,6 +55,11 @@ const AudioRoute = AudioRouteImport.update({
   path: '/audio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FranchisesRoute = FranchisesRouteImport.update({
+  id: '/franchises',
+  path: '/franchises',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -62,6 +73,11 @@ const MemesRoute = MemesRouteImport.update({
 const PlayerRoute = PlayerRouteImport.update({
   id: '/player',
   path: '/player',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeriesRoute = SeriesRouteImport.update({
+  id: '/series',
+  path: '/series',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -104,6 +120,16 @@ const CollectionsIdRoute = CollectionsIdRouteImport.update({
   path: '/collections/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FranchisesIndexRoute = FranchisesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FranchisesRoute,
+} as any)
+const FranchisesIdRoute = FranchisesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => FranchisesRoute,
+} as any)
 const MemesIndexRoute = MemesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -113,6 +139,16 @@ const MemesIdRoute = MemesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => MemesRoute,
+} as any)
+const SeriesIndexRoute = SeriesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SeriesRoute,
+} as any)
+const SeriesIdRoute = SeriesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => SeriesRoute,
 } as any)
 const VideoIndexRoute = VideoIndexRouteImport.update({
   id: '/',
@@ -130,9 +166,11 @@ export interface FileRoutesByFullPath {
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/audio': typeof AudioRouteWithChildren
+  '/franchises': typeof FranchisesRouteWithChildren
   '/login': typeof LoginRoute
   '/memes': typeof MemesRouteWithChildren
   '/player': typeof PlayerRoute
+  '/series': typeof SeriesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
@@ -140,10 +178,14 @@ export interface FileRoutesByFullPath {
   '/artists/$id': typeof ArtistsIdRoute
   '/audio/$id': typeof AudioIdRoute
   '/collections/$id': typeof CollectionsIdRoute
+  '/franchises/$id': typeof FranchisesIdRoute
   '/memes/$id': typeof MemesIdRoute
+  '/series/$id': typeof SeriesIdRoute
   '/video/$id': typeof VideoIdRoute
   '/audio/': typeof AudioIndexRoute
+  '/franchises/': typeof FranchisesIndexRoute
   '/memes/': typeof MemesIndexRoute
+  '/series/': typeof SeriesIndexRoute
   '/video/': typeof VideoIndexRoute
 }
 export interface FileRoutesByTo {
@@ -158,10 +200,14 @@ export interface FileRoutesByTo {
   '/artists/$id': typeof ArtistsIdRoute
   '/audio/$id': typeof AudioIdRoute
   '/collections/$id': typeof CollectionsIdRoute
+  '/franchises/$id': typeof FranchisesIdRoute
   '/memes/$id': typeof MemesIdRoute
+  '/series/$id': typeof SeriesIdRoute
   '/video/$id': typeof VideoIdRoute
   '/audio': typeof AudioIndexRoute
+  '/franchises': typeof FranchisesIndexRoute
   '/memes': typeof MemesIndexRoute
+  '/series': typeof SeriesIndexRoute
   '/video': typeof VideoIndexRoute
 }
 export interface FileRoutesById {
@@ -170,9 +216,11 @@ export interface FileRoutesById {
   '/activate': typeof ActivateRoute
   '/admin': typeof AdminRoute
   '/audio': typeof AudioRouteWithChildren
+  '/franchises': typeof FranchisesRouteWithChildren
   '/login': typeof LoginRoute
   '/memes': typeof MemesRouteWithChildren
   '/player': typeof PlayerRoute
+  '/series': typeof SeriesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/trash': typeof TrashRoute
   '/upload': typeof UploadRoute
@@ -180,10 +228,14 @@ export interface FileRoutesById {
   '/artists/$id': typeof ArtistsIdRoute
   '/audio/$id': typeof AudioIdRoute
   '/collections/$id': typeof CollectionsIdRoute
+  '/franchises/$id': typeof FranchisesIdRoute
   '/memes/$id': typeof MemesIdRoute
+  '/series/$id': typeof SeriesIdRoute
   '/video/$id': typeof VideoIdRoute
   '/audio/': typeof AudioIndexRoute
+  '/franchises/': typeof FranchisesIndexRoute
   '/memes/': typeof MemesIndexRoute
+  '/series/': typeof SeriesIndexRoute
   '/video/': typeof VideoIndexRoute
 }
 export interface FileRouteTypes {
@@ -193,9 +245,11 @@ export interface FileRouteTypes {
     | '/activate'
     | '/admin'
     | '/audio'
+    | '/franchises'
     | '/login'
     | '/memes'
     | '/player'
+    | '/series'
     | '/settings'
     | '/trash'
     | '/upload'
@@ -203,10 +257,14 @@ export interface FileRouteTypes {
     | '/artists/$id'
     | '/audio/$id'
     | '/collections/$id'
+    | '/franchises/$id'
     | '/memes/$id'
+    | '/series/$id'
     | '/video/$id'
     | '/audio/'
+    | '/franchises/'
     | '/memes/'
+    | '/series/'
     | '/video/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -221,10 +279,14 @@ export interface FileRouteTypes {
     | '/artists/$id'
     | '/audio/$id'
     | '/collections/$id'
+    | '/franchises/$id'
     | '/memes/$id'
+    | '/series/$id'
     | '/video/$id'
     | '/audio'
+    | '/franchises'
     | '/memes'
+    | '/series'
     | '/video'
   id:
     | '__root__'
@@ -232,9 +294,11 @@ export interface FileRouteTypes {
     | '/activate'
     | '/admin'
     | '/audio'
+    | '/franchises'
     | '/login'
     | '/memes'
     | '/player'
+    | '/series'
     | '/settings'
     | '/trash'
     | '/upload'
@@ -242,10 +306,14 @@ export interface FileRouteTypes {
     | '/artists/$id'
     | '/audio/$id'
     | '/collections/$id'
+    | '/franchises/$id'
     | '/memes/$id'
+    | '/series/$id'
     | '/video/$id'
     | '/audio/'
+    | '/franchises/'
     | '/memes/'
+    | '/series/'
     | '/video/'
   fileRoutesById: FileRoutesById
 }
@@ -254,9 +322,11 @@ export interface RootRouteChildren {
   ActivateRoute: typeof ActivateRoute
   AdminRoute: typeof AdminRoute
   AudioRoute: typeof AudioRouteWithChildren
+  FranchisesRoute: typeof FranchisesRouteWithChildren
   LoginRoute: typeof LoginRoute
   MemesRoute: typeof MemesRouteWithChildren
   PlayerRoute: typeof PlayerRoute
+  SeriesRoute: typeof SeriesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   TrashRoute: typeof TrashRoute
   UploadRoute: typeof UploadRoute
@@ -295,6 +365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AudioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/franchises': {
+      id: '/franchises'
+      path: '/franchises'
+      fullPath: '/franchises'
+      preLoaderRoute: typeof FranchisesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -314,6 +391,13 @@ declare module '@tanstack/react-router' {
       path: '/player'
       fullPath: '/player'
       preLoaderRoute: typeof PlayerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/series': {
+      id: '/series'
+      path: '/series'
+      fullPath: '/series'
+      preLoaderRoute: typeof SeriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -372,6 +456,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CollectionsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/franchises/': {
+      id: '/franchises/'
+      path: '/'
+      fullPath: '/franchises/'
+      preLoaderRoute: typeof FranchisesIndexRouteImport
+      parentRoute: typeof FranchisesRoute
+    }
+    '/franchises/$id': {
+      id: '/franchises/$id'
+      path: '/$id'
+      fullPath: '/franchises/$id'
+      preLoaderRoute: typeof FranchisesIdRouteImport
+      parentRoute: typeof FranchisesRoute
+    }
     '/memes/': {
       id: '/memes/'
       path: '/'
@@ -385,6 +483,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/memes/$id'
       preLoaderRoute: typeof MemesIdRouteImport
       parentRoute: typeof MemesRoute
+    }
+    '/series/': {
+      id: '/series/'
+      path: '/'
+      fullPath: '/series/'
+      preLoaderRoute: typeof SeriesIndexRouteImport
+      parentRoute: typeof SeriesRoute
+    }
+    '/series/$id': {
+      id: '/series/$id'
+      path: '/$id'
+      fullPath: '/series/$id'
+      preLoaderRoute: typeof SeriesIdRouteImport
+      parentRoute: typeof SeriesRoute
     }
     '/video/': {
       id: '/video/'
@@ -415,6 +527,20 @@ const AudioRouteChildren: AudioRouteChildren = {
 
 const AudioRouteWithChildren = AudioRoute._addFileChildren(AudioRouteChildren)
 
+interface FranchisesRouteChildren {
+  FranchisesIdRoute: typeof FranchisesIdRoute
+  FranchisesIndexRoute: typeof FranchisesIndexRoute
+}
+
+const FranchisesRouteChildren: FranchisesRouteChildren = {
+  FranchisesIdRoute: FranchisesIdRoute,
+  FranchisesIndexRoute: FranchisesIndexRoute,
+}
+
+const FranchisesRouteWithChildren = FranchisesRoute._addFileChildren(
+  FranchisesRouteChildren,
+)
+
 interface MemesRouteChildren {
   MemesIdRoute: typeof MemesIdRoute
   MemesIndexRoute: typeof MemesIndexRoute
@@ -426,6 +552,19 @@ const MemesRouteChildren: MemesRouteChildren = {
 }
 
 const MemesRouteWithChildren = MemesRoute._addFileChildren(MemesRouteChildren)
+
+interface SeriesRouteChildren {
+  SeriesIdRoute: typeof SeriesIdRoute
+  SeriesIndexRoute: typeof SeriesIndexRoute
+}
+
+const SeriesRouteChildren: SeriesRouteChildren = {
+  SeriesIdRoute: SeriesIdRoute,
+  SeriesIndexRoute: SeriesIndexRoute,
+}
+
+const SeriesRouteWithChildren =
+  SeriesRoute._addFileChildren(SeriesRouteChildren)
 
 interface VideoRouteChildren {
   VideoIdRoute: typeof VideoIdRoute
@@ -444,9 +583,11 @@ const rootRouteChildren: RootRouteChildren = {
   ActivateRoute: ActivateRoute,
   AdminRoute: AdminRoute,
   AudioRoute: AudioRouteWithChildren,
+  FranchisesRoute: FranchisesRouteWithChildren,
   LoginRoute: LoginRoute,
   MemesRoute: MemesRouteWithChildren,
   PlayerRoute: PlayerRoute,
+  SeriesRoute: SeriesRouteWithChildren,
   SettingsRoute: SettingsRoute,
   TrashRoute: TrashRoute,
   UploadRoute: UploadRoute,
