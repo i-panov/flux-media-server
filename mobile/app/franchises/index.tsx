@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import { useFranchises } from "../../src/api/catalog";
 import { CatalogCard } from "../../src/catalog/CatalogCard";
 import { CatalogHeader } from "../../src/catalog/CatalogHeader";
+import { CreateCatalogButton } from "../../src/catalog/CreateCatalogButton";
 import { AuthGate } from "../../src/components/AuthGate";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
@@ -28,6 +29,7 @@ function FranchisesContent() {
 				title={t("catalog.franchises")}
 				onBack={() => router.replace("/video")}
 			/>
+			<CreateCatalogButton mode="franchise" />
 			{franchises.isPending ? (
 				<ActivityIndicator color={colors.accent} />
 			) : franchises.isError ? (

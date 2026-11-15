@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, Text } from "react-native";
 import { useFranchise } from "../../src/api/catalog";
+import { useSession } from "../../src/auth/session";
 import { CatalogHeader } from "../../src/catalog/CatalogHeader";
 import { parseCatalogID } from "../../src/catalog/catalogView";
 import { AuthGate } from "../../src/components/AuthGate";
@@ -26,6 +27,7 @@ function FranchiseDetailContent() {
 	const valid = parsed !== null;
 	const numeric = parsed ?? 0;
 	const franchise = useFranchise(numeric, valid);
+	const session = useSession();
 	const { colors, spacing } = useTheme();
 	const data = franchise.data;
 	const entries = (data?.entries ?? []).filter(
@@ -51,6 +53,17 @@ function FranchiseDetailContent() {
 				title={data?.name ?? t("catalog.franchises")}
 				onBack={() => router.replace("/franchises")}
 			/>
+			{session.data?.is_admin === true && (
+				<Pressable
+					onPress={() =>
+						router.push(`/catalog-admin?kind=franchise&id=${numeric}`)
+					}
+				>
+					<Text style={{ color: colors.accent, fontWeight: "600" }}>
+						{t("catalog.adminTitle")}
+					</Text>
+				</Pressable>
+			)}
 			{franchise.isPending ? (
 				<ActivityIndicator color={colors.accent} />
 			) : franchise.isError || !data ? (

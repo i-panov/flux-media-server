@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useWork } from "../../src/api/catalog";
+import { useSession } from "../../src/auth/session";
 import { CatalogHeader } from "../../src/catalog/CatalogHeader";
 import { parseCatalogID } from "../../src/catalog/catalogView";
 import { AuthGate } from "../../src/components/AuthGate";
@@ -26,6 +27,7 @@ function SeriesDetailContent() {
 	const valid = parsed !== null;
 	const numeric = parsed ?? 0;
 	const work = useWork(numeric, valid);
+	const session = useSession();
 	const { colors, spacing } = useTheme();
 	const data = work.data;
 	if (!valid) {
@@ -48,6 +50,15 @@ function SeriesDetailContent() {
 				title={data?.title ?? t("catalog.series")}
 				onBack={() => router.replace("/series")}
 			/>
+			{session.data?.is_admin === true && (
+				<Pressable
+					onPress={() => router.push(`/catalog-admin?kind=work&id=${numeric}`)}
+				>
+					<Text style={{ color: colors.accent, fontWeight: "600" }}>
+						{t("catalog.adminTitle")}
+					</Text>
+				</Pressable>
+			)}
 			{work.isPending ? (
 				<ActivityIndicator color={colors.accent} />
 			) : work.isError || !data ? (

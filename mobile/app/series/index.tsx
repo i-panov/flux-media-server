@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useWorks } from "../../src/api/catalog";
 import { CatalogCard } from "../../src/catalog/CatalogCard";
 import { CatalogHeader } from "../../src/catalog/CatalogHeader";
+import { CreateCatalogButton } from "../../src/catalog/CreateCatalogButton";
 import { mergeWorks } from "../../src/catalog/catalogView";
 import { AuthGate } from "../../src/components/AuthGate";
 import { EmptyState } from "../../src/components/EmptyState";
@@ -31,6 +32,7 @@ function SeriesContent() {
 				title={t("catalog.series")}
 				onBack={() => router.replace("/video")}
 			/>
+			<CreateCatalogButton mode="work" />
 			{loading ? (
 				<ActivityIndicator color={colors.accent} />
 			) : (
