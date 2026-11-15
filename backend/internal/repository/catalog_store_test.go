@@ -423,3 +423,24 @@ func TestLegacyCatalogGuardRejectsOldSchema(t *testing.T) {
 	require.Equal(t, int64(1), seasons)
 	require.Equal(t, int64(1), items)
 }
+
+func TestMediaListHidesEpisodesByDefault(t *testing.T) {
+	db := setupCatalogDB(t)
+	movie := catalogVideo(t, db, "/movie.mp4")
+	kind := models.VideoKindEpisode
+	episode := models.Media{Title: "Episode", Type: models.MediaTypeVideo, FilePath: "/ep.mp4", VideoKind: &kind}
+	require.NoError(t, db.Create(&episode).Error)
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	rows, total, err := store.FindAll(ctx, MediaFilters{Type: models.MediaTypeVideo}, 0, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, rows, 1)
+	require.Equal(t, movie.ID, rows[0].ID)
+
+	rows, total, err = store.FindAll(ctx, MediaFilters{Type: models.MediaTypeVideo, IncludeEpisodes: true}, 0, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	require.Len(t, rows, 2)
+}

@@ -33,6 +33,9 @@ type MediaFilters struct {
 	// SortDesc — новые сверху (по id). Нужен мем-галерее; остальные
 	// разделы сохраняют исторический порядок id ASC.
 	SortDesc bool
+	// IncludeEpisodes — админ/отладка: вернуть эпизоды сериалов.
+	// По умолчанию общий список видео их скрывает.
+	IncludeEpisodes bool
 }
 
 // MediaRepository defines data access methods for Media entities.

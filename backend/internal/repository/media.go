@@ -29,6 +29,9 @@ func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, o
 	if filters.Type != "" {
 		query = query.Where("type = ?", filters.Type)
 	}
+	if !filters.IncludeEpisodes {
+		query = query.Where("(video_kind IS NULL OR video_kind <> ?)", models.VideoKindEpisode)
+	}
 	if filters.Year != 0 {
 		query = query.Where("year = ?", filters.Year)
 	}
