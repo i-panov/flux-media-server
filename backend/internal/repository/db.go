@@ -177,7 +177,13 @@ func AutoMigrate(db *gorm.DB) error {
 	if err := createCatalogIndexes(db); err != nil {
 		return err
 	}
+	if err := createMetadataIndexes(db); err != nil {
+		return err
+	}
 	if err := createVideoKindTriggers(db); err != nil {
+		return err
+	}
+	if err := createMediaSourceTriggers(db); err != nil {
 		return err
 	}
 	return nil
@@ -235,6 +241,23 @@ func createCatalogIndexes(db *gorm.DB) error {
 	return nil
 }
 
+// createMetadataIndexes — partial unique, которые нельзя вешать до
+// AutoMigrate на свежей БД: таблиц ещё нет.
+func createMetadataIndexes(db *gorm.DB) error {
+	indexes := []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_metadata_source_external
+			ON metadata(source, external_id) WHERE COALESCE(external_id, '') <> ''`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_media_metadata
+			ON media(metadata_id) WHERE metadata_id IS NOT NULL`,
+	}
+	for _, query := range indexes {
+		if err := db.Exec(query).Error; err != nil {
+			return fmt.Errorf("create metadata index: %w", err)
+		}
+	}
+	return nil
+}
+
 // RunMigrations applies schema fixes that AutoMigrate cannot perform
 // (dropping/replacing wrong indexes, deduplicating data, dropping columns/tables).
 // Must run BEFORE AutoMigrate so that the correct indexes can be created afterwards.
@@ -255,7 +278,10 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV3(db); err != nil {
 		return err
 	}
-	return runMigrationsV4(db)
+	if err := runMigrationsV4(db); err != nil {
+		return err
+	}
+	return runMigrationsV5(db)
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
@@ -301,10 +327,11 @@ func runMigrationsV1(db *gorm.DB) error {
 			return fmt.Errorf("migrate media indexes: %w", err)
 		}
 
-		// metadatas: unique external_id broke manual metadata updates (empty
-		// external IDs collided after the first row).
-		if err := dropUniqueIndexesOnColumn(tx, "metadatas", "external_id"); err != nil {
-			return fmt.Errorf("migrate metadatas indexes: %w", err)
+		// metadata: unique external_id broke manual metadata updates (empty
+		// external IDs collided after the first row). Таблица называется
+		// metadata, не metadatas — старое имя было no-op.
+		if err := dropUniqueIndexesOnColumn(tx, "metadata", "external_id"); err != nil {
+			return fmt.Errorf("migrate metadata indexes: %w", err)
 		}
 
 		// watch_progresses / collection_items: composite unique indexes were
@@ -612,6 +639,152 @@ func runMigrationsV4(db *gorm.DB) error {
 			Version:   schemaVersion,
 			AppliedAt: time.Now().UTC(),
 		}).Error
+	})
+}
+
+// runMigrationsV5 — metadata 1:1/external unique и source_media_id.
+func runMigrationsV5(db *gorm.DB) error {
+	const schemaVersion = 5
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 5: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		if ok, err := tableExists(tx, "media"); err != nil {
+			return fmt.Errorf("check media for v5: %w", err)
+		} else if ok {
+			// Легаси-индекс мог остаться с pre-v1 и мешает клонированию
+			// metadata с пустым external_id.
+			if err := dropUniqueIndexesOnColumn(tx, "metadata", "external_id"); err != nil {
+				return fmt.Errorf("drop legacy metadata external index: %w", err)
+			}
+			if err := tx.Exec(`UPDATE media SET metadata_id = NULL
+				WHERE metadata_id IS NOT NULL
+				  AND NOT EXISTS (SELECT 1 FROM metadata WHERE metadata.id = media.metadata_id)`).Error; err != nil {
+				return fmt.Errorf("clean media.metadata_id: %w", err)
+			}
+			if err := makeMetadataOneToOne(tx); err != nil {
+				return err
+			}
+			if err := dedupeMetadataExternal(tx); err != nil {
+				return err
+			}
+			hasSource, err := tableHasColumn(tx, "media", "source_media_id")
+			if err != nil {
+				return fmt.Errorf("check media.source_media_id: %w", err)
+			}
+			if hasSource {
+				if err := tx.Exec(`UPDATE media SET source_media_id = NULL
+					WHERE source_media_id IS NOT NULL
+					  AND NOT EXISTS (SELECT 1 FROM media src WHERE src.id = media.source_media_id)`).Error; err != nil {
+					return fmt.Errorf("clean media.source_media_id: %w", err)
+				}
+			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+func dedupeMetadataExternal(tx *gorm.DB) error {
+	var groups []struct {
+		Source     string
+		ExternalID string
+		Keeper     uint
+	}
+	if err := tx.Raw(`SELECT source, external_id, MIN(id) AS keeper FROM metadata
+		WHERE COALESCE(external_id, '') <> ''
+		GROUP BY source, external_id HAVING COUNT(*) > 1`).Scan(&groups).Error; err != nil {
+		return fmt.Errorf("find duplicate metadata: %w", err)
+	}
+	for _, group := range groups {
+		var ids []uint
+		if err := tx.Model(&models.Metadata{}).
+			Where("source = ? AND external_id = ? AND id <> ?", group.Source, group.ExternalID, group.Keeper).
+			Pluck("id", &ids).Error; err != nil {
+			return fmt.Errorf("metadata dup ids: %w", err)
+		}
+		if len(ids) == 0 {
+			continue
+		}
+		// Поля дублей сохраняем: чистим только внешнюю идентичность,
+		// иначе ручные постеры/рейтинги/описания терялись бы.
+		if err := tx.Model(&models.Metadata{}).Where("id IN ?", ids).
+			Update("external_id", "").Error; err != nil {
+			return fmt.Errorf("clear duplicate metadata external id: %w", err)
+		}
+	}
+	return nil
+}
+
+func makeMetadataOneToOne(tx *gorm.DB) error {
+	var metadataIDs []uint
+	if err := tx.Unscoped().Model(&models.Media{}).Where("metadata_id IS NOT NULL").
+		Group("metadata_id").Having("COUNT(*) > 1").Pluck("metadata_id", &metadataIDs).Error; err != nil {
+		return fmt.Errorf("find shared metadata: %w", err)
+	}
+	for _, metadataID := range metadataIDs {
+		var medias []models.Media
+		if err := tx.Unscoped().Where("metadata_id = ?", metadataID).Order("id").Find(&medias).Error; err != nil {
+			return err
+		}
+		var original models.Metadata
+		if err := tx.First(&original, metadataID).Error; err != nil {
+			return err
+		}
+		for _, media := range medias[1:] {
+			clone := original
+			clone.ID = 0
+			// У клона та же внешняя идентичность недопустима: unique
+			// (source, external_id) остаётся за оригиналом.
+			clone.ExternalID = ""
+			if err := tx.Create(&clone).Error; err != nil {
+				return fmt.Errorf("clone metadata: %w", err)
+			}
+			if err := tx.Unscoped().Model(&models.Media{}).Where("id = ?", media.ID).
+				Update("metadata_id", clone.ID).Error; err != nil {
+				return fmt.Errorf("repoint media metadata: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+// createMediaSourceTriggers защищает source_media_id без пересборки media.
+func createMediaSourceTriggers(db *gorm.DB) error {
+	exists := `NEW.source_media_id IS NOT NULL AND NOT EXISTS (
+		SELECT 1 FROM media WHERE id = NEW.source_media_id)`
+	queries := []string{
+		`DROP TRIGGER IF EXISTS media_source_insert`,
+		`CREATE TRIGGER media_source_insert BEFORE INSERT ON media
+		FOR EACH ROW WHEN ` + exists + `
+		BEGIN SELECT RAISE(ABORT, 'media_source_missing'); END`,
+		`DROP TRIGGER IF EXISTS media_source_update`,
+		`CREATE TRIGGER media_source_update BEFORE UPDATE OF source_media_id ON media
+		FOR EACH ROW WHEN NEW.source_media_id IS NOT OLD.source_media_id AND ` + exists + `
+		BEGIN SELECT RAISE(ABORT, 'media_source_missing'); END`,
+		`DROP TRIGGER IF EXISTS media_source_delete`,
+		`CREATE TRIGGER media_source_delete AFTER DELETE ON media
+		FOR EACH ROW BEGIN
+			UPDATE media SET source_media_id = NULL WHERE source_media_id = OLD.id;
+		END`,
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, query := range queries {
+			if err := tx.Exec(query).Error; err != nil {
+				return fmt.Errorf("create media source trigger: %w", err)
+			}
+		}
+		return nil
 	})
 }
 

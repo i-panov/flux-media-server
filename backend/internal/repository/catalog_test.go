@@ -85,7 +85,7 @@ func TestMigrationV2PreservesChildren(t *testing.T) {
 	require.Nil(t, gotAudio.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(4), versions)
+	require.Equal(t, int64(5), versions)
 }
 
 func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
@@ -106,7 +106,7 @@ func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
 	require.Equal(t, models.VideoKindMovie, *got.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(4), versions)
+	require.Equal(t, int64(5), versions)
 }
 
 func TestWorkItemRequiresExactlyOneTarget(t *testing.T) {
@@ -330,7 +330,7 @@ func TestMigrationV3RepairsInvalidVideoKind(t *testing.T) {
 	require.NoError(t, db.Model(&rows[1]).Update("deleted_at", time.Now().UTC()).Error)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(4), versions)
+	require.Equal(t, int64(5), versions)
 }
 
 func TestVideoKindTriggerAllowsClearingOnTypeChange(t *testing.T) {
@@ -378,4 +378,115 @@ func TestMigrationV4RenamesProgressDurationAndDedupesSubtitles(t *testing.T) {
 	var duplicate models.Subtitle
 	require.NoError(t, db.First(&duplicate).Error)
 	require.Equal(t, "/b.vtt", duplicate.Path, "kept newest subtitle")
+}
+
+func TestMigrationV5MetadataAndSourceIntegrity(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	firstMeta := models.Metadata{Source: "tmdb", ExternalID: "42", Title: "Movie"}
+	secondMeta := models.Metadata{Source: "tmdb", ExternalID: "42", Title: "Movie copy"}
+	require.NoError(t, db.Exec("DROP INDEX IF EXISTS idx_metadata_source_external").Error)
+	require.NoError(t, db.Create(&firstMeta).Error)
+	require.NoError(t, db.Create(&secondMeta).Error)
+	first := models.Media{Title: "A", Type: models.MediaTypeVideo, FilePath: "/a.mp4", MetadataID: &firstMeta.ID}
+	second := models.Media{Title: "B", Type: models.MediaTypeVideo, FilePath: "/b.mp4", MetadataID: &secondMeta.ID}
+	require.NoError(t, db.Create(&first).Error)
+	require.NoError(t, db.Create(&second).Error)
+
+	require.NoError(t, RunMigrations(db))
+
+	var metas []models.Metadata
+	require.NoError(t, db.Find(&metas).Error)
+	require.Len(t, metas, 2, "1:1 clones one metadata row")
+	var external int64
+	require.NoError(t, db.Model(&models.Metadata{}).Where("external_id = ?", "42").Count(&external).Error)
+	require.Equal(t, int64(1), external)
+	var medias []models.Media
+	require.NoError(t, db.Order("id").Find(&medias).Error)
+	require.NotEqual(t, *medias[0].MetadataID, *medias[1].MetadataID)
+
+	require.Error(t, db.Exec(`INSERT INTO media (title, type, video_kind, file_path, source_media_id)
+		VALUES ('bad', 'audio', NULL, '/bad.mp3', 999)`).Error)
+	source := models.Media{Title: "Source", Type: models.MediaTypeVideo, FilePath: "/src.mp4"}
+	require.NoError(t, db.Create(&source).Error)
+	child := models.Media{Title: "Child", Type: models.MediaTypeAudio, FilePath: "/child.mp3", SourceMediaID: &source.ID}
+	require.NoError(t, db.Create(&child).Error)
+	require.NoError(t, db.Unscoped().Delete(&models.Media{}, source.ID).Error)
+	var got models.Media
+	require.NoError(t, db.First(&got, child.ID).Error)
+	require.Nil(t, got.SourceMediaID)
+}
+
+func TestMigrationV5FreshOrderAndSoftDeleted(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, RunMigrations(db))
+	require.NoError(t, AutoMigrate(db))
+	var indexes []struct{ Name string }
+	require.NoError(t, db.Raw("PRAGMA index_list('metadata')").Scan(&indexes).Error)
+	hasExternal := false
+	for _, index := range indexes {
+		if index.Name == "idx_metadata_source_external" {
+			hasExternal = true
+		}
+	}
+	require.True(t, hasExternal, "fresh DB must get metadata external unique index")
+	indexes = nil
+	require.NoError(t, db.Raw("PRAGMA index_list('media')").Scan(&indexes).Error)
+	hasMediaMetadata := false
+	for _, index := range indexes {
+		if index.Name == "idx_media_metadata" {
+			hasMediaMetadata = true
+		}
+	}
+	require.True(t, hasMediaMetadata, "fresh DB must get media metadata unique index")
+
+	meta := models.Metadata{Source: "tmdb", ExternalID: "fresh", Title: "Meta"}
+	require.NoError(t, db.Create(&meta).Error)
+	require.Error(t, db.Create(&models.Metadata{Source: "tmdb", ExternalID: "fresh"}).Error)
+
+	meta2 := models.Metadata{Source: "manual", Title: "Meta2"}
+	require.NoError(t, db.Create(&meta2).Error)
+	require.NoError(t, db.Create(&models.Media{Title: "A", Type: models.MediaTypeVideo, FilePath: "/a.mp4", MetadataID: &meta2.ID}).Error)
+	require.Error(t, db.Create(&models.Media{Title: "B", Type: models.MediaTypeVideo, FilePath: "/b.mp4", MetadataID: &meta2.ID}).Error)
+
+	// Shared metadata у живого и trashed media не должна валить апгрейд.
+	require.NoError(t, db.Exec("DROP INDEX idx_media_metadata").Error)
+	trashed := models.Media{Title: "Trashed", Type: models.MediaTypeVideo, FilePath: "/trash.mp4", MetadataID: &meta2.ID}
+	require.NoError(t, db.Create(&trashed).Error)
+	require.NoError(t, db.Delete(&trashed).Error)
+	require.NoError(t, db.Where("version = ?", 5).Delete(&models.SchemaMigration{}).Error)
+	require.NoError(t, RunMigrations(db))
+	require.NoError(t, AutoMigrate(db))
+
+	source := models.Media{Title: "Source", Type: models.MediaTypeVideo, FilePath: "/src.mp4"}
+	require.NoError(t, db.Create(&source).Error)
+	child := models.Media{Title: "Child", Type: models.MediaTypeAudio, FilePath: "/child.mp3", SourceMediaID: &source.ID}
+	require.NoError(t, db.Create(&child).Error)
+	require.Error(t, db.Model(&child).Update("source_media_id", 999).Error)
+}
+
+func TestMigrationV5DropsLegacyMetadataExternalUnique(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+	require.NoError(t, db.Exec("DROP INDEX IF EXISTS idx_metadata_source_external").Error)
+	require.NoError(t, db.Exec("DROP INDEX IF EXISTS idx_media_metadata").Error)
+	require.NoError(t, db.Exec("CREATE UNIQUE INDEX legacy_metadata_external ON metadata(external_id)").Error)
+
+	meta := models.Metadata{Source: "tmdb", ExternalID: "legacy", Title: "Shared"}
+	require.NoError(t, db.Create(&meta).Error)
+	first := models.Media{Title: "A", Type: models.MediaTypeVideo, FilePath: "/a.mp4", MetadataID: &meta.ID}
+	second := models.Media{Title: "B", Type: models.MediaTypeVideo, FilePath: "/b.mp4", MetadataID: &meta.ID}
+	require.NoError(t, db.Create(&first).Error)
+	require.NoError(t, db.Create(&second).Error)
+	require.NoError(t, db.Where("version = ?", 5).Delete(&models.SchemaMigration{}).Error)
+
+	require.NoError(t, RunMigrations(db))
+	require.NoError(t, AutoMigrate(db))
+	var metas []models.Metadata
+	require.NoError(t, db.Find(&metas).Error)
+	require.Len(t, metas, 2)
 }
