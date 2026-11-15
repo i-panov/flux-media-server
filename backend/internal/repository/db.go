@@ -110,7 +110,7 @@ func AutoMigrate(db *gorm.DB) error {
 	if err := db.SetupJoinTable(&models.Media{}, "Artists", &models.MediaArtist{}); err != nil {
 		return err
 	}
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&models.Media{},
 		&models.Metadata{},
 		&models.User{},
@@ -128,17 +128,95 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.Subtitle{},
 		&models.SchemaMigration{},
 		&models.Setting{},
-	)
+		&models.Work{},
+		&models.Season{},
+		&models.WorkItem{},
+		&models.Franchise{},
+		&models.FranchiseEntry{},
+	); err != nil {
+		return err
+	}
+	if err := createCatalogIndexes(db); err != nil {
+		return err
+	}
+	if err := createVideoKindTriggers(db); err != nil {
+		return err
+	}
+	return nil
+}
+
+// createVideoKindTriggers проверяет media.video_kind без пересборки media.
+// CHECK через AutoMigrate на existing-БД вызывал recreateTable с DROP TABLE
+// и каскадно сносил favorites/progress/subtitles и остальные дочерние строки.
+func createVideoKindTriggers(db *gorm.DB) error {
+	condition := `(
+		(NEW.type = 'video' AND (NEW.video_kind IS NULL OR NEW.video_kind NOT IN ('movie','episode')))
+		OR (NEW.type IS NOT NULL AND NEW.type <> 'video' AND NEW.video_kind IS NOT NULL)
+		OR (NEW.type IS NULL AND NEW.video_kind IS NOT NULL)
+	)`
+	queries := []string{
+		`DROP TRIGGER IF EXISTS media_video_kind_insert`,
+		`CREATE TRIGGER media_video_kind_insert BEFORE INSERT ON media
+		FOR EACH ROW WHEN ` + condition + `
+		BEGIN SELECT RAISE(ABORT, 'media_video_kind'); END`,
+		`DROP TRIGGER IF EXISTS media_video_kind_update`,
+		`CREATE TRIGGER media_video_kind_update
+		BEFORE UPDATE OF type, video_kind ON media
+		FOR EACH ROW WHEN (NEW.type IS NOT OLD.type OR NEW.video_kind IS NOT OLD.video_kind)
+			AND ` + condition + `
+		BEGIN SELECT RAISE(ABORT, 'media_video_kind'); END`,
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, query := range queries {
+			if err := tx.Exec(query).Error; err != nil {
+				return fmt.Errorf("create media_video_kind trigger: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// createCatalogIndexes добавляет частичные UNIQUE-индексы, которые GORM
+// не умеет выразить тегами. Обычные position-индексы создаёт AutoMigrate.
+func createCatalogIndexes(db *gorm.DB) error {
+	indexes := []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_work_items_work_media
+			ON work_items(work_id, media_id) WHERE work_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_work_items_season_media
+			ON work_items(season_id, media_id) WHERE season_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_franchise_entries_work
+			ON franchise_entries(franchise_id, work_id) WHERE work_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_franchise_entries_media
+			ON franchise_entries(franchise_id, media_id) WHERE media_id IS NOT NULL`,
+	}
+	for _, query := range indexes {
+		if err := db.Exec(query).Error; err != nil {
+			return fmt.Errorf("create catalog index: %w", err)
+		}
+	}
+	return nil
 }
 
 // RunMigrations applies schema fixes that AutoMigrate cannot perform
 // (dropping/replacing wrong indexes, deduplicating data, dropping columns/tables).
 // Must run BEFORE AutoMigrate so that the correct indexes can be created afterwards.
 //
-// Вся миграция выполняется в одной транзакции: DDL в SQLite транзакционно,
-// поэтому обрыв на середине откатывается целиком, а не оставляет частично
-// мигрированную БД (guard-функции tableExists/columnExists работают на tx).
+// Каждая версия миграции выполняется в своей транзакции: DDL в SQLite
+// транзакционно, обрыв внутри версии откатывается целиком. Обрыв между
+// версиями безопасен: следующая версия продолжит с записанной schema_migrations.
 func RunMigrations(db *gorm.DB) error {
+	if err := runMigrationsV1(db); err != nil {
+		return err
+	}
+	if err := runMigrationsV2(db); err != nil {
+		return err
+	}
+	return runMigrationsV3(db)
+}
+
+// runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
+// чтобы новая v2 не перезапускала неидемпотентные шаги на уже обновлённой БД.
+func runMigrationsV1(db *gorm.DB) error {
 	const schemaVersion = 1
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
@@ -352,6 +430,98 @@ func RunMigrations(db *gorm.DB) error {
 			AppliedAt: time.Now().UTC(),
 		}).Error
 	})
+}
+
+// runMigrationsV2 добавляет video_kind. Новые таблицы каталога создаёт
+// AutoMigrate; здесь только данные, которые AutoMigrate не заполняет.
+func runMigrationsV2(db *gorm.DB) error {
+	const schemaVersion = 2
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 2: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		hasMedia, err := tableExists(tx, "media")
+		if err != nil {
+			return fmt.Errorf("check media for v2: %w", err)
+		}
+		if hasMedia {
+			hasVideoKind, err := tableHasColumn(tx, "media", "video_kind")
+			if err != nil {
+				return fmt.Errorf("check media.video_kind: %w", err)
+			}
+			if !hasVideoKind {
+				if err := tx.Exec("ALTER TABLE media ADD COLUMN video_kind TEXT").Error; err != nil {
+					return fmt.Errorf("add media.video_kind: %w", err)
+				}
+			}
+			// Старые видео считаем фильмами. NULL у audio/image сохраняем.
+			if err := repairVideoKind(tx); err != nil {
+				return fmt.Errorf("repair media.video_kind: %w", err)
+			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV3 исправляет данные, которые могла оставить v2 на уже
+// существующей БД: аудио/картинки с video_kind, видео с мусорным kind.
+func runMigrationsV3(db *gorm.DB) error {
+	const schemaVersion = 3
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 3: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		if ok, err := tableExists(tx, "media"); err != nil {
+			return fmt.Errorf("check media for v3: %w", err)
+		} else if ok {
+			hasVideoKind, err := tableHasColumn(tx, "media", "video_kind")
+			if err != nil {
+				return fmt.Errorf("check media.video_kind v3: %w", err)
+			}
+			if !hasVideoKind {
+				// v2 должен был добавить колонку; при экзотической БД не валим старт.
+				return tx.Create(&models.SchemaMigration{
+					Version:   schemaVersion,
+					AppliedAt: time.Now().UTC(),
+				}).Error
+			}
+			if err := repairVideoKind(tx); err != nil {
+				return fmt.Errorf("repair media.video_kind v3: %w", err)
+			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// repairVideoKind приводит невалидные значения к инварианту:
+// video -> movie/episode, всё остальное -> NULL.
+func repairVideoKind(tx *gorm.DB) error {
+	return tx.Exec(`UPDATE media
+		SET video_kind = CASE WHEN type = 'video' THEN 'movie' ELSE NULL END
+		WHERE (type = 'video' AND (video_kind IS NULL OR video_kind NOT IN ('movie','episode')))
+		   OR (COALESCE(type, '') <> 'video' AND video_kind IS NOT NULL)`).Error
 }
 
 // normalizeArtistNames backfills artists.name_norm (Go lower — юникодный,

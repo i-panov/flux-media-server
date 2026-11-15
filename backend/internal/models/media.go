@@ -13,6 +13,9 @@ type Media struct {
 	Year        int       `gorm:"index" json:"year"`
 	Description string    `json:"description"`
 	Type        MediaType `gorm:"index;type:text" json:"type"` // video, audio, image
+	// VideoKind — movie/episode. NULL для audio/image; для видео задаётся
+	// каталогом/загрузкой. Nullable: старые видео мигрируются как movie.
+	VideoKind *VideoKind `gorm:"column:video_kind;type:text;index" json:"video_kind,omitempty"`
 	// constraint на many2many создаёт FK на join-таблице media_artists
 	// (media_id → media.id, artist_id → artists.id) с каскадами — но только
 	// на свежих БД; старые БД не пересоздаются (ручные каскады в
@@ -68,6 +71,19 @@ type Media struct {
 	// мог вернуться, а строка осталась в корзине. Пользовательская
 	// корзина (MediaStore.Delete) всегда ставит false.
 	AutoTrashed bool `gorm:"default:false" json:"-"`
+}
+
+// BeforeCreate задаёт video_kind для видео, если вызывающий его не указал.
+// Для audio/image значение всегда NULL: инвариант держат триггеры СУБД.
+func (m *Media) BeforeCreate(tx *gorm.DB) error {
+	if m.Type == MediaTypeVideo && m.VideoKind == nil {
+		kind := VideoKindMovie
+		m.VideoKind = &kind
+	}
+	if m.Type != MediaTypeVideo {
+		m.VideoKind = nil
+	}
+	return nil
 }
 
 type Metadata struct {
