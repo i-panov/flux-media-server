@@ -50,25 +50,6 @@ env:
 - assertVisible:
     id: "audio-player-cover"
 
-# Аудио тоже можно положить в коллекцию: sheet открывается из полного
-# плеера и закрывается без изменений (создание проверяется в collections).
-- scrollUntilVisible:
-    element:
-      id: "audio-player-add-collection"
-    direction: DOWN
-    timeout: 10000
-- tapOn:
-    id: "audio-player-add-collection"
-- extendedWaitUntil:
-    visible:
-      id: "add-to-collection-sheet"
-    timeout: 10000
-- tapOn:
-    id: "add-to-collection-cancel"
-- extendedWaitUntil:
-    notVisible:
-      id: "add-to-collection-sheet"
-    timeout: 5000
 - scrollUntilVisible:
     element:
       id: "audio-player-pause"

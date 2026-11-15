@@ -23,6 +23,7 @@ import {
 } from "../../src/api/favorites";
 import { useDeleteMedia, useMedia } from "../../src/api/media";
 import { useSession } from "../../src/auth/session";
+import { LEGACY_COLLECTIONS_ENABLED } from "../../src/collections/legacy";
 import { AddToCollectionSheet } from "../../src/components/AddToCollectionSheet";
 import { AuthGate } from "../../src/components/AuthGate";
 import { ChangeCoverSheet } from "../../src/components/ChangeCoverSheet";
@@ -430,7 +431,7 @@ function VideoDetailContent() {
 				{tvCapabilities.canDownload && (
 					<DownloadButton media={item} testID="video-detail-download" />
 				)}
-				{tvCapabilities.canManageCollections && (
+				{LEGACY_COLLECTIONS_ENABLED && (
 					<ActionButton
 						icon="folder-open-outline"
 						label={t("video.addToCollection")}

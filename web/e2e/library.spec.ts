@@ -1,7 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
+import { stubEmptyLibraryMeta } from "./stubs";
 
-const COLLECTION_DETAIL_PATTERN = /\/collections\/1$/;
-const NESTED_COLLECTION_PATTERN = /\/collections\/2$/;
 const VIDEO_LIST_PATTERN = /\/video$/;
 const TRASH_PATTERN = /\/trash$/;
 
@@ -145,7 +144,6 @@ test("коллекция переезжает в корень", async ({ page })
 	);
 
 	await page.goto("/collections/2");
-	await expect(page).toHaveURL(NESTED_COLLECTION_PATTERN);
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Вложенная" }),
 	).toBeVisible();
@@ -270,10 +268,16 @@ test("корзина: ошибка восстановления показыва
 	await expect(page.getByText("Конфликтный фильм")).toBeVisible();
 });
 
-test("избранное и коллекции: добавить, убрать, создать и открыть", async ({
+test("избранное: добавить и убрать; legacy-коллекции скрыты", async ({
 	page,
 }) => {
 	await stubLibrary(page);
+	let collectionRequests = 0;
+	page.on("request", (request) => {
+		if (new URL(request.url()).pathname.startsWith("/api/collections")) {
+			collectionRequests += 1;
+		}
+	});
 
 	let favorites: ReturnType<typeof videoItem>[] = [];
 	await page.route(
@@ -305,64 +309,6 @@ test("избранное и коллекции: добавить, убрать, 
 		},
 	);
 
-	const collections: Array<{
-		id: number;
-		user_id: number;
-		name: string;
-		type: string;
-		parent_id: number | null;
-		created_at: string;
-		updated_at: string;
-	}> = [];
-	await page.route(
-		(url) => url.pathname === "/api/collections",
-		(route) => {
-			if (route.request().method() === "POST") {
-				collections.push({
-					id: 1,
-					user_id: 1,
-					name: "Тестовая",
-					type: "video",
-					parent_id: null,
-					created_at: "2026-01-01T00:00:00Z",
-					updated_at: "2026-01-01T00:00:00Z",
-				});
-				collections.push({
-					id: 2,
-					user_id: 1,
-					name: "Сезон 1",
-					type: "video",
-					parent_id: 1,
-					created_at: "2026-01-01T00:00:00Z",
-					updated_at: "2026-01-01T00:00:00Z",
-				});
-			}
-			return route.fulfill({
-				status: route.request().method() === "POST" ? 201 : 200,
-				contentType: "application/json",
-				body: JSON.stringify(collections),
-			});
-		},
-	);
-	await page.route(
-		(url) => url.pathname === "/api/collections/1/items",
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: "[]",
-			}),
-	);
-	await page.route(
-		(url) => url.pathname === "/api/collections/2/items",
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: "[]",
-			}),
-	);
-
 	await page.goto("/video");
 	await expect(page.getByRole("link", { name: "Первый фильм" })).toBeVisible();
 
@@ -382,25 +328,50 @@ test("избранное и коллекции: добавить, убрать, 
 		page.getByRole("heading", { level: 2, name: "Избранное" }),
 	).toBeHidden();
 
-	await page.getByRole("button", { name: "Создать коллекцию" }).click();
-	const dialog = page.getByRole("dialog");
-	await dialog.getByLabel("Название").fill("Тестовая");
-	await dialog.getByRole("button", { name: "Создать коллекцию" }).click();
+	// Legacy-коллекции скрыты из основных разделов.
+	for (const [path, heading] of [
+		["/video", "Видео"],
+		["/audio", "Аудио"],
+		["/memes", "Мемы"],
+	] as const) {
+		await page.goto(path);
+		await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+		await expect(page.getByRole("heading", { name: "Коллекции" })).toHaveCount(
+			0,
+		);
+		await expect(
+			page.getByRole("button", { name: "Создать коллекцию" }),
+		).toHaveCount(0);
+	}
+	expect(collectionRequests).toBe(0);
+});
 
-	await expect(page.getByRole("link", { name: "Тестовая" })).toBeVisible();
-	await page.getByRole("link", { name: "Тестовая" }).click();
-	await expect(page).toHaveURL(COLLECTION_DETAIL_PATTERN);
+test("upload: админ не видит legacy-коллекции", async ({ page }) => {
+	await page.route("**/api/auth/me", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				id: 1,
+				email: "admin@example.com",
+				is_admin: true,
+			}),
+		}),
+	);
+	await stubEmptyLibraryMeta(page);
+	let collectionRequests = 0;
+	page.on("request", (request) => {
+		if (new URL(request.url()).pathname.startsWith("/api/collections")) {
+			collectionRequests += 1;
+		}
+	});
+	await page.goto("/upload?type=video");
+	await expect(page.getByRole("heading", { name: "Загрузка" })).toBeVisible();
+	await expect(page.getByRole("combobox", { name: "Коллекция" })).toHaveCount(
+		0,
+	);
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Тестовая" }),
-	).toBeVisible();
-	await expect(page.getByText("В коллекции пока нет медиа")).toBeVisible();
-	await expect(page.getByRole("link", { name: "Сезон 1" })).toBeVisible();
-	await page.getByRole("link", { name: "Сезон 1" }).click();
-	await expect(page).toHaveURL(NESTED_COLLECTION_PATTERN);
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Сезон 1" }),
-	).toBeVisible();
-	// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
-	await page.getByRole("button", { name: "Назад к «Тестовая»" }).click();
-	await expect(page).toHaveURL(COLLECTION_DETAIL_PATTERN);
+		page.getByRole("button", { name: "Создать коллекцию" }),
+	).toHaveCount(0);
+	await expect.poll(() => collectionRequests).toBe(0);
 });

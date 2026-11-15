@@ -15,6 +15,7 @@ import { CardGridSkeletons } from "../../components/CardGridSkeletons";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
+import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
@@ -63,7 +64,9 @@ export function MemesPage() {
 				w={{ base: "100%", sm: 320 }}
 			/>
 			{debounced === "" && <FavoriteSection type="image" />}
-			{debounced === "" && <CollectionsSection type="image" />}
+			{LEGACY_COLLECTIONS_ENABLED && debounced === "" && (
+				<CollectionsSection type="image" />
+			)}
 			{list.isPending ? (
 				<CardGridSkeletons square textLines={0} />
 			) : list.isError && items.length === 0 ? (

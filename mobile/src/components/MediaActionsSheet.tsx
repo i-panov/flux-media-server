@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDeleteMedia } from "../api/media";
 import { useSession } from "../auth/session";
+import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import {
 	useDownloadActions,
 	useDownloadIndicator,
@@ -127,7 +128,7 @@ export function MediaActionsSheet({
 								onClose();
 								void saveMediaFile(media);
 							})}
-						{tvCapabilities.canManageCollections &&
+						{LEGACY_COLLECTIONS_ENABLED &&
 							media.type !== "image" &&
 							row("folder-open-outline", t("collections.addTitle"), () =>
 								setCollectionOpen(true),
@@ -154,7 +155,7 @@ export function MediaActionsSheet({
 				onClose={() => setCoverOpen(false)}
 				onUploaded={() => setCoverOpen(false)}
 			/>
-			{media.type !== "image" && (
+			{LEGACY_COLLECTIONS_ENABLED && media.type !== "image" && (
 				<AddToCollectionSheet
 					visible={collectionOpen}
 					mediaId={media.id}

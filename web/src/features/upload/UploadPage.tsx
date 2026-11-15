@@ -19,6 +19,7 @@ import { useCollections } from "../../api/collections";
 import { useSession } from "../../api/session";
 import type { UploadType } from "../../api/upload";
 import { CreateCollectionModal } from "../collections/CreateCollectionModal";
+import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { LinkDownloadCard } from "./LinkDownloadCard";
 import { UploadItemCard } from "./UploadItemCard";
@@ -48,7 +49,7 @@ export function UploadPage() {
 	// выбор, коллекция чужого типа файлам не достанется.
 	const [collectionId, setCollectionId] = useState<number | null>(null);
 	const [createOpened, setCreateOpened] = useState(false);
-	const collections = useCollections();
+	const collections = useCollections(LEGACY_COLLECTIONS_ENABLED);
 	const {
 		items,
 		addFiles,
@@ -148,44 +149,50 @@ export function UploadPage() {
 					w="fit-content"
 				/>
 
-				<Group gap="xs" wrap="wrap">
-					<Select
-						label={t("upload.collection")}
-						placeholder={t("upload.collectionPlaceholder")}
-						value={selectedCollection === null ? null : String(collectionId)}
-						data={matchingCollections.map((collection) => ({
-							value: String(collection.id),
-							label: collection.name,
-						}))}
-						allowDeselect={false}
-						disabled={collections.isPending}
-						w={{ base: "100%", sm: 280 }}
-						onChange={(value) => {
-							setCollectionId(value === null ? null : Number(value));
-						}}
-					/>
-					{selectedCollection !== null && (
-						<Button
-							variant="subtle"
-							color="red"
-							leftSection={<X size={16} />}
-							onClick={() => setCollectionId(null)}
-						>
-							{t("upload.collectionClear")}
-						</Button>
-					)}
-					<Button
-						variant="light"
-						leftSection={<FolderPlus size={16} />}
-						onClick={() => setCreateOpened(true)}
-					>
-						{t("collections.create")}
-					</Button>
-				</Group>
-				{selectedCollection !== null && (
-					<Text size="sm" c="dimmed">
-						{t("upload.collectionHint", { name: selectedCollection.name })}
-					</Text>
+				{LEGACY_COLLECTIONS_ENABLED && (
+					<>
+						<Group gap="xs" wrap="wrap">
+							<Select
+								label={t("upload.collection")}
+								placeholder={t("upload.collectionPlaceholder")}
+								value={
+									selectedCollection === null ? null : String(collectionId)
+								}
+								data={matchingCollections.map((collection) => ({
+									value: String(collection.id),
+									label: collection.name,
+								}))}
+								allowDeselect={false}
+								disabled={collections.isPending}
+								w={{ base: "100%", sm: 280 }}
+								onChange={(value) => {
+									setCollectionId(value === null ? null : Number(value));
+								}}
+							/>
+							{selectedCollection !== null && (
+								<Button
+									variant="subtle"
+									color="red"
+									leftSection={<X size={16} />}
+									onClick={() => setCollectionId(null)}
+								>
+									{t("upload.collectionClear")}
+								</Button>
+							)}
+							<Button
+								variant="light"
+								leftSection={<FolderPlus size={16} />}
+								onClick={() => setCreateOpened(true)}
+							>
+								{t("collections.create")}
+							</Button>
+						</Group>
+						{selectedCollection !== null && (
+							<Text size="sm" c="dimmed">
+								{t("upload.collectionHint", { name: selectedCollection.name })}
+							</Text>
+						)}
+					</>
 				)}
 
 				<FileButton onChange={addFiles} accept={ACCEPT[type]} multiple>

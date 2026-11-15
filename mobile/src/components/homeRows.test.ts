@@ -1,27 +1,5 @@
-import type { Collection } from "@flux/shared";
 import { describe, expect, it } from "vitest";
-import {
-	clampProgress,
-	continueProgressRatio,
-	isRowVisible,
-	rootCollections,
-} from "./homeRows";
-
-function collection(
-	id: number,
-	type: string,
-	parentId: number | null | undefined = null,
-): Collection {
-	return {
-		id,
-		user_id: 1,
-		name: `Collection ${id}`,
-		type,
-		parent_id: parentId,
-		created_at: "",
-		updated_at: "",
-	};
-}
+import { clampProgress, continueProgressRatio, isRowVisible } from "./homeRows";
 
 describe("isRowVisible", () => {
 	it("скрывает пустой, отсутствующий и null-список", () => {
@@ -63,31 +41,5 @@ describe("continueProgressRatio", () => {
 
 	it("не выходит за 100%", () => {
 		expect(continueProgressRatio({ position: 300, duration: 120 })).toBe(1);
-	});
-});
-
-describe("rootCollections", () => {
-	const all = [
-		collection(1, "video"),
-		collection(2, "video", 1),
-		collection(3, "audio"),
-		collection(4, "video", 999),
-	];
-
-	it("фильтрует по типу и оставляет только корни", () => {
-		expect(rootCollections(all, "video").map((item) => item.id)).toEqual([
-			1, 4,
-		]);
-		expect(rootCollections(all, "audio").map((item) => item.id)).toEqual([3]);
-	});
-
-	it("коллекция с отсутствующим родителем считается корнем", () => {
-		expect(
-			rootCollections([collection(5, "video", 404)], "video"),
-		).toHaveLength(1);
-	});
-
-	it("пустой список даёт пустой ряд", () => {
-		expect(rootCollections([], "video")).toEqual([]);
 	});
 });

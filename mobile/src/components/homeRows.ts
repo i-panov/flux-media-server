@@ -1,5 +1,3 @@
-import type { Collection } from "@flux/shared";
-
 // Сколько карточек держим в горизонтальном ряду: остальное доступно через
 // «Продолжить»/избранное на соответствующих экранах.
 export const HOME_ROW_LIMIT = 20;
@@ -29,21 +27,4 @@ export function continueProgressRatio(
 		return 0;
 	}
 	return clampProgress(entry.position / total);
-}
-
-// Корневые коллекции выбранного типа: ребёнок, чей родитель есть в списке,
-// в ряд не попадает. Коллекция с отсутствующим родителем считается корнем,
-// иначе она потерялась бы из UI при удалении папки-родителя.
-export function rootCollections(
-	collections: readonly Collection[],
-	type: string,
-): Collection[] {
-	const ids = new Set(collections.map((collection) => collection.id));
-	return collections.filter(
-		(collection) =>
-			collection.type === type &&
-			(collection.parent_id === null ||
-				collection.parent_id === undefined ||
-				!ids.has(collection.parent_id)),
-	);
 }

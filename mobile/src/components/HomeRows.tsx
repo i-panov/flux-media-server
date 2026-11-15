@@ -1,8 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { Collection, Media } from "@flux/shared";
+import type { Media } from "@flux/shared";
 import { router } from "expo-router";
 import { Alert, Pressable, Text, View } from "react-native";
-import { useAudioCollections, useVideoCollections } from "../api/collections";
 import {
 	useFavoriteMedia,
 	useFavoriteMediaIds,
@@ -14,20 +13,11 @@ import { t, useLanguage } from "../i18n";
 import { AudioCover } from "../player/AudioCover";
 import { useAudioActions } from "../player/AudioProvider";
 import { useTheme } from "../theme/ThemeProvider";
-import { CollectionRow } from "./CollectionRow";
-import {
-	continueProgressRatio,
-	isRowVisible,
-	rootCollections,
-} from "./homeRows";
+import { continueProgressRatio, isRowVisible } from "./homeRows";
 import { MediaRow, type MediaRowItem } from "./MediaRow";
 import { SectionHeader } from "./SectionHeader";
 
 const EMPTY_IDS: ReadonlySet<number> = new Set<number>();
-
-function openCollection(collection: Collection): void {
-	router.push(`/collections/${collection.id}`);
-}
 
 function openVideo(media: Media): void {
 	router.push(`/video/${media.id}`);
@@ -39,7 +29,6 @@ export function VideoHomeRows({ hidden = false }: { hidden?: boolean }) {
 	const continueQuery = useContinueWatching("video");
 	const favorites = useFavoriteMedia("video");
 	const favoriteIds = useFavoriteMediaIds("video");
-	const collections = useVideoCollections();
 	const toggleFavorite = useToggleVideoFavorite();
 	const favoriteSet = favoriteIds.data ?? EMPTY_IDS;
 
@@ -74,7 +63,6 @@ export function VideoHomeRows({ hidden = false }: { hidden?: boolean }) {
 		isFavorite: true,
 		testID: `favorite-card-${media.id}`,
 	}));
-	const roots = rootCollections(collections.data ?? [], "video");
 
 	return (
 		<View style={{ gap: spacing.lg, marginBottom: spacing.lg }}>
@@ -93,11 +81,6 @@ export function VideoHomeRows({ hidden = false }: { hidden?: boolean }) {
 				onFavoriteItem={onToggleFavorite}
 			/>
 			<CatalogRows hidden={hidden} />
-			<CollectionRow
-				collections={roots}
-				testID="collections-row"
-				onPressCollection={openCollection}
-			/>
 		</View>
 	);
 }
@@ -200,7 +183,6 @@ export function AudioHomeRows({
 	useLanguage();
 	const { spacing } = useTheme();
 	const favorites = useFavoriteMedia("audio");
-	const collections = useAudioCollections();
 	const { playQueue } = useAudioActions();
 
 	if (hidden) {
@@ -216,7 +198,6 @@ export function AudioHomeRows({
 		isFavorite: true,
 		testID: `favorite-card-${media.id}`,
 	}));
-	const roots = rootCollections(collections.data ?? [], "audio");
 
 	return (
 		<View style={{ gap: spacing.lg }}>
@@ -226,11 +207,6 @@ export function AudioHomeRows({
 				testID="favorite-row"
 				onPressItem={(item) => play(item.media)}
 				onMenuItem={(item) => onMenuItem(item.media)}
-			/>
-			<CollectionRow
-				collections={roots}
-				testID="collections-row"
-				onPressCollection={openCollection}
 			/>
 		</View>
 	);

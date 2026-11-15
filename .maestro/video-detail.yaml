@@ -47,7 +47,7 @@ env:
 # Экшен-кнопки могут быть ниже fold на маленьком экране.
 - scrollUntilVisible:
     element:
-      id: "video-detail-add-collection"
+      id: "video-detail-favorite-(on|off|disabled)"
     direction: DOWN
 - assertVisible:
     id: "video-detail-favorite-(on|off|disabled)"
@@ -62,19 +62,6 @@ env:
       - assertVisible:
           id: "video-detail-source"
 
-# Add-to-collection: открываем sheet и закрываем его, не меняя данные.
-- tapOn:
-    id: "video-detail-add-collection"
-- assertVisible:
-    id: "add-to-collection-sheet"
-- tapOn:
-    id: "add-to-collection-cancel"
-- extendedWaitUntil:
-    notVisible:
-      id: "add-to-collection-sheet"
-    timeout: 10000
-
-# Назад возвращает к списку, детали не остаются в истории вкладки.
 - tapOn:
     id: "video-detail-back"
 - extendedWaitUntil:

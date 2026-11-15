@@ -56,14 +56,6 @@ export function useCollections() {
 	return useQuery(collectionsQueryOptions());
 }
 
-export function useVideoCollections() {
-	return useQuery(typedCollectionsQueryOptions("video"));
-}
-
-export function useAudioCollections() {
-	return useQuery(typedCollectionsQueryOptions("audio"));
-}
-
 // Общий хук для sheet добавления: тип приходит из экрана (видео/аудио).
 export function useCollectionsByType(type: AddableCollectionType) {
 	return useQuery(typedCollectionsQueryOptions(type));

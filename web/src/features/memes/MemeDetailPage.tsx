@@ -13,6 +13,7 @@ import { ApiError } from "../../api/client";
 import { useMedia, useMediaReload } from "../../api/media";
 import type { Media } from "../../core/media";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
+import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
 import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
@@ -161,7 +162,9 @@ export function MemeDetailPage() {
 					</Button>
 					<Group gap="xs">
 						<FavoriteButton mediaId={item.id} type="image" />
-						<AddToCollectionButton mediaId={item.id} type="image" />
+						{LEGACY_COLLECTIONS_ENABLED && (
+							<AddToCollectionButton mediaId={item.id} type="image" />
+						)}
 						{capabilities.canDownload && (
 							<Button
 								component="a"

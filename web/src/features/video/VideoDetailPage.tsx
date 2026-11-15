@@ -20,6 +20,7 @@ import {
 import { formatDuration, splitSubLang } from "../../core/format";
 import type { Media } from "../../core/media";
 import { AddToCollectionButton } from "../collections/AddToCollectionButton";
+import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { MediaAdminActions } from "../media/MediaAdminActions";
 import { MetaItem } from "../media/MetaItem";
@@ -83,6 +84,7 @@ export function SubTrack({
 	);
 }
 
+// eslint-disable-next-line max-lines-per-function -- экран собран из секций, рефакторинг вне этапа.
 export function VideoDetailPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
@@ -288,7 +290,9 @@ export function VideoDetailPage() {
 						</Title>
 						<Group gap="xs">
 							<FavoriteButton mediaId={item.id} type="video" />
-							<AddToCollectionButton mediaId={item.id} type="video" />
+							{LEGACY_COLLECTIONS_ENABLED && (
+								<AddToCollectionButton mediaId={item.id} type="video" />
+							)}
 						</Group>
 					</Group>
 					<VideoMeta item={item} />

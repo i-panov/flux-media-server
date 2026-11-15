@@ -121,8 +121,8 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - Поиск и сортировка списков видео/аудио реализованы в mobile 0.1.31, текущий релиз 0.1.44:
   `useVideoList(q, sort)`/`useAudioList(q, sort)`, debounce 300 мс,
   переключатель asc/desc и отдельные пустые состояния.
-- Maestro: 19 flow в `.maestro/` (tabs, theme, video, audio, lyrics,
-  artists, collections, favorites, search, trash, upload, metadata,
+- Maestro: 18 flow в `.maestro/` (tabs, theme, video, audio, lyrics,
+  artists, favorites, search, trash, upload, metadata,
   downloads).
   Ручной workflow `.github/workflows/mobile-e2e.yml` поднимает Android
   emulator, backend и прогоняет `tabs.yaml`/`theme.yaml`; в push/PR не

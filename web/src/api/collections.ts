@@ -34,8 +34,8 @@ function collectionsQueryOptions() {
 	});
 }
 
-export function useCollections() {
-	return useQuery(collectionsQueryOptions());
+export function useCollections(enabled = true) {
+	return useQuery({ ...collectionsQueryOptions(), enabled });
 }
 
 export function useCollectionItems(collectionId: number, enabled = true) {

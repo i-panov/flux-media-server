@@ -16,6 +16,7 @@ import { CardGridSkeletons } from "../../components/CardGridSkeletons";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
+import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import { FavoriteArtistsSection } from "../favorites/FavoriteArtistsSection";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { useAudioPlayer } from "../player/AudioPlayerProvider";
@@ -97,7 +98,9 @@ export function AudioPage() {
 			{debounced === "" && (
 				<FavoriteArtistsSection onSelect={(name) => setQuery(name)} />
 			)}
-			{debounced === "" && <CollectionsSection type="audio" />}
+			{LEGACY_COLLECTIONS_ENABLED && debounced === "" && (
+				<CollectionsSection type="audio" />
+			)}
 			{list.isPending ? (
 				<CardGridSkeletons imageHeight={160} textLines={2} />
 			) : list.isError && items.length === 0 ? (

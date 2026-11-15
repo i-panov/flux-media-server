@@ -13,6 +13,7 @@ import {
 	useFavoriteAudioIds,
 	useToggleAudioFavorite,
 } from "../src/api/favorites";
+import { LEGACY_COLLECTIONS_ENABLED } from "../src/collections/legacy";
 import { AddToCollectionSheet } from "../src/components/AddToCollectionSheet";
 import { ArtistLinks } from "../src/components/ArtistLinks";
 import { AuthGate } from "../src/components/AuthGate";
@@ -195,7 +196,7 @@ function AudioPlayerContent() {
 			{tvCapabilities.canDownload && (
 				<DownloadButton media={current} testID="audio-player-download" />
 			)}
-			{tvCapabilities.canManageCollections && (
+			{LEGACY_COLLECTIONS_ENABLED && (
 				<Pressable
 					accessibilityRole="button"
 					accessibilityLabel={t("collections.addButton")}

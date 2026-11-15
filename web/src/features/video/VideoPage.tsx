@@ -16,12 +16,15 @@ import { CardGridSkeletons } from "../../components/CardGridSkeletons";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useVisibleMedia } from "../../hooks/useVisibleMedia";
 import { CollectionsSection } from "../collections/CollectionsSection";
+import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
 import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { VideoCard } from "./VideoCard";
 
+// Legacy-коллекции скрыты из основного UI: каталог сериалов/франшиз
+// заменяет их. Прямые маршруты /collections остаются для старых ссылок.
 export function VideoPage() {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
@@ -88,7 +91,9 @@ export function VideoPage() {
 			{/* При поиске ряды продолжения не нужны: они не фильтруются. */}
 			{debounced === "" && <ContinueWatching limit={1} />}
 			{debounced === "" && <FavoriteSection type="video" />}
-			{debounced === "" && <CollectionsSection type="video" />}
+			{LEGACY_COLLECTIONS_ENABLED && debounced === "" && (
+				<CollectionsSection type="video" />
+			)}
 			{list.isPending ? (
 				<CardGridSkeletons />
 			) : list.isError && items.length === 0 ? (
