@@ -57,6 +57,12 @@ type FranchisePatch struct {
 	CoverURL    *string
 }
 
+func (r *FranchiseStore) GetEntry(ctx context.Context, id uint) (*models.FranchiseEntry, error) {
+	var entry models.FranchiseEntry
+	err := r.db.WithContext(ctx).Preload("Work").Preload("Media").First(&entry, id).Error
+	return &entry, err
+}
+
 func (r *FranchiseStore) Update(ctx context.Context, id uint, patch FranchisePatch) (*models.Franchise, error) {
 	updates := map[string]any{}
 	if patch.Name != nil {
@@ -148,8 +154,9 @@ func (r *FranchiseStore) AddEntry(ctx context.Context, franchiseID uint, workID,
 	return &entry, nil
 }
 
-func (r *FranchiseStore) RemoveEntry(ctx context.Context, entryID uint) error {
-	res := r.db.WithContext(ctx).Unscoped().Delete(&models.FranchiseEntry{}, entryID)
+func (r *FranchiseStore) RemoveEntry(ctx context.Context, franchiseID, entryID uint) error {
+	res := r.db.WithContext(ctx).Where("franchise_id = ?", franchiseID).
+		Unscoped().Delete(&models.FranchiseEntry{}, entryID)
 	if res.Error != nil {
 		return res.Error
 	}

@@ -83,7 +83,7 @@ type Franchise struct {
 	CoverURL    string           `json:"cover_url"`
 	CreatedAt   time.Time        `json:"created_at"`
 	UpdatedAt   time.Time        `json:"updated_at"`
-	Entries     []FranchiseEntry `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	Entries     []FranchiseEntry `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"entries,omitempty"`
 }
 
 // FranchiseEntry — элемент франшизы: work (series/film_series) или
@@ -96,6 +96,6 @@ type FranchiseEntry struct {
 	Position    int        `gorm:"index:idx_franchise_entries_position,priority:2" json:"position"`
 	CreatedAt   time.Time  `json:"created_at"`
 	Franchise   *Franchise `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
-	Work        *Work      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
-	Media       *Media     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	Work        *Work      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"work,omitempty"`
+	Media       *Media     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"media,omitempty"`
 }

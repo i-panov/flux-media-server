@@ -168,6 +168,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	favRepo := repository.NewFavoriteRepository(db)
 	colRepo := repository.NewCollectionRepository(db)
 	colItemRepo := repository.NewCollectionItemRepository(db)
+	workRepo := repository.NewWorkRepository(db)
+	franchiseRepo := repository.NewFranchiseRepository(db)
 	lyricsRepo := repository.NewLyricsRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	deviceAuthRepo := repository.NewDeviceAuthRepository(db)
@@ -359,6 +361,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	metadataHandler := handlers.NewMetadataHandler(mediaRepo)
 	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
+	catalogHandler := handlers.NewCatalogHandler(workRepo, franchiseRepo)
 	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc, subRepo)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
 	artistHandler := handlers.NewArtistHandler(artistRepo, cfg.Media.ThumbnailPath)
@@ -751,6 +754,35 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Delete("/collections/:id/items/:mediaId", collectionHandler.RemoveItem)
 	api.Get("/collections/:id/items", readRateLimiter, collectionHandler.ListItems)
 	api.Get("/collections/:id/stats", readRateLimiter, trashHandler.Stats)
+
+	// Глобальный каталог: чтение — всем авторизованным, запись — админу.
+	works := api.Group("/works")
+	works.Get("", readRateLimiter, catalogHandler.ListWorks)
+	works.Post("", requireAdmin, catalogHandler.CreateWork)
+	works.Get("/:id", readRateLimiter, catalogHandler.GetWork)
+	works.Put("/:id", requireAdmin, catalogHandler.UpdateWork)
+	works.Delete("/:id", requireAdmin, catalogHandler.DeleteWork)
+	works.Post("/:id/seasons", requireAdmin, catalogHandler.CreateSeason)
+	works.Put("/:id/seasons/order", requireAdmin, catalogHandler.ReorderSeasons)
+	works.Post("/:id/items", requireAdmin, catalogHandler.AddFilm)
+	works.Delete("/:id/items/:mediaId", requireAdmin, catalogHandler.RemoveFilm)
+	works.Put("/:id/items/order", requireAdmin, catalogHandler.ReorderFilmItems)
+
+	api.Put("/seasons/:id", requireAdmin, catalogHandler.UpdateSeason)
+	api.Delete("/seasons/:id", requireAdmin, catalogHandler.DeleteSeason)
+	api.Post("/seasons/:id/items", requireAdmin, catalogHandler.AddEpisode)
+	api.Delete("/seasons/:id/items/:mediaId", requireAdmin, catalogHandler.RemoveEpisode)
+	api.Put("/seasons/:id/items/order", requireAdmin, catalogHandler.ReorderEpisodes)
+
+	franchises := api.Group("/franchises")
+	franchises.Get("", readRateLimiter, catalogHandler.ListFranchises)
+	franchises.Post("", requireAdmin, catalogHandler.CreateFranchise)
+	franchises.Get("/:id", readRateLimiter, catalogHandler.GetFranchise)
+	franchises.Put("/:id", requireAdmin, catalogHandler.UpdateFranchise)
+	franchises.Delete("/:id", requireAdmin, catalogHandler.DeleteFranchise)
+	franchises.Post("/:id/entries", requireAdmin, catalogHandler.AddFranchiseEntry)
+	franchises.Delete("/:id/entries/:entryId", requireAdmin, catalogHandler.RemoveFranchiseEntry)
+	franchises.Put("/:id/entries/order", requireAdmin, catalogHandler.ReorderFranchiseEntries)
 
 	// Trash — корзина: плоский список, восстановление, снос навсегда.
 	// Медиа-ветки и Empty — под requireAdmin, как media.Delete/:id:

@@ -110,6 +110,39 @@ func (r *WorkStore) Get(ctx context.Context, id uint) (*models.Work, error) {
 	return &work, nil
 }
 
+// GetSeason возвращает сезон с эпизодами и Media — для ответа после update.
+func (r *WorkStore) GetSeason(ctx context.Context, id uint) (*models.Season, error) {
+	var season models.Season
+	db := r.db.WithContext(ctx)
+	if err := db.First(&season, id).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Where("season_id = ?", id).
+		Order("position ASC, id ASC").Find(&season.Items).Error; err != nil {
+		return nil, err
+	}
+	items := make([]*models.WorkItem, 0, len(season.Items))
+	for i := range season.Items {
+		items = append(items, &season.Items[i])
+	}
+	if err := r.attachMedia(ctx, items); err != nil {
+		return nil, err
+	}
+	return &season, nil
+}
+
+// GetItem возвращает элемент с подгруженным Media.
+func (r *WorkStore) GetItem(ctx context.Context, id uint) (*models.WorkItem, error) {
+	var item models.WorkItem
+	if err := r.db.WithContext(ctx).First(&item, id).Error; err != nil {
+		return nil, err
+	}
+	if err := r.attachMedia(ctx, []*models.WorkItem{&item}); err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
 func (r *WorkStore) attachMedia(ctx context.Context, items []*models.WorkItem) error {
 	if len(items) == 0 {
 		return nil
