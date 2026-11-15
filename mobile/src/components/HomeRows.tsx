@@ -9,6 +9,7 @@ import {
 	useToggleVideoFavorite,
 } from "../api/favorites";
 import { useContinueWatching } from "../api/progress";
+import { CatalogRows } from "../catalog/CatalogRows";
 import { t, useLanguage } from "../i18n";
 import { AudioCover } from "../player/AudioCover";
 import { useAudioActions } from "../player/AudioProvider";
@@ -91,6 +92,7 @@ export function VideoHomeRows({ hidden = false }: { hidden?: boolean }) {
 				onPressItem={(item) => openVideo(item.media)}
 				onFavoriteItem={onToggleFavorite}
 			/>
+			<CatalogRows hidden={hidden} />
 			<CollectionRow
 				collections={roots}
 				testID="collections-row"
