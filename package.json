@@ -8,6 +8,14 @@
 		"packages/shared"
 	],
 	"devDependencies": {
-		"knip": "^6.45.1"
+		"knip": "^6.45.1",
+		"react-native-gesture-handler": "3.3.0",
+		"react-native-worklets": "0.13.0",
+		"react-native-reanimated": "4.7.1"
+	},
+	"overrides": {
+		"react-native-gesture-handler": "3.3.0",
+		"react-native-worklets": "0.13.0",
+		"react-native-reanimated": "4.7.1"
 	}
 }

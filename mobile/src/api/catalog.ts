@@ -282,3 +282,28 @@ export function useReorderSeasons() {
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
+
+export function useDeleteWork() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) => write<void>(`/works/${id}`, "DELETE"),
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export function useUpdateFranchise() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, name }: { id: number; name: string }) =>
+			write<CatalogFranchise>(`/franchises/${id}`, "PUT", { name }),
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export function useDeleteFranchise() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) => write<void>(`/franchises/${id}`, "DELETE"),
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}

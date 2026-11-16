@@ -17,7 +17,9 @@ import {
 	useAddFilm,
 	useAddFranchiseEntry,
 	useCreateSeason,
+	useDeleteFranchise,
 	useDeleteSeason,
+	useDeleteWork,
 	useFranchise,
 	useRemoveEpisode,
 	useRemoveFilm,
@@ -26,6 +28,7 @@ import {
 	useReorderFilms,
 	useReorderFranchiseEntries,
 	useReorderSeasons,
+	useUpdateFranchise,
 	useUpdateWork,
 	useWork,
 	useWorks,
@@ -34,6 +37,7 @@ import { useSession } from "../src/auth/session";
 import { CatalogHeader } from "../src/catalog/CatalogHeader";
 import { parseCatalogID } from "../src/catalog/catalogView";
 import { MediaPickerModal } from "../src/catalog/MediaPickerModal";
+import { ReorderModal } from "../src/catalog/ReorderModal";
 import { AuthGate } from "../src/components/AuthGate";
 import { Screen } from "../src/components/Screen";
 import { t } from "../src/i18n";
@@ -63,6 +67,9 @@ function CatalogAdminContent() {
 	const works = useWorks("series");
 	const films = useWorks("film_series");
 	const updateWork = useUpdateWork();
+	const deleteWork = useDeleteWork();
+	const updateFranchise = useUpdateFranchise();
+	const deleteFranchise = useDeleteFranchise();
 	const createSeason = useCreateSeason();
 	const deleteSeason = useDeleteSeason();
 	const addEpisode = useAddEpisode();
@@ -78,6 +85,11 @@ function CatalogAdminContent() {
 	const [title, setTitle] = useState("");
 	const [picker, setPicker] = useState<Picker>(null);
 	const [pickerSeason, setPickerSeason] = useState<number | null>(null);
+	const [sortKind, setSortKind] = useState<
+		"seasons" | "episodes" | "films" | null
+	>(null);
+	const [sortSeason, setSortSeason] = useState<number | null>(null);
+	const [franchiseSort, setFranchiseSort] = useState(false);
 
 	if (session.data?.is_admin !== true) {
 		return (
@@ -120,6 +132,7 @@ function CatalogAdminContent() {
 	};
 	const allWorks = [...(works.data ?? []), ...(films.data ?? [])];
 	const deleteItemConfirm = t("catalog.deleteItemConfirm");
+	const sortLabel = t("catalog.sort");
 	const handleMedia = (mediaID: number) =>
 		void run(async () => {
 			if (picker === "film" && work.data) {
@@ -161,38 +174,62 @@ function CatalogAdminContent() {
 					onChangeText={setTitle}
 					placeholder={t("catalog.adminTitle")}
 				/>
-				<Pressable
-					onPress={() =>
-						void run(() =>
-							updateWork.mutateAsync({
-								id: data.id,
-								title: (title || data.title).trim(),
-							}),
-						)
-					}
-				>
-					<Text style={{ color: colors.accent }}>{t("common.save")}</Text>
-				</Pressable>
+				<View style={{ flexDirection: "row", gap: spacing.md }}>
+					<Pressable
+						onPress={() =>
+							void run(() =>
+								updateWork.mutateAsync({
+									id: data.id,
+									title: (title || data.title).trim(),
+								}),
+							)
+						}
+					>
+						<Text style={{ color: colors.accent }}>{t("common.save")}</Text>
+					</Pressable>
+					<Pressable
+						onPress={() =>
+							confirm(
+								deleteItemConfirm,
+								() =>
+									void run(async () => {
+										await deleteWork.mutateAsync(data.id);
+										router.dismissAll();
+										router.replace("/series");
+									}),
+							)
+						}
+					>
+						<Text style={{ color: colors.danger }}>
+							{t("catalog.adminDelete")}
+						</Text>
+					</Pressable>
+				</View>
 				{data.kind === "series" ? (
 					<>
-						<Pressable
-							onPress={() =>
-								void run(() =>
-									createSeason.mutateAsync({
-										workID: data.id,
-										seasonNumber:
-											Math.max(
-												0,
-												...(data.seasons ?? []).map((s) => s.season_number),
-											) + 1,
-									}),
-								)
-							}
-						>
-							<Text style={{ color: colors.accent }}>
-								{t("catalog.adminAddSeason")}
-							</Text>
-						</Pressable>
+						<View style={{ flexDirection: "row", gap: spacing.md }}>
+							<Pressable
+								onPress={() =>
+									void run(() =>
+										createSeason.mutateAsync({
+											workID: data.id,
+											seasonNumber:
+												Math.max(
+													0,
+													...(data.seasons ?? []).map((s) => s.season_number),
+												) + 1,
+										}),
+									)
+								}
+							>
+								<Text style={{ color: colors.accent }}>
+									{t("catalog.adminAddSeason")}
+								</Text>
+							</Pressable>
+							<Pressable onPress={() => setSortKind("seasons")}>
+								<Text style={{ color: colors.accent }}>{sortLabel}</Text>
+							</Pressable>
+						</View>
 						{(data.seasons ?? []).map((season, index) => (
 							<View
 								key={season.id}
@@ -275,16 +312,26 @@ function CatalogAdminContent() {
 										/>
 									</Pressable>
 								</View>
-								<Pressable
-									onPress={() => {
-										setPickerSeason(season.id);
-										setPicker("episode");
-									}}
-								>
-									<Text style={{ color: colors.accent }}>
-										{t("catalog.adminAddEpisode")}
-									</Text>
-								</Pressable>
+								<View style={{ flexDirection: "row", gap: spacing.md }}>
+									<Pressable
+										onPress={() => {
+											setPickerSeason(season.id);
+											setPicker("episode");
+										}}
+									>
+										<Text style={{ color: colors.accent }}>
+											{t("catalog.adminAddEpisode")}
+										</Text>
+									</Pressable>
+									<Pressable
+										onPress={() => {
+											setSortSeason(season.id);
+											setSortKind("episodes");
+										}}
+									>
+										<Text style={{ color: colors.accent }}>{sortLabel}</Text>
+									</Pressable>
+								</View>
 								{(season.items ?? []).map((item, itemIndex) => (
 									<View
 										key={item.id}
@@ -340,11 +387,16 @@ function CatalogAdminContent() {
 					</>
 				) : (
 					<>
-						<Pressable onPress={() => setPicker("film")}>
-							<Text style={{ color: colors.accent }}>
-								{t("catalog.adminAddFilm")}
-							</Text>
-						</Pressable>
+						<View style={{ flexDirection: "row", gap: spacing.md }}>
+							<Pressable onPress={() => setPicker("film")}>
+								<Text style={{ color: colors.accent }}>
+									{t("catalog.adminAddFilm")}
+								</Text>
+							</Pressable>
+							<Pressable onPress={() => setSortKind("films")}>
+								<Text style={{ color: colors.accent }}>{sortLabel}</Text>
+							</Pressable>
+						</View>
 						{(data.items ?? []).map((item, index) => (
 							<View
 								key={item.id}
@@ -394,6 +446,47 @@ function CatalogAdminContent() {
 						))}
 					</>
 				)}
+				<ReorderModal
+					visible={sortKind !== null}
+					title={sortLabel}
+					rows={
+						sortKind === "seasons"
+							? (data.seasons ?? []).map((season) => ({
+									id: season.id,
+									label:
+										season.title ||
+										t("catalog.season", { number: season.season_number }),
+								}))
+							: sortKind === "films"
+								? (data.items ?? []).map((item) => ({
+										id: item.id,
+										label: item.media?.title || `#${item.media_id}`,
+									}))
+								: (
+										data.seasons?.find((season) => season.id === sortSeason)
+											?.items ?? []
+									).map((item) => ({
+										id: item.id,
+										label: item.media?.title || `#${item.media_id}`,
+									}))
+					}
+					onClose={() => setSortKind(null)}
+					onSave={(ids) => {
+						if (sortKind === "seasons") {
+							void run(() =>
+								reorderSeasons.mutateAsync({ workID: data.id, ids }),
+							);
+						} else if (sortKind === "films") {
+							void run(() =>
+								reorderFilms.mutateAsync({ workID: data.id, ids }),
+							);
+						} else if (sortSeason !== null) {
+							void run(() =>
+								reorderEpisodes.mutateAsync({ seasonID: sortSeason, ids }),
+							);
+						}
+					}}
+				/>
 				<MediaPickerModal
 					visible={picker === "episode" || picker === "film"}
 					title={
@@ -424,11 +517,59 @@ function CatalogAdminContent() {
 	return (
 		<Screen scroll>
 			<CatalogHeader title={data.name} onBack={() => router.back()} />
-			<Pressable onPress={() => setPicker("work")}>
-				<Text style={{ color: colors.accent }}>
-					{t("catalog.adminAddEntry")}
-				</Text>
-			</Pressable>
+			<TextInput
+				style={{
+					color: colors.text,
+					borderColor: colors.border,
+					borderWidth: 1,
+					borderRadius: 8,
+					padding: spacing.sm,
+				}}
+				value={title || data.name}
+				onChangeText={setTitle}
+				placeholder={t("catalog.newFranchise")}
+			/>
+			<View style={{ flexDirection: "row", gap: spacing.md }}>
+				<Pressable
+					onPress={() =>
+						void run(() =>
+							updateFranchise.mutateAsync({
+								id: data.id,
+								name: (title || data.name).trim(),
+							}),
+						)
+					}
+				>
+					<Text style={{ color: colors.accent }}>{t("common.save")}</Text>
+				</Pressable>
+				<Pressable
+					onPress={() =>
+						confirm(
+							deleteItemConfirm,
+							() =>
+								void run(async () => {
+									await deleteFranchise.mutateAsync(data.id);
+									router.dismissAll();
+									router.replace("/franchises");
+								}),
+						)
+					}
+				>
+					<Text style={{ color: colors.danger }}>
+						{t("catalog.adminDelete")}
+					</Text>
+				</Pressable>
+			</View>
+			<View style={{ flexDirection: "row", gap: spacing.md }}>
+				<Pressable onPress={() => setPicker("work")}>
+					<Text style={{ color: colors.accent }}>
+						{t("catalog.adminAddEntry")}
+					</Text>
+				</Pressable>
+				<Pressable onPress={() => setFranchiseSort(true)}>
+					<Text style={{ color: colors.accent }}>{sortLabel}</Text>
+				</Pressable>
+			</View>
 			{(data.entries ?? []).map((entry, index) => {
 				const label = entry.work?.title || entry.media?.title || `#${entry.id}`;
 				return (
@@ -527,6 +668,20 @@ function CatalogAdminContent() {
 					</Pressable>
 				</ScrollView>
 			</Modal>
+			<ReorderModal
+				visible={franchiseSort}
+				title={sortLabel}
+				rows={(data.entries ?? []).map((entry) => ({
+					id: entry.id,
+					label: entry.work?.title || entry.media?.title || `#${entry.id}`,
+				}))}
+				onClose={() => setFranchiseSort(false)}
+				onSave={(ids) =>
+					void run(() =>
+						reorderEntries.mutateAsync({ franchiseID: data.id, ids }),
+					)
+				}
+			/>
 			<MediaPickerModal
 				visible={picker === "media"}
 				title={t("catalog.adminPickMovie")}

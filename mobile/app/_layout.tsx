@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 // Импорт ради побочного эффекта (дефолт configureApi) и initApiConfig:
 // модуль должен выполниться до любых запросов.
@@ -77,33 +78,35 @@ function AppShell({
 		return null;
 	}
 	return (
-		<QueryClientProvider client={client}>
-			<SessionResetProvider>
-				<DownloadProvider>
-					<AudioProvider>
-						<Stack screenOptions={{ headerShown: false }}>
-							<Stack.Screen name="(tabs)" />
-							{/* Свайп-назад iOS не должен обходить confirm о несохранённых
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<QueryClientProvider client={client}>
+				<SessionResetProvider>
+					<DownloadProvider>
+						<AudioProvider>
+							<Stack screenOptions={{ headerShown: false }}>
+								<Stack.Screen name="(tabs)" />
+								{/* Свайп-назад iOS не должен обходить confirm о несохранённых
 							    правках в редакторе метаданных. */}
-							<Stack.Screen
-								name="media/[id]/edit"
-								options={{ gestureEnabled: false, headerShown: false }}
-							/>
-							<Stack.Screen
-								name="player"
-								options={{ presentation: "modal", headerShown: false }}
-							/>
-							<Stack.Screen name="login" />
-							<Stack.Screen name="server" />
-							<Stack.Screen name="activate" />
-							<Stack.Screen name="devices" />
-							<Stack.Screen name="meme/[id]" />
-							<Stack.Screen name="downloads" />
-						</Stack>
-					</AudioProvider>
-				</DownloadProvider>
-			</SessionResetProvider>
-		</QueryClientProvider>
+								<Stack.Screen
+									name="media/[id]/edit"
+									options={{ gestureEnabled: false, headerShown: false }}
+								/>
+								<Stack.Screen
+									name="player"
+									options={{ presentation: "modal", headerShown: false }}
+								/>
+								<Stack.Screen name="login" />
+								<Stack.Screen name="server" />
+								<Stack.Screen name="activate" />
+								<Stack.Screen name="devices" />
+								<Stack.Screen name="meme/[id]" />
+								<Stack.Screen name="downloads" />
+							</Stack>
+						</AudioProvider>
+					</DownloadProvider>
+				</SessionResetProvider>
+			</QueryClientProvider>
+		</GestureHandlerRootView>
 	);
 }
 
