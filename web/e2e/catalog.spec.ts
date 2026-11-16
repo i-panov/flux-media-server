@@ -169,7 +169,9 @@ test("каталог: сериал с сезоном и эпизодом", async
 	).toBeVisible();
 	await page.getByRole("link", { name: SERIES_TITLE }).click();
 	await expect(page.getByRole("heading", { name: "Сезон 1" })).toBeVisible();
-	await expect(page.getByRole("link", { name: PILOT_TITLE })).toBeVisible();
+	await expect(
+		page.getByRole("link", { name: PILOT_TITLE }).first(),
+	).toBeVisible();
 });
 
 test("каталог: film_series доступна вне франшизы", async ({ page }) => {
@@ -177,7 +179,9 @@ test("каталог: film_series доступна вне франшизы", asy
 	await page.goto("/series");
 	await page.getByRole("link", { name: FILM_SERIES_TITLE }).click();
 	await expect(page).toHaveURL(FILM_SERIES_URL);
-	await expect(page.getByRole("link", { name: FIRST_FILM_LINK })).toBeVisible();
+	await expect(
+		page.getByRole("link", { name: FIRST_FILM_LINK }).first(),
+	).toBeVisible();
 });
 
 test("каталог: франшиза со смешанными элементами", async ({ page }) => {
@@ -248,4 +252,37 @@ test("каталог: TV холодная детальная франшизы", 
 	});
 	await page.goto("/franchises/3?tv=1");
 	await expect.poll(() => activeKey(page)).toBe("franchise-entry-1");
+});
+
+test("видео: сериалы и франшизы — вкладки одного раздела", async ({ page }) => {
+	await stubCatalog(page);
+	await page.route("**/api/media?*", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({ items: [], total: 0, limit: 24, offset: 0 }),
+		}),
+	);
+	await page.goto("/video");
+	await expect(page.getByRole("link", { name: "Сериалы" })).toHaveCount(0);
+	await page.getByRole("tab", { name: "Сериалы" }).click();
+	await expect(
+		page.getByRole("heading", { name: "Сериалы", level: 2 }),
+	).toBeVisible();
+	await page.getByRole("tab", { name: "Франшизы" }).click();
+	await expect(page.getByRole("link", { name: FRANCHISE_TITLE })).toBeVisible();
+});
+
+test("видео: TV Down с вкладки сериалов ведёт в карточки", async ({ page }) => {
+	await stubCatalog(page);
+	await page.goto("/video?tv=1");
+	await expect.poll(() => activeKey(page)).toBe("video-tab-movies");
+	await page.keyboard.press("ArrowRight");
+	await expect.poll(() => activeKey(page)).toBe("video-tab-series");
+	await page.keyboard.press("Enter");
+	await expect(
+		page.getByRole("heading", { name: "Сериалы", level: 2 }),
+	).toBeVisible();
+	await page.keyboard.press("ArrowDown");
+	await expect.poll(() => activeKey(page)).toBe("series-card-7");
 });

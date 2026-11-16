@@ -39,12 +39,16 @@ func (h *ProgressHandler) List(c *fiber.Ctx) error {
 
 	limit, offset := response.ClampPage(c.QueryInt("limit", defaultPageSize), c.QueryInt("offset", 0), defaultPageSize)
 
-	// Тип необязателен: без него старые клиенты получают весь список.
-	var mediaType models.MediaType
+	// Прогресс существует только для видео. Аудио всегда стартует
+	// с начала, поэтому остальные типы здесь не отдаём.
+	mediaType := models.MediaTypeVideo
 	if rawType := c.Query("type"); rawType != "" {
-		mediaType = models.ParseMediaType(rawType)
-		if !mediaType.Valid() {
+		parsed := models.ParseMediaType(rawType)
+		if !parsed.Valid() {
 			return response.Error(c, fiber.StatusBadRequest, "invalid type")
+		}
+		if parsed != models.MediaTypeVideo {
+			return response.Paginated(c, []models.WatchProgress{}, 0, limit, offset)
 		}
 	}
 
@@ -74,6 +78,17 @@ func (h *ProgressHandler) GetOne(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
 	}
 
+	media, err := h.mediaRepo.FindByID(c.UserContext(), mediaID)
+	if err != nil {
+		return repoError(c, err, "Media not found", "Failed to fetch media")
+	}
+	if media.Type != models.MediaTypeVideo {
+		// Контракт shared-клиентов: валидный объект прогресса, но нулевой.
+		// GET аудио всегда начинает с начала.
+		return c.JSON(models.WatchProgress{
+			UserID: userID, MediaID: mediaID, Position: 0, Duration: 0,
+		})
+	}
 	progress, err := h.progressRepo.FindByUserAndMedia(c.UserContext(), userID, mediaID)
 	if err != nil {
 		return repoError(c, err, "Progress not found", "Failed to fetch progress")
@@ -112,8 +127,16 @@ func (h *ProgressHandler) Update(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Проверяем существование медиа до создания/обновления прогресса.
-	if _, err := h.mediaRepo.FindByID(ctx, mediaID); err != nil {
+	media, err := h.mediaRepo.FindByID(ctx, mediaID)
+	if err != nil {
 		return repoError(c, err, "Media not found", "Failed to fetch media")
+	}
+	if media.Type != models.MediaTypeVideo {
+		// Заодно убираем старые записи, созданные до этого правила.
+		_ = h.progressRepo.Delete(ctx, userID, mediaID)
+		return c.JSON(models.WatchProgress{
+			UserID: userID, MediaID: mediaID, Position: 0, Duration: 0,
+		})
 	}
 
 	progress, err := h.progressRepo.FindByUserAndMedia(ctx, userID, mediaID)

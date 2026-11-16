@@ -280,7 +280,8 @@ test("текст: пока текст не загружен, редактор н
 	).toHaveCount(0);
 });
 
-test("аудио продолжает с сохранённой позиции", async ({ page }) => {
+test("аудио всегда стартует с начала", async ({ page }) => {
+	let progressReads = 0;
 	await page.route("**/api/auth/me", (route) =>
 		route.fulfill({
 			status: 200,
@@ -317,8 +318,9 @@ test("аудио продолжает с сохранённой позиции",
 	);
 	await page.route(
 		(url) => url.pathname === "/api/progress/1",
-		(route) =>
-			route.fulfill({
+		(route) => {
+			progressReads++;
+			return route.fulfill({
 				status: 200,
 				contentType: "application/json",
 				body: JSON.stringify({
@@ -330,7 +332,8 @@ test("аудио продолжает с сохранённой позиции",
 					completed: false,
 					updated_at: "2026-01-01T00:00:00Z",
 				}),
-			}),
+			});
+		},
 	);
 	await page.route("**/api/collections", (route) =>
 		route.fulfill({
@@ -355,10 +358,8 @@ test("аудио продолжает с сохранённой позиции",
 				body: JSON.stringify({ error: "not found" }),
 			}),
 	);
-	// Минута тишины: сохранённые 0:30 обязаны попасть внутрь файла.
-	// Отдаём с поддержкой Range: без неё Chromium считает поток
-	// неseekable и молча игнорирует восстановление позиции — как и
-	// положено, а тест проверяет именно восстановление.
+	// Минута тишины: аудио не должно восстанавливать сохранённые 0:30
+	// и не должно запрашивать прогресс. Range нужен обычному playback.
 	await page.route(
 		(url) => url.pathname === "/api/media/1/stream",
 		(route) => {
@@ -409,13 +410,13 @@ test("аудио продолжает с сохранённой позиции",
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Первый трек" }),
 	).toBeVisible();
-	await expect
-		.poll(
-			async () =>
-				page.evaluate(() => document.querySelector("audio")?.currentTime ?? -1),
-			{ timeout: 15000 },
-		)
-		.toBeGreaterThanOrEqual(29);
+	await page.waitForTimeout(700);
+	const currentTime = await page.evaluate(
+		() => document.querySelector("audio")?.currentTime ?? -1,
+	);
+	expect(currentTime).toBeGreaterThanOrEqual(0);
+	expect(currentTime).toBeLessThan(5);
+	expect(progressReads).toBe(0);
 });
 
 test("текст: синхронные строки подсвечиваются по позиции", async ({ page }) => {
@@ -443,94 +444,4 @@ test("текст: синхронные строки подсвечиваются
 	const active = page.locator('[aria-current="true"]');
 	await expect(active).toBeVisible({ timeout: 8000 });
 	await expect(active).toContainText("Первая");
-});
-
-function progressEntry(
-	id: number,
-	media: ReturnType<typeof audioItem>,
-	position: number,
-	completed = false,
-) {
-	return {
-		id,
-		user_id: 1,
-		media_id: media.id,
-		position,
-		duration: media.duration,
-		completed,
-		updated_at: "2026-01-01T00:00:00Z",
-		media,
-	};
-}
-
-test("сид не затирает очередь, начатую до ответа сервера", async ({ page }) => {
-	await stubPlayer(page);
-	// Долгий ответ: пользователь успевает нажать раньше резолва.
-	await page.route(
-		(url) => url.pathname === "/api/progress",
-		async (route) => {
-			await new Promise((resolve) => setTimeout(resolve, 800));
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					items: [progressEntry(2, audioItem(2, "Второй трек"), 40)],
-					total: 1,
-					limit: 20,
-					offset: 0,
-				}),
-			});
-		},
-	);
-	// Длинный файл: секундный стаб закончился бы и увёл на второй трек.
-	await page.route(
-		(url) => STREAM_PATTERN.test(url.pathname),
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "audio/wav",
-				body: silentWav(60),
-			}),
-	);
-
-	await page.goto("/audio");
-	await startFirstTrack(page);
-	await expect(page).toHaveURL(PLAYER_PATTERN);
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Первый трек" }),
-	).toBeVisible();
-	// Ответ пришёл позже — очередь пользователя уцелела.
-	await page.waitForTimeout(1200);
-	await expect(
-		page.getByRole("heading", { level: 1, name: "Первый трек" }),
-	).toBeVisible();
-});
-
-test("сид пропускает завершённый трек к старому недослушанному", async ({
-	page,
-}) => {
-	await stubPlayer(page);
-	await page.route(
-		(url) => url.pathname === "/api/progress",
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					items: [
-						// Самый свежий — дослушанный: сид идёт дальше по списку.
-						progressEntry(3, audioItem(2, "Второй трек"), 120, true),
-						progressEntry(1, audioItem(1, "Первый трек"), 30),
-					],
-					total: 2,
-					limit: 20,
-					offset: 0,
-				}),
-			}),
-	);
-
-	await page.goto("/audio");
-	const miniPlayer = page.locator(".audio-mini-player");
-	await expect(miniPlayer).toBeVisible();
-	await expect(miniPlayer.getByText("Первый трек")).toBeVisible();
 });

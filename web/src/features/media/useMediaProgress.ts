@@ -23,9 +23,13 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 	mediaRef: React.RefObject<E | null>,
 	enabled = true,
 	restoreDriftSeconds = 0,
+	persist = true,
 ) {
 	// Состояние живёт в refs: объект результата useMutation — новый на каждом
-	const progressQuery = useProgress(enabled ? mediaId : 0, enabled);
+	const progressQuery = useProgress(
+		enabled && persist ? mediaId : 0,
+		enabled && persist,
+	);
 	const { mutate } = useSaveProgress();
 	const { mutate: remove } = useDeleteProgress();
 	// Готовность метаданных привязана к mediaId: при смене id она сама
@@ -59,6 +63,9 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 
 	const flush = useCallback(
 		(id: number, position: number, duration: number) => {
+			if (!persist) {
+				return;
+			}
 			const pos = Math.max(Math.floor(position), 0);
 			const dur = Math.max(Math.floor(duration), 0);
 			// Позиция за пределами длительности — испорченный элемент.
@@ -91,7 +98,7 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 				completed: dur > 0 && pos >= dur - COMPLETED_TAIL_SECONDS,
 			});
 		},
-		[],
+		[persist],
 	);
 
 	// Сброс при смене mediaId; cleanup эффекта сохранения ниже выполняется
@@ -163,7 +170,7 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 	// метаданных: порядок этих событий не определён. Флаг restored
 	// выставляется только когда решение действительно принято.
 	useEffect(() => {
-		if (!enabled || !metadataReady || restored.current) {
+		if (!enabled || !persist || !metadataReady || restored.current) {
 			return;
 		}
 		const data = progressQuery.data;
@@ -191,6 +198,7 @@ export function useMediaProgress<E extends HTMLMediaElement>(
 		savedPosition.current = position;
 	}, [
 		enabled,
+		persist,
 		metadataReady,
 		progressQuery.data,
 		mediaRef,

@@ -444,3 +444,37 @@ func TestMediaListHidesEpisodesByDefault(t *testing.T) {
 	require.Equal(t, int64(2), total)
 	require.Len(t, rows, 2)
 }
+
+func TestGetMediaContextEpisodeAndFranchise(t *testing.T) {
+	db := setupCatalogDB(t)
+	store := NewWorkRepository(db)
+	franchises := NewFranchiseRepository(db)
+	ctx := context.Background()
+
+	work := models.Work{Kind: models.WorkKindSeries, Title: "Show"}
+	require.NoError(t, store.Create(ctx, &work))
+	got, err := store.Get(ctx, work.ID)
+	require.NoError(t, err)
+	episode := catalogVideo(t, db, "/episode.mp4")
+	number := 3
+	_, err = store.AddEpisode(ctx, got.Seasons[0].ID, episode.ID, &number)
+	require.NoError(t, err)
+
+	franchise := models.Franchise{Name: "Universe"}
+	require.NoError(t, franchises.Create(ctx, &franchise))
+	_, err = franchises.AddEntry(ctx, franchise.ID, &work.ID, nil)
+	require.NoError(t, err)
+
+	context, err := store.GetMediaContext(ctx, episode.ID)
+	require.NoError(t, err)
+	require.NotNil(t, context.WorkID)
+	require.Equal(t, work.ID, *context.WorkID)
+	require.Equal(t, "Show", context.WorkTitle)
+	require.Equal(t, models.WorkKindSeries, context.WorkKind)
+	require.NotNil(t, context.SeasonID)
+	require.Equal(t, 1, context.SeasonNumber)
+	require.NotNil(t, context.EpisodeNumber)
+	require.Equal(t, number, *context.EpisodeNumber)
+	require.Len(t, context.Franchises, 1)
+	require.Equal(t, "Universe", context.Franchises[0].Name)
+}

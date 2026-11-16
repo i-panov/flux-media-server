@@ -477,5 +477,22 @@
 	"catalog.admin.loadMore": "Загрузить ещё",
 	"catalog.admin.error": "Ошибка",
 	"catalog.admin.seasonPrefix": "Сезон",
-	"catalog.admin.deleteSeasonConfirm": "Удалить сезон? Эпизоды останутся в медиатеке."
+	"catalog.admin.deleteSeasonConfirm": "Удалить сезон? Эпизоды останутся в медиатеке.",
+	"catalog.movies": "Фильмы",
+	"catalog.tabs": "Разделы видео",
+	"catalog.franchise": "Франшиза",
+	"catalog.episode": "Эпизод {{number}}",
+	"catalog.addToCatalog": "В каталог",
+	"catalog.target": "Тип",
+	"catalog.episodeNumber": "Номер эпизода",
+	"catalog.openWork": "Открыть произведение",
+	"catalog.admin.searchWorks": "Поиск произведений",
+	"catalog.admin.selectedWork": "Выбрано: {{title}}",
+	"catalog.admin.addedToCatalog": "Видео добавлено в каталог",
+	"common.add": "Добавить",
+	"catalog.removeFromCatalog": "Убрать из каталога",
+	"catalog.removeFromCatalogConfirm": "Убрать видео из каталога?",
+	"catalog.addError": "Не удалось добавить видео в каталог",
+	"catalog.seasonLabel": "Сезон",
+	"catalog.removeError": "Не удалось убрать видео из каталога"
 }

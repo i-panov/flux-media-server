@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
+import { AddToCatalogButton } from "../catalog/AddToCatalogButton";
 import { useTVMode } from "../tv/useTVMode";
 import { ExtractAudioSection } from "../video/ExtractAudioSection";
 import { ChangeCoverButton } from "./ChangeCoverButton";
@@ -53,6 +54,7 @@ export function MediaAdminActions({
 							{t("metadata.edit")}
 						</Button>
 					)}
+					{media.type === "video" && <AddToCatalogButton media={media} />}
 					{canChangeCover && <ChangeCoverButton mediaId={media.id} />}
 					{canDelete && (
 						<DeleteMediaButton mediaId={media.id} backPath={backPath} />

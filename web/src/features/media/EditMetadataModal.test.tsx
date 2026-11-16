@@ -42,7 +42,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 	});
 }
 
-function renderModal(onClose: () => void = () => undefined) {
+function renderModal(
+	onClose: () => void = () => undefined,
+	media: Media = mediaItem(),
+) {
 	const queryClient = new QueryClient({
 		defaultOptions: {
 			queries: { retry: false },
@@ -54,10 +57,9 @@ function renderModal(onClose: () => void = () => undefined) {
 			<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 		</MantineProvider>
 	);
-	return render(
-		<EditMetadataModal opened media={mediaItem()} onClose={onClose} />,
-		{ wrapper },
-	);
+	return render(<EditMetadataModal opened media={media} onClose={onClose} />, {
+		wrapper,
+	});
 }
 
 afterEach(() => {
@@ -88,6 +90,35 @@ describe("EditMetadataModal", () => {
 		const source =
 			await screen.findByLabelText<HTMLInputElement>("Ссылка на источник");
 		expect(source.value).toBe("https://example.com/source");
+	});
+
+	it("у картинки нет полей года, жанра, альбома и исполнителей", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue(jsonResponse({ items: [] })),
+		);
+		renderModal(undefined, { ...mediaItem(), type: "image" });
+
+		await screen.findByLabelText("Название");
+		expect(screen.queryByLabelText("Год")).toBeNull();
+		expect(screen.queryByLabelText("Жанр")).toBeNull();
+		expect(screen.queryByLabelText("Альбом")).toBeNull();
+		expect(screen.queryByText("Исполнители")).toBeNull();
+		expect(screen.getByLabelText("Ссылка на источник")).toBeTruthy();
+	});
+
+	it("у видео есть год и жанр, но нет альбома и исполнителей", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue(jsonResponse({ items: [] })),
+		);
+		renderModal();
+
+		await screen.findByLabelText("Название");
+		expect(screen.getByLabelText("Год")).toBeTruthy();
+		expect(screen.getByLabelText("Жанр")).toBeTruthy();
+		expect(screen.queryByLabelText("Альбом")).toBeNull();
+		expect(screen.queryByText("Исполнители")).toBeNull();
 	});
 
 	it("отмена выбрасывает черновик", async () => {

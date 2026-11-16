@@ -74,6 +74,10 @@ type MediaRepository interface {
 	// созданных до появления колонок width/height, файлы не менялись,
 	// поэтому обычный скан их больше не трогает.
 	FindVideosMissingDimensions(ctx context.Context, limit int) ([]models.Media, error)
+	// FindMissingThumbnails — живые видео/картинки без URL превью.
+	FindMissingThumbnails(ctx context.Context, limit int) ([]models.Media, error)
+	// UpdateThumbnailURL пишет только URL превью.
+	UpdateThumbnailURL(ctx context.Context, id uint, url string) error
 	// UpdateDimensions записывает ТОЛЬКО размеры кадра, ничего не
 	// трогая в остальных полях и связях.
 	//

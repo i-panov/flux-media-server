@@ -477,5 +477,22 @@
 	"catalog.admin.loadMore": "Load more",
 	"catalog.admin.error": "Error",
 	"catalog.admin.seasonPrefix": "Season",
-	"catalog.admin.deleteSeasonConfirm": "Delete this season? Episodes will remain in the library."
+	"catalog.admin.deleteSeasonConfirm": "Delete this season? Episodes will remain in the library.",
+	"catalog.movies": "Movies",
+	"catalog.tabs": "Video sections",
+	"catalog.franchise": "Franchise",
+	"catalog.episode": "Episode {{number}}",
+	"catalog.addToCatalog": "Add to catalog",
+	"catalog.target": "Type",
+	"catalog.episodeNumber": "Episode number",
+	"catalog.openWork": "Open work",
+	"catalog.admin.searchWorks": "Search works",
+	"catalog.admin.selectedWork": "Selected: {{title}}",
+	"catalog.admin.addedToCatalog": "Video added to catalog",
+	"common.add": "Add",
+	"catalog.removeFromCatalog": "Remove from catalog",
+	"catalog.removeFromCatalogConfirm": "Remove video from catalog?",
+	"catalog.addError": "Could not add video to catalog",
+	"catalog.seasonLabel": "Season",
+	"catalog.removeError": "Could not remove video from catalog"
 }

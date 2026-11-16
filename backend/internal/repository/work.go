@@ -618,3 +618,72 @@ func sameWorkItemSet(rows []models.WorkItem, ids []uint) bool {
 }
 
 // (isUniqueViolation живёт в db.go: общий SQLite-детектор UNIQUE.)
+
+// MediaCatalogContext — где медиа участвует в глобальном каталоге.
+// Возвращается отдельным запросом, чтобы не раздувать Media.
+type MediaCatalogContext struct {
+	WorkID        *uint              `json:"work_id,omitempty"`
+	WorkTitle     string             `json:"work_title,omitempty"`
+	WorkKind      models.WorkKind    `json:"work_kind,omitempty"`
+	SeasonID      *uint              `json:"season_id,omitempty"`
+	SeasonNumber  int                `json:"season_number,omitempty"`
+	EpisodeNumber *int               `json:"episode_number,omitempty"`
+	Franchises    []FranchiseContext `json:"franchises"`
+}
+
+type FranchiseContext struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
+func (r *WorkStore) GetMediaContext(ctx context.Context, mediaID uint) (*MediaCatalogContext, error) {
+	result := &MediaCatalogContext{Franchises: []FranchiseContext{}}
+	var item models.WorkItem
+	err := r.db.WithContext(ctx).Where("media_id = ?", mediaID).First(&item).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if err == nil {
+		if item.SeasonID != nil {
+			var season models.Season
+			if err := r.db.WithContext(ctx).First(&season, *item.SeasonID).Error; err != nil {
+				return nil, err
+			}
+			var work models.Work
+			if err := r.db.WithContext(ctx).First(&work, season.WorkID).Error; err != nil {
+				return nil, err
+			}
+			result.WorkID = &work.ID
+			result.WorkTitle = work.Title
+			result.WorkKind = work.Kind
+			result.SeasonID = &season.ID
+			result.SeasonNumber = season.SeasonNumber
+			result.EpisodeNumber = item.EpisodeNumber
+		} else if item.WorkID != nil {
+			var work models.Work
+			if err := r.db.WithContext(ctx).First(&work, *item.WorkID).Error; err != nil {
+				return nil, err
+			}
+			result.WorkID = &work.ID
+			result.WorkTitle = work.Title
+			result.WorkKind = work.Kind
+		}
+	}
+	entryQuery := r.db.WithContext(ctx).Model(&FranchiseContext{}).
+		Table("franchise_entries").
+		Select("DISTINCT franchises.id, franchises.name").
+		Joins("JOIN franchises ON franchises.id = franchise_entries.franchise_id")
+	if result.WorkID != nil {
+		entryQuery = entryQuery.Where(
+			"franchise_entries.media_id = ? OR franchise_entries.work_id = ?",
+			mediaID, *result.WorkID,
+		)
+	} else {
+		entryQuery = entryQuery.Where("franchise_entries.media_id = ?", mediaID)
+	}
+	if err := entryQuery.Order("franchises.name ASC, franchises.id ASC").
+		Scan(&result.Franchises).Error; err != nil {
+		return nil, err
+	}
+	return result, nil
+}

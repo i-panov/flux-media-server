@@ -27,6 +27,7 @@ import { MetaItem } from "../media/MetaItem";
 import { useMediaProgress } from "../media/useMediaProgress";
 import { clickNode, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { TVVideoControls } from "./TVVideoControls";
+import { VideoCatalogContext } from "./VideoCatalogContext";
 
 // Мета-строка деталей: свой компонент, чтобы страница оставалась
 // в лимите строк.
@@ -296,6 +297,7 @@ export function VideoDetailPage() {
 						</Group>
 					</Group>
 					<VideoMeta item={item} />
+					<VideoCatalogContext mediaId={item.id} />
 					{item.description !== "" && <Text>{item.description}</Text>}
 					{HTTP_URL_PATTERN.test(item.source_url) && (
 						<Button

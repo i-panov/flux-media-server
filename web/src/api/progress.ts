@@ -1,12 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Media, MediaKind } from "../core/media";
-import { queryClient } from "../queryClient";
-import type { AuthUser } from "./auth";
+import type { MediaKind } from "../core/media";
 import {
-	ApiError,
 	deleteProgress,
 	fetchContinueWatching,
-	fetchLatestUnfinishedAudio as fetchLatestUnfinishedAudioFromApi,
 	fetchProgress,
 	saveProgress,
 } from "./client";
@@ -57,25 +53,4 @@ export function useContinueWatching(kind: MediaKind) {
 		retry: false,
 		refetchOnWindowFocus: false,
 	});
-}
-
-// Сид фоновый и необязательный: без сессии в сеть не ходим, иначе
-// apiFetch дёрнул бы refresh ради трека, который некому слушать.
-// Ключ зеркалит sessionQueryKey из api/session (не экспортируется).
-// Ошибки гасятся — плеер без сида просто стартует пустым.
-export async function fetchLatestUnfinishedAudio(): Promise<Media | null> {
-	const session = queryClient.getQueryData<AuthUser | null>(["session"]);
-	if (session === null || session === undefined) {
-		return null;
-	}
-	try {
-		return await fetchLatestUnfinishedAudioFromApi();
-	} catch (error) {
-		// 401 после неудачного refresh — разлогинен, молча без сида.
-		if (error instanceof ApiError && error.status === 401) {
-			return null;
-		}
-		console.warn("Failed to fetch latest unfinished audio", error);
-		return null;
-	}
 }

@@ -9,6 +9,10 @@ const FILM_SERIES_LINK = /Реальная серия фильмов/;
 const STANDALONE_LINK = /Отдельный фильм/;
 const FILM_LINK = /Реальный фильм/;
 const SERIES_URL = /\/series\/9002$/;
+const ADMIN_SERIES_LINK = /E2E админ-сериал/;
+const ADMIN_EPISODE_LINK = /E2E эпизод/;
+const VIDEO_LIST_URL = /\/video$/;
+const ADMIN_SEASON_TWO = /Сезон 2/;
 
 test("реальный каталог: сериал, film_series и франшиза", async ({ page }) => {
 	const email = "catalog-e2e@example.com";
@@ -62,11 +66,11 @@ test("реальный админ: создать сериал, сезон, эп
 	expect(verify.ok()).toBeTruthy();
 
 	await page.goto("/series");
-	await page.getByRole("button", { name: "Добавить" }).click();
+	await page.getByRole("button", { name: "Добавить", exact: true }).click();
 	await page.getByLabel("Название").fill("E2E админ-сериал");
 	await page.getByRole("button", { name: "Создать" }).click();
 	await expect(
-		page.getByRole("link", { name: /E2E админ-сериал/ }),
+		page.getByRole("link", { name: ADMIN_SERIES_LINK }),
 	).toBeVisible();
 
 	const worksResponse = await page.request.get("/api/works?kind=series");
@@ -114,9 +118,11 @@ test("реальный админ: создать сериал, сезон, эп
 	expect(reordered.seasons[0]?.items[0]?.media_id).toBe(9004);
 
 	await page.reload();
-	await page.getByRole("link", { name: /E2E админ-сериал/ }).click();
+	await page.getByRole("link", { name: ADMIN_SERIES_LINK }).click();
 	await expect(page.getByRole("heading", { name: "Сезон 2" })).toBeVisible();
-	await expect(page.getByRole("link", { name: /E2E эпизод/ })).toBeVisible();
+	await expect(
+		page.getByRole("link", { name: ADMIN_EPISODE_LINK }).first(),
+	).toBeVisible();
 	await expect
 		.poll(async () =>
 			(await page.getByRole("heading", { level: 2 }).allTextContents()).filter(
@@ -125,12 +131,33 @@ test("реальный админ: создать сериал, сезон, эп
 		)
 		.toEqual(["Сезон 2", "Сезон 1"]);
 
+	await page.goto("/video/9006");
+	await page.getByRole("button", { name: "В каталог" }).click();
+	await page.getByText("E2E админ-сериал", { exact: true }).click();
+	await page.getByRole("combobox").last().click();
+	await page.getByRole("option", { name: "Сезон 2" }).click();
+	await page.getByRole("button", { name: "Добавить", exact: true }).click();
+	await expect
+		.poll(async () => {
+			const response = await page.request.get(
+				"/api/media/9006/catalog-context",
+			);
+			return ((await response.json()) as { season_number: number })
+				.season_number;
+		})
+		.toBe(2);
+	await page.reload();
+	await expect(
+		page.getByText(ADMIN_SEASON_TWO, { exact: false }),
+	).toBeVisible();
+	await page.goto(`/series/${work.id}`);
+
 	page.once("dialog", (dialog) => void dialog.accept());
 	await page.getByRole("button", { name: "Удалить", exact: true }).click();
-	await expect(page).toHaveURL(/\/series$/);
-	await expect(
-		page.getByRole("link", { name: /E2E админ-сериал/ }),
-	).toHaveCount(0);
+	await expect(page).toHaveURL(VIDEO_LIST_URL);
+	await expect(page.getByRole("link", { name: ADMIN_SERIES_LINK })).toHaveCount(
+		0,
+	);
 	const deletedResponse = await page.request.get(`/api/works/${work.id}`);
 	expect(deletedResponse.status()).toBe(404);
 });

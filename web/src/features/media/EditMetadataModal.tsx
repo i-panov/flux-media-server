@@ -84,6 +84,7 @@ function MetadataFormActions({
 // ссылка): как во Flutter, при ошибке сети диалог остаётся открытым
 // и введённое не теряется. Пустые необязательные поля не отправляются,
 // source_url — только при изменении; пустое при непустом исходном это очистка.
+// eslint-disable-next-line max-lines-per-function -- форма по типам медиа.
 export function EditMetadataModal({
 	opened,
 	media,
@@ -111,8 +112,13 @@ export function EditMetadataModal({
 	const [sourceUrl, setSourceUrl] = useState(media.source_url);
 	const originalSourceUrl = media.source_url;
 
+	const isAudio = media.type === "audio";
+	const isVideo = media.type === "video";
+	const isImage = media.type === "image";
+	const showYear = !isImage;
 	const titleError = title.trim() === "" ? t("metadata.required") : null;
-	const yearError = isValidYear(year) ? null : t("metadata.invalidYear");
+	const yearError =
+		showYear && !isValidYear(year) ? t("metadata.invalidYear") : null;
 	const sourceError = isValidSourceUrl(sourceUrl)
 		? null
 		: t("metadata.invalidSourceUrl");
@@ -163,76 +169,86 @@ export function EditMetadataModal({
 					error={titleError}
 					onChange={(event) => setTitle(event.currentTarget.value)}
 				/>
-				<Stack gap={4}>
-					<Group justify="space-between">
-						<Text size="sm" fw={500}>
-							{t("metadata.artists")}
-						</Text>
-						<ActionIcon
-							variant="subtle"
-							aria-label={t("metadata.addArtist")}
-							onClick={() => setArtists((prev) => [...prev, ""])}
-						>
-							<Plus size={16} />
-						</ActionIcon>
-					</Group>
-					{artists.map((name, position) => (
-						// Исполнители без id: порядок и есть идентификатор строки.
-						// biome-ignore lint/suspicious/noArrayIndexKey: artist row
-						<Group key={position} gap="xs" wrap="nowrap">
-							<TextInput
-								className="flex-1"
-								value={name}
-								list="metadata-artists"
-								aria-label={`${t("metadata.artists")} ${position + 1}`}
-								onChange={(event) =>
-									setArtists((prev) =>
-										prev.map((item, i) =>
-											i === position ? event.currentTarget.value : item,
-										),
-									)
-								}
-							/>
-							{artists.length > 1 && (
-								<ActionIcon
-									variant="subtle"
-									color="red"
-									aria-label={t("metadata.removeArtist")}
-									onClick={() =>
-										setArtists((prev) => prev.filter((_, i) => i !== position))
-									}
-								>
-									<X size={16} />
-								</ActionIcon>
-							)}
+				{isAudio && (
+					<Stack gap={4}>
+						<Group justify="space-between">
+							<Text size="sm" fw={500}>
+								{t("metadata.artists")}
+							</Text>
+							<ActionIcon
+								variant="subtle"
+								aria-label={t("metadata.addArtist")}
+								onClick={() => setArtists((prev) => [...prev, ""])}
+							>
+								<Plus size={16} />
+							</ActionIcon>
 						</Group>
-					))}
-					<datalist id="metadata-artists">
-						{(artistNames.data ?? []).map((artist) => (
-							<option key={artist.id} value={artist.name} />
+						{artists.map((name, position) => (
+							// Исполнители без id: порядок и есть идентификатор строки.
+							// biome-ignore lint/suspicious/noArrayIndexKey: artist row
+							<Group key={position} gap="xs" wrap="nowrap">
+								<TextInput
+									className="flex-1"
+									value={name}
+									list="metadata-artists"
+									aria-label={`${t("metadata.artists")} ${position + 1}`}
+									onChange={(event) =>
+										setArtists((prev) =>
+											prev.map((item, i) =>
+												i === position ? event.currentTarget.value : item,
+											),
+										)
+									}
+								/>
+								{artists.length > 1 && (
+									<ActionIcon
+										variant="subtle"
+										color="red"
+										aria-label={t("metadata.removeArtist")}
+										onClick={() =>
+											setArtists((prev) =>
+												prev.filter((_, i) => i !== position),
+											)
+										}
+									>
+										<X size={16} />
+									</ActionIcon>
+								)}
+							</Group>
 						))}
-					</datalist>
-				</Stack>
+						<datalist id="metadata-artists">
+							{(artistNames.data ?? []).map((artist) => (
+								<option key={artist.id} value={artist.name} />
+							))}
+						</datalist>
+					</Stack>
+				)}
+				{(isAudio || isVideo) && (
+					<Group grow>
+						{isAudio && (
+							<TextInput
+								label={t("metadata.album")}
+								value={album}
+								onChange={(event) => setAlbum(event.currentTarget.value)}
+							/>
+						)}
+						<TextInput
+							label={t("metadata.genre")}
+							value={genre}
+							onChange={(event) => setGenre(event.currentTarget.value)}
+						/>
+					</Group>
+				)}
 				<Group grow>
-					<TextInput
-						label={t("metadata.album")}
-						value={album}
-						onChange={(event) => setAlbum(event.currentTarget.value)}
-					/>
-					<TextInput
-						label={t("metadata.genre")}
-						value={genre}
-						onChange={(event) => setGenre(event.currentTarget.value)}
-					/>
-				</Group>
-				<Group grow>
-					<TextInput
-						label={t("metadata.year")}
-						value={year}
-						inputMode="numeric"
-						error={yearError}
-						onChange={(event) => setYear(event.currentTarget.value)}
-					/>
+					{showYear && (
+						<TextInput
+							label={t("metadata.year")}
+							value={year}
+							inputMode="numeric"
+							error={yearError}
+							onChange={(event) => setYear(event.currentTarget.value)}
+						/>
+					)}
 					<TextInput
 						label={t("metadata.sourceUrl")}
 						value={sourceUrl}

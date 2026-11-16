@@ -41,24 +41,6 @@ function listBody(items: ReturnType<typeof audioItem>[], total: number) {
 	return JSON.stringify({ items, total, limit: 24, offset: 0 });
 }
 
-function progressItem(
-	id: number,
-	media: ReturnType<typeof audioItem>,
-	position: number,
-	completed = false,
-) {
-	return {
-		id,
-		user_id: 1,
-		media_id: media.id,
-		position,
-		duration: media.duration,
-		completed,
-		updated_at: "2026-01-01T00:00:00Z",
-		media,
-	};
-}
-
 // 1×1 прозрачный PNG: обложка должна декодироваться как настоящая картинка.
 const PIXEL_PNG = Buffer.from(
 	// biome-ignore lint/security/noSecrets: это картинка-фикстура, а не секрет.
@@ -169,43 +151,6 @@ test("аудио: список, поиск и переход в детали с 
 		page
 			.locator(".audio-mini-player")
 			.getByText("Исполнитель Один, Исполнитель Два"),
-	).toBeVisible();
-});
-
-test("аудио: недослушанный трек поднимается мини-плеером на паузе", async ({
-	page,
-}) => {
-	await stubAuthedSession(page);
-	await stubAudioApi(page);
-	await page.route(
-		(url) => url.pathname === "/api/progress",
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					items: [progressItem(2, audioItem(2, "Вторая песня"), 40)],
-					total: 1,
-					limit: 20,
-					offset: 0,
-				}),
-			}),
-	);
-
-	await page.goto("/audio");
-	// Блока продолжения в разделе нет: вместо него мини-плеер с треком.
-	await expect(
-		page.getByRole("heading", {
-			// biome-ignore lint/security/noSecrets: текст интерфейса, не секрет.
-			name: "Продолжить прослушивание",
-		}),
-	).toHaveCount(0);
-	const miniPlayer = page.locator(".audio-mini-player");
-	await expect(miniPlayer).toBeVisible();
-	await expect(miniPlayer.getByText("Вторая песня")).toBeVisible();
-	// Стоит на паузе: показана кнопка старта, а не паузы.
-	await expect(
-		miniPlayer.getByRole("button", { name: "Слушать" }),
 	).toBeVisible();
 });
 

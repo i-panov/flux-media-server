@@ -11,7 +11,7 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -109,7 +109,7 @@ export function WorkAdminPanel({ work }: { work: CatalogWork }) {
 						if (window.confirm(t("catalog.admin.deleteWorkConfirm"))) {
 							void run(async () => {
 								await removeWork.mutateAsync(work.id);
-								await navigate({ to: "/series", replace: true });
+								await navigate({ to: "/video", replace: true });
 							});
 						}
 					}}
@@ -202,12 +202,18 @@ export function WorkAdminPanel({ work }: { work: CatalogWork }) {
 														if (!item) return null;
 														return (
 															<Group justify="space-between" wrap="nowrap">
-																<Text size="sm" lineClamp={1}>
-																	{item.episode_number == null
-																		? ""
-																		: `${item.episode_number}. `}
-																	{item.media?.title ?? `#${item.media_id}`}
-																</Text>
+																<Link
+																	to="/video/$id"
+																	params={{ id: String(item.media_id) }}
+																	className="no-underline [color:inherit]"
+																>
+																	<Text size="sm" lineClamp={1}>
+																		{item.episode_number == null
+																			? ""
+																			: `${item.episode_number}. `}
+																		{item.media?.title ?? `#${item.media_id}`}
+																	</Text>
+																</Link>
 																<Button
 																	size="compact-xs"
 																	color="red"
@@ -259,9 +265,15 @@ export function WorkAdminPanel({ work }: { work: CatalogWork }) {
 							if (!item) return null;
 							return (
 								<Group justify="space-between" wrap="nowrap">
-									<Text size="sm">
-										{item.media?.title ?? `#${item.media_id}`}
-									</Text>
+									<Link
+										to="/video/$id"
+										params={{ id: String(item.media_id) }}
+										className="no-underline [color:inherit]"
+									>
+										<Text size="sm">
+											{item.media?.title ?? `#${item.media_id}`}
+										</Text>
+									</Link>
 									<Button
 										size="compact-xs"
 										color="red"

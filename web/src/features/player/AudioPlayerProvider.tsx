@@ -15,7 +15,6 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "../../api/client";
-import { fetchLatestUnfinishedAudio } from "../../api/progress";
 import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
 import { useMediaProgress } from "../media/useMediaProgress";
@@ -99,7 +98,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 	}, [currentId]);
 	const timings = useAudioTimings(currentId);
 	// Допуск дрейфа автоплея: трек уже играет, пока позиция едет с сервера.
-	const progress = useMediaProgress(currentId, audioRef, current !== null, 2);
+	const progress = useMediaProgress(
+		currentId,
+		audioRef,
+		current !== null,
+		0,
+		false,
+	);
 	const handlePlayError = useCallback(
 		(message: string) => {
 			setError(message === PLAYBACK_ERROR ? playbackFailed : message);
@@ -120,26 +125,6 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 			() => handlePlayError(PLAYBACK_ERROR),
 		);
 	}, [current, handlePlayError]);
-
-	// Сид мини-плеера: без очереди (и без сохранённой) подтягиваем
-	// последний недослушанный трек с сервера — на паузе, позиция
-	// восстановится прогрессом при загрузке метаданных. Применяем
-	// функцией: пользователь мог начать очередь, пока запрос в воздухе.
-	const seeded = useRef(restoredQueue !== null);
-	useEffect(() => {
-		if (seeded.current || queue.length > 0) {
-			return;
-		}
-		seeded.current = true;
-		void fetchLatestUnfinishedAudio().then((media) => {
-			if (media === null) {
-				return;
-			}
-			setQueueState((prev) =>
-				prev.items.length === 0 ? { items: [media], index: 0 } : prev,
-			);
-		});
-	}, [queue.length]);
 
 	const toggleShuffle = useCallback(() => {
 		setShuffle((prev) => !prev);

@@ -222,7 +222,9 @@ test("ТВ: список видео, карточки, детали и Back", as
 	await stubVideoDetail(page, 2, "Второй фильм");
 
 	await page.goto("/video?tv=1");
-	// Начальный route-focus ведёт на первую карточку.
+	// Начальный route-focus ведёт на вкладки, вниз — в сетку.
+	await expect.poll(() => activeFocusKey(page)).toBe("video-tab-movies");
+	await page.keyboard.press("ArrowDown");
 	await expect.poll(() => activeElementText(page)).toContain("Первый фильм");
 
 	await page.keyboard.press("ArrowRight");

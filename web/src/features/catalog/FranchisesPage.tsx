@@ -60,7 +60,7 @@ function FranchiseCard({
 	);
 }
 
-export function FranchisesPage() {
+export function FranchisesPage({ embedded = false }: { embedded?: boolean }) {
 	const { t } = useTranslation();
 	const franchises = useFranchises();
 	const session = useSession();
@@ -72,17 +72,25 @@ export function FranchisesPage() {
 	return (
 		<Stack
 			gap="lg"
-			ref={tvRef}
-			tabIndex={tvMode ? -1 : undefined}
-			data-tv-page-root="true"
-			data-tv-focus-key="franchises-page"
+			ref={embedded ? undefined : tvRef}
+			tabIndex={!embedded && tvMode ? -1 : undefined}
+			data-tv-page-root={embedded ? undefined : "true"}
+			data-tv-focus-key={embedded ? undefined : "franchises-page"}
 		>
-			<Group justify="space-between">
-				<Title order={1} size="h2">
-					{t("catalog.franchises")}
-				</Title>
-				{canManage && <CreateFranchiseButton />}
-			</Group>
+			{embedded ? (
+				canManage && (
+					<Group justify="flex-end">
+						<CreateFranchiseButton />
+					</Group>
+				)
+			) : (
+				<Group justify="space-between">
+					<Title order={1} size="h2">
+						{t("catalog.franchises")}
+					</Title>
+					{canManage && <CreateFranchiseButton />}
+				</Group>
+			)}
 			{franchises.isPending ? (
 				<Text c="dimmed">{t("common.loading")}</Text>
 			) : franchises.isError ? (

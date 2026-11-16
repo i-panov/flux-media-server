@@ -227,9 +227,7 @@ func TestProgressHandler_GetOneOmitsMedia(t *testing.T) {
 	assert.NotContains(t, buf.String(), `"media":`)
 }
 
-// ?type=audio сужает список в БД: блоки «Продолжить просмотр» и
-// «Продолжить прослушивание» получают каждый свои 20 записей.
-func TestProgressHandler_ListFiltersByType(t *testing.T) {
+func TestProgressHandler_OnlyVideoHasProgress(t *testing.T) {
 	app := setupProgressTestApp(t)
 
 	for _, id := range []string{"1", "2"} {
@@ -237,18 +235,25 @@ func TestProgressHandler_ListFiltersByType(t *testing.T) {
 			"position": 10,
 			"duration": 100,
 		})
-		updateReq := httptest.NewRequest("PUT", "/api/progress/"+id, bytes.NewReader(updateBody))
-		updateReq.Header.Set("Content-Type", "application/json")
-		updateResp, err := app.Test(updateReq)
+		req := httptest.NewRequest("PUT", "/api/progress/"+id, bytes.NewReader(updateBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
 		require.NoError(t, err)
-		updateResp.Body.Close()
-		require.Equal(t, fiber.StatusOK, updateResp.StatusCode)
+		resp.Body.Close()
+		require.Equal(t, fiber.StatusOK, resp.StatusCode)
 	}
 
-	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress?type=audio", nil))
+	// Аудио всегда стартует с нуля: валидный нулевой прогресс.
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/progress/2", nil))
+	require.NoError(t, err)
+	var zero models.WatchProgress
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&zero))
+	resp.Body.Close()
+	require.Zero(t, zero.Position)
+
+	resp, err = app.Test(httptest.NewRequest("GET", "/api/progress?type=audio", nil))
 	require.NoError(t, err)
 	defer resp.Body.Close()
-
 	var body struct {
 		Items []struct {
 			MediaID uint          `json:"media_id"`
@@ -257,10 +262,16 @@ func TestProgressHandler_ListFiltersByType(t *testing.T) {
 		Total int64 `json:"total"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Empty(t, body.Items)
+	require.Zero(t, body.Total)
+
+	resp, err = app.Test(httptest.NewRequest("GET", "/api/progress?type=video", nil))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	require.Len(t, body.Items, 1)
 	require.NotNil(t, body.Items[0].Media)
-	assert.Equal(t, models.MediaTypeAudio, body.Items[0].Media.Type)
-	assert.Equal(t, int64(1), body.Total)
+	assert.Equal(t, models.MediaTypeVideo, body.Items[0].Media.Type)
 }
 
 func TestProgressHandler_ListRejectsInvalidType(t *testing.T) {

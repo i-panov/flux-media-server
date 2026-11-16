@@ -61,10 +61,11 @@ export function useWorks(kind?: WorkKind, enabled = true) {
 	});
 }
 
-export function useWork(id: number) {
+export function useWork(id: number, enabled = true) {
 	return useQuery({
 		queryKey: ["works", id],
 		queryFn: () => apiFetch<CatalogWork>(`/works/${id}`),
+		enabled: enabled && id > 0,
 	});
 }
 
@@ -321,5 +322,24 @@ export function useReorderFranchiseEntries() {
 				entry_ids: ids,
 			}),
 		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export interface MediaCatalogContext {
+	work_id?: number;
+	work_title?: string;
+	work_kind?: WorkKind;
+	season_id?: number;
+	season_number?: number;
+	episode_number?: number;
+	franchises: Array<{ id: number; name: string }>;
+}
+
+export function useMediaCatalogContext(mediaId: number, enabled = true) {
+	return useQuery({
+		queryKey: ["media", mediaId, "catalog-context"],
+		queryFn: () =>
+			apiFetch<MediaCatalogContext>(`/media/${mediaId}/catalog-context`),
+		enabled: enabled && mediaId > 0,
 	});
 }

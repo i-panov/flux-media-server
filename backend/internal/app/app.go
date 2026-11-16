@@ -114,6 +114,7 @@ type App struct {
 	scanWG *sync.WaitGroup
 	// backfillWG дожидается разовой заливки dimensions.
 	backfillWG       *sync.WaitGroup
+	thumbBackfillWG  *sync.WaitGroup
 	dimensionsCancel context.CancelFunc
 }
 
@@ -755,6 +756,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Get("/collections/:id/items", readRateLimiter, collectionHandler.ListItems)
 	api.Get("/collections/:id/stats", readRateLimiter, trashHandler.Stats)
 
+	// Контекст медиа в глобальном каталоге (сериал/сезон/франшиза).
+	api.Get("/media/:id/catalog-context", readRateLimiter, catalogHandler.GetMediaContext)
+
 	// Глобальный каталог: чтение — всем авторизованным, запись — админу.
 	works := api.Group("/works")
 	works.Get("", readRateLimiter, catalogHandler.ListWorks)
@@ -906,6 +910,15 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 			log.Printf("dimensions: залито размеров кадра для %d видео", updated)
 		}
 	})
+	thumbBackfillWG := new(sync.WaitGroup)
+	thumbBackfillWG.Add(1)
+	goSafe(func() {
+		defer thumbBackfillWG.Done()
+		generated := services.BackfillThumbnails(dimensionsCtx, mediaRepo, thumbSvc)
+		if generated > 0 {
+			log.Printf("thumbnails: сгенерировано %d недостающих превью", generated)
+		}
+	})
 	goSafe(func() {
 		<-cleanupStop
 		cancelDimensions()
@@ -927,6 +940,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		scanCancelFn:     scanCancelFn,
 		scanWG:           scanWG,
 		backfillWG:       backfillWG,
+		thumbBackfillWG:  thumbBackfillWG,
 		dimensionsCancel: cancelDimensions,
 	}, nil
 }
@@ -1096,6 +1110,18 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 		case <-backfillDone:
 		case <-shutdownCtx.Done():
 			log.Printf("shutdown: timed out waiting for dimensions backfill; closing database anyway")
+		}
+	}
+	if a.thumbBackfillWG != nil {
+		thumbDone := make(chan struct{})
+		go func() {
+			a.thumbBackfillWG.Wait()
+			close(thumbDone)
+		}()
+		select {
+		case <-thumbDone:
+		case <-shutdownCtx.Done():
+			log.Printf("shutdown: timed out waiting for thumbnail backfill; closing database anyway")
 		}
 	}
 	if a.sqlDB != nil {

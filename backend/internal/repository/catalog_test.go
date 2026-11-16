@@ -85,7 +85,7 @@ func TestMigrationV2PreservesChildren(t *testing.T) {
 	require.Nil(t, gotAudio.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(5), versions)
+	require.Equal(t, int64(6), versions)
 }
 
 func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
@@ -106,7 +106,7 @@ func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
 	require.Equal(t, models.VideoKindMovie, *got.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(5), versions)
+	require.Equal(t, int64(6), versions)
 }
 
 func TestWorkItemRequiresExactlyOneTarget(t *testing.T) {
@@ -330,7 +330,7 @@ func TestMigrationV3RepairsInvalidVideoKind(t *testing.T) {
 	require.NoError(t, db.Model(&rows[1]).Update("deleted_at", time.Now().UTC()).Error)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(5), versions)
+	require.Equal(t, int64(6), versions)
 }
 
 func TestVideoKindTriggerAllowsClearingOnTypeChange(t *testing.T) {
@@ -489,4 +489,26 @@ func TestMigrationV5DropsLegacyMetadataExternalUnique(t *testing.T) {
 	var metas []models.Metadata
 	require.NoError(t, db.Find(&metas).Error)
 	require.Len(t, metas, 2)
+}
+
+func TestMigrationV6RemovesNonVideoProgress(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+	user := models.User{Email: "progress@test.com"}
+	require.NoError(t, db.Create(&user).Error)
+	video := models.Media{Title: "Video", Type: models.MediaTypeVideo, FilePath: "/video.mp4"}
+	audio := models.Media{Title: "Audio", Type: models.MediaTypeAudio, FilePath: "/audio.mp3"}
+	require.NoError(t, db.Create(&video).Error)
+	require.NoError(t, db.Create(&audio).Error)
+	require.NoError(t, db.Create(&models.WatchProgress{UserID: user.ID, MediaID: video.ID, Position: 10, Duration: 100}).Error)
+	require.NoError(t, db.Create(&models.WatchProgress{UserID: user.ID, MediaID: audio.ID, Position: 5, Duration: 50}).Error)
+	require.NoError(t, db.Where("version = ?", 6).Delete(&models.SchemaMigration{}).Error)
+	require.NoError(t, RunMigrations(db))
+
+	var count int64
+	require.NoError(t, db.Model(&models.WatchProgress{}).Where("media_id = ?", audio.ID).Count(&count).Error)
+	require.Zero(t, count)
+	require.NoError(t, db.Model(&models.WatchProgress{}).Where("media_id = ?", video.ID).Count(&count).Error)
+	require.Equal(t, int64(1), count)
 }

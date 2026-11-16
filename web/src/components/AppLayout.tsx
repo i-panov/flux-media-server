@@ -10,7 +10,6 @@ import {
 } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import {
-	Clapperboard,
 	Film,
 	Image as ImageIcon,
 	LogOut,
@@ -19,7 +18,6 @@ import {
 	Settings,
 	Shield,
 	Sun,
-	Tv,
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -32,15 +30,7 @@ import { clickNode, useTVFocusable } from "../features/tv/tvFocus";
 import { useTVMode } from "../features/tv/useTVMode";
 import { PwaUpdatePrompt } from "./PwaUpdatePrompt";
 
-type NavTo =
-	| "/"
-	| "/video"
-	| "/series"
-	| "/franchises"
-	| "/audio"
-	| "/memes"
-	| "/settings"
-	| "/admin";
+type NavTo = "/" | "/video" | "/audio" | "/memes" | "/settings" | "/admin";
 
 interface NavItemConfig {
 	to: NavTo;
@@ -51,13 +41,6 @@ interface NavItemConfig {
 
 const MAIN_NAV: NavItemConfig[] = [
 	{ to: "/video", labelKey: "nav.video", icon: Film, exact: false },
-	{ to: "/series", labelKey: "nav.series", icon: Tv, exact: false },
-	{
-		to: "/franchises",
-		labelKey: "nav.franchises",
-		icon: Clapperboard,
-		exact: false,
-	},
 	{ to: "/audio", labelKey: "nav.audio", icon: Music, exact: false },
 	{ to: "/memes", labelKey: "nav.memes", icon: ImageIcon, exact: false },
 ];

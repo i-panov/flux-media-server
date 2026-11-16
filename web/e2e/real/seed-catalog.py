@@ -7,6 +7,7 @@ media = [
     (9002, "Реальный фильм", "/tmp/film.mp4", 5400, "movie"),
     (9003, "Отдельный фильм", "/tmp/standalone.mp4", 4800, "movie"),
     (9004, "E2E эпизод", "/tmp/e2e-episode.mp4", 1500, "movie"),
+    (9006, "E2E видео из UI", "/tmp/e2e-ui.mp4", 1200, "movie"),
 ]
 for media_id, title, path, duration, kind in media:
     db.execute("""INSERT INTO media (id, title, type, video_kind, file_path, duration, created_at, updated_at)

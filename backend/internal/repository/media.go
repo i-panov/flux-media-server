@@ -169,6 +169,20 @@ func (r *MediaStore) FindImagesWithPHash(ctx context.Context, excludeID uint) ([
 // заставлять заливку переспрашивать его при каждом старте — достаточно,
 // чтобы он не уехал в конец очереди навсегда. Порядок по ID: заливка
 // идёт до конца, а не крутится по кругу.
+func (r *MediaStore) FindMissingThumbnails(ctx context.Context, limit int) ([]models.Media, error) {
+	var rows []models.Media
+	err := r.db.WithContext(ctx).
+		Where("type IN ?", []models.MediaType{models.MediaTypeVideo, models.MediaTypeImage}).
+		Where("(thumbnail_url IS NULL OR thumbnail_url = '')").
+		Order("id ASC").Limit(limit).Find(&rows).Error
+	return rows, err
+}
+
+func (r *MediaStore) UpdateThumbnailURL(ctx context.Context, id uint, url string) error {
+	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
+		Update("thumbnail_url", url).Error
+}
+
 func (r *MediaStore) FindVideosMissingDimensions(ctx context.Context, limit int) ([]models.Media, error) {
 	if limit <= 0 {
 		limit = 50

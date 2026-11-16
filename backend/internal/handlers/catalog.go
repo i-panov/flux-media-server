@@ -41,6 +41,18 @@ func (h *CatalogHandler) ListWorks(c *fiber.Ctx) error {
 	return c.JSON(works)
 }
 
+func (h *CatalogHandler) GetMediaContext(c *fiber.Ctx) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
+	}
+	result, err := h.works.GetMediaContext(c.UserContext(), id)
+	if err != nil {
+		return h.mapError(c, err)
+	}
+	return c.JSON(result)
+}
+
 func (h *CatalogHandler) GetWork(c *fiber.Ctx) error {
 	id, err := parseIDParam(c, "id")
 	if err != nil {

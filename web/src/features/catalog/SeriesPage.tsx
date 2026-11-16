@@ -7,7 +7,7 @@ import { useTVMode } from "../tv/useTVMode";
 import { CreateWorkButton } from "./admin/CreateWorkButton";
 import { WorkCard } from "./WorkCard";
 
-export function SeriesPage() {
+export function SeriesPage({ embedded = false }: { embedded?: boolean }) {
 	const { t } = useTranslation();
 	const series = useWorks("series");
 	const films = useWorks("film_series");
@@ -21,17 +21,25 @@ export function SeriesPage() {
 	return (
 		<Stack
 			gap="lg"
-			ref={tvRef}
-			tabIndex={tvMode ? -1 : undefined}
-			data-tv-page-root="true"
-			data-tv-focus-key="series-page"
+			ref={embedded ? undefined : tvRef}
+			tabIndex={!embedded && tvMode ? -1 : undefined}
+			data-tv-page-root={embedded ? undefined : "true"}
+			data-tv-focus-key={embedded ? undefined : "series-page"}
 		>
-			<Group justify="space-between">
-				<Title order={1} size="h2">
-					{t("catalog.seriesAndFilms")}
-				</Title>
-				{canManage && <CreateWorkButton />}
-			</Group>
+			{embedded ? (
+				canManage && (
+					<Group justify="flex-end">
+						<CreateWorkButton />
+					</Group>
+				)
+			) : (
+				<Group justify="space-between">
+					<Title order={1} size="h2">
+						{t("catalog.seriesAndFilms")}
+					</Title>
+					{canManage && <CreateWorkButton />}
+				</Group>
+			)}
 			{series.isError || films.isError ? (
 				<Alert color="red">{t("catalog.error")}</Alert>
 			) : (

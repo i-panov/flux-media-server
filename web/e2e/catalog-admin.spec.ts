@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { stubEmptyLibraryMeta } from "./stubs";
 
-const SERIES_LIST_URL = /\/series$/;
+const VIDEO_URL = /\/video$/;
 const NEW_SERIES_LINK = /Новый сериал/;
 
 async function stubAdmin(page: Page) {
@@ -118,7 +118,7 @@ test("каталог: админ удаляет сериал с подтверж
 	await page.getByRole("button", { name: "Удалить" }).click();
 	expect(dialogType).toBe("confirm");
 	await expect.poll(() => deleted).toBe(true);
-	await expect(page).toHaveURL(SERIES_LIST_URL);
+	await expect(page).toHaveURL(VIDEO_URL);
 });
 
 test("каталог: админ меняет порядок сезонов с клавиатуры", async ({ page }) => {

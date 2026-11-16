@@ -281,7 +281,10 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV4(db); err != nil {
 		return err
 	}
-	return runMigrationsV5(db)
+	if err := runMigrationsV5(db); err != nil {
+		return err
+	}
+	return runMigrationsV6(db)
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
@@ -633,6 +636,40 @@ func runMigrationsV4(db *gorm.DB) error {
 			if err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_subtitles_media_lang
 				ON subtitles(media_id, lang)`).Error; err != nil {
 				return fmt.Errorf("create subtitles unique index: %w", err)
+			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV6 — прогресс существует только для видео.
+func runMigrationsV6(db *gorm.DB) error {
+	const schemaVersion = 6
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 6: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		if ok, err := tableExists(tx, "watch_progresses"); err != nil {
+			return fmt.Errorf("check watch_progresses: %w", err)
+		} else if ok {
+			if ok, err := tableExists(tx, "media"); err != nil {
+				return fmt.Errorf("check media for v6: %w", err)
+			} else if ok {
+				if err := tx.Exec(`DELETE FROM watch_progresses
+					WHERE media_id IN (SELECT id FROM media WHERE type <> 'video')`).Error; err != nil {
+					return fmt.Errorf("delete non-video progress: %w", err)
+				}
 			}
 		}
 		return tx.Create(&models.SchemaMigration{

@@ -87,7 +87,7 @@ export function FranchiseAdminPanel({
 						if (window.confirm(t("catalog.admin.deleteFranchiseConfirm"))) {
 							void run(async () => {
 								await remove.mutateAsync(franchise.id);
-								await navigate({ to: "/franchises" });
+								await navigate({ to: "/video", replace: true });
 							});
 						}
 					}}
