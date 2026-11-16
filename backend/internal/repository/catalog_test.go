@@ -85,7 +85,7 @@ func TestMigrationV2PreservesChildren(t *testing.T) {
 	require.Nil(t, gotAudio.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(8), versions)
+	require.Equal(t, int64(9), versions)
 }
 
 func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
@@ -106,7 +106,7 @@ func TestMigrationV2RunsBeforeAutoMigrate(t *testing.T) {
 	require.Equal(t, models.VideoKindMovie, *got.VideoKind)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(8), versions)
+	require.Equal(t, int64(9), versions)
 }
 
 func TestWorkItemRequiresExactlyOneTarget(t *testing.T) {
@@ -330,7 +330,7 @@ func TestMigrationV3RepairsInvalidVideoKind(t *testing.T) {
 	require.NoError(t, db.Model(&rows[1]).Update("deleted_at", time.Now().UTC()).Error)
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	require.Equal(t, int64(8), versions)
+	require.Equal(t, int64(9), versions)
 }
 
 func TestVideoKindTriggerAllowsClearingOnTypeChange(t *testing.T) {

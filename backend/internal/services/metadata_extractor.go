@@ -16,15 +16,20 @@ import (
 
 // FileMetadata holds metadata extracted from a media file.
 type FileMetadata struct {
-	Title    string
-	Artist   string
-	Album    string
-	Genre    string
-	Year     int
-	Duration int    // seconds
-	Width    int    // video only
-	Height   int    // video only
-	Codec    string // video only
+	Title       string
+	Artist      string
+	Album       string
+	Genre       string
+	Year        int
+	Description string
+	AlbumArtist string
+	Composer    string
+	TrackNumber int
+	DiscNumber  int
+	Duration    int    // seconds
+	Width       int    // video only
+	Height      int    // video only
+	Codec       string // video only
 }
 
 // MetadataExtractor extracts metadata from media files.
@@ -101,12 +106,19 @@ func (e *MetadataExtractor) extractAudio(ctx context.Context, path string) *File
 		return nil
 	}
 
+	track, _ := m.Track()
+	disc, _ := m.Disc()
 	return &FileMetadata{
-		Title:  m.Title(),
-		Artist: m.Artist(),
-		Album:  m.Album(),
-		Genre:  m.Genre(),
-		Year:   m.Year(),
+		Title:       m.Title(),
+		Artist:      m.Artist(),
+		Album:       m.Album(),
+		Genre:       m.Genre(),
+		Year:        m.Year(),
+		Description: m.Comment(),
+		AlbumArtist: m.AlbumArtist(),
+		Composer:    m.Composer(),
+		TrackNumber: track,
+		DiscNumber:  disc,
 	}
 }
 
@@ -160,15 +172,50 @@ func extractVideoFromData(data *ffprobe.ProbeData) *FileMetadata {
 		meta.Codec = vs.CodecName
 	}
 
-	// Some video containers store title/artist tags.
+	// Some video containers store title/artist/genre/date tags.
 	if t, err := data.Format.TagList.GetString("title"); err == nil {
 		meta.Title = t
 	}
 	if a, err := data.Format.TagList.GetString("artist"); err == nil {
 		meta.Artist = a
 	}
+	if album, err := data.Format.TagList.GetString("album"); err == nil {
+		meta.Album = album
+	}
+	if genre, err := data.Format.TagList.GetString("genre"); err == nil {
+		meta.Genre = genre
+	}
+	if comment, err := data.Format.TagList.GetString("comment"); err == nil {
+		meta.Description = comment
+	}
+	if date, err := data.Format.TagList.GetString("date"); err == nil {
+		meta.Year = parseTagYear(date)
+	}
+	if meta.Year == 0 {
+		if year, err := data.Format.TagList.GetString("year"); err == nil {
+			meta.Year = parseTagYear(year)
+		}
+	}
 
 	return meta
+}
+
+func parseTagYear(raw string) int {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 4 {
+		raw = raw[:4]
+	}
+	year := 0
+	for _, r := range raw {
+		if r < '0' || r > '9' {
+			return 0
+		}
+		year = year*10 + int(r-'0')
+	}
+	if year < 1888 || year > time.Now().Year()+2 {
+		return 0
+	}
+	return year
 }
 
 // DetermineMediaTypeFromProbe returns the media type from probe stream data.

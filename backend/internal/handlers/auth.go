@@ -168,6 +168,13 @@ func randomUserCode() (string, error) {
 
 // normalizeUserCode принимает код с пробелами/дефисами и цифровую
 // клавиатуру: "482 913" -> "482913".
+func hashPrefix(hash string) string {
+	if len(hash) > 8 {
+		return hash[:8]
+	}
+	return hash
+}
+
 func normalizeUserCode(value string) string {
 	var digits strings.Builder
 	for _, r := range value {
@@ -387,13 +394,16 @@ func (h *AuthHandler) InspectDevice(c *fiber.Ctx) error {
 	if len(code) != 6 {
 		return response.Error(c, fiber.StatusBadRequest, "user_code must be 6 digits")
 	}
-	record, err := h.deviceAuthRepo.FindPendingByUserCode(c.UserContext(), repository.HashDeviceCode(code))
+	hash := repository.HashDeviceCode(code)
+	record, err := h.deviceAuthRepo.FindPendingByUserCode(c.UserContext(), hash)
 	if err != nil {
+		log.Printf("device inspect: hash=%s status=not-found", hashPrefix(hash))
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.Error(c, fiber.StatusNotFound, "Code not found or already used")
 		}
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to inspect code")
 	}
+	log.Printf("device inspect: hash=%s status=%s", hashPrefix(hash), record.Status)
 	if time.Now().After(record.ExpiresAt) {
 		return response.Error(c, fiber.StatusGone, "Code expired")
 	}
@@ -422,13 +432,16 @@ func (h *AuthHandler) ApproveDevice(c *fiber.Ctx) error {
 	if len(code) != 6 {
 		return response.Error(c, fiber.StatusBadRequest, "user_code must be 6 digits")
 	}
-	record, err := h.deviceAuthRepo.Approve(c.UserContext(), repository.HashDeviceCode(code), userID)
+	hash := repository.HashDeviceCode(code)
+	record, err := h.deviceAuthRepo.Approve(c.UserContext(), hash, userID)
 	if err != nil {
+		log.Printf("device approve: hash=%s user=%d err=%v", hashPrefix(hash), userID, err)
 		if errors.Is(err, repository.ErrDeviceCodeInvalid) {
 			return response.Error(c, fiber.StatusNotFound, "Code not found, expired or already used")
 		}
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to approve device")
 	}
+	log.Printf("device approve: hash=%s user=%d status=%s", hashPrefix(hash), userID, record.Status)
 	return c.JSON(fiber.Map{
 		"approved":    true,
 		"device_name": record.DeviceName,

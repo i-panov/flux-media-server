@@ -13,6 +13,7 @@ import {
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ApiError } from "../../api/client";
 import {
 	useApproveDeviceCodeMutation,
 	useInspectDeviceCodeMutation,
@@ -47,18 +48,33 @@ export function ActivatePage() {
 	const [done, setDone] = useState(false);
 	const [inspectedCode, setInspectedCode] = useState<string | null>(null);
 	const [approveError, setApproveError] = useState<string | null>(null);
+	const [inspectError, setInspectError] = useState<string | null>(null);
 	const inspectedRef = useRef(false);
+
+	const errorMessage = useCallback(
+		(error: unknown) => {
+			if (error instanceof ApiError) {
+				if (error.status === 410) return t("auth.activateExpired");
+				if (error.status === 429) return t("auth.activateRateLimited");
+				if (error.status === 404) return t("auth.activateNotFound");
+			}
+			return t("auth.activateInvalid");
+		},
+		[t],
+	);
 
 	const runInspect = useCallback(
 		(value: string) => {
 			const normalized = value.replace(NON_DIGITS, "").slice(0, 6);
 			if (normalized.length !== 6) return;
 			setApproveError(null);
+			setInspectError(null);
 			inspect.mutate(normalized, {
 				onSuccess: () => setInspectedCode(normalized),
+				onError: (error) => setInspectError(errorMessage(error)),
 			});
 		},
-		[inspect],
+		[inspect, errorMessage],
 	);
 
 	// Код приходит во фрагменте (#code=482913): он не уходит на сервер
@@ -112,9 +128,9 @@ export function ActivatePage() {
 					<Text size="sm" c="dimmed">
 						{t("auth.activateHint")}
 					</Text>
-					{inspect.isError && (
+					{inspectError !== null && (
 						<Alert color="red" variant="light">
-							{t("auth.activateInvalid")}
+							{inspectError}
 						</Alert>
 					)}
 					{approveError !== null && (
@@ -156,6 +172,7 @@ export function ActivatePage() {
 											if (next !== inspectedCode) {
 												setInspectedCode(null);
 												setApproveError(null);
+												setInspectError(null);
 												inspect.reset();
 											}
 											setCode(next);
@@ -186,8 +203,8 @@ export function ActivatePage() {
 											onClick={() =>
 												approve.mutate(codeDigits, {
 													onSuccess: () => setDone(true),
-													onError: () =>
-														setApproveError(t("auth.activateInvalid")),
+													onError: (error) =>
+														setApproveError(errorMessage(error)),
 												})
 											}
 										>

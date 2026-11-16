@@ -529,8 +529,23 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 		if existing.Album == "" && fileMeta.Album != "" {
 			existing.Album = fileMeta.Album
 		}
+		if existing.AlbumArtist == "" && fileMeta.AlbumArtist != "" {
+			existing.AlbumArtist = fileMeta.AlbumArtist
+		}
+		if existing.Composer == "" && fileMeta.Composer != "" {
+			existing.Composer = fileMeta.Composer
+		}
+		if existing.TrackNumber == 0 && fileMeta.TrackNumber > 0 {
+			existing.TrackNumber = fileMeta.TrackNumber
+		}
+		if existing.DiscNumber == 0 && fileMeta.DiscNumber > 0 {
+			existing.DiscNumber = fileMeta.DiscNumber
+		}
 		if existing.Genre == "" && fileMeta.Genre != "" {
 			existing.Genre = fileMeta.Genre
+		}
+		if existing.Description == "" && fileMeta.Description != "" {
+			existing.Description = fileMeta.Description
 		}
 		// Размеры кадра — ТЕХНИЧЕСКИЕ поля: они перезаписываются
 		// всегда, в отличие от пользовательских (title/artist/album/
@@ -565,6 +580,9 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 	if existing.Type != models.MediaTypeImage {
 		if coverPath := s.thumbService.ExtractCoverContext(ctx, existing.ID, path); coverPath != "" {
 			existing.CoverURL = fmt.Sprintf("/api/media/%d/cover", existing.ID)
+		}
+		if err := s.mediaRepo.SetCoverAttempted(ctx, existing.ID, true); err != nil {
+			log.Printf("Error marking cover attempt for %s: %v", path, err)
 		}
 	}
 
@@ -653,8 +671,23 @@ func (s *ScannerService) createNewMedia(ctx context.Context, path string, info o
 		if media.Album == "" && fileMeta.Album != "" {
 			media.Album = fileMeta.Album
 		}
+		if media.AlbumArtist == "" && fileMeta.AlbumArtist != "" {
+			media.AlbumArtist = fileMeta.AlbumArtist
+		}
+		if media.Composer == "" && fileMeta.Composer != "" {
+			media.Composer = fileMeta.Composer
+		}
+		if media.TrackNumber == 0 && fileMeta.TrackNumber > 0 {
+			media.TrackNumber = fileMeta.TrackNumber
+		}
+		if media.DiscNumber == 0 && fileMeta.DiscNumber > 0 {
+			media.DiscNumber = fileMeta.DiscNumber
+		}
 		if media.Genre == "" && fileMeta.Genre != "" {
 			media.Genre = fileMeta.Genre
+		}
+		if media.Description == "" && fileMeta.Description != "" {
+			media.Description = fileMeta.Description
 		}
 		if media.Width == 0 && fileMeta.Width > 0 {
 			media.Width = fileMeta.Width
@@ -684,6 +717,21 @@ func (s *ScannerService) createNewMedia(ctx context.Context, path string, info o
 		media.ThumbnailURL = fmt.Sprintf("/api/media/%d/thumb", media.ID)
 		if err := s.mediaRepo.Update(ctx, media); err != nil {
 			log.Printf("Error updating media thumbnail for %s: %v", path, err)
+		}
+	}
+
+	// Встроенная обложка аудио: при первичном скане её тоже нужно
+	// извлечь. Отмечаем попытку даже при отсутствии арта, чтобы не
+	// запускать ffmpeg на каждом старте.
+	if detectedType.IsAudio() {
+		if coverPath := s.thumbService.ExtractCoverContext(ctx, media.ID, path); coverPath != "" {
+			media.CoverURL = fmt.Sprintf("/api/media/%d/cover", media.ID)
+			if err := s.mediaRepo.UpdateCoverURL(ctx, media.ID, media.CoverURL); err != nil {
+				log.Printf("Error updating media cover for %s: %v", path, err)
+			}
+		}
+		if err := s.mediaRepo.SetCoverAttempted(ctx, media.ID, true); err != nil {
+			log.Printf("Error marking cover attempt for %s: %v", path, err)
 		}
 	}
 

@@ -313,7 +313,10 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV7(db); err != nil {
 		return err
 	}
-	return runMigrationsV8(db)
+	if err := runMigrationsV8(db); err != nil {
+		return err
+	}
+	return runMigrationsV9(db)
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
@@ -666,6 +669,28 @@ func runMigrationsV4(db *gorm.DB) error {
 				ON subtitles(media_id, lang)`).Error; err != nil {
 				return fmt.Errorf("create subtitles unique index: %w", err)
 			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV9 — признак попытки извлечения встроенной обложки.
+func runMigrationsV9(db *gorm.DB) error {
+	const schemaVersion = 9
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 9: %w", err)
+		}
+		if applied > 0 {
+			return nil
 		}
 		return tx.Create(&models.SchemaMigration{
 			Version:   schemaVersion,

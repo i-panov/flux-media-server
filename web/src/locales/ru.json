@@ -514,5 +514,8 @@
 	"catalog.videos": "Видео",
 	"metadata.optional": "Необязательно",
 	"tags.loadError": "Не удалось загрузить теги",
-	"tags.deleteError": "Не удалось удалить тег"
+	"tags.deleteError": "Не удалось удалить тег",
+	"auth.activateNotFound": "Код не найден или уже использован.",
+	"auth.activateExpired": "Код истёк. Получите новый код на устройстве.",
+	"auth.activateRateLimited": "Слишком много попыток. Подождите минуту."
 }

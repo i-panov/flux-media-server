@@ -514,5 +514,8 @@
 	"catalog.videos": "Videos",
 	"metadata.optional": "Optional",
 	"tags.loadError": "Could not load tags",
-	"tags.deleteError": "Could not delete tag"
+	"tags.deleteError": "Could not delete tag",
+	"auth.activateNotFound": "Code not found or already used.",
+	"auth.activateExpired": "Code expired. Get a new code on the device.",
+	"auth.activateRateLimited": "Too many attempts. Wait a minute."
 }

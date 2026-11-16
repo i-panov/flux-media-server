@@ -931,6 +931,10 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		if generated > 0 {
 			log.Printf("thumbnails: сгенерировано %d недостающих превью", generated)
 		}
+		covers := services.BackfillAudioCovers(dimensionsCtx, mediaRepo, thumbSvc)
+		if covers > 0 {
+			log.Printf("covers: извлечено %d встроенных обложек", covers)
+		}
 	})
 	goSafe(func() {
 		<-cleanupStop

@@ -82,6 +82,12 @@ type MediaRepository interface {
 	FindMissingThumbnails(ctx context.Context, limit int) ([]models.Media, error)
 	// UpdateThumbnailURL пишет только URL превью.
 	UpdateThumbnailURL(ctx context.Context, id uint, url string) error
+	// FindAudioMissingCover — аудио без обложки, для которого извлечение
+	// ещё не пробовали.
+	FindAudioMissingCover(ctx context.Context, limit int) ([]models.Media, error)
+	// SetCoverAttempted фиксирует попытку извлечения встроенной обложки.
+	SetCoverAttempted(ctx context.Context, id uint, attempted bool) error
+	UpdateCoverURL(ctx context.Context, id uint, url string) error
 	// UpdateDimensions записывает ТОЛЬКО размеры кадра, ничего не
 	// трогая в остальных полях и связях.
 	//

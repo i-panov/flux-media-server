@@ -52,8 +52,8 @@ function VideoTabButton({
 				return onDown();
 			}
 			const order: VideoTab[] = [
-				"films",
 				"videos",
+				"films",
 				"series",
 				"film_series",
 				"franchises",
@@ -146,15 +146,6 @@ export function VideoPage() {
 			</Group>
 			<Group role="tablist" aria-label={t("catalog.tabs")} gap="xs">
 				<VideoTabButton
-					focusKey="video-tab-films"
-					value="films"
-					onSelect={setTab}
-					active={tab === "films"}
-					onDown={focusFirstCard}
-				>
-					{t("catalog.films")}
-				</VideoTabButton>
-				<VideoTabButton
 					focusKey="video-tab-videos"
 					value="videos"
 					onSelect={setTab}
@@ -162,6 +153,15 @@ export function VideoPage() {
 					onDown={focusFirstCard}
 				>
 					{t("catalog.videos")}
+				</VideoTabButton>
+				<VideoTabButton
+					focusKey="video-tab-films"
+					value="films"
+					onSelect={setTab}
+					active={tab === "films"}
+					onDown={focusFirstCard}
+				>
+					{t("catalog.films")}
 				</VideoTabButton>
 				<VideoTabButton
 					focusKey="video-tab-series"

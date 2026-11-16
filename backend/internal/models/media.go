@@ -20,10 +20,14 @@ type Media struct {
 	// (media_id → media.id, artist_id → artists.id) с каскадами — но только
 	// на свежих БД; старые БД не пересоздаются (ручные каскады в
 	// repository.MediaStore.Delete покрывают их).
-	Artists  []Artist `gorm:"many2many:media_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists"`
-	Album    string   `json:"album"`
-	Genre    string   `json:"genre"`
-	Duration int      `json:"duration"` // seconds
+	Artists     []Artist `gorm:"many2many:media_artists;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"artists"`
+	Album       string   `json:"album"`
+	AlbumArtist string   `json:"album_artist"`
+	Composer    string   `json:"composer"`
+	TrackNumber int      `json:"track_number"`
+	DiscNumber  int      `json:"disc_number"`
+	Genre       string   `json:"genre"`
+	Duration    int      `json:"duration"` // seconds
 	// Width/Height — размеры видео в пикселях (0 у аудио и у файлов,
 	// у которых ffprobe не отдал поток). Нужны клиенту до старта
 	// воспроизведения: по соотношению сторон выбирается ориентация
@@ -50,6 +54,8 @@ type Media struct {
 	ViewCount    uint64 `json:"view_count"`
 	ThumbnailURL string `json:"thumbnail_url"`
 	CoverURL     string `json:"cover_url"`
+	// CoverAttempted — встроенную обложку уже пытались извлечь.
+	CoverAttempted bool `gorm:"not null;default:false" json:"-"`
 	// SourceURL — ссылка на источник (например, страница YouTube).
 	// Заполняется только вручную через PUT /api/metadata/:mediaId,
 	// сканер и очередь загрузок её не трогают.

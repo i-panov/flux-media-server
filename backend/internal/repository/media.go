@@ -190,6 +190,24 @@ func (r *MediaStore) FindMissingThumbnails(ctx context.Context, limit int) ([]mo
 	return rows, err
 }
 
+func (r *MediaStore) FindAudioMissingCover(ctx context.Context, limit int) ([]models.Media, error) {
+	var rows []models.Media
+	err := r.db.WithContext(ctx).
+		Where("type = ? AND (cover_url IS NULL OR cover_url = '') AND cover_attempted = ?", models.MediaTypeAudio, false).
+		Order("id ASC").Limit(limit).Find(&rows).Error
+	return rows, err
+}
+
+func (r *MediaStore) UpdateCoverURL(ctx context.Context, id uint, url string) error {
+	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
+		Update("cover_url", url).Error
+}
+
+func (r *MediaStore) SetCoverAttempted(ctx context.Context, id uint, attempted bool) error {
+	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
+		Update("cover_attempted", attempted).Error
+}
+
 func (r *MediaStore) UpdateThumbnailURL(ctx context.Context, id uint, url string) error {
 	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
 		Update("thumbnail_url", url).Error

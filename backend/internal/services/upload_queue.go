@@ -786,6 +786,9 @@ func (q *UploadQueue) continueWithMedia(job *UploadJob, media *models.Media) {
 				return
 			}
 		}
+		if err := q.media.SetCoverAttempted(ctx, media.ID, true); err != nil {
+			log.Printf("upload queue: mark cover attempt for %d: %v", media.ID, err)
+		}
 	}
 
 	q.mu.Lock()
