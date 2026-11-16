@@ -109,7 +109,7 @@ export function WorkAdminPanel({ work }: { work: CatalogWork }) {
 						if (window.confirm(t("catalog.admin.deleteWorkConfirm"))) {
 							void run(async () => {
 								await removeWork.mutateAsync(work.id);
-								await navigate({ to: "/series" });
+								await navigate({ to: "/series", replace: true });
 							});
 						}
 					}}

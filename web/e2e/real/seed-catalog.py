@@ -6,6 +6,7 @@ media = [
     (9001, "Пилот", "/tmp/pilot.mp4", 1200, "episode"),
     (9002, "Реальный фильм", "/tmp/film.mp4", 5400, "movie"),
     (9003, "Отдельный фильм", "/tmp/standalone.mp4", 4800, "movie"),
+    (9004, "E2E эпизод", "/tmp/e2e-episode.mp4", 1500, "movie"),
 ]
 for media_id, title, path, duration, kind in media:
     db.execute("""INSERT INTO media (id, title, type, video_kind, file_path, duration, created_at, updated_at)
@@ -20,6 +21,10 @@ db.execute("""INSERT INTO works (id, kind, title, description, cover_url, year, 
               VALUES (9002, 'film_series', 'Реальная серия фильмов', '', '', 2025, ?, ?)""", (now, now))
 db.execute("""INSERT INTO work_items (id, work_id, media_id, position, created_at)
               VALUES (9002, 9002, 9002, 0, ?)""", (now,))
+db.execute("""INSERT INTO users (id, email, is_admin, created_at, updated_at)
+              VALUES (9001, 'catalog-admin@example.com', 1, ?, ?)""", (now, now))
+db.execute("""INSERT INTO users (id, email, is_admin, created_at, updated_at)
+              VALUES (9002, 'e2e@example.com', 1, ?, ?)""", (now, now))
 db.execute("""INSERT INTO franchises (id, name, description, cover_url, created_at, updated_at)
               VALUES (9001, 'Реальная франшиза', '', '', ?, ?)""", (now, now))
 db.execute("INSERT INTO franchise_entries (id, franchise_id, work_id, position) VALUES (9001, 9001, 9001, 0)")
