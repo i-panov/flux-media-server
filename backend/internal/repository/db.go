@@ -171,6 +171,10 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.WorkItem{},
 		&models.Franchise{},
 		&models.FranchiseEntry{},
+		&models.Tag{},
+		&models.MediaTag{},
+		&models.WorkTag{},
+		&models.FranchiseTag{},
 	); err != nil {
 		return err
 	}
@@ -178,6 +182,9 @@ func AutoMigrate(db *gorm.DB) error {
 		return err
 	}
 	if err := createMetadataIndexes(db); err != nil {
+		return err
+	}
+	if err := seedSystemTags(db); err != nil {
 		return err
 	}
 	if err := createVideoKindTriggers(db); err != nil {
@@ -241,6 +248,22 @@ func createCatalogIndexes(db *gorm.DB) error {
 	return nil
 }
 
+func seedSystemTags(db *gorm.DB) error {
+	for _, row := range []struct{ slug, name string }{
+		{"film", "Фильм"},
+		{"clip", "Клип"},
+		{"podcast", "Подкаст"},
+	} {
+		if err := db.Exec(`INSERT OR IGNORE INTO tags
+			(tag_group, slug, name, created_at, updated_at)
+			VALUES ('format', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			row.slug, row.name).Error; err != nil {
+			return fmt.Errorf("seed tag %s: %w", row.slug, err)
+		}
+	}
+	return nil
+}
+
 // createMetadataIndexes — partial unique, которые нельзя вешать до
 // AutoMigrate на свежей БД: таблиц ещё нет.
 func createMetadataIndexes(db *gorm.DB) error {
@@ -284,7 +307,13 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV5(db); err != nil {
 		return err
 	}
-	return runMigrationsV6(db)
+	if err := runMigrationsV6(db); err != nil {
+		return err
+	}
+	if err := runMigrationsV7(db); err != nil {
+		return err
+	}
+	return runMigrationsV8(db)
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
@@ -637,6 +666,52 @@ func runMigrationsV4(db *gorm.DB) error {
 				ON subtitles(media_id, lang)`).Error; err != nil {
 				return fmt.Errorf("create subtitles unique index: %w", err)
 			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV8 — системные теги формата, без которых вкладка «Фильмы»
+// не может найти контент.
+func runMigrationsV8(db *gorm.DB) error {
+	const schemaVersion = 8
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 8: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV7 — теги и связи. Таблицы создаёт AutoMigrate; версия
+// фиксирует этап для старых установок.
+func runMigrationsV7(db *gorm.DB) error {
+	const schemaVersion = 7
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 7: %w", err)
+		}
+		if applied > 0 {
+			return nil
 		}
 		return tx.Create(&models.SchemaMigration{
 			Version:   schemaVersion,

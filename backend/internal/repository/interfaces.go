@@ -36,6 +36,10 @@ type MediaFilters struct {
 	// IncludeEpisodes — админ/отладка: вернуть эпизоды сериалов.
 	// По умолчанию общий список видео их скрывает.
 	IncludeEpisodes bool
+	// Format — slug тега группы format (film, clip, podcast).
+	Format string
+	// ExcludeFormat — исключить media с этим format-тегом.
+	ExcludeFormat string
 }
 
 // MediaRepository defines data access methods for Media entities.

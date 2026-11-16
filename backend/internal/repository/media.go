@@ -39,6 +39,18 @@ func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, o
 		query = query.Where(`EXISTS (SELECT 1 FROM media_artists ma
 			WHERE ma.media_id = media.id AND ma.artist_id = ?)`, filters.ArtistID)
 	}
+	if filters.Format != "" {
+		query = query.Where(`media.id IN (
+			SELECT mt.media_id FROM media_tags mt
+			JOIN tags t ON t.id = mt.tag_id
+			WHERE t.tag_group = ? AND t.slug = ?)`, models.TagGroupFormat, filters.Format)
+	}
+	if filters.ExcludeFormat != "" {
+		query = query.Where(`media.id NOT IN (
+			SELECT mt.media_id FROM media_tags mt
+			JOIN tags t ON t.id = mt.tag_id
+			WHERE t.tag_group = ? AND t.slug = ?)`, models.TagGroupFormat, filters.ExcludeFormat)
+	}
 	if filters.Q != "" {
 		// Экранируем спецсимволы LIKE из пользовательского ввода: иначе
 		// «%» и «_» трактуются как шаблон, а не как литеральные символы.

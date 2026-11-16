@@ -9,15 +9,22 @@ import {
 	TextInput,
 } from "@mantine/core";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCreateWork, type WorkKind } from "../../../api/catalog";
 
-export function CreateWorkButton() {
+export function CreateWorkButton({
+	initialKind,
+}: {
+	initialKind?: WorkKind;
+} = {}) {
 	const { t } = useTranslation();
 	const create = useCreateWork();
 	const [open, setOpen] = useState(false);
-	const [kind, setKind] = useState<WorkKind>("series");
+	const [kind, setKind] = useState<WorkKind>(initialKind ?? "series");
+	useEffect(() => {
+		if (initialKind !== undefined) setKind(initialKind);
+	}, [initialKind]);
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [coverURL, setCoverURL] = useState("");
@@ -55,17 +62,19 @@ export function CreateWorkButton() {
 				title={t("catalog.admin.newWork")}
 			>
 				<Stack>
-					<Select
-						label={t("catalog.admin.type")}
-						data={[
-							{ value: "series", label: t("catalog.admin.series") },
-							{ value: "film_series", label: t("catalog.admin.filmSeries") },
-						]}
-						value={kind}
-						onChange={(value) =>
-							setKind(value === "film_series" ? "film_series" : "series")
-						}
-					/>
+					{initialKind === undefined && (
+						<Select
+							label={t("catalog.admin.type")}
+							data={[
+								{ value: "series", label: t("catalog.admin.series") },
+								{ value: "film_series", label: t("catalog.admin.filmSeries") },
+							]}
+							value={kind}
+							onChange={(value) =>
+								setKind(value === "film_series" ? "film_series" : "series")
+							}
+						/>
+					)}
 					<TextInput
 						label={t("catalog.admin.title")}
 						value={title}

@@ -72,8 +72,26 @@ func (r *WorkStore) List(ctx context.Context, kind models.WorkKind) ([]models.Wo
 		q = q.Where("kind = ?", kind)
 	}
 	var works []models.Work
-	err := q.Find(&works).Error
-	return works, err
+	if err := q.Find(&works).Error; err != nil {
+		return nil, err
+	}
+	for i := range works {
+		tags, err := loadWorkTags(r.db.WithContext(ctx), works[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		works[i].Tags = tags
+	}
+	return works, nil
+}
+
+func loadWorkTags(db *gorm.DB, workID uint) ([]models.Tag, error) {
+	var tags []models.Tag
+	err := db.Table("tags").
+		Joins("JOIN work_tags ON work_tags.tag_id = tags.id").
+		Where("work_tags.work_id = ?", workID).
+		Order("tags.tag_group ASC, tags.name ASC").Find(&tags).Error
+	return tags, err
 }
 
 // Get загружает work с сезонами, эпизодами и фильмами film_series.
@@ -107,6 +125,11 @@ func (r *WorkStore) Get(ctx context.Context, id uint) (*models.Work, error) {
 	if err := r.attachMedia(ctx, all); err != nil {
 		return nil, err
 	}
+	tags, err := loadWorkTags(db, work.ID)
+	if err != nil {
+		return nil, err
+	}
+	work.Tags = tags
 	return &work, nil
 }
 

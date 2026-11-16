@@ -14,8 +14,15 @@ import {
 	videoListOptions,
 } from "../core/media";
 import { apiFetch } from "./client";
-export function useVideoList(q: string, sort: "asc" | "desc" = "desc") {
-	return useInfiniteQuery(videoListOptions(apiFetch, q, sort));
+export function useVideoList(
+	q: string,
+	sort: "asc" | "desc" = "desc",
+	format?: string,
+	excludeFormat?: string,
+) {
+	return useInfiniteQuery(
+		videoListOptions(apiFetch, q, sort, format, excludeFormat),
+	);
 }
 
 export function useAudioList(

@@ -187,7 +187,7 @@ test("метаданные: правка названия на детально�
 		"https://example.com/source",
 	);
 	await page.getByLabel("Название").fill("Новое название");
-	await page.getByRole("button", { name: "Сохранить" }).click();
+	await page.getByRole("button", { name: "Сохранить", exact: true }).click();
 
 	// Ждём успех (закрытие модалки), а не отправку: заголовок
 	// обновляется в onSuccess той же очередью микротасков.
@@ -206,7 +206,7 @@ test("метаданные: правка названия на детально�
 	// Осознанная очистка: пустое поле при непустой исходной уходит "".
 	await page.getByRole("button", { name: "Изменить" }).click();
 	await page.getByLabel("Ссылка на источник").fill("");
-	await page.getByRole("button", { name: "Сохранить" }).click();
+	await page.getByRole("button", { name: "Сохранить", exact: true }).click();
 	await expect.poll(() => metadataBodies.length).toBe(2);
 	const cleared = JSON.parse(metadataBodies[1] ?? "{}") as Record<
 		string,

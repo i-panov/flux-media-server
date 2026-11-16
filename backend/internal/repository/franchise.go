@@ -36,7 +36,26 @@ func (r *FranchiseStore) Create(ctx context.Context, franchise *models.Franchise
 func (r *FranchiseStore) List(ctx context.Context) ([]models.Franchise, error) {
 	var rows []models.Franchise
 	err := r.db.WithContext(ctx).Order("name ASC, id ASC").Find(&rows).Error
-	return rows, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		tags, tagErr := franchiseTags(r.db.WithContext(ctx), rows[i].ID)
+		if tagErr != nil {
+			return nil, tagErr
+		}
+		rows[i].Tags = tags
+	}
+	return rows, nil
+}
+
+func franchiseTags(db *gorm.DB, franchiseID uint) ([]models.Tag, error) {
+	var tags []models.Tag
+	err := db.Table("tags").
+		Joins("JOIN franchise_tags ON franchise_tags.tag_id = tags.id").
+		Where("franchise_tags.franchise_id = ?", franchiseID).
+		Order("tags.tag_group ASC, tags.name ASC").Find(&tags).Error
+	return tags, err
 }
 
 func (r *FranchiseStore) Get(ctx context.Context, id uint) (*models.Franchise, error) {
@@ -48,7 +67,15 @@ func (r *FranchiseStore) Get(ctx context.Context, id uint) (*models.Franchise, e
 		Preload("Entries.Work").
 		Preload("Entries.Media").
 		First(&row, id).Error
-	return &row, err
+	if err != nil {
+		return nil, err
+	}
+	tags, err := franchiseTags(r.db.WithContext(ctx), id)
+	if err != nil {
+		return nil, err
+	}
+	row.Tags = tags
+	return &row, nil
 }
 
 type FranchisePatch struct {

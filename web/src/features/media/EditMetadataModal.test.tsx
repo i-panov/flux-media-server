@@ -104,7 +104,9 @@ describe("EditMetadataModal", () => {
 		expect(screen.queryByLabelText("Жанр")).toBeNull();
 		expect(screen.queryByLabelText("Альбом")).toBeNull();
 		expect(screen.queryByText("Исполнители")).toBeNull();
-		expect(screen.getByLabelText("Ссылка на источник")).toBeTruthy();
+		expect(screen.queryByLabelText("Ссылка на источник")).toBeNull();
+		expect(screen.queryByLabelText("Описание")).toBeNull();
+		expect(screen.getByLabelText("Название")).toBeTruthy();
 	});
 
 	it("у видео есть год и жанр, но нет альбома и исполнителей", async () => {

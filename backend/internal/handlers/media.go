@@ -69,6 +69,8 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 		filters.ArtistID = uint(artistID)
 	}
 	filters.IncludeEpisodes = c.QueryBool("include_episodes", false)
+	filters.Format = strings.TrimSpace(c.Query("format"))
+	filters.ExcludeFormat = strings.TrimSpace(c.Query("exclude_format"))
 	// Порядок по id: по умолчанию старый (совместимо с прежним
 	// поведением), sort=desc — новые сверху для мем-галереи.
 	if sortOrder := c.Query("sort"); sortOrder != "" {

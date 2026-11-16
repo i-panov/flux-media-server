@@ -276,7 +276,8 @@ test("видео: сериалы и франшизы — вкладки одно
 test("видео: TV Down с вкладки сериалов ведёт в карточки", async ({ page }) => {
 	await stubCatalog(page);
 	await page.goto("/video?tv=1");
-	await expect.poll(() => activeKey(page)).toBe("video-tab-movies");
+	await expect.poll(() => activeKey(page)).toBe("video-tab-films");
+	await page.keyboard.press("ArrowRight");
 	await page.keyboard.press("ArrowRight");
 	await expect.poll(() => activeKey(page)).toBe("video-tab-series");
 	await page.keyboard.press("Enter");

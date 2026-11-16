@@ -95,12 +95,14 @@ interface MediaListRequest {
 	offset: number;
 	sort?: "asc" | "desc";
 	artistId?: number;
+	format?: string;
+	excludeFormat?: string;
 	signal?: AbortSignal;
 }
 
 export async function fetchMediaList(
 	fetch: CoreFetcher,
-	{ type, q, limit, offset, sort, artistId, signal }: MediaListRequest,
+	{ type, q, limit, offset, sort, artistId, format, excludeFormat, signal }: MediaListRequest,
 ): Promise<MediaList> {
 	const params = new URLSearchParams({
 		type,
@@ -116,6 +118,12 @@ export async function fetchMediaList(
 	if (artistId !== undefined) {
 		params.set("artist_id", String(artistId));
 	}
+	if (format !== undefined && format !== "") {
+		params.set("format", format);
+	}
+	if (excludeFormat !== undefined && excludeFormat !== "") {
+		params.set("exclude_format", excludeFormat);
+	}
 	const body = await fetch(`${MEDIA_PATH}?${params.toString()}`, { signal });
 	return mediaListSchema.parse(body);
 }
@@ -126,9 +134,19 @@ function mediaListOptions(
 	q: string,
 	sort?: "asc" | "desc",
 	artistId?: number,
+	format?: string,
+	excludeFormat?: string,
 ) {
 	return infiniteQueryOptions({
-		queryKey: ["media", type, q, sort ?? "", artistId ?? 0],
+		queryKey: [
+			"media",
+			type,
+			q,
+			sort ?? "",
+			artistId ?? 0,
+			format ?? "",
+			excludeFormat ?? "",
+		],
 		queryFn: ({ pageParam, signal }) =>
 			fetchMediaList(fetch, {
 				type,
@@ -137,6 +155,8 @@ function mediaListOptions(
 				offset: pageParam,
 				sort,
 				artistId,
+				format,
+				excludeFormat,
 				signal,
 			}),
 		initialPageParam: 0,
@@ -160,8 +180,10 @@ export function videoListOptions(
 	fetch: CoreFetcher,
 	q: string,
 	sort: "asc" | "desc" = "desc",
+	format?: string,
+	excludeFormat?: string,
 ) {
-	return mediaListOptions(fetch, "video", q, sort);
+	return mediaListOptions(fetch, "video", q, sort, undefined, format, excludeFormat);
 }
 
 export function audioListOptions(

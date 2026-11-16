@@ -35,7 +35,7 @@ export function MemeCard({ media }: { media: Media }) {
 				to="/memes/$id"
 				params={{ id: String(media.id) }}
 				aria-label={
-					NUMERIC_TITLE.test(media.title.trim())
+					media.title.trim() === "" || NUMERIC_TITLE.test(media.title.trim())
 						? t("memes.title")
 						: media.title
 				}

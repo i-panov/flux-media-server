@@ -131,6 +131,18 @@ test("реальный админ: создать сериал, сезон, эп
 		)
 		.toEqual(["Сезон 2", "Сезон 1"]);
 
+	const tagResponse = await page.request.post("/api/tags", {
+		data: { group: "format", slug: "e2e-film", name: "E2E фильм" },
+	});
+	expect(tagResponse.ok()).toBeTruthy();
+	const tag = (await tagResponse.json()) as { id: number };
+	const setTags = await page.request.put("/api/media/9006/tags", {
+		data: { tag_ids: [tag.id] },
+	});
+	expect(setTags.ok()).toBeTruthy();
+	const mediaTags = await page.request.get("/api/media/9006/tags");
+	expect(((await mediaTags.json()) as unknown[]).length).toBe(1);
+
 	await page.goto("/video/9006");
 	await page.getByRole("button", { name: "В каталог" }).click();
 	await page.getByText("E2E админ-сериал", { exact: true }).click();

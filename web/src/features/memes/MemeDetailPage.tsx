@@ -139,7 +139,8 @@ export function MemeDetailPage() {
 	const filename = item.filename === "" ? item.title : item.filename;
 	// У мемов часто нет осмысленного названия — сервер подставляет имя
 	// файла вида 1000011340. Это не заголовок для пользователя.
-	const hasHumanTitle = !NUMERIC_TITLE.test(item.title.trim());
+	const hasHumanTitle =
+		item.title.trim() !== "" && !NUMERIC_TITLE.test(item.title.trim());
 
 	return (
 		<Stack

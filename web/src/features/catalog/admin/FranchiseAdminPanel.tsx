@@ -25,6 +25,7 @@ import {
 	useWorks,
 } from "../../../api/catalog";
 import { useSession } from "../../../api/session";
+import { TagEditor } from "../../tags/TagEditor";
 import { useTVMode } from "../../tv/useTVMode";
 import { MediaPicker } from "./MediaPicker";
 import { SortableList } from "./SortableList";
@@ -76,6 +77,7 @@ export function FranchiseAdminPanel({
 				{t("catalog.admin.manageFranchise")}
 			</Title>
 			{error && <Alert color="red">{error}</Alert>}
+			<TagEditor entity="franchise" id={franchise.id} />
 			<Group>
 				<Button variant="default" onClick={() => setEditOpen(true)}>
 					{t("catalog.admin.edit")}

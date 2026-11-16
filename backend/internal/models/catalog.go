@@ -42,6 +42,7 @@ type Work struct {
 	// и терять эпизоды. gorm:"-" не даёт AutoMigrate трогать схему.
 	Seasons []Season   `gorm:"-" json:"seasons,omitempty"`
 	Items   []WorkItem `gorm:"-" json:"items,omitempty"`
+	Tags    []Tag      `gorm:"-" json:"tags,omitempty"`
 }
 
 // Season — сезон сериала. Работает только для WorkKindSeries.
@@ -84,6 +85,7 @@ type Franchise struct {
 	CreatedAt   time.Time        `json:"created_at"`
 	UpdatedAt   time.Time        `json:"updated_at"`
 	Entries     []FranchiseEntry `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"entries,omitempty"`
+	Tags        []Tag            `gorm:"-" json:"tags,omitempty"`
 }
 
 // FranchiseEntry — элемент франшизы: work (series/film_series) или

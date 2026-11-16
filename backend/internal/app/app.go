@@ -363,6 +363,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	favoriteHandler := handlers.NewFavoriteHandler(favRepo, mediaRepo, artistRepo)
 	collectionHandler := handlers.NewCollectionHandler(colRepo, colItemRepo, mediaRepo)
 	catalogHandler := handlers.NewCatalogHandler(workRepo, franchiseRepo)
+	tagRepo := repository.NewTagRepository(db)
+	tagHandler := handlers.NewTagHandler(tagRepo)
 	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc, subRepo)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
 	artistHandler := handlers.NewArtistHandler(artistRepo, cfg.Media.ThumbnailPath)
@@ -758,11 +760,20 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	// Контекст медиа в глобальном каталоге (сериал/сезон/франшиза).
 	api.Get("/media/:id/catalog-context", readRateLimiter, catalogHandler.GetMediaContext)
+	api.Get("/media/:id/tags", readRateLimiter, tagHandler.MediaTags)
+	api.Put("/media/:id/tags", requireAdmin, tagHandler.SetMediaTags)
+
+	api.Get("/tags", readRateLimiter, tagHandler.List)
+	api.Post("/tags", requireAdmin, tagHandler.Create)
+	api.Put("/tags/:id", requireAdmin, tagHandler.Update)
+	api.Delete("/tags/:id", requireAdmin, tagHandler.Delete)
 
 	// Глобальный каталог: чтение — всем авторизованным, запись — админу.
 	works := api.Group("/works")
 	works.Get("", readRateLimiter, catalogHandler.ListWorks)
 	works.Post("", requireAdmin, catalogHandler.CreateWork)
+	works.Get("/:id/tags", readRateLimiter, tagHandler.WorkTags)
+	works.Put("/:id/tags", requireAdmin, tagHandler.SetWorkTags)
 	works.Get("/:id", readRateLimiter, catalogHandler.GetWork)
 	works.Put("/:id", requireAdmin, catalogHandler.UpdateWork)
 	works.Delete("/:id", requireAdmin, catalogHandler.DeleteWork)
@@ -781,6 +792,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	franchises := api.Group("/franchises")
 	franchises.Get("", readRateLimiter, catalogHandler.ListFranchises)
 	franchises.Post("", requireAdmin, catalogHandler.CreateFranchise)
+	franchises.Get("/:id/tags", readRateLimiter, tagHandler.FranchiseTags)
+	franchises.Put("/:id/tags", requireAdmin, tagHandler.SetFranchiseTags)
 	franchises.Get("/:id", readRateLimiter, catalogHandler.GetFranchise)
 	franchises.Put("/:id", requireAdmin, catalogHandler.UpdateFranchise)
 	franchises.Delete("/:id", requireAdmin, catalogHandler.DeleteFranchise)

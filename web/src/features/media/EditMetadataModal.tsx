@@ -116,12 +116,14 @@ export function EditMetadataModal({
 	const isVideo = media.type === "video";
 	const isImage = media.type === "image";
 	const showYear = !isImage;
-	const titleError = title.trim() === "" ? t("metadata.required") : null;
+	const titleError =
+		!isImage && title.trim() === "" ? t("metadata.required") : null;
 	const yearError =
 		showYear && !isValidYear(year) ? t("metadata.invalidYear") : null;
-	const sourceError = isValidSourceUrl(sourceUrl)
-		? null
-		: t("metadata.invalidSourceUrl");
+	const sourceError =
+		!isImage && !isValidSourceUrl(sourceUrl)
+			? t("metadata.invalidSourceUrl")
+			: null;
 	const canSave =
 		titleError === null && yearError === null && sourceError === null;
 
@@ -164,6 +166,7 @@ export function EditMetadataModal({
 			<Stack gap="md">
 				<TextInput
 					label={t("metadata.name")}
+					description={isImage ? t("metadata.optional") : undefined}
 					value={title}
 					data-autofocus
 					error={titleError}
@@ -249,23 +252,27 @@ export function EditMetadataModal({
 							onChange={(event) => setYear(event.currentTarget.value)}
 						/>
 					)}
-					<TextInput
-						label={t("metadata.sourceUrl")}
-						value={sourceUrl}
-						placeholder="https://"
-						inputMode="url"
-						error={sourceError}
-						onChange={(event) => setSourceUrl(event.currentTarget.value)}
-					/>
+					{!isImage && (
+						<TextInput
+							label={t("metadata.sourceUrl")}
+							value={sourceUrl}
+							placeholder="https://"
+							inputMode="url"
+							error={sourceError}
+							onChange={(event) => setSourceUrl(event.currentTarget.value)}
+						/>
+					)}
 				</Group>
-				<Textarea
-					label={t("metadata.description")}
-					value={description}
-					autosize
-					minRows={3}
-					maxRows={8}
-					onChange={(event) => setDescription(event.currentTarget.value)}
-				/>
+				{!isImage && (
+					<Textarea
+						label={t("metadata.description")}
+						value={description}
+						autosize
+						minRows={3}
+						maxRows={8}
+						onChange={(event) => setDescription(event.currentTarget.value)}
+					/>
+				)}
 				{media.filename !== "" && (
 					<Group gap="xs" wrap="nowrap">
 						<Text size="xs" c="dimmed" truncate className="flex-1">

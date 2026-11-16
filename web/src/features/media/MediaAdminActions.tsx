@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
 import { AddToCatalogButton } from "../catalog/AddToCatalogButton";
+import { TagEditor } from "../tags/TagEditor";
 import { useTVMode } from "../tv/useTVMode";
 import { ExtractAudioSection } from "../video/ExtractAudioSection";
 import { ChangeCoverButton } from "./ChangeCoverButton";
@@ -62,6 +63,9 @@ export function MediaAdminActions({
 				</Group>
 				{extractAudio === true && canEdit && (
 					<ExtractAudioSection mediaId={media.id} />
+				)}
+				{canEdit && media.type !== "image" && (
+					<TagEditor entity="media" id={media.id} />
 				)}
 			</Stack>
 			{/* Модалка монтируется только на время открытия: «Отмена»

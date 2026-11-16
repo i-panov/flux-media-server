@@ -27,7 +27,7 @@ import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
 import { VideoCard } from "./VideoCard";
 
-type VideoTab = "movies" | "series" | "franchises";
+type VideoTab = "films" | "videos" | "series" | "film_series" | "franchises";
 
 function VideoTabButton({
 	focusKey,
@@ -51,7 +51,13 @@ function VideoTabButton({
 			if (direction === "down") {
 				return onDown();
 			}
-			const order: VideoTab[] = ["movies", "series", "franchises"];
+			const order: VideoTab[] = [
+				"films",
+				"videos",
+				"series",
+				"film_series",
+				"franchises",
+			];
 			const index = order.indexOf(value);
 			const target =
 				direction === "right"
@@ -87,17 +93,21 @@ export function VideoPage() {
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- tab живёт в search, но общий SearchSchema его не знает.
 	const search = useSearch({ strict: false }) as { tab?: string };
 	const tab: VideoTab =
-		search.tab === "series"
-			? "series"
-			: search.tab === "franchises"
-				? "franchises"
-				: "movies";
+		search.tab === "films"
+			? "films"
+			: search.tab === "series"
+				? "series"
+				: search.tab === "film_series"
+					? "film_series"
+					: search.tab === "franchises"
+						? "franchises"
+						: "videos";
 	const setTab = (value: VideoTab) => {
 		void navigate({
 			to: "/video",
 			search: {
 				...search,
-				tab: value === "movies" ? undefined : value,
+				tab: value === "videos" ? undefined : value,
 			},
 		});
 	};
@@ -107,10 +117,12 @@ export function VideoPage() {
 	const focusFirstCard = () => {
 		const selector =
 			tab === "series"
-				? '[data-tv-focus-key^="series-card-"], [data-tv-focus-key^="film-series-card-"]'
-				: tab === "franchises"
-					? '[data-tv-focus-key^="franchise-card-"]'
-					: '[data-tv-focus-key^="video-card-"]';
+				? '[data-tv-focus-key^="series-card-"]'
+				: tab === "film_series"
+					? '[data-tv-focus-key^="film-series-card-"]'
+					: tab === "franchises"
+						? '[data-tv-focus-key^="franchise-card-"]'
+						: '[data-tv-focus-key^="video-card-"]';
 		const node = document.querySelector<HTMLElement>(selector);
 		const key = node?.getAttribute("data-tv-focus-key");
 		if (key === null || key === undefined) return false;
@@ -134,13 +146,22 @@ export function VideoPage() {
 			</Group>
 			<Group role="tablist" aria-label={t("catalog.tabs")} gap="xs">
 				<VideoTabButton
-					focusKey="video-tab-movies"
-					value="movies"
+					focusKey="video-tab-films"
+					value="films"
 					onSelect={setTab}
-					active={tab === "movies"}
+					active={tab === "films"}
 					onDown={focusFirstCard}
 				>
-					{t("catalog.movies")}
+					{t("catalog.films")}
+				</VideoTabButton>
+				<VideoTabButton
+					focusKey="video-tab-videos"
+					value="videos"
+					onSelect={setTab}
+					active={tab === "videos"}
+					onDown={focusFirstCard}
+				>
+					{t("catalog.videos")}
 				</VideoTabButton>
 				<VideoTabButton
 					focusKey="video-tab-series"
@@ -152,6 +173,15 @@ export function VideoPage() {
 					{t("catalog.series")}
 				</VideoTabButton>
 				<VideoTabButton
+					focusKey="video-tab-film-series"
+					value="film_series"
+					onSelect={setTab}
+					active={tab === "film_series"}
+					onDown={focusFirstCard}
+				>
+					{t("catalog.filmSeriesPlural")}
+				</VideoTabButton>
+				<VideoTabButton
 					focusKey="video-tab-franchises"
 					value="franchises"
 					onSelect={setTab}
@@ -161,10 +191,14 @@ export function VideoPage() {
 					{t("catalog.franchises")}
 				</VideoTabButton>
 			</Group>
-			{tab === "movies" ? (
-				<MoviesContent />
+			{tab === "films" ? (
+				<MoviesContent format="film" />
+			) : tab === "videos" ? (
+				<MoviesContent excludeFormat="film" />
 			) : tab === "series" ? (
-				<SeriesPage embedded />
+				<SeriesPage key="series" embedded kind="series" />
+			) : tab === "film_series" ? (
+				<SeriesPage key="film_series" embedded kind="film_series" />
 			) : (
 				<FranchisesPage embedded />
 			)}
@@ -172,7 +206,13 @@ export function VideoPage() {
 	);
 }
 
-function MoviesContent() {
+function MoviesContent({
+	format,
+	excludeFormat,
+}: {
+	format?: string;
+	excludeFormat?: string;
+}) {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<"desc" | "asc">("desc");
@@ -189,7 +229,7 @@ function MoviesContent() {
 		undefined,
 		{ secondary: true },
 	);
-	const list = useVideoList(debounced, sort);
+	const list = useVideoList(debounced, sort, format, excludeFormat);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const visibleItems = useVisibleMedia("video", items, debounced !== "");
 

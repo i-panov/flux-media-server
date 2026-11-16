@@ -32,6 +32,7 @@ import {
 	useUpdateWork,
 } from "../../../api/catalog";
 import { useSession } from "../../../api/session";
+import { TagEditor } from "../../tags/TagEditor";
 import { useTVMode } from "../../tv/useTVMode";
 import { MediaPicker } from "./MediaPicker";
 import { SortableList } from "./SortableList";
@@ -98,6 +99,7 @@ export function WorkAdminPanel({ work }: { work: CatalogWork }) {
 				{t("catalog.admin.manageWork")}
 			</Title>
 			{error && <Alert color="red">{error}</Alert>}
+			<TagEditor entity="work" id={work.id} />
 			<Group>
 				<Button variant="default" onClick={() => setEditOpen(true)}>
 					{t("catalog.admin.edit")}

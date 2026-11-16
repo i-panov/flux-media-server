@@ -223,7 +223,7 @@ test("ТВ: список видео, карточки, детали и Back", as
 
 	await page.goto("/video?tv=1");
 	// Начальный route-focus ведёт на вкладки, вниз — в сетку.
-	await expect.poll(() => activeFocusKey(page)).toBe("video-tab-movies");
+	await expect.poll(() => activeFocusKey(page)).toBe("video-tab-films");
 	await page.keyboard.press("ArrowDown");
 	await expect.poll(() => activeElementText(page)).toContain("Первый фильм");
 
