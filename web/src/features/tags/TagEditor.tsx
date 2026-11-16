@@ -2,16 +2,20 @@ import {
 	Alert,
 	Button,
 	Group,
+	Modal,
 	MultiSelect,
 	Select,
 	Stack,
 	Text,
+	TextInput,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	type TagEntity,
+	type TagGroup,
+	useCreateTag,
 	useEntityTags,
 	useSetEntityTags,
 	useTags,
@@ -25,6 +29,11 @@ export function TagEditor({ entity, id }: { entity: TagEntity; id: number }) {
 	const current = useEntityTags(entity, id);
 	const save = useSetEntityTags(entity, id);
 	const [selected, setSelected] = useState<string[]>([]);
+	const createTag = useCreateTag();
+	const [createOpen, setCreateOpen] = useState(false);
+	const [newGroup, setNewGroup] = useState<TagGroup>("genre");
+	const [newName, setNewName] = useState("");
+	const [newSlug, setNewSlug] = useState("");
 
 	useEffect(() => {
 		// eslint-disable-next-line react-hooks/set-state-in-effect -- синхронизация с загруженными тегами.
@@ -93,7 +102,17 @@ export function TagEditor({ entity, id }: { entity: TagEntity; id: number }) {
 					/>
 				);
 			})}
-			<Group justify="flex-end">
+			<Group justify="space-between">
+				<Button
+					size="xs"
+					variant="subtle"
+					onClick={() => {
+						setNewGroup(entity === "media" ? "genre" : "genre");
+						setCreateOpen(true);
+					}}
+				>
+					{t("tags.createInline")}
+				</Button>
 				<Button
 					size="xs"
 					loading={save.isPending}
@@ -108,6 +127,70 @@ export function TagEditor({ entity, id }: { entity: TagEntity; id: number }) {
 					{t("tags.save")}
 				</Button>
 			</Group>
+			<Modal
+				opened={createOpen}
+				onClose={() => setCreateOpen(false)}
+				title={t("tags.createInline")}
+			>
+				<Stack>
+					<Select
+						label={t("tags.group")}
+						value={newGroup}
+						onChange={(value) => setNewGroup((value as TagGroup) ?? "genre")}
+						data={[
+							{ value: "genre", label: t("tags.genre") },
+							{ value: "mood", label: t("tags.mood") },
+							...(entity === "media"
+								? [{ value: "format", label: t("tags.format") }]
+								: []),
+						]}
+					/>
+					<TextInput
+						label={t("tags.name")}
+						value={newName}
+						onChange={(event) => setNewName(event.currentTarget.value)}
+					/>
+					<TextInput
+						label={t("tags.slug")}
+						value={newSlug}
+						onChange={(event) => setNewSlug(event.currentTarget.value)}
+						placeholder="comedy"
+					/>
+					<Group justify="flex-end">
+						<Button variant="default" onClick={() => setCreateOpen(false)}>
+							{t("common.cancel")}
+						</Button>
+						<Button
+							loading={createTag.isPending}
+							disabled={newName.trim() === ""}
+							onClick={() => {
+								void createTag
+									.mutateAsync({
+										group: newGroup,
+										name: newName.trim(),
+										slug:
+											newSlug.trim() ||
+											newName.trim().toLocaleLowerCase().replace(/\s+/g, "-"),
+									})
+									.then((tag) => {
+										setSelected((prev) => [...prev, String(tag.id)]);
+										setCreateOpen(false);
+										setNewName("");
+										setNewSlug("");
+									})
+									.catch(() =>
+										notifications.show({
+											message: t("tags.createError"),
+											color: "red",
+										}),
+									);
+							}}
+						>
+							{t("tags.create")}
+						</Button>
+					</Group>
+				</Stack>
+			</Modal>
 		</Stack>
 	);
 }

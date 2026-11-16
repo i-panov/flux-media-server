@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"path/filepath"
 	"strconv"
@@ -112,6 +113,24 @@ func (h *MediaHandler) Get(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(media)
+}
+
+func (h *MediaHandler) CoverFromFrame(c *fiber.Ctx) error {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid media ID")
+	}
+	media, err := h.mediaRepo.FindByID(c.UserContext(), id)
+	if err != nil {
+		return repoError(c, err, "Media not found", "Failed to fetch media")
+	}
+	if media.Type != models.MediaTypeVideo {
+		return response.Error(c, fiber.StatusBadRequest, "Cover from frame is available only for video")
+	}
+	if h.thumbSvc.GenerateCoverFromFrame(c.UserContext(), media.ID, media.FilePath) == "" {
+		return response.Error(c, fiber.StatusUnprocessableEntity, "Failed to generate cover from frame")
+	}
+	return c.JSON(fiber.Map{"cover_url": fmt.Sprintf("/api/media/%d/cover", media.ID)})
 }
 
 func (h *MediaHandler) Delete(c *fiber.Ctx) error {

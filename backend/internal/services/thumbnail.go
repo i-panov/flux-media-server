@@ -322,3 +322,24 @@ func detectImageFormat(path string) string {
 		return ".jpg"
 	}
 }
+
+// GenerateCoverFromFrame делает обложку из кадра видео: генерирует
+// обычное превью и копирует его в cover-файл. Используется только по
+// явному действию админа, поэтому существующую обложку может заменить.
+func (s *ThumbnailService) GenerateCoverFromFrame(ctx context.Context, mediaID uint, filePath string) string {
+	if s.GenerateWithContext(ctx, mediaID, filePath) == "" {
+		return ""
+	}
+	data, err := os.ReadFile(s.GetPath(mediaID))
+	if err != nil {
+		log.Printf("thumb: read frame for cover %d: %v", mediaID, err)
+		return ""
+	}
+	final := s.CoverPathForExt(mediaID, ".jpg")
+	// #nosec G703 -- путь строится из числового mediaID, не из пользовательской строки.
+	if err := os.WriteFile(final, data, 0o600); err != nil {
+		log.Printf("thumb: write cover from frame %d: %v", mediaID, err)
+		return ""
+	}
+	return final
+}

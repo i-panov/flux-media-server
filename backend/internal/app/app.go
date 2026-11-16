@@ -715,6 +715,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Get("/:id/thumb", readRateLimiter, thumbHandler.Get)
 	media.Get("/:id/cover", readRateLimiter, thumbHandler.GetCover)
 	media.Put("/:id"+coverRouteSuffix, requireAdmin, thumbHandler.UploadCover)
+	media.Post("/:id/cover/from-frame", requireAdmin, mediaHandler.CoverFromFrame)
 
 	progress := api.Group("/progress")
 	progress.Get("", readRateLimiter, progressHandler.List)

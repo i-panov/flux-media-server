@@ -777,8 +777,8 @@ func (q *UploadQueue) continueWithMedia(job *UploadJob, media *models.Media) {
 		}
 	}
 
-	// Обложка из встроенного арта — только для аудио.
-	if job.mediaType.IsAudio() {
+	// Обложка из встроенного арта — для аудио и видео.
+	if !job.mediaType.IsImage() {
 		if coverPath := q.thumbSvc.ExtractCoverContext(ctx, media.ID, job.filePath); coverPath != "" {
 			media.CoverURL = fmt.Sprintf("/api/media/%d/cover", media.ID)
 			if err := q.media.Update(ctx, media); err != nil {

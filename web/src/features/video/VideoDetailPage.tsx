@@ -201,6 +201,7 @@ export function VideoDetailPage() {
 	}
 
 	const item = media.data;
+	const posterURL = item.cover_url || item.thumbnail_url;
 
 	return (
 		<Stack
@@ -232,7 +233,7 @@ export function VideoDetailPage() {
 						controls={!tvMode}
 						preload="metadata"
 						src={`/api/media/${item.id}/stream`}
-						poster={item.thumbnail_url === "" ? undefined : item.thumbnail_url}
+						poster={posterURL === "" ? undefined : posterURL}
 						className="aspect-video w-full rounded-md bg-black"
 						onError={handleMediaError}
 						onLoadedMetadata={() => {

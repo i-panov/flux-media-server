@@ -517,5 +517,10 @@
 	"tags.deleteError": "Не удалось удалить тег",
 	"auth.activateNotFound": "Код не найден или уже использован.",
 	"auth.activateExpired": "Код истёк. Получите новый код на устройстве.",
-	"auth.activateRateLimited": "Слишком много попыток. Подождите минуту."
+	"auth.activateRateLimited": "Слишком много попыток. Подождите минуту.",
+	"metadata.coverFromFrame": "Обложка из кадра",
+	"metadata.coverFromFrameConfirm": "Заменить текущую обложку кадром из видео?",
+	"metadata.coverFromFrameDone": "Обложка создана из кадра",
+	"metadata.coverFromFrameError": "Не удалось создать обложку из кадра",
+	"tags.createInline": "Создать тег"
 }

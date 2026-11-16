@@ -9,6 +9,7 @@ import { TagEditor } from "../tags/TagEditor";
 import { useTVMode } from "../tv/useTVMode";
 import { ExtractAudioSection } from "../video/ExtractAudioSection";
 import { ChangeCoverButton } from "./ChangeCoverButton";
+import { CoverFromFrameButton } from "./CoverFromFrameButton";
 import { DeleteMediaButton } from "./DeleteMediaButton";
 import { EditMetadataModal } from "./EditMetadataModal";
 
@@ -57,6 +58,9 @@ export function MediaAdminActions({
 					)}
 					{media.type === "video" && <AddToCatalogButton media={media} />}
 					{canChangeCover && <ChangeCoverButton mediaId={media.id} />}
+					{canChangeCover && media.type === "video" && (
+						<CoverFromFrameButton mediaId={media.id} />
+					)}
 					{canDelete && (
 						<DeleteMediaButton mediaId={media.id} backPath={backPath} />
 					)}

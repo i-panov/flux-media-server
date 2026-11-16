@@ -517,5 +517,10 @@
 	"tags.deleteError": "Could not delete tag",
 	"auth.activateNotFound": "Code not found or already used.",
 	"auth.activateExpired": "Code expired. Get a new code on the device.",
-	"auth.activateRateLimited": "Too many attempts. Wait a minute."
+	"auth.activateRateLimited": "Too many attempts. Wait a minute.",
+	"metadata.coverFromFrame": "Cover from frame",
+	"metadata.coverFromFrameConfirm": "Replace the current cover with a video frame?",
+	"metadata.coverFromFrameDone": "Cover created from frame",
+	"metadata.coverFromFrameError": "Could not create cover from frame",
+	"tags.createInline": "Create tag"
 }

@@ -13,7 +13,7 @@ export function PwaUpdatePrompt() {
 	} = useRegisterSW();
 	if (!needRefresh) return null;
 	return (
-		<Alert color="blue" variant="light" title={t("pwa.updateTitle")}>
+		<Alert color="blue" variant="light" mb="md" title={t("pwa.updateTitle")}>
 			<Group justify="space-between" gap="sm" wrap="wrap">
 				{t("pwa.updateText")}
 				<Button size="xs" onClick={() => void updateServiceWorker(true)}>

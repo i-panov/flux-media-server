@@ -120,3 +120,16 @@ export function useSavedTime(ref: RefObject<HTMLMediaElement | null>) {
 	}, [ref]);
 	return { save, restore };
 }
+
+export function useCoverFromFrame() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (mediaId: number) =>
+			apiFetch<{ cover_url: string }>(`/media/${mediaId}/cover/from-frame`, {
+				method: "POST",
+			}),
+		onSuccess: (_data, mediaId) => {
+			void queryClient.invalidateQueries({ queryKey: ["media", mediaId] });
+		},
+	});
+}

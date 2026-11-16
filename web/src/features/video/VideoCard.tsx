@@ -47,7 +47,8 @@ export function VideoCard({ media }: { media: Media }) {
 	);
 	// Пустой URL (превью ещё не сгенерировано) и окончательно битая
 	// картинка: вместо <img src=""> — плейсхолдер без лишних запросов.
-	const hasThumb = media.thumbnail_url !== "" && !reload.failed;
+	const imageURL = media.cover_url || media.thumbnail_url;
+	const hasThumb = imageURL !== "" && !reload.failed;
 	return (
 		<div
 			ref={tvRef}
@@ -63,7 +64,7 @@ export function VideoCard({ media }: { media: Media }) {
 					<Card.Section className="relative">
 						{hasThumb ? (
 							<ThumbImage
-								src={media.thumbnail_url}
+								src={imageURL}
 								alt={media.title}
 								nonce={reload.nonce}
 								onError={reload.handleError}
