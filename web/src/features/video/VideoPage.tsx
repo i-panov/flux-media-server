@@ -15,6 +15,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVideoList } from "../../api/media";
+import { useSession } from "../../api/session";
 import { useTags } from "../../api/tags";
 import { CardGridSkeletons } from "../../components/CardGridSkeletons";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -27,6 +28,7 @@ import { FavoriteSection } from "../favorites/FavoriteSection";
 import { ContinueWatching } from "../media/ContinueWatching";
 import { TVButton, TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { UploadButton } from "../upload/UploadButton";
+import { BulkTagBar } from "./BulkTagBar";
 import { VideoCard } from "./VideoCard";
 
 type VideoTab = "films" | "videos" | "series" | "film_series" | "franchises";
@@ -219,6 +221,10 @@ function MoviesContent({
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<"desc" | "asc">("desc");
 	const [tagIDs, setTagIDs] = useState<string[]>([]);
+	const [bulkActive, setBulkActive] = useState(false);
+	const [bulkSelected, setBulkSelected] = useState<number[]>([]);
+	const session = useSession();
+	const canBulkTag = session.data?.is_admin === true;
 	const tags = useTags();
 	const debounced = useDebouncedValue(query);
 	const { targetRef: searchRef } = useTVFocusable<HTMLInputElement>(
@@ -285,6 +291,17 @@ function MoviesContent({
 					/>
 				</div>
 			</Group>
+			{canBulkTag && (
+				<BulkTagBar
+					active={bulkActive}
+					selected={bulkSelected}
+					onToggleActive={() => {
+						setBulkActive((prev) => !prev);
+						setBulkSelected([]);
+					}}
+					onClear={() => setBulkSelected([])}
+				/>
+			)}
 			{debounced === "" && <ContinueWatching limit={1} />}
 			{debounced === "" && <FavoriteSection type="video" />}
 			{LEGACY_COLLECTIONS_ENABLED && debounced === "" && (
@@ -319,7 +336,19 @@ function MoviesContent({
 						spacing="md"
 					>
 						{visibleItems.map((media) => (
-							<VideoCard key={media.id} media={media} />
+							<VideoCard
+								key={media.id}
+								media={media}
+								selectable={bulkActive}
+								selected={bulkSelected.includes(media.id)}
+								onToggleSelect={(id) =>
+									setBulkSelected((prev) =>
+										prev.includes(id)
+											? prev.filter((value) => value !== id)
+											: [...prev, id],
+									)
+								}
+							/>
 						))}
 					</SimpleGrid>
 					{list.isFetchNextPageError ? (

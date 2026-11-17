@@ -3,6 +3,8 @@ package handlers
 import (
 	"errors"
 	"log"
+	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -34,7 +36,11 @@ type createWorkRequest struct {
 
 func (h *CatalogHandler) ListWorks(c *fiber.Ctx) error {
 	kind := models.WorkKind(c.Query("kind"))
-	works, err := h.works.List(c.UserContext(), kind)
+	tagIDs, err := parseTagIDs(c.Query("tag_ids"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "invalid tag_ids")
+	}
+	works, err := h.works.List(c.UserContext(), kind, tagIDs...)
 	if err != nil {
 		return h.mapError(c, err)
 	}
@@ -440,6 +446,21 @@ func (h *CatalogHandler) ReorderFranchiseEntries(c *fiber.Ctx) error {
 		return h.mapError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func parseTagIDs(raw string) ([]uint, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	var ids []uint
+	for _, part := range strings.Split(raw, ",") {
+		id, err := strconv.ParseUint(strings.TrimSpace(part), 10, 32)
+		if err != nil || id == 0 {
+			return nil, errors.New("invalid tag id")
+		}
+		ids = append(ids, uint(id))
+	}
+	return ids, nil
 }
 
 func (h *CatalogHandler) mapError(c *fiber.Ctx, err error) error {

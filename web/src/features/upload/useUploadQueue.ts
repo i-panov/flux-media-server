@@ -24,6 +24,12 @@ export type ItemStatus =
 	| "duplicate"
 	| "cancelled";
 
+export type UploadTarget =
+	| { kind: "standalone" }
+	| { kind: "series"; workID: number; seasonID: number; episodeNumber?: number }
+	| { kind: "film_series"; workID: number }
+	| { kind: "franchise"; franchiseID: number };
+
 export interface QueueItem {
 	key: string;
 	file: File;
@@ -48,6 +54,7 @@ interface PipelineContext {
 	update: (patch: Partial<QueueItem>) => void;
 	invalidateList: (type: UploadType) => void;
 	addToCollection: (mediaId: number) => Promise<string>;
+	addToTarget: (mediaId: number) => Promise<string>;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -97,7 +104,15 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 			const mediaId = status.media?.id ?? null;
 			const collectionError =
 				mediaId === null ? "" : await ctx.addToCollection(mediaId);
-			ctx.update({ status: "done", progress: 100, collectionError });
+			const targetError =
+				mediaId === null ? "" : await ctx.addToTarget(mediaId);
+			ctx.update({
+				status: "done",
+				progress: 100,
+				collectionError: [collectionError, targetError]
+					.filter(Boolean)
+					.join(" "),
+			});
 			ctx.invalidateList(ctx.item.type);
 			return;
 		}
@@ -126,9 +141,11 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 // отсекаются тикетом (отмена/повтор/force).
 // targetCollectionId — коллекция экрана: готовый файл кладётся в неё
 // сразу, выбор читается на старте обработки.
+// eslint-disable-next-line max-lines-per-function -- очередь и назначение каталога.
 export function useUploadQueue(
 	type: UploadType,
 	targetCollectionId: number | null,
+	target: UploadTarget = { kind: "standalone" },
 ) {
 	const queryClient = useQueryClient();
 	const { t } = useTranslation();
@@ -160,6 +177,39 @@ export function useUploadQueue(
 
 	const invalidateList = (uploadType: UploadType) => {
 		void queryClient.invalidateQueries({ queryKey: ["media", uploadType] });
+	};
+
+	const addToTarget = async (mediaId: number): Promise<string> => {
+		if (target.kind === "standalone") return "";
+		try {
+			if (target.kind === "series") {
+				await apiFetch(`/seasons/${target.seasonID}/items`, {
+					method: "POST",
+					body: JSON.stringify({
+						media_id: mediaId,
+						episode_number: target.episodeNumber,
+					}),
+				});
+			} else if (target.kind === "film_series") {
+				await apiFetch(`/works/${target.workID}/items`, {
+					method: "POST",
+					body: JSON.stringify({ media_id: mediaId }),
+				});
+			} else {
+				await apiFetch(`/franchises/${target.franchiseID}/entries`, {
+					method: "POST",
+					body: JSON.stringify({ media_id: mediaId }),
+				});
+			}
+			void queryClient.invalidateQueries({ queryKey: ["works"] });
+			void queryClient.invalidateQueries({ queryKey: ["franchises"] });
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			return "";
+		} catch (error) {
+			return error instanceof ApiError && error.message !== ""
+				? error.message
+				: t("upload.collectionErrorFallback");
+		}
 	};
 
 	const addToCollection = async (mediaId: number): Promise<string> => {
@@ -218,6 +268,7 @@ export function useUploadQueue(
 				update: (patch) => updateItem(item.key, patch),
 				invalidateList,
 				addToCollection,
+				addToTarget,
 			});
 		} catch (error) {
 			if (!isCurrent(item.key, token)) {

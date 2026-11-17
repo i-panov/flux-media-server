@@ -365,6 +365,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	catalogHandler := handlers.NewCatalogHandler(workRepo, franchiseRepo)
 	tagRepo := repository.NewTagRepository(db)
 	tagHandler := handlers.NewTagHandler(tagRepo)
+	maintenanceSvc := services.NewMediaMaintenanceService(mediaRepo, thumbSvc)
+	maintenanceHandler := handlers.NewMaintenanceHandler(mediaRepo, maintenanceSvc)
 	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc, subRepo)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
 	artistHandler := handlers.NewArtistHandler(artistRepo, cfg.Media.ThumbnailPath)
@@ -668,6 +670,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	// Админка хранилища: диск, карантин оригиналов, список и ретрай заданий.
 	admin := api.Group("/admin", requireAdmin)
+	admin.Get("/maintenance", readRateLimiter, maintenanceHandler.Get)
+	admin.Post("/maintenance/thumbnails", maintenanceHandler.BackfillThumbnails)
+	admin.Post("/maintenance/covers", maintenanceHandler.BackfillCovers)
 	admin.Get("/storage", readRateLimiter, adminHandler.StorageInfo)
 	admin.Put("/storage/settings", adminHandler.UpdateStorageSettings)
 	admin.Get("/originals", readRateLimiter, adminHandler.OriginalsList)
@@ -763,6 +768,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Get("/media/:id/catalog-context", readRateLimiter, catalogHandler.GetMediaContext)
 	api.Get("/media/:id/tags", readRateLimiter, tagHandler.MediaTags)
 	api.Put("/media/:id/tags", requireAdmin, tagHandler.SetMediaTags)
+	api.Post("/tags/bulk", requireAdmin, tagHandler.BulkMediaTags)
 
 	api.Get("/tags", readRateLimiter, tagHandler.List)
 	api.Post("/tags", requireAdmin, tagHandler.Create)

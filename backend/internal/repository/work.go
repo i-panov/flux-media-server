@@ -63,13 +63,16 @@ func (r *WorkStore) Create(ctx context.Context, work *models.Work) error {
 	})
 }
 
-func (r *WorkStore) List(ctx context.Context, kind models.WorkKind) ([]models.Work, error) {
+func (r *WorkStore) List(ctx context.Context, kind models.WorkKind, tagIDs ...uint) ([]models.Work, error) {
 	q := r.db.WithContext(ctx).Order("title ASC, id ASC")
 	if kind != "" {
 		if !kind.Valid() {
 			return nil, ErrInvalidWorkKind
 		}
 		q = q.Where("kind = ?", kind)
+	}
+	if len(tagIDs) > 0 {
+		q = q.Where("works.id IN (SELECT work_id FROM work_tags WHERE tag_id IN ?)", tagIDs)
 	}
 	var works []models.Work
 	if err := q.Find(&works).Error; err != nil {

@@ -1,7 +1,17 @@
-import { Alert, Group, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import {
+	Alert,
+	Group,
+	MultiSelect,
+	SimpleGrid,
+	Stack,
+	Text,
+	Title,
+} from "@mantine/core";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useWorks, type WorkKind } from "../../api/catalog";
 import { useSession } from "../../api/session";
+import { useTags } from "../../api/tags";
 import { useTVFocusable } from "../tv/tvFocus";
 import { useTVMode } from "../tv/useTVMode";
 import { CreateWorkButton } from "./admin/CreateWorkButton";
@@ -16,8 +26,11 @@ export function SeriesPage({
 	kind?: WorkKind;
 }) {
 	const { t } = useTranslation();
-	const series = useWorks("series");
-	const films = useWorks("film_series");
+	const [tagIDs, setTagIDs] = useState<string[]>([]);
+	const tags = useTags();
+	const selectedTags = tagIDs.map(Number);
+	const series = useWorks("series", true, selectedTags);
+	const films = useWorks("film_series", true, selectedTags);
 	const session = useSession();
 	const { capabilities } = useTVMode();
 	const canManage =
@@ -58,6 +71,16 @@ export function SeriesPage({
 					{canManage && <CreateWorkButton />}
 				</Group>
 			)}
+			<MultiSelect
+				label={t("catalog.tagFilter")}
+				data={(tags.data ?? [])
+					.filter((tag) => tag.group === "genre" || tag.group === "mood")
+					.map((tag) => ({ value: String(tag.id), label: tag.name }))}
+				value={tagIDs}
+				onChange={setTagIDs}
+				clearable
+				searchable
+			/>
 			{showSeries && series.isError ? (
 				<Alert color="red">{t("catalog.error")}</Alert>
 			) : showFilms && films.isError ? (

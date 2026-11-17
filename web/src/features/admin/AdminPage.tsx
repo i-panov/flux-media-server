@@ -23,6 +23,7 @@ import { ApiError } from "../../api/client";
 import { useSession } from "../../api/session";
 import { useCancelTranscode, useTranscodesQuery } from "../../api/transcode";
 import { TagsAdmin } from "../tags/TagsAdmin";
+import { MediaMaintenanceCard } from "./MediaMaintenanceCard";
 import { OriginalsTable } from "./OriginalsTable";
 import { StorageWidget } from "./StorageWidget";
 import { TranscodeQueueTable } from "./TranscodeQueueTable";
@@ -136,6 +137,10 @@ export function AdminPage() {
 						/>
 					)}
 				</Stack>
+			</section>
+
+			<section aria-label={t("admin.maintenance.title")}>
+				<MediaMaintenanceCard />
 			</section>
 
 			<section aria-label={t("tags.adminTitle")}>

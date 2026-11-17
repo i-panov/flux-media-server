@@ -75,3 +75,22 @@ export function useSetEntityTags(entity: TagEntity, id: number) {
 		},
 	});
 }
+
+export function useBulkMediaTags() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: { mediaIDs: number[]; tagID: number; add: boolean }) =>
+			apiFetch<{ affected: number }>("/tags/bulk", {
+				method: "POST",
+				body: JSON.stringify({
+					media_ids: input.mediaIDs,
+					tag_id: input.tagID,
+					add: input.add,
+				}),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["tags"] });
+		},
+	});
+}

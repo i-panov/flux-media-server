@@ -194,3 +194,60 @@ export function useDeleteUser() {
 		},
 	});
 }
+
+const maintenanceStateSchema = z.object({
+	running: z.boolean(),
+	kind: z.string().optional(),
+	generated: z.number(),
+	last_error: z.string().optional(),
+	started_at: z.string().optional(),
+	finished_at: z.string().optional(),
+});
+
+const maintenanceSchema = z.object({
+	missing_thumbnails: z.number(),
+	missing_covers: z.number(),
+	state: maintenanceStateSchema,
+});
+
+export type MaintenanceInfo = z.infer<typeof maintenanceSchema>;
+
+export function useMaintenanceQuery(options?: { enabled?: boolean }) {
+	return useQuery({
+		queryKey: ["admin", "maintenance"],
+		queryFn: async () => {
+			const body = await apiFetch<unknown>("/admin/maintenance");
+			return maintenanceSchema.parse(body);
+		},
+		refetchInterval: (query) =>
+			query.state.data?.state.running === true ? 2000 : false,
+		retry: false,
+		enabled: options?.enabled ?? true,
+	});
+}
+
+export function useBackfillThumbnails() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: () =>
+			apiFetch<unknown>("/admin/maintenance/thumbnails", { method: "POST" }),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({
+				queryKey: ["admin", "maintenance"],
+			});
+		},
+	});
+}
+
+export function useBackfillCovers() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: () =>
+			apiFetch<unknown>("/admin/maintenance/covers", { method: "POST" }),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({
+				queryKey: ["admin", "maintenance"],
+			});
+		},
+	});
+}

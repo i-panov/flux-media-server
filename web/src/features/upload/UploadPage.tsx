@@ -5,6 +5,7 @@ import {
 	FileButton,
 	Group,
 	Loader,
+	NumberInput,
 	SegmentedControl,
 	Select,
 	Stack,
@@ -15,6 +16,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { ArrowLeft, FolderPlus, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useFranchises, useWork, useWorks } from "../../api/catalog";
 import { useCollections } from "../../api/collections";
 import { useSession } from "../../api/session";
 import type { UploadType } from "../../api/upload";
@@ -23,7 +25,7 @@ import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
 import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { LinkDownloadCard } from "./LinkDownloadCard";
 import { UploadItemCard } from "./UploadItemCard";
-import { useUploadQueue } from "./useUploadQueue";
+import { type UploadTarget, useUploadQueue } from "./useUploadQueue";
 
 const ACCEPT: Record<UploadType, string> = {
 	video: ".mp4,.m4v,.mkv,.avi,.mov,.wmv,.webm,.flv,.ts",
@@ -39,6 +41,7 @@ const TYPE_LABEL_KEYS: Record<UploadType, string> = {
 
 const UPLOAD_TYPES: UploadType[] = ["video", "audio", "image"];
 
+// eslint-disable-next-line max-lines-per-function, complexity -- форма загрузки с назначением.
 export function UploadPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
@@ -48,6 +51,38 @@ export function UploadPage() {
 	// Коллекция для всей пачки (как во Flutter): смена типа сбрасывает
 	// выбор, коллекция чужого типа файлам не достанется.
 	const [collectionId, setCollectionId] = useState<number | null>(null);
+	const [targetKind, setTargetKind] = useState<
+		"standalone" | "series" | "film_series" | "franchise"
+	>("standalone");
+	const [targetWorkID, setTargetWorkID] = useState<string | null>(null);
+	const [targetSeasonID, setTargetSeasonID] = useState<string | null>(null);
+	const [targetEpisode, setTargetEpisode] = useState<string | number>("");
+	const [targetFranchiseID, setTargetFranchiseID] = useState<string | null>(
+		null,
+	);
+	const works = useWorks("series");
+	const filmSeries = useWorks("film_series");
+	const franchises = useFranchises();
+	const selectedWork = useWork(
+		Number(targetWorkID ?? 0),
+		targetWorkID !== null,
+	);
+	const uploadTarget: UploadTarget =
+		targetKind === "series" && targetWorkID !== null && targetSeasonID !== null
+			? {
+					kind: "series",
+					workID: Number(targetWorkID),
+					seasonID: Number(targetSeasonID),
+					episodeNumber:
+						targetEpisode === ""
+							? undefined
+							: Number.parseInt(String(targetEpisode), 10) || undefined,
+				}
+			: targetKind === "film_series" && targetWorkID !== null
+				? { kind: "film_series", workID: Number(targetWorkID) }
+				: targetKind === "franchise" && targetFranchiseID !== null
+					? { kind: "franchise", franchiseID: Number(targetFranchiseID) }
+					: { kind: "standalone" };
 	const [createOpened, setCreateOpened] = useState(false);
 	const collections = useCollections(LEGACY_COLLECTIONS_ENABLED);
 	const {
@@ -58,7 +93,7 @@ export function UploadPage() {
 		retryItem,
 		forceItem,
 		busy,
-	} = useUploadQueue(type, collectionId);
+	} = useUploadQueue(type, collectionId, uploadTarget);
 	// ТВ-режим: корень страницы — spatial-секция, форма внутри —
 	// контент секции.
 	const { targetRef: tvRef, tvMode } =
@@ -148,6 +183,94 @@ export function UploadPage() {
 					}))}
 					w="fit-content"
 				/>
+
+				{type === "video" && (
+					<Card withBorder padding="md" radius="md">
+						<Stack gap="sm">
+							<Text fw={600}>{t("upload.target.title")}</Text>
+							<Select
+								label={t("upload.target.label")}
+								value={targetKind}
+								onChange={(value) => {
+									setTargetKind(
+										value === "series" ||
+											value === "film_series" ||
+											value === "franchise"
+											? value
+											: "standalone",
+									);
+									setTargetWorkID(null);
+									setTargetSeasonID(null);
+									setTargetFranchiseID(null);
+								}}
+								data={[
+									{ value: "standalone", label: t("upload.target.standalone") },
+									{ value: "series", label: t("catalog.seriesOne") },
+									{ value: "film_series", label: t("catalog.filmSeries") },
+									{ value: "franchise", label: t("catalog.franchise") },
+								]}
+							/>
+							{targetKind === "series" && (
+								<>
+									<Select
+										label={t("catalog.seriesOne")}
+										data={(works.data ?? []).map((work) => ({
+											value: String(work.id),
+											label: work.title,
+										}))}
+										value={targetWorkID}
+										onChange={(value) => {
+											setTargetWorkID(value);
+											setTargetSeasonID(null);
+										}}
+										searchable
+									/>
+									<Select
+										label={t("catalog.seasonLabel")}
+										data={(selectedWork.data?.seasons ?? []).map((season) => ({
+											value: String(season.id),
+											label:
+												season.title ||
+												t("catalog.season", { number: season.season_number }),
+										}))}
+										value={targetSeasonID}
+										onChange={setTargetSeasonID}
+									/>
+									<NumberInput
+										label={t("catalog.episodeNumber")}
+										value={targetEpisode}
+										onChange={setTargetEpisode}
+										min={1}
+									/>
+								</>
+							)}
+							{targetKind === "film_series" && (
+								<Select
+									label={t("catalog.filmSeries")}
+									data={(filmSeries.data ?? []).map((work) => ({
+										value: String(work.id),
+										label: work.title,
+									}))}
+									value={targetWorkID}
+									onChange={setTargetWorkID}
+									searchable
+								/>
+							)}
+							{targetKind === "franchise" && (
+								<Select
+									label={t("catalog.franchise")}
+									data={(franchises.data ?? []).map((franchise) => ({
+										value: String(franchise.id),
+										label: franchise.name,
+									}))}
+									value={targetFranchiseID}
+									onChange={setTargetFranchiseID}
+									searchable
+								/>
+							)}
+						</Stack>
+					</Card>
+				)}
 
 				{LEGACY_COLLECTIONS_ENABLED && (
 					<>

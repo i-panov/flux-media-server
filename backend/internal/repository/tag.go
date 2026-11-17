@@ -8,6 +8,7 @@ import (
 	"flux/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -245,6 +246,60 @@ func (r *TagStore) SetFranchiseTags(ctx context.Context, franchiseID uint, tagID
 		}
 		return nil
 	})
+}
+
+// BulkMediaTags добавляет или снимает тег у набора медиа. Для
+// format-тега добавление заменяет текущий формат, сохраняя инвариант
+// «один формат на видео».
+func (r *TagStore) BulkMediaTags(ctx context.Context, mediaIDs []uint, tagID uint, add bool) (int, error) {
+	ids := uniqueIDs(mediaIDs)
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	affected := 0
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tag models.Tag
+		if err := tx.First(&tag, tagID).Error; err != nil {
+			return err
+		}
+		var medias []models.Media
+		if err := tx.Where("id IN ?", ids).Find(&medias).Error; err != nil {
+			return err
+		}
+		if len(medias) != len(ids) {
+			return ErrTagNotFound
+		}
+		for _, media := range medias {
+			if media.Type == models.MediaTypeImage {
+				return ErrTagsForImage
+			}
+		}
+		if !add {
+			res := tx.Where("tag_id = ? AND media_id IN ?", tagID, ids).Delete(&models.MediaTag{})
+			if res.Error != nil {
+				return res.Error
+			}
+			affected = int(res.RowsAffected)
+			return nil
+		}
+		if tag.Group == models.TagGroupFormat {
+			if err := tx.Where(`media_id IN ? AND tag_id IN (
+				SELECT id FROM tags WHERE tag_group = ?)`, ids, models.TagGroupFormat).
+				Delete(&models.MediaTag{}).Error; err != nil {
+				return err
+			}
+		}
+		for _, id := range ids {
+			res := tx.Clauses(clause.OnConflict{DoNothing: true}).
+				Create(&models.MediaTag{MediaID: id, TagID: tagID})
+			if res.Error != nil {
+				return res.Error
+			}
+			affected += int(res.RowsAffected)
+		}
+		return nil
+	})
+	return affected, err
 }
 
 func (r *TagStore) MediaTags(ctx context.Context, mediaID uint) ([]models.Tag, error) {

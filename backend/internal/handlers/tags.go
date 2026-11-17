@@ -102,6 +102,27 @@ func (h *TagHandler) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+type bulkTagsRequest struct {
+	MediaIDs []uint `json:"media_ids"`
+	TagID    uint   `json:"tag_id"`
+	Add      bool   `json:"add"`
+}
+
+func (h *TagHandler) BulkMediaTags(c *fiber.Ctx) error {
+	var req bulkTagsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if req.TagID == 0 || len(req.MediaIDs) == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "tag_id and media_ids are required")
+	}
+	affected, err := h.tags.BulkMediaTags(c.UserContext(), req.MediaIDs, req.TagID, req.Add)
+	if err != nil {
+		return h.mapError(c, err)
+	}
+	return c.JSON(fiber.Map{"affected": affected})
+}
+
 func (h *TagHandler) MediaTags(c *fiber.Ctx) error {
 	id, err := parseIDParam(c, "id")
 	if err != nil {

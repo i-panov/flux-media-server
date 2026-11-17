@@ -1,4 +1,4 @@
-import { Card, Text } from "@mantine/core";
+import { Badge, Card, Group, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Clapperboard, Tv } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -46,6 +46,15 @@ export function WorkCard({
 					<Text size="xs" c="dimmed">
 						{work.year > 0 ? work.year : t("common.emptyFallback")}
 					</Text>
+					{(work.tags ?? []).length > 0 && (
+						<Group gap={4} mt={4}>
+							{(work.tags ?? []).slice(0, 3).map((tag) => (
+								<Badge key={tag.id} size="xs" variant="light">
+									{tag.name}
+								</Badge>
+							))}
+						</Group>
+					)}
 				</Card>
 			</Link>
 		</div>

@@ -1,6 +1,6 @@
 import { Card, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
-import { Film } from "lucide-react";
+import { Check, Film } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
@@ -33,7 +33,17 @@ function ThumbImage({
 	);
 }
 
-export function VideoCard({ media }: { media: Media }) {
+export function VideoCard({
+	media,
+	selectable = false,
+	selected = false,
+	onToggleSelect,
+}: {
+	media: Media;
+	selectable?: boolean;
+	selected?: boolean;
+	onToggleSelect?: (mediaId: number) => void;
+}) {
 	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
 	// ТВ-режим: карточка — spatial-цель, Enter повторяет клик по ссылке.
@@ -49,6 +59,49 @@ export function VideoCard({ media }: { media: Media }) {
 	// картинка: вместо <img src=""> — плейсхолдер без лишних запросов.
 	const imageURL = media.cover_url || media.thumbnail_url;
 	const hasThumb = imageURL !== "" && !reload.failed;
+	if (selectable) {
+		return (
+			<button
+				type="button"
+				onClick={() => onToggleSelect?.(media.id)}
+				aria-pressed={selected}
+				className={[
+					"media-card relative flex h-full flex-col rounded-md border-2 p-0 text-left",
+					selected
+						? "border-[var(--mantine-color-violet-5)]"
+						: "border-transparent",
+				].join(" ")}
+			>
+				<Card withBorder padding="sm" radius="md" h="100%">
+					<Card.Section className="relative">
+						{hasThumb ? (
+							<ThumbImage
+								src={imageURL}
+								alt={media.title}
+								nonce={reload.nonce}
+								onError={reload.handleError}
+							/>
+						) : (
+							<div className="grid aspect-video w-full place-items-center bg-[var(--mantine-color-default-hover)]">
+								<Film
+									size={32}
+									className="text-[var(--mantine-color-dimmed)]"
+								/>
+							</div>
+						)}
+						{selected && (
+							<span className="absolute inset-0 grid place-items-center bg-black/40">
+								<Check size={28} className="text-white" />
+							</span>
+						)}
+					</Card.Section>
+					<Text fw={600} size="sm" mt="xs" lineClamp={2}>
+						{media.title}
+					</Text>
+				</Card>
+			</button>
+		);
+	}
 	return (
 		<div
 			ref={tvRef}

@@ -21,6 +21,14 @@ export interface CatalogSeason {
 	title: string;
 	position: number;
 	items?: CatalogItem[];
+	tags?: CatalogTag[];
+}
+
+export interface CatalogTag {
+	id: number;
+	group: string;
+	slug: string;
+	name: string;
 }
 
 export interface CatalogWork {
@@ -32,6 +40,7 @@ export interface CatalogWork {
 	year: number;
 	seasons?: CatalogSeason[];
 	items?: CatalogItem[];
+	tags?: CatalogTag[];
 }
 
 export interface CatalogEntry {
@@ -50,13 +59,21 @@ export interface CatalogFranchise {
 	description: string;
 	cover_url: string;
 	entries?: CatalogEntry[];
+	tags?: CatalogTag[];
 }
 
-export function useWorks(kind?: WorkKind, enabled = true) {
+export function useWorks(
+	kind?: WorkKind,
+	enabled = true,
+	tagIDs: number[] = [],
+) {
+	const params = new URLSearchParams();
+	if (kind !== undefined) params.set("kind", kind);
+	if (tagIDs.length > 0) params.set("tag_ids", tagIDs.join(","));
+	const query = params.toString();
 	return useQuery({
-		queryKey: ["works", kind ?? "all"],
-		queryFn: () =>
-			apiFetch<CatalogWork[]>(`/works${kind ? `?kind=${kind}` : ""}`),
+		queryKey: ["works", kind ?? "all", tagIDs.join(",")],
+		queryFn: () => apiFetch<CatalogWork[]>(`/works${query ? `?${query}` : ""}`),
 		enabled,
 	});
 }
@@ -69,10 +86,11 @@ export function useWork(id: number, enabled = true) {
 	});
 }
 
-export function useFranchises() {
+export function useFranchises(tagIDs: number[] = []) {
+	const query = tagIDs.length > 0 ? `?tag_ids=${tagIDs.join(",")}` : "";
 	return useQuery({
-		queryKey: ["franchises"],
-		queryFn: () => apiFetch<CatalogFranchise[]>("/franchises"),
+		queryKey: ["franchises", tagIDs.join(",")],
+		queryFn: () => apiFetch<CatalogFranchise[]>(`/franchises${query}`),
 	});
 }
 

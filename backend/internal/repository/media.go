@@ -202,6 +202,22 @@ func (r *MediaStore) FindAudioMissingCover(ctx context.Context, limit int) ([]mo
 	return rows, err
 }
 
+func (r *MediaStore) CountMissingThumbnails(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Media{}).
+		Where("type IN ?", []models.MediaType{models.MediaTypeVideo, models.MediaTypeImage}).
+		Where("(thumbnail_url IS NULL OR thumbnail_url = '')").Count(&count).Error
+	return count, err
+}
+
+func (r *MediaStore) CountMissingCovers(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Media{}).
+		Where("type = ?", models.MediaTypeAudio).
+		Where("(cover_url IS NULL OR cover_url = '')").Count(&count).Error
+	return count, err
+}
+
 func (r *MediaStore) UpdateCoverURL(ctx context.Context, id uint, url string) error {
 	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
 		Update("cover_url", url).Error

@@ -103,3 +103,42 @@ func TestSystemFormatTagsSeeded(t *testing.T) {
 	require.Equal(t, "film", tags[1].Slug)
 	require.Equal(t, "podcast", tags[2].Slug)
 }
+
+func TestBulkMediaTags(t *testing.T) {
+	db := setupCatalogDB(t)
+	tags := NewTagRepository(db)
+	ctx := context.Background()
+	var film, clip, comedy models.Tag
+	require.NoError(t, db.Where("tag_group = ? AND slug = ?", models.TagGroupFormat, "film").First(&film).Error)
+	require.NoError(t, db.Where("tag_group = ? AND slug = ?", models.TagGroupFormat, "clip").First(&clip).Error)
+	comedy = models.Tag{Group: models.TagGroupGenre, Slug: "comedy", Name: "Комедия"}
+	require.NoError(t, tags.Create(ctx, &comedy))
+
+	first := catalogVideo(t, db, "/bulk1.mp4")
+	second := catalogVideo(t, db, "/bulk2.mp4")
+	affected, err := tags.BulkMediaTags(ctx, []uint{first.ID, second.ID}, film.ID, true)
+	require.NoError(t, err)
+	require.Equal(t, 2, affected)
+	affected, err = tags.BulkMediaTags(ctx, []uint{first.ID, second.ID}, comedy.ID, true)
+	require.NoError(t, err)
+	require.Equal(t, 2, affected)
+
+	// Смена формата заменяет прежний: ровно один format-тег.
+	affected, err = tags.BulkMediaTags(ctx, []uint{first.ID}, clip.ID, true)
+	require.NoError(t, err)
+	require.Equal(t, 1, affected)
+	firstTags, err := tags.MediaTags(ctx, first.ID)
+	require.NoError(t, err)
+	formats := 0
+	for _, tag := range firstTags {
+		if tag.Group == models.TagGroupFormat {
+			formats++
+			require.Equal(t, "clip", tag.Slug)
+		}
+	}
+	require.Equal(t, 1, formats)
+
+	affected, err = tags.BulkMediaTags(ctx, []uint{first.ID, second.ID}, comedy.ID, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, affected)
+}

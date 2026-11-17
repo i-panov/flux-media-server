@@ -33,9 +33,13 @@ func (r *FranchiseStore) Create(ctx context.Context, franchise *models.Franchise
 	return r.db.WithContext(ctx).Create(franchise).Error
 }
 
-func (r *FranchiseStore) List(ctx context.Context) ([]models.Franchise, error) {
+func (r *FranchiseStore) List(ctx context.Context, tagIDs ...uint) ([]models.Franchise, error) {
 	var rows []models.Franchise
-	err := r.db.WithContext(ctx).Order("name ASC, id ASC").Find(&rows).Error
+	query := r.db.WithContext(ctx)
+	if len(tagIDs) > 0 {
+		query = query.Where("franchises.id IN (SELECT franchise_id FROM franchise_tags WHERE tag_id IN ?)", tagIDs)
+	}
+	err := query.Order("name ASC, id ASC").Find(&rows).Error
 	if err != nil {
 		return nil, err
 	}
