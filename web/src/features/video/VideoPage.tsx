@@ -382,12 +382,7 @@ function MoviesContent({
 			)}
 			{canBulkTag && bulkActive && (
 				<BulkTagBar
-					active={bulkActive}
 					selected={bulkSelected}
-					onToggleActive={() => {
-						setBulkActive((prev) => !prev);
-						setBulkSelected([]);
-					}}
 					onClear={() => setBulkSelected([])}
 				/>
 			)}
