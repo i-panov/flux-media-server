@@ -43,6 +43,8 @@ server:
   max_upload_size: 104857600
 database:
   path: "$OUT/flux.db"
+rate_limiter:
+  max: 100
 auth:
   jwt_secret: "e2e-only-secret-0123456789-0123456789"
   allow_unknown_email: true

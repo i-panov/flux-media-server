@@ -6,6 +6,9 @@ export default defineConfig({
 	testDir: "./e2e",
 	testMatch: "**/real/*.spec.ts",
 	fullyParallel: false,
+	// Один воркер: тесты делят реальный media-loader, кэш источника и
+	// лимитер OTP — параллельный запуск даёт ложные падения.
+	workers: 1,
 	retries: 0,
 	timeout: 180_000,
 	reporter: "list",
