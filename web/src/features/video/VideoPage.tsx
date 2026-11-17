@@ -219,6 +219,7 @@ export function VideoPage() {
 	);
 }
 
+// eslint-disable-next-line max-lines-per-function -- фильтры, сортировка и массовая разметка.
 function MoviesContent({
 	format,
 	excludeFormat,
@@ -251,6 +252,9 @@ function MoviesContent({
 	const filterTags = (tags.data ?? [])
 		.filter((tag) => tag.group === "genre" || tag.group === "mood")
 		.map((tag) => ({ value: String(tag.id), label: tag.name }));
+	const formatTags = (tags.data ?? [])
+		.filter((tag) => tag.group === "format")
+		.map((tag) => ({ value: String(tag.id), label: tag.name }));
 	const selectedTagIDs = tagIDs.map(Number);
 	const list = useVideoList(
 		debounced,
@@ -275,17 +279,41 @@ function MoviesContent({
 					}}
 					w={{ base: "100%", sm: 320 }}
 				/>
-				{filterTags.length > 0 && (
-					<MultiSelect
-						label={t("video.tagsFilter")}
-						data={filterTags}
-						value={tagIDs}
-						onChange={setTagIDs}
-						clearable
-						searchable
-						w={{ base: "100%", sm: 280 }}
-					/>
-				)}
+				<MultiSelect
+					label={t("video.formatFilter")}
+					data={formatTags}
+					value={tagIDs.filter((id) =>
+						formatTags.some((tag) => tag.value === id),
+					)}
+					onChange={(values) => {
+						const genreAndMood = tagIDs.filter((id) =>
+							filterTags.some((tag) => tag.value === id),
+						);
+						setTagIDs([...genreAndMood, ...values]);
+					}}
+					nothingFoundMessage={t("video.noFormatTags")}
+					placeholder={t("video.allFormats")}
+					clearable
+					w={{ base: "100%", sm: 220 }}
+				/>
+				<MultiSelect
+					label={t("video.tagsFilter")}
+					data={filterTags}
+					value={tagIDs.filter((id) =>
+						filterTags.some((tag) => tag.value === id),
+					)}
+					onChange={(values) => {
+						const formats = tagIDs.filter((id) =>
+							formatTags.some((tag) => tag.value === id),
+						);
+						setTagIDs([...formats, ...values]);
+					}}
+					nothingFoundMessage={t("video.noTags")}
+					placeholder={t("video.allTags")}
+					clearable
+					searchable
+					w={{ base: "100%", sm: 260 }}
+				/>
 				{tagIDs.length > 0 && (
 					<Button variant="subtle" size="xs" onClick={() => setTagIDs([])}>
 						{t("video.clearFilters")}

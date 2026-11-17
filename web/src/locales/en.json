@@ -583,5 +583,10 @@
 	"admin.maintenance.started": "Task started",
 	"admin.maintenance.finished": "Done: processed {{generated}}, errors {{failed}}",
 	"admin.maintenance.failed": "Could not start the task",
-	"admin.maintenance.lastRun": "Last run: {{kind}}, processed {{generated}}, errors {{failed}}"
+	"admin.maintenance.lastRun": "Last run: {{kind}}, processed {{generated}}, errors {{failed}}",
+	"video.formatFilter": "Format",
+	"video.noFormatTags": "No formats yet",
+	"video.noTags": "No tags yet — create them in admin",
+	"video.allFormats": "All formats",
+	"video.allTags": "All tags"
 }
