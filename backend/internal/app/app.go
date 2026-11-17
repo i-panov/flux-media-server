@@ -365,6 +365,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	catalogHandler := handlers.NewCatalogHandler(workRepo, franchiseRepo)
 	tagRepo := repository.NewTagRepository(db)
 	tagHandler := handlers.NewTagHandler(tagRepo)
+	importRepo := repository.NewImportRepository(db)
+	importSvc := services.NewImportService(mediaLoader, workRepo, importRepo)
+	importHandler := handlers.NewImportHandler(mediaLoader, importRepo, importSvc)
 	maintenanceSvc := services.NewMediaMaintenanceService(mediaRepo, thumbSvc)
 	maintenanceHandler := handlers.NewMaintenanceHandler(mediaRepo, maintenanceSvc)
 	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc, subRepo)
@@ -769,6 +772,12 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Get("/media/:id/tags", readRateLimiter, tagHandler.MediaTags)
 	api.Put("/media/:id/tags", requireAdmin, tagHandler.SetMediaTags)
 	api.Post("/tags/bulk", requireAdmin, tagHandler.BulkMediaTags)
+
+	api.Post("/import/probe", requireAdmin, importHandler.Probe)
+	api.Post("/import", requireAdmin, importHandler.Start)
+	api.Get("/import", requireAdmin, importHandler.List)
+	api.Get("/import/:id", requireAdmin, importHandler.Get)
+	api.Delete("/import/:id", requireAdmin, importHandler.Cancel)
 
 	api.Get("/tags", readRateLimiter, tagHandler.List)
 	api.Post("/tags", requireAdmin, tagHandler.Create)

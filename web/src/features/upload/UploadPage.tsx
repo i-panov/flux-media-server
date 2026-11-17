@@ -22,6 +22,7 @@ import { useSession } from "../../api/session";
 import type { UploadType } from "../../api/upload";
 import { CreateCollectionModal } from "../collections/CreateCollectionModal";
 import { LEGACY_COLLECTIONS_ENABLED } from "../collections/legacy";
+import { SeriesImportCard } from "../import/SeriesImportCard";
 import { TVFocusScope, useTVFocusable } from "../tv/tvFocus";
 import { LinkDownloadCard } from "./LinkDownloadCard";
 import { UploadItemCard } from "./UploadItemCard";
@@ -332,6 +333,8 @@ export function UploadPage() {
 				</FileButton>
 
 				<LinkDownloadCard key={type} type={type} />
+
+				{type === "video" && <SeriesImportCard />}
 
 				{items.length === 0 ? (
 					<Card withBorder padding="xl" radius="md">

@@ -175,6 +175,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.MediaTag{},
 		&models.WorkTag{},
 		&models.FranchiseTag{},
+		&models.ImportJob{},
+		&models.ImportEpisode{},
 	); err != nil {
 		return err
 	}
@@ -316,7 +318,10 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV8(db); err != nil {
 		return err
 	}
-	return runMigrationsV9(db)
+	if err := runMigrationsV9(db); err != nil {
+		return err
+	}
+	return runMigrationsV10(db)
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
@@ -669,6 +674,28 @@ func runMigrationsV4(db *gorm.DB) error {
 				ON subtitles(media_id, lang)`).Error; err != nil {
 				return fmt.Errorf("create subtitles unique index: %w", err)
 			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV10 — импорт сезонов/сериалов из media-loader.
+func runMigrationsV10(db *gorm.DB) error {
+	const schemaVersion = 10
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 10: %w", err)
+		}
+		if applied > 0 {
+			return nil
 		}
 		return tx.Create(&models.SchemaMigration{
 			Version:   schemaVersion,

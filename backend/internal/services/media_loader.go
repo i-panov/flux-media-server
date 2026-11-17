@@ -586,3 +586,266 @@ func sleepContext(ctx context.Context, d time.Duration) bool {
 		return true
 	}
 }
+
+// CollectionEpisode — готовая серия коллекции media-loader.
+type CollectionEpisode struct {
+	Season      int
+	Episode     int
+	Title       string
+	Filename    string
+	DownloadURL string
+}
+
+// RunCollection просит media-loader скачать сезон/сериал целиком и
+// последовательно отдаёт готовые серии. media-loader не умеет отдавать
+// URL отдельной серии до скачивания, поэтому выбор подмножества серий
+// делается на стороне Flux уже после получения манифеста.
+func (m *MediaLoader) RunCollection(
+	ctx context.Context,
+	req MediaLoaderRequest,
+	scope string,
+	progress func(stage string, percent float64),
+	ready func(CollectionEpisode) error,
+) error {
+	if !m.Enabled() {
+		return ErrMediaLoaderDisabled
+	}
+	body, err := json.Marshal(map[string]any{
+		"url": req.URL, "audio_only": req.AudioOnly,
+		"format": req.Format, "quality": req.Quality,
+		"scope": scope, "respond_json": true,
+	})
+	if err != nil {
+		return err
+	}
+	networkRetries := 0
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, m.baseURL+"/videos", strings.NewReader(string(body)))
+		if err != nil {
+			return err
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		if m.token != "" {
+			httpReq.Header.Set("Authorization", "Bearer "+m.token)
+		}
+		resp, err := m.client.Do(httpReq)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if networkRetries < 3 {
+				networkRetries++
+				if !sleepContext(ctx, time.Duration(networkRetries)*time.Second) {
+					return ctx.Err()
+				}
+				continue
+			}
+			return err
+		}
+		data, readErr := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+		resp.Body.Close()
+		if readErr != nil {
+			return readErr
+		}
+		networkRetries = 0
+		var out struct {
+			Status     string `json:"status"`
+			Stage      string `json:"stage"`
+			RetryAfter int    `json:"retry_after"`
+			Detail     string `json:"detail"`
+			Error      string `json:"error"`
+			Progress   struct {
+				Percent float64 `json:"percent"`
+				Stage   string  `json:"stage"`
+			} `json:"progress"`
+			Episodes []struct {
+				Season      int    `json:"season"`
+				Episode     int    `json:"episode"`
+				Title       string `json:"title"`
+				Status      string `json:"status"`
+				Filename    string `json:"filename"`
+				DownloadURL string `json:"download_url"`
+				Error       string `json:"error"`
+			} `json:"episodes"`
+		}
+		if err := json.Unmarshal(data, &out); err != nil {
+			return fmt.Errorf("media loader collection: invalid response: %w", err)
+		}
+		switch resp.StatusCode {
+		case http.StatusAccepted:
+			stage := out.Stage
+			if out.Progress.Stage != "" {
+				stage = out.Progress.Stage
+			}
+			percent := out.Progress.Percent
+			if progress != nil {
+				progress(stage, percent)
+			}
+			delay := time.Duration(out.RetryAfter) * time.Second
+			if delay <= 0 {
+				delay = 5 * time.Second
+			}
+			if !sleepContext(ctx, delay) {
+				return ctx.Err()
+			}
+		case http.StatusOK:
+			for _, episode := range out.Episodes {
+				if episode.DownloadURL == "" {
+					continue
+				}
+				if err := ready(CollectionEpisode{
+					Season:      episode.Season,
+					Episode:     episode.Episode,
+					Title:       episode.Title,
+					Filename:    episode.Filename,
+					DownloadURL: episode.DownloadURL,
+				}); err != nil {
+					return err
+				}
+			}
+			return nil
+		default:
+			msg := out.Detail
+			if msg == "" {
+				msg = out.Error
+			}
+			if msg == "" {
+				msg = strings.TrimSpace(string(data))
+			}
+			return fmt.Errorf("media loader collection: %s", msg)
+		}
+	}
+}
+
+// ImportDownload скачивает готовый файл коллекции, кладёт его в обработку
+// и ждёт создания media. Возвращает id созданной записи.
+func (m *MediaLoader) ImportDownload(ctx context.Context, downloadURL, filename, contentType string) (uint, error) {
+	job := &MediaLoaderJob{
+		ID:        "collection-" + strconv.FormatInt(time.Now().UnixNano(), 36),
+		Status:    "importing",
+		mediaType: models.MediaTypeVideo,
+	}
+	out := loaderResponse{DownloadURL: downloadURL, Filename: filename, ContentType: contentType}
+	if err := m.importFile(ctx, job, out); err != nil {
+		return 0, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return job.MediaID, nil
+}
+
+// ProbeSeries — быстрый metadata-only запрос без скачивания. Пытается
+// получить структуру сериала; если сервис не знает сезонов, возвращает
+// одиночное видео.
+type ProbeEpisode struct {
+	Season   int    `json:"season"`
+	Episode  int    `json:"episode"`
+	Title    string `json:"title"`
+	Duration int    `json:"duration"`
+}
+
+type SeriesProbe struct {
+	Kind      string         `json:"kind"`
+	SeriesID  string         `json:"series_id,omitempty"`
+	Title     string         `json:"title"`
+	Scope     string         `json:"scope"`
+	Seasons   []int          `json:"seasons,omitempty"`
+	Episodes  []ProbeEpisode `json:"episodes,omitempty"`
+	Duration  int            `json:"duration,omitempty"`
+	Thumbnail string         `json:"thumbnail,omitempty"`
+}
+
+func (m *MediaLoader) ProbeSeries(ctx context.Context, rawURL string) (*SeriesProbe, error) {
+	if !m.Enabled() {
+		return nil, ErrMediaLoaderDisabled
+	}
+	var lastErr error
+	for _, scope := range []string{"series", "season", "episode"} {
+		result, err := m.probeScope(ctx, rawURL, scope)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		return result, nil
+	}
+	if lastErr == nil {
+		lastErr = errors.New("media loader probe failed")
+	}
+	return nil, lastErr
+}
+
+func (m *MediaLoader) probeScope(ctx context.Context, rawURL, scope string) (*SeriesProbe, error) {
+	body, err := json.Marshal(map[string]any{
+		"url": rawURL, "metadata_only": true, "scope": scope,
+	})
+	if err != nil {
+		return nil, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, m.baseURL+"/videos", strings.NewReader(string(body)))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if m.token != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+m.token)
+	}
+	resp, err := m.client.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("media loader probe: %s: %s", resp.Status, strings.TrimSpace(string(data)))
+	}
+	var out struct {
+		Collection bool `json:"collection"`
+		Series     struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"series"`
+		Seasons  []int `json:"seasons"`
+		Episodes []struct {
+			Season   int    `json:"season"`
+			Episode  int    `json:"episode"`
+			Title    string `json:"title"`
+			Duration int    `json:"duration"`
+		} `json:"episodes"`
+		Title     string `json:"title"`
+		Duration  int    `json:"duration"`
+		Thumbnail string `json:"thumbnail"`
+	}
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("media loader probe: invalid response: %w", err)
+	}
+	if out.Collection && len(out.Episodes) > 0 {
+		result := &SeriesProbe{
+			Kind:     "series",
+			SeriesID: out.Series.ID,
+			Title:    out.Series.Title,
+			Scope:    scope,
+			Seasons:  out.Seasons,
+		}
+		for _, episode := range out.Episodes {
+			result.Episodes = append(result.Episodes, ProbeEpisode{
+				Season: episode.Season, Episode: episode.Episode,
+				Title: episode.Title, Duration: episode.Duration,
+			})
+		}
+		return result, nil
+	}
+	if scope != "episode" {
+		return nil, errors.New("media loader probe: not a series")
+	}
+	return &SeriesProbe{
+		Kind: "episode", Title: out.Title, Scope: scope,
+		Duration: out.Duration, Thumbnail: out.Thumbnail,
+		Episodes: []ProbeEpisode{{Season: 1, Episode: 1, Title: out.Title, Duration: out.Duration}},
+	}, nil
+}
