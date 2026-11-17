@@ -579,5 +579,9 @@
 	"import.singleVideo": "Это одиночное видео без сезонов: воспользуйтесь «Загрузить по ссылке».",
 	"import.cancel": "Отменить импорт",
 	"upload.target.incomplete": "Назначение не выбрано полностью — файл загрузится как сольное видео.",
-	"clip.cancel": "Отменить обрезку"
+	"clip.cancel": "Отменить обрезку",
+	"admin.maintenance.started": "Задача запущена",
+	"admin.maintenance.finished": "Готово: обработано {{generated}}, ошибок {{failed}}",
+	"admin.maintenance.failed": "Не удалось запустить задачу",
+	"admin.maintenance.lastRun": "Последний запуск: {{kind}}, обработано {{generated}}, ошибок {{failed}}"
 }

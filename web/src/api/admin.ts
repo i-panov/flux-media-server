@@ -199,6 +199,7 @@ const maintenanceStateSchema = z.object({
 	running: z.boolean(),
 	kind: z.string().optional(),
 	generated: z.number(),
+	failed: z.number().default(0),
 	last_error: z.string().optional(),
 	started_at: z.string().optional(),
 	finished_at: z.string().optional(),

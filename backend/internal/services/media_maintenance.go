@@ -12,6 +12,7 @@ type MaintenanceState struct {
 	Running    bool      `json:"running"`
 	Kind       string    `json:"kind,omitempty"`
 	Generated  int       `json:"generated"`
+	Failed     int       `json:"failed"`
 	LastError  string    `json:"last_error,omitempty"`
 	StartedAt  time.Time `json:"started_at,omitempty"`
 	FinishedAt time.Time `json:"finished_at,omitempty"`
@@ -36,7 +37,7 @@ func (s *MediaMaintenanceService) Status() MaintenanceState {
 	return s.state
 }
 
-func (s *MediaMaintenanceService) start(kind string, run func(context.Context) int) bool {
+func (s *MediaMaintenanceService) start(kind string, run func(context.Context) (int, int)) bool {
 	s.mu.Lock()
 	if s.state.Running {
 		s.mu.Unlock()
@@ -45,10 +46,11 @@ func (s *MediaMaintenanceService) start(kind string, run func(context.Context) i
 	s.state = MaintenanceState{Running: true, Kind: kind, StartedAt: time.Now().UTC()}
 	s.mu.Unlock()
 	go func() {
-		generated := run(context.Background())
+		generated, failed := run(context.Background())
 		s.mu.Lock()
 		s.state.Running = false
 		s.state.Generated = generated
+		s.state.Failed = failed
 		s.state.FinishedAt = time.Now().UTC()
 		s.mu.Unlock()
 	}()
@@ -56,13 +58,13 @@ func (s *MediaMaintenanceService) start(kind string, run func(context.Context) i
 }
 
 func (s *MediaMaintenanceService) StartThumbnails() bool {
-	return s.start("thumbnails", func(ctx context.Context) int {
+	return s.start("thumbnails", func(ctx context.Context) (int, int) {
 		return BackfillThumbnails(ctx, s.media, s.thumbs)
 	})
 }
 
 func (s *MediaMaintenanceService) StartCovers() bool {
-	return s.start("covers", func(ctx context.Context) int {
+	return s.start("covers", func(ctx context.Context) (int, int) {
 		return BackfillAudioCovers(ctx, s.media, s.thumbs)
 	})
 }

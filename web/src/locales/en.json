@@ -579,5 +579,9 @@
 	"import.singleVideo": "This is a standalone video: use \"Upload by link\".",
 	"import.cancel": "Cancel import",
 	"upload.target.incomplete": "Destination is incomplete — the file will be uploaded as a standalone video.",
-	"clip.cancel": "Cancel trimming"
+	"clip.cancel": "Cancel trimming",
+	"admin.maintenance.started": "Task started",
+	"admin.maintenance.finished": "Done: processed {{generated}}, errors {{failed}}",
+	"admin.maintenance.failed": "Could not start the task",
+	"admin.maintenance.lastRun": "Last run: {{kind}}, processed {{generated}}, errors {{failed}}"
 }

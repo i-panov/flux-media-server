@@ -957,13 +957,13 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	thumbBackfillWG.Add(1)
 	goSafe(func() {
 		defer thumbBackfillWG.Done()
-		generated := services.BackfillThumbnails(dimensionsCtx, mediaRepo, thumbSvc)
-		if generated > 0 {
-			log.Printf("thumbnails: сгенерировано %d недостающих превью", generated)
+		generated, failed := services.BackfillThumbnails(dimensionsCtx, mediaRepo, thumbSvc)
+		if generated > 0 || failed > 0 {
+			log.Printf("thumbnails: сгенерировано %d, ошибок %d", generated, failed)
 		}
-		covers := services.BackfillAudioCovers(dimensionsCtx, mediaRepo, thumbSvc)
-		if covers > 0 {
-			log.Printf("covers: извлечено %d встроенных обложек", covers)
+		covers, coverFailed := services.BackfillAudioCovers(dimensionsCtx, mediaRepo, thumbSvc)
+		if covers > 0 || coverFailed > 0 {
+			log.Printf("covers: извлечено %d, ошибок %d", covers, coverFailed)
 		}
 	})
 	goSafe(func() {
