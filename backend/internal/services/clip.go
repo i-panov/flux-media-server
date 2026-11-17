@@ -104,23 +104,33 @@ func (s *ClipService) RecoverStale(ctx context.Context) error {
 
 func (s *ClipService) Cancel(id uint) bool {
 	s.mu.Lock()
-	cancel, ok := s.running[id]
+	cancel, running := s.running[id]
 	s.mu.Unlock()
-	if ok {
+	if running {
 		cancel()
-	}
-	// Условный UPDATE: завершившаяся между Get и Update задача не будет
-	// затёрта ошибкой.
-	cancelled, err := s.clips.CancelActive(context.Background(), id)
-	if err != nil {
-		return false
-	}
-	if !cancelled {
-		return false
 	}
 	task, err := s.clips.Get(context.Background(), id)
 	if err != nil {
-		return ok
+		return false
+	}
+	cancelled, err := s.clips.CancelActive(context.Background(), id)
+	if err != nil {
+		// Не маскируем сбой БД под «задача не найдена».
+		return false
+	}
+	if !cancelled && task.Status != models.ClipError {
+		// Задача уже завершилась (done) — отменять нечего.
+		return false
+	}
+	if !cancelled && task.Error != "cancelled" {
+		// Ошибка не из-за отмены — не выдаём её за успешную отмену.
+		return false
+	}
+	// Даже если run уже записал cancelled, обработку ниже всё равно
+	// останавливаем: иначе transcode/upload продолжат создавать медиа.
+	task, err = s.clips.Get(context.Background(), id)
+	if err != nil {
+		return true
 	}
 	if task.TranscodeJobID != 0 {
 		if source, err := s.media.FindByID(context.Background(), task.SourceMediaID); err == nil {
