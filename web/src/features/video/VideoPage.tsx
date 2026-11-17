@@ -1,9 +1,12 @@
 import {
 	Alert,
+	Badge,
 	Button,
+	CloseButton,
 	Group,
 	MultiSelect,
 	SegmentedControl,
+	Select,
 	SimpleGrid,
 	Stack,
 	Text,
@@ -230,11 +233,13 @@ function MoviesContent({
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<"desc" | "asc">("desc");
-	const [tagIDs, setTagIDs] = useState<string[]>([]);
+	const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+	const [selectedTags, setSelectedTags] = useState<string[]>([]);
 	const [bulkActive, setBulkActive] = useState(false);
 	const [bulkSelected, setBulkSelected] = useState<number[]>([]);
 	const session = useSession();
 	const canBulkTag = session.data?.is_admin === true;
+	const clearLabel = t("video.clearFilters");
 	const tags = useTags();
 	const debounced = useDebouncedValue(query);
 	const { targetRef: searchRef } = useTVFocusable<HTMLInputElement>(
@@ -255,7 +260,10 @@ function MoviesContent({
 	const formatTags = (tags.data ?? [])
 		.filter((tag) => tag.group === "format")
 		.map((tag) => ({ value: String(tag.id), label: tag.name }));
-	const selectedTagIDs = tagIDs.map(Number);
+	const selectedTagIDs = [
+		...(selectedFormat === null ? [] : [Number(selectedFormat)]),
+		...selectedTags.map(Number),
+	];
 	const list = useVideoList(
 		debounced,
 		sort,
@@ -268,7 +276,7 @@ function MoviesContent({
 
 	return (
 		<>
-			<Group gap="sm" wrap="wrap">
+			<Group gap="sm" wrap="wrap" align="center">
 				<TextInput
 					ref={searchRef}
 					placeholder={t("video.search")}
@@ -277,48 +285,29 @@ function MoviesContent({
 					onChange={(event) => {
 						setQuery(event.currentTarget.value);
 					}}
-					w={{ base: "100%", sm: 320 }}
+					w={{ base: "100%", sm: 300 }}
 				/>
-				<MultiSelect
-					label={t("video.formatFilter")}
-					data={formatTags}
-					value={tagIDs.filter((id) =>
-						formatTags.some((tag) => tag.value === id),
-					)}
-					onChange={(values) => {
-						const genreAndMood = tagIDs.filter((id) =>
-							filterTags.some((tag) => tag.value === id),
-						);
-						setTagIDs([...genreAndMood, ...values]);
-					}}
-					nothingFoundMessage={t("video.noFormatTags")}
+				<Select
 					placeholder={t("video.allFormats")}
+					aria-label={t("video.formatFilter")}
+					data={formatTags}
+					value={selectedFormat}
+					onChange={setSelectedFormat}
 					clearable
-					w={{ base: "100%", sm: 220 }}
+					nothingFoundMessage={t("video.noFormatTags")}
+					w={{ base: "100%", sm: 170 }}
 				/>
 				<MultiSelect
-					label={t("video.tagsFilter")}
-					data={filterTags}
-					value={tagIDs.filter((id) =>
-						filterTags.some((tag) => tag.value === id),
-					)}
-					onChange={(values) => {
-						const formats = tagIDs.filter((id) =>
-							formatTags.some((tag) => tag.value === id),
-						);
-						setTagIDs([...formats, ...values]);
-					}}
-					nothingFoundMessage={t("video.noTags")}
 					placeholder={t("video.allTags")}
+					aria-label={t("video.tagsFilter")}
+					data={filterTags}
+					value={selectedTags}
+					onChange={setSelectedTags}
 					clearable
 					searchable
-					w={{ base: "100%", sm: 260 }}
+					nothingFoundMessage={t("video.noTags")}
+					w={{ base: "100%", sm: 220 }}
 				/>
-				{tagIDs.length > 0 && (
-					<Button variant="subtle" size="xs" onClick={() => setTagIDs([])}>
-						{t("video.clearFilters")}
-					</Button>
-				)}
 				<div ref={sortRef} tabIndex={tvMode ? -1 : undefined}>
 					<SegmentedControl
 						size="xs"
@@ -344,6 +333,53 @@ function MoviesContent({
 					</Button>
 				)}
 			</Group>
+			{(selectedFormat !== null || selectedTags.length > 0) && (
+				<Group gap="xs">
+					{selectedFormat !== null && (
+						<Badge
+							variant="light"
+							rightSection={
+								<CloseButton
+									size="xs"
+									aria-label={clearLabel}
+									onClick={() => setSelectedFormat(null)}
+								/>
+							}
+						>
+							{formatTags.find((tag) => tag.value === selectedFormat)?.label}
+						</Badge>
+					)}
+					{selectedTags.map((value) => (
+						<Badge
+							key={value}
+							variant="light"
+							rightSection={
+								<CloseButton
+									size="xs"
+									aria-label={clearLabel}
+									onClick={() =>
+										setSelectedTags((prev) =>
+											prev.filter((item) => item !== value),
+										)
+									}
+								/>
+							}
+						>
+							{filterTags.find((tag) => tag.value === value)?.label}
+						</Badge>
+					))}
+					<Button
+						variant="subtle"
+						size="compact-xs"
+						onClick={() => {
+							setSelectedFormat(null);
+							setSelectedTags([]);
+						}}
+					>
+						{clearLabel}
+					</Button>
+				</Group>
+			)}
 			{canBulkTag && bulkActive && (
 				<BulkTagBar
 					active={bulkActive}
