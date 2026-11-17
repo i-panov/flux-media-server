@@ -19,9 +19,10 @@ export function useVideoList(
 	sort: "asc" | "desc" = "desc",
 	format?: string,
 	excludeFormat?: string,
+	tagIDs?: number[],
 ) {
 	return useInfiniteQuery(
-		videoListOptions(apiFetch, q, sort, format, excludeFormat),
+		videoListOptions(apiFetch, q, sort, format, excludeFormat, tagIDs),
 	);
 }
 

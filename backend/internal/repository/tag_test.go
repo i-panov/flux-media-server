@@ -82,6 +82,14 @@ func TestMediaFormatFilter(t *testing.T) {
 	require.Equal(t, int64(1), total)
 	require.Len(t, rows, 1)
 	require.Equal(t, clip.ID, rows[0].ID)
+
+	filtered, filteredTotal, err := media.FindAll(ctx, MediaFilters{
+		Type: models.MediaTypeVideo, TagIDs: []uint{format.ID},
+	}, 20, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), filteredTotal)
+	require.Len(t, filtered, 1)
+	require.Equal(t, film.ID, filtered[0].ID)
 }
 
 func TestSystemFormatTagsSeeded(t *testing.T) {

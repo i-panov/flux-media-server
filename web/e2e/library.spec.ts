@@ -335,7 +335,9 @@ test("избранное: добавить и убрать; legacy-коллек�
 		["/memes", "Мемы"],
 	] as const) {
 		await page.goto(path);
-		await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+		await expect(
+			page.getByRole("heading", { name: heading, exact: true }),
+		).toBeVisible();
 		await expect(page.getByRole("heading", { name: "Коллекции" })).toHaveCount(
 			0,
 		);

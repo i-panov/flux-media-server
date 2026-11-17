@@ -72,6 +72,15 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 	filters.IncludeEpisodes = c.QueryBool("include_episodes", false)
 	filters.Format = strings.TrimSpace(c.Query("format"))
 	filters.ExcludeFormat = strings.TrimSpace(c.Query("exclude_format"))
+	if rawTags := strings.TrimSpace(c.Query("tag_ids")); rawTags != "" {
+		for _, part := range strings.Split(rawTags, ",") {
+			id, err := strconv.ParseUint(strings.TrimSpace(part), 10, 32)
+			if err != nil || id == 0 {
+				return response.Error(c, fiber.StatusBadRequest, "invalid tag_ids")
+			}
+			filters.TagIDs = append(filters.TagIDs, uint(id))
+		}
+	}
 	// Порядок по id: по умолчанию старый (совместимо с прежним
 	// поведением), sort=desc — новые сверху для мем-галереи.
 	if sortOrder := c.Query("sort"); sortOrder != "" {
@@ -130,7 +139,11 @@ func (h *MediaHandler) CoverFromFrame(c *fiber.Ctx) error {
 	if h.thumbSvc.GenerateCoverFromFrame(c.UserContext(), media.ID, media.FilePath) == "" {
 		return response.Error(c, fiber.StatusUnprocessableEntity, "Failed to generate cover from frame")
 	}
-	return c.JSON(fiber.Map{"cover_url": fmt.Sprintf("/api/media/%d/cover", media.ID)})
+	coverURL := fmt.Sprintf("/api/media/%d/cover", media.ID)
+	if err := h.mediaRepo.UpdateCoverURL(c.UserContext(), media.ID, coverURL); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to save cover")
+	}
+	return c.JSON(fiber.Map{"cover_url": coverURL})
 }
 
 func (h *MediaHandler) Delete(c *fiber.Ctx) error {

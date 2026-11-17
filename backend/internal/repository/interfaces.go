@@ -40,6 +40,8 @@ type MediaFilters struct {
 	Format string
 	// ExcludeFormat — исключить media с этим format-тегом.
 	ExcludeFormat string
+	// TagIDs — хотя бы один из тегов (OR). Пустой — без фильтра.
+	TagIDs []uint
 }
 
 // MediaRepository defines data access methods for Media entities.
@@ -80,6 +82,9 @@ type MediaRepository interface {
 	FindVideosMissingDimensions(ctx context.Context, limit int) ([]models.Media, error)
 	// FindMissingThumbnails — живые видео/картинки без URL превью.
 	FindMissingThumbnails(ctx context.Context, limit int) ([]models.Media, error)
+	// FindThumbnailCandidates — все видео/картинки после ID для проверки
+	// не только URL, но и фактического файла превью.
+	FindThumbnailCandidates(ctx context.Context, afterID uint, limit int) ([]models.Media, error)
 	// UpdateThumbnailURL пишет только URL превью.
 	UpdateThumbnailURL(ctx context.Context, id uint, url string) error
 	// FindAudioMissingCover — аудио без обложки, для которого извлечение

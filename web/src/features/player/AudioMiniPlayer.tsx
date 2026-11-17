@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatDuration } from "../../core/format";
+import { FavoriteButton } from "../favorites/FavoriteButton";
 import { clickNode, TVActionIcon, useTVFocusable } from "../tv/tvFocus";
 import { useAudioPlayer } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
@@ -85,6 +86,7 @@ export function AudioMiniPlayer() {
 					/>
 				</Group>
 				<Group gap={4} wrap="nowrap">
+					<FavoriteButton mediaId={current.id} type="audio" />
 					<Tooltip label={t("player.previous")} withArrow>
 						<TVActionIcon
 							focusKey="audio-mini-prev"

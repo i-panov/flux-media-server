@@ -38,6 +38,7 @@ export function AudioTrackRow({
 }) {
 	const { t } = useTranslation();
 	const player = useAudioPlayer();
+	const active = isCurrent || player.current?.id === media.id;
 	const { capabilities } = useTVMode();
 	const session = useSession();
 	const isAdmin = session.data?.is_admin === true;
@@ -93,7 +94,7 @@ export function AudioTrackRow({
 				}}
 				className={[
 					"media-row cursor-pointer rounded-md border px-3 py-2",
-					isCurrent
+					active
 						? "border-[var(--mantine-color-violet-5)] bg-[var(--mantine-color-violet-light)]"
 						: "border-[var(--mantine-color-default-border)]",
 				].join(" ")}
@@ -118,12 +119,7 @@ export function AudioTrackRow({
 					)}
 				</div>
 				<Stack gap={0} className="min-w-0 flex-1">
-					<Text
-						fw={600}
-						size="sm"
-						truncate
-						c={isCurrent ? "violet" : undefined}
-					>
+					<Text fw={600} size="sm" truncate c={active ? "violet" : undefined}>
 						{media.title}
 					</Text>
 					<Text size="xs" c="dimmed" truncate>

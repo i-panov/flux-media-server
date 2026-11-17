@@ -522,5 +522,7 @@
 	"metadata.coverFromFrameConfirm": "Заменить текущую обложку кадром из видео?",
 	"metadata.coverFromFrameDone": "Обложка создана из кадра",
 	"metadata.coverFromFrameError": "Не удалось создать обложку из кадра",
-	"tags.createInline": "Создать тег"
+	"tags.createInline": "Создать тег",
+	"video.tagsFilter": "Жанры и настроение",
+	"video.clearFilters": "Сбросить фильтры"
 }

@@ -522,5 +522,7 @@
 	"metadata.coverFromFrameConfirm": "Replace the current cover with a video frame?",
 	"metadata.coverFromFrameDone": "Cover created from frame",
 	"metadata.coverFromFrameError": "Could not create cover from frame",
-	"tags.createInline": "Create tag"
+	"tags.createInline": "Create tag",
+	"video.tagsFilter": "Genres and mood",
+	"video.clearFilters": "Clear filters"
 }

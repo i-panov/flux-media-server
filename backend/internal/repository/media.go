@@ -51,6 +51,10 @@ func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, o
 			JOIN tags t ON t.id = mt.tag_id
 			WHERE t.tag_group = ? AND t.slug = ?)`, models.TagGroupFormat, filters.ExcludeFormat)
 	}
+	if len(filters.TagIDs) > 0 {
+		query = query.Where(`media.id IN (
+			SELECT media_id FROM media_tags WHERE tag_id IN ?)`, filters.TagIDs)
+	}
 	if filters.Q != "" {
 		// Экранируем спецсимволы LIKE из пользовательского ввода: иначе
 		// «%» и «_» трактуются как шаблон, а не как литеральные символы.
@@ -206,6 +210,14 @@ func (r *MediaStore) UpdateCoverURL(ctx context.Context, id uint, url string) er
 func (r *MediaStore) SetCoverAttempted(ctx context.Context, id uint, attempted bool) error {
 	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
 		Update("cover_attempted", attempted).Error
+}
+
+func (r *MediaStore) FindThumbnailCandidates(ctx context.Context, afterID uint, limit int) ([]models.Media, error) {
+	var rows []models.Media
+	err := r.db.WithContext(ctx).
+		Where("id > ? AND type IN ?", afterID, []models.MediaType{models.MediaTypeVideo, models.MediaTypeImage}).
+		Order("id ASC").Limit(limit).Find(&rows).Error
+	return rows, err
 }
 
 func (r *MediaStore) UpdateThumbnailURL(ctx context.Context, id uint, url string) error {

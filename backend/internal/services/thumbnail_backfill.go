@@ -52,12 +52,12 @@ func BackfillAudioCovers(ctx context.Context, mediaRepo repository.MediaReposito
 // задерживать старт сервера или HTTP-запросы.
 func BackfillThumbnails(ctx context.Context, mediaRepo repository.MediaRepository, thumbSvc *ThumbnailService) int {
 	generated := 0
-	seen := map[uint]bool{}
-	for batch := 0; batch < thumbnailBackfillMaxBatches; batch++ {
+	lastID := uint(0)
+	for batch := 0; batch < 100; batch++ {
 		if ctx.Err() != nil {
 			return generated
 		}
-		rows, err := mediaRepo.FindMissingThumbnails(ctx, thumbnailBackfillBatch)
+		rows, err := mediaRepo.FindThumbnailCandidates(ctx, lastID, thumbnailBackfillBatch)
 		if err != nil {
 			log.Printf("thumb backfill: list: %v", err)
 			return generated
@@ -65,16 +65,21 @@ func BackfillThumbnails(ctx context.Context, mediaRepo repository.MediaRepositor
 		if len(rows) == 0 {
 			return generated
 		}
-		newInBatch := 0
 		for _, media := range rows {
 			if ctx.Err() != nil {
 				return generated
 			}
-			if seen[media.ID] {
+			lastID = media.ID
+			// Файл есть, даже если URL потерян — достаточно восстановить URL.
+			if thumbSvc.Exists(media.ID) {
+				if media.ThumbnailURL == "" {
+					if err := mediaRepo.UpdateThumbnailURL(ctx, media.ID,
+						fmt.Sprintf("/api/media/%d/thumb", media.ID)); err != nil {
+						log.Printf("thumb backfill: restore url %d: %v", media.ID, err)
+					}
+				}
 				continue
 			}
-			seen[media.ID] = true
-			newInBatch++
 			if thumbSvc.GenerateWithContext(ctx, media.ID, media.FilePath) == "" {
 				continue
 			}
@@ -85,7 +90,7 @@ func BackfillThumbnails(ctx context.Context, mediaRepo repository.MediaRepositor
 			}
 			generated++
 		}
-		if len(rows) < thumbnailBackfillBatch || newInBatch == 0 {
+		if len(rows) < thumbnailBackfillBatch {
 			return generated
 		}
 	}

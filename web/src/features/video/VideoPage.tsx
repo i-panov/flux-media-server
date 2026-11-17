@@ -2,6 +2,7 @@ import {
 	Alert,
 	Button,
 	Group,
+	MultiSelect,
 	SegmentedControl,
 	SimpleGrid,
 	Stack,
@@ -14,6 +15,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVideoList } from "../../api/media";
+import { useTags } from "../../api/tags";
 import { CardGridSkeletons } from "../../components/CardGridSkeletons";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useVisibleMedia } from "../../hooks/useVisibleMedia";
@@ -216,6 +218,8 @@ function MoviesContent({
 	const { t } = useTranslation();
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<"desc" | "asc">("desc");
+	const [tagIDs, setTagIDs] = useState<string[]>([]);
+	const tags = useTags();
 	const debounced = useDebouncedValue(query);
 	const { targetRef: searchRef } = useTVFocusable<HTMLInputElement>(
 		"video-search",
@@ -229,7 +233,14 @@ function MoviesContent({
 		undefined,
 		{ secondary: true },
 	);
-	const list = useVideoList(debounced, sort, format, excludeFormat);
+	const selectedTagIDs = tagIDs.map(Number);
+	const list = useVideoList(
+		debounced,
+		sort,
+		format,
+		excludeFormat,
+		selectedTagIDs,
+	);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const visibleItems = useVisibleMedia("video", items, debounced !== "");
 
@@ -246,6 +257,22 @@ function MoviesContent({
 					}}
 					w={{ base: "100%", sm: 320 }}
 				/>
+				<MultiSelect
+					label={t("video.tagsFilter")}
+					data={(tags.data ?? [])
+						.filter((tag) => tag.group === "genre" || tag.group === "mood")
+						.map((tag) => ({ value: String(tag.id), label: tag.name }))}
+					value={tagIDs}
+					onChange={setTagIDs}
+					clearable
+					searchable
+					w={{ base: "100%", sm: 280 }}
+				/>
+				{tagIDs.length > 0 && (
+					<Button variant="subtle" size="xs" onClick={() => setTagIDs([])}>
+						{t("video.clearFilters")}
+					</Button>
+				)}
 				<div ref={sortRef} tabIndex={tvMode ? -1 : undefined}>
 					<SegmentedControl
 						size="xs"
