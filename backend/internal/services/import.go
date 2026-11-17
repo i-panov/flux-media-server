@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -62,12 +63,44 @@ func (s *ImportService) Start(req ImportRequest) (*models.ImportJob, error) {
 	if err := s.imports.Create(context.Background(), job, episodes); err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	// Верхний предел: зависший media-loader не должен держать задачу вечно.
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
 	s.mu.Lock()
 	s.running[job.ID] = cancel
 	s.mu.Unlock()
 	go s.run(ctx, job, req, episodes)
 	return job, nil
+}
+
+// RecoverStale помечает незавершённые задания ошибкой после рестарта:
+// их рабочие горутины потеряны, и UI иначе опрашивает их бесконечно.
+func (s *ImportService) RecoverStale(ctx context.Context) error {
+	jobs, err := s.imports.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, job := range jobs {
+		if job.Status == models.ImportQueued || job.Status == models.ImportDownloading ||
+			job.Status == models.ImportImporting {
+			if err := s.imports.Update(ctx, job.ID, map[string]any{
+				"status": models.ImportError,
+				"error":  "прервано перезапуском сервера",
+			}); err != nil {
+				return err
+			}
+			if _, episodes, err := s.imports.Get(ctx, job.ID); err == nil {
+				for _, episode := range episodes {
+					if episode.Status == models.ImportEpisodeQueued {
+						_ = s.imports.UpdateEpisode(ctx, episode.ID, map[string]any{
+							"status": models.ImportEpisodeError,
+							"error":  "прервано перезапуском сервера",
+						})
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (s *ImportService) Cancel(id uint) bool {
@@ -111,6 +144,23 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 		if !ok {
 			// Серия не выбрана: файл остался в кэше media-loader.
 			return nil
+		}
+		if item.DownloadURL == "" {
+			failed++
+			message := item.Error
+			if message == "" {
+				message = "media loader did not produce this episode"
+			}
+			_ = s.imports.UpdateEpisode(ctx, episode.ID, map[string]any{
+				"status": models.ImportEpisodeError, "error": message,
+			})
+			_ = s.imports.Update(ctx, job.ID, map[string]any{
+				"episodes_done": done, "episodes_error": failed,
+			})
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 		mediaID, err := s.loader.ImportDownload(ctx, item.DownloadURL, item.Filename, "video/mp4")
 		if err != nil {
@@ -195,6 +245,15 @@ func (s *ImportService) ensureWork(ctx context.Context, job *models.ImportJob, r
 	}
 	if title == "" {
 		title = "Импорт " + req.SeriesID
+	}
+	// Повторный импорт следующего сезона должен дополнять существующий
+	// сериал, а не создавать второй с тем же названием.
+	if existing, found, err := s.works.FindSeriesByTitle(ctx, title); err != nil {
+		if !errors.Is(err, repository.ErrWorkTitleRequired) {
+			return 0, err
+		}
+	} else if found && existing != nil {
+		return existing.ID, nil
 	}
 	work := models.Work{Kind: models.WorkKindSeries, Title: title}
 	if err := s.works.Create(ctx, &work); err != nil {

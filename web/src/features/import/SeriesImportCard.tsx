@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	type ImportProbe,
+	useCancelImport,
 	useImportJob,
 	useImportJobs,
 	useImportProbe,
@@ -73,6 +74,7 @@ export function SeriesImportCard() {
 	const [jobID, setJobID] = useState<number | null>(null);
 	const probeMutation = useImportProbe();
 	const start = useStartImport();
+	const cancel = useCancelImport();
 	const jobs = useImportJobs();
 
 	const seasons = useMemo(() => {
@@ -119,11 +121,13 @@ export function SeriesImportCard() {
 			.filter((item) => selected.has(keyOf(item.season, item.episode)))
 			.map((item) => ({ season: item.season, episode: item.episode }));
 		if (episodes.length === 0) return;
+		// Сезонный scope, если выбраны серии одного сезона: media-loader
+		// не должен скачивать весь сериал ради одного сезона.
 		const multiSeason = new Set(episodes.map((item) => item.season)).size > 1;
 		start.mutate(
 			{
 				url: url.trim(),
-				scope: multiSeason || probe.kind === "series" ? "series" : "season",
+				scope: multiSeason ? "series" : "season",
 				title: probe.title,
 				seriesID: probe.series_id,
 				episodes,
@@ -158,7 +162,10 @@ export function SeriesImportCard() {
 					</Button>
 				</Group>
 				{error !== null && <Alert color="red">{error}</Alert>}
-				{probe !== null && (
+				{probe !== null && probe.kind === "episode" && (
+					<Alert color="yellow">{t("import.singleVideo")}</Alert>
+				)}
+				{probe !== null && probe.kind === "series" && (
 					<Stack gap="xs">
 						<Text fw={600}>{probe.title}</Text>
 						{seasons.map(([seasonNumber, episodes]) => (
@@ -213,7 +220,19 @@ export function SeriesImportCard() {
 						</Group>
 					</Stack>
 				)}
-				{jobID !== null && <ImportProgress id={jobID} />}
+				{jobID !== null && (
+					<>
+						<ImportProgress id={jobID} />
+						<Button
+							size="xs"
+							variant="subtle"
+							color="red"
+							onClick={() => cancel.mutate(jobID)}
+						>
+							{t("import.cancel")}
+						</Button>
+					</>
+				)}
 				{(jobs.data ?? []).length > 0 && (
 					<Stack gap={4}>
 						<Text size="sm" fw={600}>

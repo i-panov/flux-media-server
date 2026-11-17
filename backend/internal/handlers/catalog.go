@@ -316,7 +316,11 @@ func (h *CatalogHandler) ReorderFilmItems(c *fiber.Ctx) error {
 }
 
 func (h *CatalogHandler) ListFranchises(c *fiber.Ctx) error {
-	rows, err := h.franchises.List(c.UserContext())
+	tagIDs, err := parseTagIDs(c.Query("tag_ids"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "invalid tag_ids")
+	}
+	rows, err := h.franchises.List(c.UserContext(), tagIDs...)
 	if err != nil {
 		return h.mapError(c, err)
 	}

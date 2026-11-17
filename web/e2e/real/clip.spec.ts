@@ -60,11 +60,11 @@ test("реальная обрезка: фрагмент создаётся и о
 	const clipped = (await output.json()) as {
 		id: number;
 		duration: number;
-		source_media_id?: number;
+		clip_source_media_id?: number;
 		title: string;
 	};
 	expect(clipped.id).not.toBe(SOURCE_MEDIA_ID);
-	expect(clipped.source_media_id).toBe(SOURCE_MEDIA_ID);
+	expect(clipped.clip_source_media_id).toBe(SOURCE_MEDIA_ID);
 	expect(clipped.title).toBe("E2E фрагмент");
 	expect(clipped.duration).toBeGreaterThanOrEqual(1);
 	expect(clipped.duration).toBeLessThanOrEqual(2);

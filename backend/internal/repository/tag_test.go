@@ -150,3 +150,29 @@ func TestClipRangeValidation(t *testing.T) {
 		t.Fatalf("unexpected duration")
 	}
 }
+
+func TestFranchiseTagFilter(t *testing.T) {
+	db := setupCatalogDB(t)
+	tags := NewTagRepository(db)
+	franchises := NewFranchiseRepository(db)
+	ctx := context.Background()
+	drama := models.Tag{Group: models.TagGroupGenre, Slug: "drama-filter", Name: "Драма"}
+	comedy := models.Tag{Group: models.TagGroupGenre, Slug: "comedy-filter", Name: "Комедия"}
+	require.NoError(t, tags.Create(ctx, &drama))
+	require.NoError(t, tags.Create(ctx, &comedy))
+	first := models.Franchise{Name: "Первая"}
+	second := models.Franchise{Name: "Вторая"}
+	require.NoError(t, franchises.Create(ctx, &first))
+	require.NoError(t, franchises.Create(ctx, &second))
+	require.NoError(t, tags.SetFranchiseTags(ctx, first.ID, []uint{drama.ID}))
+	require.NoError(t, tags.SetFranchiseTags(ctx, second.ID, []uint{comedy.ID}))
+
+	rows, err := franchises.List(ctx, drama.ID)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, first.ID, rows[0].ID)
+
+	rows, err = franchises.List(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+}

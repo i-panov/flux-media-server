@@ -93,8 +93,8 @@ type MediaRepository interface {
 	// SetCoverAttempted фиксирует попытку извлечения встроенной обложки.
 	SetCoverAttempted(ctx context.Context, id uint, attempted bool) error
 	UpdateCoverURL(ctx context.Context, id uint, url string) error
-	// SetSourceMediaID помечает медиа как производное от другого.
-	SetSourceMediaID(ctx context.Context, id, sourceID uint) error
+	// SetClipSourceMediaID помечает медиа как фрагмент другого медиа.
+	SetClipSourceMediaID(ctx context.Context, id, sourceID uint) error
 	CountMissingThumbnails(ctx context.Context) (int64, error)
 	CountMissingCovers(ctx context.Context) (int64, error)
 	// UpdateDimensions записывает ТОЛЬКО размеры кадра, ничего не

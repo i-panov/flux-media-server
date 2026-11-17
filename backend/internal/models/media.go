@@ -66,7 +66,12 @@ type Media struct {
 	// Индекс обычный, НЕ unique: soft-deleted строки остаются в таблице,
 	// и unique заблокировал бы повторное извлечение после удаления трека.
 	// Гонки закрыты дедупом in-flight джобов в ExtractService.
-	SourceMediaID *uint          `gorm:"index" json:"source_media_id,omitempty"`
+	SourceMediaID *uint `gorm:"index" json:"source_media_id,omitempty"`
+	// ClipSourceMediaID — ID медиа, из которого вырезан этот фрагмент
+	// (POST /api/media/:id/clip). Отдельно от SourceMediaID: тот означает
+	// «аудиодорожка, извлечённая из видео», и смешивать их нельзя —
+	// экран видео искал бы видеоклип вместо трека.
+	ClipSourceMediaID *uint `gorm:"index" json:"clip_source_media_id,omitempty"`
 	MetadataID    *uint          `json:"metadata_id,omitempty"`
 	Metadata      *Metadata      `json:"metadata,omitempty"`
 	CreatedAt     time.Time      `json:"created_at"`

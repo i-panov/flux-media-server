@@ -8,13 +8,14 @@ import {
 	Text,
 	Tooltip,
 } from "@mantine/core";
-import { MoreVertical, Music, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Music, Pencil, Scissors, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDeleteMedia, useMediaReload } from "../../api/media";
 import { useSession } from "../../api/session";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
+import { ClipDialog } from "../clip/ClipDialog";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { ChangeCoverButton } from "../media/ChangeCoverButton";
 import { EditMetadataModal } from "../media/EditMetadataModal";
@@ -46,6 +47,7 @@ export function AudioTrackRow({
 	const remove = useDeleteMedia();
 	const [deleteOpened, setDeleteOpened] = useState(false);
 	const [editOpened, setEditOpened] = useState(false);
+	const [clipOpened, setClipOpened] = useState(false);
 	const startPlayback = () => {
 		if (onPlay !== undefined) {
 			onPlay();
@@ -157,6 +159,14 @@ export function AudioTrackRow({
 							{isAdmin && capabilities.canChangeCover && (
 								<ChangeCoverButton mediaId={media.id} asMenuItem />
 							)}
+							{isAdmin && capabilities.canEditMetadata && (
+								<Menu.Item
+									leftSection={<Scissors size={16} />}
+									onClick={() => setClipOpened(true)}
+								>
+									{t("clip.submit")}
+								</Menu.Item>
+							)}
 							{showDelete && capabilities.canDelete && (
 								<Menu.Item
 									color="red"
@@ -170,6 +180,9 @@ export function AudioTrackRow({
 					</Menu>
 				</Group>
 			</Group>
+			{clipOpened && (
+				<ClipDialog media={media} opened onClose={() => setClipOpened(false)} />
+			)}
 			<Modal
 				opened={deleteOpened}
 				onClose={() => setDeleteOpened(false)}

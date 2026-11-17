@@ -367,9 +367,15 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	tagHandler := handlers.NewTagHandler(tagRepo)
 	clipRepo := repository.NewClipRepository(db)
 	clipSvc := services.NewClipService(clipRepo, mediaRepo, cfg.Storage.OriginalsDir, transcodeQueue, uploadQueue)
+	if err := clipSvc.RecoverStale(context.Background()); err != nil {
+		log.Printf("clips: recover stale tasks: %v", err)
+	}
 	clipHandler := handlers.NewClipHandler(clipRepo, clipSvc)
 	importRepo := repository.NewImportRepository(db)
 	importSvc := services.NewImportService(mediaLoader, workRepo, importRepo)
+	if err := importSvc.RecoverStale(context.Background()); err != nil {
+		log.Printf("import: recover stale jobs: %v", err)
+	}
 	importHandler := handlers.NewImportHandler(mediaLoader, importRepo, importSvc)
 	maintenanceSvc := services.NewMediaMaintenanceService(mediaRepo, thumbSvc)
 	maintenanceHandler := handlers.NewMaintenanceHandler(mediaRepo, maintenanceSvc)

@@ -594,6 +594,9 @@ type CollectionEpisode struct {
 	Title       string
 	Filename    string
 	DownloadURL string
+	// Status — статус серии в манифесте (ready/failed/expired/queued).
+	Status string
+	Error  string
 }
 
 // RunCollection просит media-loader скачать сезон/сериал целиком и
@@ -662,8 +665,8 @@ func (m *MediaLoader) RunCollection(
 				Stage   string  `json:"stage"`
 			} `json:"progress"`
 			Episodes []struct {
-				Season      int    `json:"season"`
-				Episode     int    `json:"episode"`
+				Season      *int   `json:"season"`
+				Episode     *int   `json:"episode"`
 				Title       string `json:"title"`
 				Status      string `json:"status"`
 				Filename    string `json:"filename"`
@@ -692,16 +695,25 @@ func (m *MediaLoader) RunCollection(
 				return ctx.Err()
 			}
 		case http.StatusOK:
-			for _, episode := range out.Episodes {
-				if episode.DownloadURL == "" {
-					continue
+			// Отдаём каждую серию, включая неудачные: иначе импорт
+			// молча теряет частичный результат media-loader.
+			for index, episode := range out.Episodes {
+				season := 1
+				if episode.Season != nil && *episode.Season > 0 {
+					season = *episode.Season
+				}
+				number := index + 1
+				if episode.Episode != nil && *episode.Episode > 0 {
+					number = *episode.Episode
 				}
 				if err := ready(CollectionEpisode{
-					Season:      episode.Season,
-					Episode:     episode.Episode,
+					Season:      season,
+					Episode:     number,
 					Title:       episode.Title,
 					Filename:    episode.Filename,
 					DownloadURL: episode.DownloadURL,
+					Status:      episode.Status,
+					Error:       episode.Error,
 				}); err != nil {
 					return err
 				}
@@ -812,8 +824,8 @@ func (m *MediaLoader) probeScope(ctx context.Context, rawURL, scope string) (*Se
 		} `json:"series"`
 		Seasons  []int `json:"seasons"`
 		Episodes []struct {
-			Season   int    `json:"season"`
-			Episode  int    `json:"episode"`
+			Season   *int   `json:"season"`
+			Episode  *int   `json:"episode"`
 			Title    string `json:"title"`
 			Duration int    `json:"duration"`
 		} `json:"episodes"`
@@ -832,9 +844,17 @@ func (m *MediaLoader) probeScope(ctx context.Context, rawURL, scope string) (*Se
 			Scope:    scope,
 			Seasons:  out.Seasons,
 		}
-		for _, episode := range out.Episodes {
+		for index, episode := range out.Episodes {
+			season := 1
+			if episode.Season != nil && *episode.Season > 0 {
+				season = *episode.Season
+			}
+			number := index + 1
+			if episode.Episode != nil && *episode.Episode > 0 {
+				number = *episode.Episode
+			}
 			result.Episodes = append(result.Episodes, ProbeEpisode{
-				Season: episode.Season, Episode: episode.Episode,
+				Season: season, Episode: number,
 				Title: episode.Title, Duration: episode.Duration,
 			})
 		}

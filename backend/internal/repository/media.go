@@ -202,9 +202,9 @@ func (r *MediaStore) FindAudioMissingCover(ctx context.Context, limit int) ([]mo
 	return rows, err
 }
 
-func (r *MediaStore) SetSourceMediaID(ctx context.Context, id, sourceID uint) error {
+func (r *MediaStore) SetClipSourceMediaID(ctx context.Context, id, sourceID uint) error {
 	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
-		Update("source_media_id", sourceID).Error
+		Update("clip_source_media_id", sourceID).Error
 }
 
 func (r *MediaStore) CountMissingThumbnails(ctx context.Context) (int64, error) {
@@ -316,7 +316,9 @@ func (r *MediaStore) FindBySourceMediaID(ctx context.Context, mediaID uint) (*mo
 	var media models.Media
 	// Детерминированный порядок: дублей быть не должно (дедуп очереди),
 	// но без Order при дубле вернулся бы произвольный.
-	err := r.db.WithContext(ctx).Where("source_media_id = ?", mediaID).Order("id").First(&media).Error
+	err := r.db.WithContext(ctx).
+		Where("source_media_id = ? AND type = ?", mediaID, models.MediaTypeAudio).
+		Order("id").First(&media).Error
 	return &media, err
 }
 

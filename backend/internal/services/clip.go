@@ -84,6 +84,24 @@ func (s *ClipService) Start(ctx context.Context, mediaID uint, start, end float6
 	return task, nil
 }
 
+// RecoverStale помечает незавершённые задачи ошибкой после рестарта.
+func (s *ClipService) RecoverStale(ctx context.Context) error {
+	tasks, err := s.clips.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, task := range tasks {
+		if task.Status == models.ClipQueued || task.Status == models.ClipProcessing {
+			if err := s.clips.Update(ctx, task.ID, map[string]any{
+				"status": models.ClipError, "error": "прервано перезапуском сервера",
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (s *ClipService) Cancel(id uint) bool {
 	s.mu.Lock()
 	cancel, ok := s.running[id]
@@ -155,7 +173,7 @@ func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *mo
 			s.fail(task, err)
 			return
 		}
-		mediaID = s.waitTranscode(jobID)
+		mediaID = s.waitTranscode(ctx, jobID)
 	} else {
 		jobID, err := s.upload.Enqueue(UploadJobInput{
 			FilePath: finalPath, Filename: filepath.Base(finalPath),
@@ -165,13 +183,19 @@ func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *mo
 			s.fail(task, err)
 			return
 		}
-		mediaID = s.waitUpload(jobID)
+		mediaID = s.waitUpload(ctx, jobID)
 	}
 	if mediaID == 0 {
+		if ctx.Err() != nil {
+			_ = s.clips.Update(context.Background(), task.ID, map[string]any{
+				"status": models.ClipError, "error": "cancelled",
+			})
+			return
+		}
 		s.fail(task, fmt.Errorf("media was not created"))
 		return
 	}
-	_ = s.media.SetSourceMediaID(context.Background(), mediaID, source.ID)
+	_ = s.media.SetClipSourceMediaID(context.Background(), mediaID, source.ID)
 	_, _ = s.media.PatchMetadata(context.Background(), mediaID, repository.MetadataPatch{
 		Title: &task.Title,
 	})
@@ -197,9 +221,12 @@ func (s *ClipService) ffmpegArgs(source *models.Media, task *models.ClipTask, ou
 	return args
 }
 
-func (s *ClipService) waitTranscode(id uint64) uint {
+func (s *ClipService) waitTranscode(ctx context.Context, id uint64) uint {
 	deadline := time.Now().Add(2 * time.Hour)
 	for time.Now().Before(deadline) {
+		if ctx.Err() != nil {
+			return 0
+		}
 		if snap, ok := s.transcode.Get(id); ok {
 			switch snap.Status {
 			case TranscodeTaskDone:
@@ -213,9 +240,12 @@ func (s *ClipService) waitTranscode(id uint64) uint {
 	return 0
 }
 
-func (s *ClipService) waitUpload(id uint64) uint {
+func (s *ClipService) waitUpload(ctx context.Context, id uint64) uint {
 	deadline := time.Now().Add(30 * time.Minute)
 	for time.Now().Before(deadline) {
+		if ctx.Err() != nil {
+			return 0
+		}
 		if snap, ok := s.upload.Status(id); ok {
 			switch snap.Status {
 			case UploadJobDone:

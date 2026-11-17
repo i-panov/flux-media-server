@@ -68,22 +68,32 @@ export function UploadPage() {
 		Number(targetWorkID ?? 0),
 		targetWorkID !== null,
 	);
+	const targetIncomplete =
+		type === "video" &&
+		((targetKind === "series" &&
+			(targetWorkID === null || targetSeasonID === null)) ||
+			(targetKind === "film_series" && targetWorkID === null) ||
+			(targetKind === "franchise" && targetFranchiseID === null));
 	const uploadTarget: UploadTarget =
-		targetKind === "series" && targetWorkID !== null && targetSeasonID !== null
-			? {
-					kind: "series",
-					workID: Number(targetWorkID),
-					seasonID: Number(targetSeasonID),
-					episodeNumber:
-						targetEpisode === ""
-							? undefined
-							: Number.parseInt(String(targetEpisode), 10) || undefined,
-				}
-			: targetKind === "film_series" && targetWorkID !== null
-				? { kind: "film_series", workID: Number(targetWorkID) }
-				: targetKind === "franchise" && targetFranchiseID !== null
-					? { kind: "franchise", franchiseID: Number(targetFranchiseID) }
-					: { kind: "standalone" };
+		type === "video"
+			? targetKind === "series" &&
+				targetWorkID !== null &&
+				targetSeasonID !== null
+				? {
+						kind: "series",
+						workID: Number(targetWorkID),
+						seasonID: Number(targetSeasonID),
+						episodeNumber:
+							targetEpisode === ""
+								? undefined
+								: Number.parseInt(String(targetEpisode), 10) || undefined,
+					}
+				: targetKind === "film_series" && targetWorkID !== null
+					? { kind: "film_series", workID: Number(targetWorkID) }
+					: targetKind === "franchise" && targetFranchiseID !== null
+						? { kind: "franchise", franchiseID: Number(targetFranchiseID) }
+						: { kind: "standalone" }
+			: { kind: "standalone" };
 	const [createOpened, setCreateOpened] = useState(false);
 	const collections = useCollections(LEGACY_COLLECTIONS_ENABLED);
 	const {
@@ -103,6 +113,12 @@ export function UploadPage() {
 	const changeType = (value: string) => {
 		const next = value as UploadType;
 		setCollectionId(null);
+		if (next !== "video") {
+			setTargetKind("standalone");
+			setTargetWorkID(null);
+			setTargetSeasonID(null);
+			setTargetFranchiseID(null);
+		}
 		void navigate({ to: "/upload", search: { type: next }, replace: true });
 	};
 
@@ -256,6 +272,11 @@ export function UploadPage() {
 									onChange={setTargetWorkID}
 									searchable
 								/>
+							)}
+							{targetIncomplete && (
+								<Alert color="yellow" variant="light">
+									{t("upload.target.incomplete")}
+								</Alert>
 							)}
 							{targetKind === "franchise" && (
 								<Select

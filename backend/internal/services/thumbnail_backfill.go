@@ -53,7 +53,9 @@ func BackfillAudioCovers(ctx context.Context, mediaRepo repository.MediaReposito
 func BackfillThumbnails(ctx context.Context, mediaRepo repository.MediaRepository, thumbSvc *ThumbnailService) int {
 	generated := 0
 	lastID := uint(0)
-	for batch := 0; batch < 100; batch++ {
+	// Без верхнего предела по числу батчей: большие библиотеки должны
+	// доходить до конца. Ограничение — контекст (отмена/остановка).
+	for {
 		if ctx.Err() != nil {
 			return generated
 		}
@@ -94,5 +96,4 @@ func BackfillThumbnails(ctx context.Context, mediaRepo repository.MediaRepositor
 			return generated
 		}
 	}
-	return generated
 }

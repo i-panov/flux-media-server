@@ -75,6 +75,8 @@ export function useStartImport() {
 			}),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["import"] });
+			void queryClient.invalidateQueries({ queryKey: ["works"] });
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
 		},
 	});
 }
@@ -117,6 +119,8 @@ export function useCancelImport() {
 			apiFetch<void>(`/import/${id}`, { method: "DELETE" }),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["import"] });
+			void queryClient.invalidateQueries({ queryKey: ["works"] });
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
 		},
 	});
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"flux/internal/models"
 
@@ -95,6 +96,26 @@ func loadWorkTags(db *gorm.DB, workID uint) ([]models.Tag, error) {
 		Where("work_tags.work_id = ?", workID).
 		Order("tags.tag_group ASC, tags.name ASC").Find(&tags).Error
 	return tags, err
+}
+
+// FindSeriesByTitle ищет сериал по точному названию без учёта регистра.
+// Нужен импорту: повторный сезон дополняет существующий сериал.
+func (r *WorkStore) FindSeriesByTitle(ctx context.Context, title string) (*models.Work, bool, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, false, ErrWorkTitleRequired
+	}
+	var work models.Work
+	err := r.db.WithContext(ctx).
+		Where("kind = ? AND LOWER(TRIM(title)) = LOWER(?)", models.WorkKindSeries, title).
+		Order("id").First(&work).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return &work, true, nil
 }
 
 // Get загружает work с сезонами, эпизодами и фильмами film_series.

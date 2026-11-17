@@ -33,6 +33,7 @@ export function MediaPicker({
 	const list = useVideoList(query, "desc");
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 
+	const currentLabel = value === null ? "" : selectedLabel || `#${value}`;
 	const select = (id: string, title: string) => {
 		onChange(id);
 		setSelectedLabel(title);
@@ -46,8 +47,7 @@ export function MediaPicker({
 			</Text>
 			<Group gap="xs">
 				<Button variant="default" onClick={() => setOpened(true)}>
-					{selectedLabel ||
-						(value === null ? t("catalog.admin.pickVideo") : `#${value}`)}
+					{currentLabel === "" ? t("catalog.admin.pickVideo") : currentLabel}
 				</Button>
 				{value !== null && (
 					<Button
