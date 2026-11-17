@@ -33,16 +33,27 @@ type TargetKind = "series" | "film_series";
 function WorkOption({
 	title,
 	year,
+	selected,
 	onClick,
 }: {
 	title: string;
 	year: number;
+	selected: boolean;
 	onClick: () => void;
 }) {
 	return (
 		<UnstyledButton
 			onClick={onClick}
+			aria-pressed={selected}
 			className="w-full rounded-md border p-3 text-left"
+			style={{
+				// Инлайн: Mantine задаёт background-color для UnstyledButton
+				// вне Tailwind-слоёв, и utility-класс проигрывает.
+				backgroundColor: selected
+					? "var(--mantine-color-violet-light)"
+					: undefined,
+				borderColor: selected ? "var(--mantine-color-violet-5)" : undefined,
+			}}
 		>
 			<Text fw={600} lineClamp={2}>
 				{title}
@@ -103,18 +114,19 @@ function WorkPicker({
 					{t("catalog.emptySeries")}
 				</Text>
 			) : (
-				<ScrollArea h={260}>
+				<ScrollArea.Autosize mah={260}>
 					<SimpleGrid cols={2} spacing="xs">
 						{rows.map((work) => (
 							<WorkOption
 								key={work.id}
 								title={work.title}
 								year={work.year}
+								selected={selected === work.id}
 								onClick={() => onSelect(work.id)}
 							/>
 						))}
 					</SimpleGrid>
-				</ScrollArea>
+				</ScrollArea.Autosize>
 			)}
 			{selected !== null && (
 				<Text size="xs" c="dimmed">
