@@ -212,19 +212,29 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 	}
 
 	markRemaining := func(message string) {
-		for i := range episodes {
-			if episodes[i].Status != models.ImportEpisodeQueued {
-				continue
-			}
-			_ = s.imports.UpdateEpisode(context.Background(), episodes[i].ID, map[string]any{
-				"status": models.ImportEpisodeError, "error": message,
-			})
-			if byKey[[2]int{episodes[i].Season, episodes[i].Episode}] != nil {
-				failed++
+		// Статусы в срезе не обновляются, поэтому перечитываем из БД:
+		// иначе уже готовые серии затёрлись бы ошибкой.
+		_, current, err := s.imports.Get(context.Background(), job.ID)
+		if err != nil {
+			return
+		}
+		pending, doneCount, failedCount := 0, 0, 0
+		for i := range current {
+			switch current[i].Status {
+			case models.ImportEpisodeQueued:
+				pending++
+				_ = s.imports.UpdateEpisode(context.Background(), current[i].ID, map[string]any{
+					"status": models.ImportEpisodeError, "error": message,
+				})
+				failedCount++
+			case models.ImportEpisodeDone:
+				doneCount++
+			case models.ImportEpisodeError:
+				failedCount++
 			}
 		}
 		_ = s.imports.Update(context.Background(), job.ID, map[string]any{
-			"episodes_done": done, "episodes_error": failed,
+			"episodes_done": doneCount, "episodes_error": failedCount,
 		})
 	}
 
@@ -246,6 +256,9 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 	}
 	if ctx.Err() != nil {
 		markRemaining("cancelled")
+		_ = s.imports.Update(context.Background(), job.ID, map[string]any{
+			"status": models.ImportError, "error": "cancelled",
+		})
 		return
 	}
 	status := models.ImportDone

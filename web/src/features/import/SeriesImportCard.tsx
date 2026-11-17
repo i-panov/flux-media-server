@@ -32,7 +32,11 @@ function ImportProgress({ id }: { id: number }) {
 	const detail = useImportJob(id);
 	const jobStatus = detail.data?.job.status;
 	useEffect(() => {
-		if (jobStatus === "done" || jobStatus === "partial") {
+		if (
+			jobStatus === "done" ||
+			jobStatus === "partial" ||
+			jobStatus === "error"
+		) {
 			void queryClient.invalidateQueries({ queryKey: ["works"] });
 			void queryClient.invalidateQueries({ queryKey: ["media"] });
 		}

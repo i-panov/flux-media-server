@@ -59,3 +59,23 @@ func TestClipSourceDoesNotShadowExtractedAudio(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, extracted.ID, found.ID)
 }
+
+func TestClipCancelIgnoresFinishedTask(t *testing.T) {
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+	task := models.ClipTask{
+		SourceMediaID: 1, StartSeconds: 0, EndSeconds: 1,
+		Status: models.ClipDone, OutputMediaID: 42,
+	}
+	require.NoError(t, db.Create(&task).Error)
+	service := NewClipService(
+		repository.NewClipRepository(db), repository.NewMediaRepository(db),
+		filepath.Join(t.TempDir(), "originals"), nil, nil,
+	)
+	require.False(t, service.Cancel(task.ID))
+	stored, err := repository.NewClipRepository(db).Get(context.Background(), task.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.ClipDone, stored.Status)
+	require.Equal(t, uint(42), stored.OutputMediaID)
+}
