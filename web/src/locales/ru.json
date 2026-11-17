@@ -566,5 +566,14 @@
 	"import.episode.queued": "в очереди",
 	"import.episode.done": "добавлена",
 	"import.episode.skipped": "пропущена",
-	"import.episode.error": "ошибка"
+	"import.episode.error": "ошибка",
+	"clip.title": "Обрезка фрагмента",
+	"clip.name": "Название фрагмента",
+	"clip.setStart": "Начало здесь",
+	"clip.setEnd": "Конец здесь",
+	"clip.preview": "Предпросмотр",
+	"clip.submit": "Обрезать",
+	"clip.processing": "Обрезка выполняется…",
+	"clip.done": "Фрагмент создан и добавлен в библиотеку",
+	"clip.error": "Не удалось обрезать фрагмент"
 }

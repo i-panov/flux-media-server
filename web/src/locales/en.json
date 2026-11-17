@@ -566,5 +566,14 @@
 	"import.episode.queued": "queued",
 	"import.episode.done": "added",
 	"import.episode.skipped": "skipped",
-	"import.episode.error": "error"
+	"import.episode.error": "error",
+	"clip.title": "Trim fragment",
+	"clip.name": "Fragment title",
+	"clip.setStart": "Set start",
+	"clip.setEnd": "Set end",
+	"clip.preview": "Preview",
+	"clip.submit": "Trim",
+	"clip.processing": "Trimming…",
+	"clip.done": "Fragment created and added to the library",
+	"clip.error": "Could not trim fragment"
 }

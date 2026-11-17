@@ -365,6 +365,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	catalogHandler := handlers.NewCatalogHandler(workRepo, franchiseRepo)
 	tagRepo := repository.NewTagRepository(db)
 	tagHandler := handlers.NewTagHandler(tagRepo)
+	clipRepo := repository.NewClipRepository(db)
+	clipSvc := services.NewClipService(clipRepo, mediaRepo, cfg.Storage.OriginalsDir, transcodeQueue, uploadQueue)
+	clipHandler := handlers.NewClipHandler(clipRepo, clipSvc)
 	importRepo := repository.NewImportRepository(db)
 	importSvc := services.NewImportService(mediaLoader, workRepo, importRepo)
 	importHandler := handlers.NewImportHandler(mediaLoader, importRepo, importSvc)
@@ -778,6 +781,11 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	api.Get("/import", requireAdmin, importHandler.List)
 	api.Get("/import/:id", requireAdmin, importHandler.Get)
 	api.Delete("/import/:id", requireAdmin, importHandler.Cancel)
+
+	api.Post("/media/:id/clip", requireAdmin, clipHandler.Create)
+	api.Get("/clips", requireAdmin, clipHandler.List)
+	api.Get("/clips/:id", requireAdmin, clipHandler.Get)
+	api.Delete("/clips/:id", requireAdmin, clipHandler.Cancel)
 
 	api.Get("/tags", readRateLimiter, tagHandler.List)
 	api.Post("/tags", requireAdmin, tagHandler.Create)

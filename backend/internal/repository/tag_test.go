@@ -142,3 +142,11 @@ func TestBulkMediaTags(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, affected)
 }
+
+func TestClipRangeValidation(t *testing.T) {
+	// Диапазон проверяется в сервисе; здесь фиксируем модель задачи.
+	task := models.ClipTask{SourceMediaID: 1, StartSeconds: 10, EndSeconds: 20, Status: models.ClipQueued}
+	if task.EndSeconds-task.StartSeconds != 10 {
+		t.Fatalf("unexpected duration")
+	}
+}

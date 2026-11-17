@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "../../api/session";
 import type { Media } from "../../core/media";
 import { AddToCatalogButton } from "../catalog/AddToCatalogButton";
+import { ClipDialog } from "../clip/ClipDialog";
 import { TagEditor } from "../tags/TagEditor";
 import { useTVMode } from "../tv/useTVMode";
 import { ExtractAudioSection } from "../video/ExtractAudioSection";
@@ -29,6 +30,7 @@ export function MediaAdminActions({
 	const session = useSession();
 	const { capabilities } = useTVMode();
 	const [editOpened, setEditOpened] = useState(false);
+	const [clipOpened, setClipOpened] = useState(false);
 
 	// Read-only профиль (ТВ) скрывает write-действия даже админу;
 	// возможности берём из capability-слоя, а не из одного tvMode.
@@ -61,6 +63,11 @@ export function MediaAdminActions({
 					{canChangeCover && media.type === "video" && (
 						<CoverFromFrameButton mediaId={media.id} />
 					)}
+					{canEdit && (media.type === "video" || media.type === "audio") && (
+						<Button variant="light" onClick={() => setClipOpened(true)}>
+							{t("clip.submit")}
+						</Button>
+					)}
 					{canDelete && (
 						<DeleteMediaButton mediaId={media.id} backPath={backPath} />
 					)}
@@ -75,6 +82,9 @@ export function MediaAdminActions({
 			{/* Модалка монтируется только на время открытия: «Отмена»
 			выбрасывает черновик, повторное открытие показывает данные
 			медиа. При ошибке сети opened остаётся true — введённое живёт. */}
+			{clipOpened && (
+				<ClipDialog media={media} opened onClose={() => setClipOpened(false)} />
+			)}
 			{editOpened && (
 				<EditMetadataModal
 					key={media.id}
