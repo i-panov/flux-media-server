@@ -33,6 +33,15 @@ func (r *ClipStore) Get(ctx context.Context, id uint) (*models.ClipTask, error) 
 	return &task, nil
 }
 
+// ListActive — незавершённые задачи без лимита истории.
+func (r *ClipStore) ListActive(ctx context.Context) ([]models.ClipTask, error) {
+	var tasks []models.ClipTask
+	err := r.db.WithContext(ctx).
+		Where("status IN ?", []string{models.ClipQueued, models.ClipProcessing}).
+		Find(&tasks).Error
+	return tasks, err
+}
+
 func (r *ClipStore) List(ctx context.Context) ([]models.ClipTask, error) {
 	var tasks []models.ClipTask
 	err := r.db.WithContext(ctx).Order("id DESC").Limit(30).Find(&tasks).Error

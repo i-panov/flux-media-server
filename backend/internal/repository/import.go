@@ -54,6 +54,16 @@ func (r *ImportStore) UpdateEpisode(ctx context.Context, id uint, updates map[st
 		Updates(updates).Error
 }
 
+// ListActive — все незавершённые задания без лимита: восстановление
+// после рестарта не должно зависеть от длины истории.
+func (r *ImportStore) ListActive(ctx context.Context) ([]models.ImportJob, error) {
+	var jobs []models.ImportJob
+	err := r.db.WithContext(ctx).
+		Where("status IN ?", []string{models.ImportQueued, models.ImportDownloading, models.ImportImporting}).
+		Find(&jobs).Error
+	return jobs, err
+}
+
 func (r *ImportStore) List(ctx context.Context) ([]models.ImportJob, error) {
 	var jobs []models.ImportJob
 	err := r.db.WithContext(ctx).Order("id DESC").Limit(30).Find(&jobs).Error

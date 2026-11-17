@@ -75,7 +75,7 @@ func (s *ImportService) Start(req ImportRequest) (*models.ImportJob, error) {
 // RecoverStale помечает незавершённые задания ошибкой после рестарта:
 // их рабочие горутины потеряны, и UI иначе опрашивает их бесконечно.
 func (s *ImportService) RecoverStale(ctx context.Context) error {
-	jobs, err := s.imports.List(ctx)
+	jobs, err := s.imports.ListActive(ctx)
 	if err != nil {
 		return err
 	}
@@ -211,6 +211,23 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 		return nil
 	}
 
+	markRemaining := func(message string) {
+		for i := range episodes {
+			if episodes[i].Status != models.ImportEpisodeQueued {
+				continue
+			}
+			_ = s.imports.UpdateEpisode(context.Background(), episodes[i].ID, map[string]any{
+				"status": models.ImportEpisodeError, "error": message,
+			})
+			if byKey[[2]int{episodes[i].Season, episodes[i].Episode}] != nil {
+				failed++
+			}
+		}
+		_ = s.imports.Update(context.Background(), job.ID, map[string]any{
+			"episodes_done": done, "episodes_error": failed,
+		})
+	}
+
 	err := s.loader.RunCollection(ctx, MediaLoaderRequest{
 		URL: req.URL, Format: req.Format, Quality: req.Quality,
 	}, req.Scope, func(stage string, percent float64) {
@@ -220,10 +237,15 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 	}, attach)
 	if err != nil {
 		log.Printf("import %d: %v", job.ID, err)
+		markRemaining(err.Error())
 		_ = s.imports.Update(context.Background(), job.ID, map[string]any{
 			"status": models.ImportError, "error": err.Error(),
 			"episodes_done": done, "episodes_error": failed,
 		})
+		return
+	}
+	if ctx.Err() != nil {
+		markRemaining("cancelled")
 		return
 	}
 	status := models.ImportDone

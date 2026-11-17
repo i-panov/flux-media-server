@@ -11,10 +11,11 @@ import {
 import { Scissors } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useClip, useCreateClip } from "../../api/clip";
+import { useCancelClip, useClip, useCreateClip } from "../../api/clip";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
 
+// eslint-disable-next-line max-lines-per-function -- диалог с плеером и маркерами.
 export function ClipDialog({
 	media,
 	opened,
@@ -27,6 +28,7 @@ export function ClipDialog({
 	const { t } = useTranslation();
 	const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
 	const create = useCreateClip();
+	const cancel = useCancelClip();
 	const [range, setRange] = useState<[number, number]>([0, 0]);
 	const [title, setTitle] = useState("");
 	const [taskID, setTaskID] = useState<number | null>(null);
@@ -189,6 +191,18 @@ export function ClipDialog({
 					</Alert>
 				)}
 				<Group justify="flex-end">
+					{(status === "queued" || status === "processing") && (
+						<Button
+							variant="subtle"
+							color="red"
+							loading={cancel.isPending}
+							onClick={() => {
+								if (taskID !== null) cancel.mutate(taskID);
+							}}
+						>
+							{t("clip.cancel")}
+						</Button>
+					)}
 					<Button variant="default" onClick={onClose}>
 						{t("common.cancel")}
 					</Button>

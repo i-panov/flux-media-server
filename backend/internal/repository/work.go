@@ -105,17 +105,19 @@ func (r *WorkStore) FindSeriesByTitle(ctx context.Context, title string) (*model
 	if title == "" {
 		return nil, false, ErrWorkTitleRequired
 	}
-	var work models.Work
-	err := r.db.WithContext(ctx).
-		Where("kind = ? AND LOWER(TRIM(title)) = LOWER(?)", models.WorkKindSeries, title).
-		Order("id").First(&work).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, false, nil
-	}
-	if err != nil {
+	// SQLite LOWER не сворачивает кириллицу, поэтому сравниваем в Go.
+	var rows []models.Work
+	if err := r.db.WithContext(ctx).
+		Where("kind = ?", models.WorkKindSeries).
+		Order("id").Find(&rows).Error; err != nil {
 		return nil, false, err
 	}
-	return &work, true, nil
+	for i := range rows {
+		if strings.EqualFold(strings.TrimSpace(rows[i].Title), title) {
+			return &rows[i], true, nil
+		}
+	}
+	return nil, false, nil
 }
 
 // Get загружает work с сезонами, эпизодами и фильмами film_series.

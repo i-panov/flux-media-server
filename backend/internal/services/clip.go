@@ -86,7 +86,7 @@ func (s *ClipService) Start(ctx context.Context, mediaID uint, start, end float6
 
 // RecoverStale помечает незавершённые задачи ошибкой после рестарта.
 func (s *ClipService) RecoverStale(ctx context.Context) error {
-	tasks, err := s.clips.List(ctx)
+	tasks, err := s.clips.ListActive(ctx)
 	if err != nil {
 		return err
 	}
@@ -106,13 +106,25 @@ func (s *ClipService) Cancel(id uint) bool {
 	s.mu.Lock()
 	cancel, ok := s.running[id]
 	s.mu.Unlock()
-	if !ok {
-		return false
+	if ok {
+		cancel()
 	}
-	cancel()
 	_ = s.clips.Update(context.Background(), id, map[string]any{
 		"status": models.ClipError, "error": "cancelled",
 	})
+	task, err := s.clips.Get(context.Background(), id)
+	if err != nil {
+		return ok
+	}
+	if task.TranscodeJobID != 0 {
+		if source, err := s.media.FindByID(context.Background(), task.SourceMediaID); err == nil {
+			if source.Type == models.MediaTypeVideo {
+				_ = s.transcode.Cancel(task.TranscodeJobID)
+			} else {
+				_ = s.upload.Cancel(task.TranscodeJobID)
+			}
+		}
+	}
 	return true
 }
 
@@ -173,6 +185,8 @@ func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *mo
 			s.fail(task, err)
 			return
 		}
+		_ = s.clips.Update(ctx, task.ID, map[string]any{"transcode_job_id": jobID})
+		task.TranscodeJobID = jobID
 		mediaID = s.waitTranscode(ctx, jobID)
 	} else {
 		jobID, err := s.upload.Enqueue(UploadJobInput{
@@ -183,6 +197,8 @@ func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *mo
 			s.fail(task, err)
 			return
 		}
+		_ = s.clips.Update(ctx, task.ID, map[string]any{"transcode_job_id": jobID})
+		task.TranscodeJobID = jobID
 		mediaID = s.waitUpload(ctx, jobID)
 	}
 	if mediaID == 0 {

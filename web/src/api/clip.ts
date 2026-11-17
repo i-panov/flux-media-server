@@ -36,6 +36,17 @@ export function useCreateClip() {
 	});
 }
 
+export function useCancelClip() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) =>
+			apiFetch<void>(`/clips/${id}`, { method: "DELETE" }),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["clips"] });
+		},
+	});
+}
+
 export function useClip(id: number | null) {
 	const queryClient = useQueryClient();
 	return useQuery({

@@ -9,13 +9,12 @@ import (
 )
 
 const thumbnailBackfillBatch = 100
-const thumbnailBackfillMaxBatches = 20
 
 // BackfillAudioCovers извлекает встроенные обложки у старых аудиофайлов.
 // cover_attempted не даёт повторять ffmpeg на каждом старте.
 func BackfillAudioCovers(ctx context.Context, mediaRepo repository.MediaRepository, thumbSvc *ThumbnailService) int {
 	generated := 0
-	for batch := 0; batch < thumbnailBackfillMaxBatches; batch++ {
+	for {
 		if ctx.Err() != nil {
 			return generated
 		}
@@ -44,7 +43,6 @@ func BackfillAudioCovers(ctx context.Context, mediaRepo repository.MediaReposito
 			return generated
 		}
 	}
-	return generated
 }
 
 // BackfillThumbnails генерирует недостающие превью для уже существующих

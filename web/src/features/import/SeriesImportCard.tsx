@@ -9,8 +9,9 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { DownloadCloud } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	type ImportProbe,
@@ -27,7 +28,15 @@ function keyOf(season: number, episode: number) {
 
 function ImportProgress({ id }: { id: number }) {
 	const { t } = useTranslation();
+	const queryClient = useQueryClient();
 	const detail = useImportJob(id);
+	const jobStatus = detail.data?.job.status;
+	useEffect(() => {
+		if (jobStatus === "done" || jobStatus === "partial") {
+			void queryClient.invalidateQueries({ queryKey: ["works"] });
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+		}
+	}, [jobStatus, queryClient]);
 	if (detail.data === undefined) return null;
 	const { job, episodes } = detail.data;
 	return (
@@ -123,11 +132,15 @@ export function SeriesImportCard() {
 		if (episodes.length === 0) return;
 		// Сезонный scope, если выбраны серии одного сезона: media-loader
 		// не должен скачивать весь сериал ради одного сезона.
-		const multiSeason = new Set(episodes.map((item) => item.season)).size > 1;
+		// scope=season media-loader выводит из самой ссылки: для ссылки на
+		// сериал он не сможет определить сезон и вернёт 502. Поэтому
+		// season запрашиваем только когда probe уже разрешил сезон.
+		const singleSeasonSource =
+			probe.scope === "season" || (probe.seasons?.length ?? 1) <= 1;
 		start.mutate(
 			{
 				url: url.trim(),
-				scope: multiSeason ? "series" : "season",
+				scope: singleSeasonSource ? "season" : "series",
 				title: probe.title,
 				seriesID: probe.series_id,
 				episodes,

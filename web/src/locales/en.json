@@ -578,5 +578,6 @@
 	"clip.error": "Could not trim fragment",
 	"import.singleVideo": "This is a standalone video: use \"Upload by link\".",
 	"import.cancel": "Cancel import",
-	"upload.target.incomplete": "Destination is incomplete — the file will be uploaded as a standalone video."
+	"upload.target.incomplete": "Destination is incomplete — the file will be uploaded as a standalone video.",
+	"clip.cancel": "Cancel trimming"
 }
