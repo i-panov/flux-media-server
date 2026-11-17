@@ -824,14 +824,14 @@ func (m *MediaLoader) probeScope(ctx context.Context, rawURL, scope string) (*Se
 		} `json:"series"`
 		Seasons  []int `json:"seasons"`
 		Episodes []struct {
-			Season   *int   `json:"season"`
-			Episode  *int   `json:"episode"`
-			Title    string `json:"title"`
-			Duration int    `json:"duration"`
+			Season   *int    `json:"season"`
+			Episode  *int    `json:"episode"`
+			Title    string  `json:"title"`
+			Duration float64 `json:"duration"`
 		} `json:"episodes"`
-		Title     string `json:"title"`
-		Duration  int    `json:"duration"`
-		Thumbnail string `json:"thumbnail"`
+		Title     string  `json:"title"`
+		Duration  float64 `json:"duration"`
+		Thumbnail string  `json:"thumbnail"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		return nil, fmt.Errorf("media loader probe: invalid response: %w", err)
@@ -855,7 +855,7 @@ func (m *MediaLoader) probeScope(ctx context.Context, rawURL, scope string) (*Se
 			}
 			result.Episodes = append(result.Episodes, ProbeEpisode{
 				Season: season, Episode: number,
-				Title: episode.Title, Duration: episode.Duration,
+				Title: episode.Title, Duration: int(episode.Duration),
 			})
 		}
 		return result, nil
@@ -865,7 +865,9 @@ func (m *MediaLoader) probeScope(ctx context.Context, rawURL, scope string) (*Se
 	}
 	return &SeriesProbe{
 		Kind: "episode", Title: out.Title, Scope: scope,
-		Duration: out.Duration, Thumbnail: out.Thumbnail,
-		Episodes: []ProbeEpisode{{Season: 1, Episode: 1, Title: out.Title, Duration: out.Duration}},
+		Duration: int(out.Duration), Thumbnail: out.Thumbnail,
+		Episodes: []ProbeEpisode{{
+			Season: 1, Episode: 1, Title: out.Title, Duration: int(out.Duration),
+		}},
 	}, nil
 }
