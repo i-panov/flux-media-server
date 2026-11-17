@@ -2,7 +2,6 @@ import { Card, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Check, Film } from "lucide-react";
 import { useId } from "react";
-import { useTranslation } from "react-i18next";
 import { useMediaReload } from "../../api/media";
 import { formatDuration } from "../../core/format";
 import type { Media } from "../../core/media";
@@ -44,7 +43,6 @@ export function VideoCard({
 	selected?: boolean;
 	onToggleSelect?: (mediaId: number) => void;
 }) {
-	const { t } = useTranslation();
 	const reload = useMediaReload(media.id);
 	// ТВ-режим: карточка — spatial-цель, Enter повторяет клик по ссылке.
 	// В обычном режиме focusable=false, поведение не меняется.
@@ -152,9 +150,11 @@ export function VideoCard({
 					>
 						{media.title}
 					</Text>
-					<Text size="xs" c="dimmed">
-						{media.year > 0 ? media.year : t("common.emptyFallback")}
-					</Text>
+					{media.year > 0 && (
+						<Text size="xs" c="dimmed">
+							{media.year}
+						</Text>
+					)}
 				</Card>
 			</Link>
 			<FavoriteButton

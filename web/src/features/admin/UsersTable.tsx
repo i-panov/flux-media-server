@@ -22,6 +22,20 @@ import {
 } from "../../api/admin";
 import { ApiError } from "../../api/client";
 
+function formatDate(value: string): string {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return value;
+	}
+	return date.toLocaleString(undefined, {
+		day: "2-digit",
+		month: "2-digit",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+
 export function UsersTable({
 	users,
 	currentUserId,
@@ -117,7 +131,7 @@ export function UsersTable({
 									</Table.Td>
 									<Table.Td>
 										<Text size="sm" c="dimmed">
-											{user.created_at}
+											{formatDate(user.created_at)}
 										</Text>
 									</Table.Td>
 									<Table.Td>

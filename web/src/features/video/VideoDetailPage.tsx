@@ -39,10 +39,9 @@ function VideoMeta({ item }: { item: Media }) {
 			: t("common.emptyFallback");
 	return (
 		<Group gap="xl">
-			<MetaItem
-				label={t("video.meta.year")}
-				value={item.year > 0 ? String(item.year) : t("common.emptyFallback")}
-			/>
+			{item.year > 0 && (
+				<MetaItem label={t("video.meta.year")} value={String(item.year)} />
+			)}
 			<MetaItem
 				label={t("video.meta.duration")}
 				value={formatDuration(item.duration)}
@@ -225,7 +224,7 @@ export function VideoDetailPage() {
 			размечать перевод как captions было бы неверно. Выбор дорожки
 			доступен в нативных контролах обычного режима; в ТВ-OSD
 			отдельного меню дорожек пока нет. */}
-				<div className="tv-video-shell">
+				<div className="tv-video-shell w-full max-w-[1100px]">
 					{/* biome-ignore lint/a11y/useMediaCaption: нет captions-дорожек в данных. */}
 					<video
 						ref={videoRef}
@@ -285,9 +284,9 @@ export function VideoDetailPage() {
 						{t("video.subsError")}
 					</Alert>
 				)}
-				<Stack gap="xs">
-					<Group justify="space-between" align="center" wrap="wrap">
-						<Title order={1} size="h2">
+				<Stack gap="xs" maw={1100}>
+					<Group align="center" wrap="wrap" gap="sm">
+						<Title order={1} size="h2" style={{ minWidth: 0 }}>
 							{item.title}
 						</Title>
 						<Group gap="xs">

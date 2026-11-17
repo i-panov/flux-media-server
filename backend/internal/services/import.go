@@ -218,11 +218,10 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 		if err != nil {
 			return
 		}
-		pending, doneCount, failedCount := 0, 0, 0
+		doneCount, failedCount := 0, 0
 		for i := range current {
 			switch current[i].Status {
 			case models.ImportEpisodeQueued:
-				pending++
 				_ = s.imports.UpdateEpisode(context.Background(), current[i].ID, map[string]any{
 					"status": models.ImportEpisodeError, "error": message,
 				})
@@ -248,9 +247,9 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 	if err != nil {
 		log.Printf("import %d: %v", job.ID, err)
 		markRemaining(err.Error())
+		// Счётчики уже записаны markRemaining по фактическим статусам.
 		_ = s.imports.Update(context.Background(), job.ID, map[string]any{
 			"status": models.ImportError, "error": err.Error(),
-			"episodes_done": done, "episodes_error": failed,
 		})
 		return
 	}

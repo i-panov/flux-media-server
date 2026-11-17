@@ -29,6 +29,9 @@ export function SeriesPage({
 	const [tagIDs, setTagIDs] = useState<string[]>([]);
 	const tags = useTags();
 	const selectedTags = tagIDs.map(Number);
+	const filterTags = (tags.data ?? [])
+		.filter((tag) => tag.group === "genre" || tag.group === "mood")
+		.map((tag) => ({ value: String(tag.id), label: tag.name }));
 	const series = useWorks("series", true, selectedTags);
 	const films = useWorks("film_series", true, selectedTags);
 	const session = useSession();
@@ -71,16 +74,17 @@ export function SeriesPage({
 					{canManage && <CreateWorkButton />}
 				</Group>
 			)}
-			<MultiSelect
-				label={t("catalog.tagFilter")}
-				data={(tags.data ?? [])
-					.filter((tag) => tag.group === "genre" || tag.group === "mood")
-					.map((tag) => ({ value: String(tag.id), label: tag.name }))}
-				value={tagIDs}
-				onChange={setTagIDs}
-				clearable
-				searchable
-			/>
+			{!embedded && filterTags.length > 0 && (
+				<MultiSelect
+					label={t("catalog.tagFilter")}
+					data={filterTags}
+					value={tagIDs}
+					onChange={setTagIDs}
+					clearable
+					searchable
+					w={{ base: "100%", sm: 320 }}
+				/>
+			)}
 			{showSeries && series.isError ? (
 				<Alert color="red">{t("catalog.error")}</Alert>
 			) : showFilms && films.isError ? (

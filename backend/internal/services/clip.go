@@ -109,18 +109,19 @@ func (s *ClipService) Cancel(id uint) bool {
 	if ok {
 		cancel()
 	}
-	task, err := s.clips.Get(context.Background(), id)
+	// Условный UPDATE: завершившаяся между Get и Update задача не будет
+	// затёрта ошибкой.
+	cancelled, err := s.clips.CancelActive(context.Background(), id)
 	if err != nil {
 		return false
 	}
-	// Отменять можно только незавершённую задачу: done/error не трогаем,
-	// иначе UI, не успевший обновить статус, затрёт готовый результат.
-	if task.Status != models.ClipQueued && task.Status != models.ClipProcessing {
+	if !cancelled {
 		return false
 	}
-	_ = s.clips.Update(context.Background(), id, map[string]any{
-		"status": models.ClipError, "error": "cancelled",
-	})
+	task, err := s.clips.Get(context.Background(), id)
+	if err != nil {
+		return ok
+	}
 	if task.TranscodeJobID != 0 {
 		if source, err := s.media.FindByID(context.Background(), task.SourceMediaID); err == nil {
 			if source.Type == models.MediaTypeVideo {

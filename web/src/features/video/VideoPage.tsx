@@ -12,6 +12,7 @@ import {
 } from "@mantine/core";
 import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useNavigate, useSearch } from "@tanstack/react-router";
+import { CheckSquare } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useVideoList } from "../../api/media";
@@ -148,53 +149,61 @@ export function VideoPage() {
 				</Title>
 				<UploadButton type="video" />
 			</Group>
-			<Group role="tablist" aria-label={t("catalog.tabs")} gap="xs">
-				<VideoTabButton
-					focusKey="video-tab-videos"
-					value="videos"
-					onSelect={setTab}
-					active={tab === "videos"}
-					onDown={focusFirstCard}
+			<div className="-mx-1 overflow-x-auto px-1">
+				<Group
+					role="tablist"
+					aria-label={t("catalog.tabs")}
+					gap="xs"
+					wrap="nowrap"
+					w="max-content"
 				>
-					{t("catalog.videos")}
-				</VideoTabButton>
-				<VideoTabButton
-					focusKey="video-tab-films"
-					value="films"
-					onSelect={setTab}
-					active={tab === "films"}
-					onDown={focusFirstCard}
-				>
-					{t("catalog.films")}
-				</VideoTabButton>
-				<VideoTabButton
-					focusKey="video-tab-series"
-					value="series"
-					onSelect={setTab}
-					active={tab === "series"}
-					onDown={focusFirstCard}
-				>
-					{t("catalog.series")}
-				</VideoTabButton>
-				<VideoTabButton
-					focusKey="video-tab-film-series"
-					value="film_series"
-					onSelect={setTab}
-					active={tab === "film_series"}
-					onDown={focusFirstCard}
-				>
-					{t("catalog.filmSeriesPlural")}
-				</VideoTabButton>
-				<VideoTabButton
-					focusKey="video-tab-franchises"
-					value="franchises"
-					onSelect={setTab}
-					active={tab === "franchises"}
-					onDown={focusFirstCard}
-				>
-					{t("catalog.franchises")}
-				</VideoTabButton>
-			</Group>
+					<VideoTabButton
+						focusKey="video-tab-videos"
+						value="videos"
+						onSelect={setTab}
+						active={tab === "videos"}
+						onDown={focusFirstCard}
+					>
+						{t("catalog.videos")}
+					</VideoTabButton>
+					<VideoTabButton
+						focusKey="video-tab-films"
+						value="films"
+						onSelect={setTab}
+						active={tab === "films"}
+						onDown={focusFirstCard}
+					>
+						{t("catalog.films")}
+					</VideoTabButton>
+					<VideoTabButton
+						focusKey="video-tab-series"
+						value="series"
+						onSelect={setTab}
+						active={tab === "series"}
+						onDown={focusFirstCard}
+					>
+						{t("catalog.series")}
+					</VideoTabButton>
+					<VideoTabButton
+						focusKey="video-tab-film-series"
+						value="film_series"
+						onSelect={setTab}
+						active={tab === "film_series"}
+						onDown={focusFirstCard}
+					>
+						{t("catalog.filmSeriesPlural")}
+					</VideoTabButton>
+					<VideoTabButton
+						focusKey="video-tab-franchises"
+						value="franchises"
+						onSelect={setTab}
+						active={tab === "franchises"}
+						onDown={focusFirstCard}
+					>
+						{t("catalog.franchises")}
+					</VideoTabButton>
+				</Group>
+			</div>
 			{tab === "films" ? (
 				<MoviesContent format="film" />
 			) : tab === "videos" ? (
@@ -239,6 +248,9 @@ function MoviesContent({
 		undefined,
 		{ secondary: true },
 	);
+	const filterTags = (tags.data ?? [])
+		.filter((tag) => tag.group === "genre" || tag.group === "mood")
+		.map((tag) => ({ value: String(tag.id), label: tag.name }));
 	const selectedTagIDs = tagIDs.map(Number);
 	const list = useVideoList(
 		debounced,
@@ -263,17 +275,17 @@ function MoviesContent({
 					}}
 					w={{ base: "100%", sm: 320 }}
 				/>
-				<MultiSelect
-					label={t("video.tagsFilter")}
-					data={(tags.data ?? [])
-						.filter((tag) => tag.group === "genre" || tag.group === "mood")
-						.map((tag) => ({ value: String(tag.id), label: tag.name }))}
-					value={tagIDs}
-					onChange={setTagIDs}
-					clearable
-					searchable
-					w={{ base: "100%", sm: 280 }}
-				/>
+				{filterTags.length > 0 && (
+					<MultiSelect
+						label={t("video.tagsFilter")}
+						data={filterTags}
+						value={tagIDs}
+						onChange={setTagIDs}
+						clearable
+						searchable
+						w={{ base: "100%", sm: 280 }}
+					/>
+				)}
 				{tagIDs.length > 0 && (
 					<Button variant="subtle" size="xs" onClick={() => setTagIDs([])}>
 						{t("video.clearFilters")}
@@ -290,8 +302,21 @@ function MoviesContent({
 						]}
 					/>
 				</div>
+				{canBulkTag && (
+					<Button
+						variant={bulkActive ? "filled" : "light"}
+						size="compact-sm"
+						leftSection={<CheckSquare size={16} />}
+						onClick={() => {
+							setBulkActive((prev) => !prev);
+							setBulkSelected([]);
+						}}
+					>
+						{bulkActive ? t("tags.bulkExit") : t("tags.bulkStart")}
+					</Button>
+				)}
 			</Group>
-			{canBulkTag && (
+			{canBulkTag && bulkActive && (
 				<BulkTagBar
 					active={bulkActive}
 					selected={bulkSelected}

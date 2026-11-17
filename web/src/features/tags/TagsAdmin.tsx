@@ -84,7 +84,7 @@ export function TagsAdmin() {
 			{tags.isPending ? (
 				<Text c="dimmed">{t("common.loading")}</Text>
 			) : (
-				<Stack gap={4}>
+				<Stack gap={4} maw={560}>
 					{groups.map((g) => {
 						const rows = (tags.data ?? []).filter(
 							(tag) => tag.group === g.value,

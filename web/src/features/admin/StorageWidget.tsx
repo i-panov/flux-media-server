@@ -35,6 +35,30 @@ function freePercent(total: number, free: number): number {
 	return Math.max(0, Math.min(100, (free / total) * 100));
 }
 
+// Несколько каталогов на одном разделе — это один диск: показываем его
+// один раз, а пути перечисляем компактно.
+function groupDisks(disks: StorageInfo["disks"]) {
+	const groups = new Map<
+		string,
+		{ disk: StorageInfo["disks"][number]; usedBytes: number; paths: string[] }
+	>();
+	for (const disk of disks) {
+		const key = `${disk.total_bytes}:${disk.free_bytes}`;
+		const existing = groups.get(key);
+		if (existing === undefined) {
+			groups.set(key, {
+				disk,
+				usedBytes: disk.used_bytes,
+				paths: [disk.path],
+			});
+		} else {
+			existing.usedBytes += disk.used_bytes;
+			existing.paths.push(disk.path);
+		}
+	}
+	return [...groups.values()];
+}
+
 export function StorageWidget({ data }: { data: StorageInfo }) {
 	const { t } = useTranslation();
 	const setAutoCleanup = useSetAutoCleanup();
@@ -66,21 +90,19 @@ export function StorageWidget({ data }: { data: StorageInfo }) {
 					}}
 				/>
 			</Group>
-			{data.disks.map((disk) => {
+			{groupDisks(data.disks).map((group) => {
+				const disk = group.disk;
 				const freePct = freePercent(disk.total_bytes, disk.free_bytes);
 				const low = freePct < 10;
 				return (
-					<Card key={disk.path} withBorder padding="md" radius="md">
+					<Card
+						key={`${disk.total_bytes}-${disk.free_bytes}`}
+						withBorder
+						padding="md"
+						radius="md"
+					>
 						<Stack gap="xs">
-							<Text fw={600} truncate>
-								{disk.path}
-							</Text>
-							<Text size="sm" c="dimmed">
-								{t("admin.storage.sectionUsed", {
-									value: formatBytes(disk.used_bytes),
-								})}
-							</Text>
-							<Text size="sm" c={low ? "red" : "dimmed"}>
+							<Text fw={600}>
 								{t("admin.storage.diskFree", {
 									free: formatBytes(disk.free_bytes),
 									percent: Math.round(freePct),
@@ -89,13 +111,27 @@ export function StorageWidget({ data }: { data: StorageInfo }) {
 							<Progress
 								value={100 - freePct}
 								color={low ? "red" : "violet"}
-								aria-label={disk.path}
+								aria-label={t("admin.storage.title")}
 							/>
-							<Text size="sm" c="dimmed">
-								{t("admin.storage.total", {
-									value: formatBytes(disk.total_bytes),
-								})}
-							</Text>
+							<Group justify="space-between" gap="sm" wrap="wrap">
+								<Text size="sm" c="dimmed">
+									{t("admin.storage.total", {
+										value: formatBytes(disk.total_bytes),
+									})}
+								</Text>
+								<Text size="sm" c="dimmed">
+									{t("admin.storage.sectionUsed", {
+										value: formatBytes(group.usedBytes),
+									})}
+								</Text>
+							</Group>
+							<Stack gap={2}>
+								{group.paths.map((path) => (
+									<Text key={path} size="xs" c="dimmed" truncate>
+										{path}
+									</Text>
+								))}
+							</Stack>
 						</Stack>
 					</Card>
 				);

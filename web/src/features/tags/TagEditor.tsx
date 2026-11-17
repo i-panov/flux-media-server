@@ -73,7 +73,7 @@ export function TagEditor({ entity, id }: { entity: TagEntity; id: number }) {
 	};
 
 	return (
-		<Stack gap="sm">
+		<Stack gap="sm" maw={520}>
 			<Text fw={600}>{t("tags.title")}</Text>
 			{(current.isError || tags.isError) && (
 				<Alert color="red">{t("tags.loadError")}</Alert>

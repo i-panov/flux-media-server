@@ -237,9 +237,12 @@ test("обложка: замена уходит multipart-полем cover", asy
 	await page.route(
 		(url) => url.pathname === "/api/media/1/cover",
 		async (route) => {
-			coverBody = route.request().postDataBuffer() ?? Buffer.alloc(0);
-			coverContentType =
-				(await route.request().headerValue("content-type")) ?? "";
+			// GET — это постер <video>; фиксируем только PUT с файлом.
+			if (route.request().method() === "PUT") {
+				coverBody = route.request().postDataBuffer() ?? Buffer.alloc(0);
+				coverContentType =
+					(await route.request().headerValue("content-type")) ?? "";
+			}
 			return route.fulfill({
 				status: 200,
 				contentType: "application/json",

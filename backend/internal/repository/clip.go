@@ -25,6 +25,18 @@ func (r *ClipStore) Update(ctx context.Context, id uint, updates map[string]any)
 		Updates(updates).Error
 }
 
+// CancelActive переводит задачу в error только если она ещё не завершена.
+// Условный UPDATE защищает от гонки с завершением задачи.
+func (r *ClipStore) CancelActive(ctx context.Context, id uint) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&models.ClipTask{}).
+		Where("id = ? AND status IN ?", id, []string{models.ClipQueued, models.ClipProcessing}).
+		Updates(map[string]any{"status": models.ClipError, "error": "cancelled"})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
 func (r *ClipStore) Get(ctx context.Context, id uint) (*models.ClipTask, error) {
 	var task models.ClipTask
 	if err := r.db.WithContext(ctx).First(&task, id).Error; err != nil {

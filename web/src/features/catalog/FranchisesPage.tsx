@@ -79,6 +79,9 @@ export function FranchisesPage({ embedded = false }: { embedded?: boolean }) {
 	const { t } = useTranslation();
 	const [tagIDs, setTagIDs] = useState<string[]>([]);
 	const tags = useTags();
+	const filterTags = (tags.data ?? [])
+		.filter((tag) => tag.group === "genre" || tag.group === "mood")
+		.map((tag) => ({ value: String(tag.id), label: tag.name }));
 	const franchises = useFranchises(tagIDs.map(Number));
 	const session = useSession();
 	const { capabilities } = useTVMode();
@@ -95,11 +98,22 @@ export function FranchisesPage({ embedded = false }: { embedded?: boolean }) {
 			data-tv-focus-key={embedded ? undefined : "franchises-page"}
 		>
 			{embedded ? (
-				canManage && (
-					<Group justify="flex-end">
-						<CreateFranchiseButton />
-					</Group>
-				)
+				<Group justify="space-between" align="flex-end" wrap="wrap">
+					{filterTags.length > 0 ? (
+						<MultiSelect
+							label={t("catalog.tagFilter")}
+							data={filterTags}
+							value={tagIDs}
+							onChange={setTagIDs}
+							clearable
+							searchable
+							w={{ base: "100%", sm: 320 }}
+						/>
+					) : (
+						<span />
+					)}
+					{canManage && <CreateFranchiseButton />}
+				</Group>
 			) : (
 				<Group justify="space-between">
 					<Title order={1} size="h2">
@@ -108,16 +122,17 @@ export function FranchisesPage({ embedded = false }: { embedded?: boolean }) {
 					{canManage && <CreateFranchiseButton />}
 				</Group>
 			)}
-			<MultiSelect
-				label={t("catalog.tagFilter")}
-				data={(tags.data ?? [])
-					.filter((tag) => tag.group === "genre" || tag.group === "mood")
-					.map((tag) => ({ value: String(tag.id), label: tag.name }))}
-				value={tagIDs}
-				onChange={setTagIDs}
-				clearable
-				searchable
-			/>
+			{!embedded && filterTags.length > 0 && (
+				<MultiSelect
+					label={t("catalog.tagFilter")}
+					data={filterTags}
+					value={tagIDs}
+					onChange={setTagIDs}
+					clearable
+					searchable
+					w={{ base: "100%", sm: 320 }}
+				/>
+			)}
 			{franchises.isPending ? (
 				<Text c="dimmed">{t("common.loading")}</Text>
 			) : franchises.isError ? (
