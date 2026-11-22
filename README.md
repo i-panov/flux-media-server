@@ -113,6 +113,11 @@ docker compose up -d
 `https://github.com/i-panov/media-loader` (`backend/media-loader.Dockerfile`).
 Ветка/тег/commit задаётся `MEDIA_LOADER_REF` (по умолчанию `main`).
 
+Прокси для скачивания задаётся `MEDIA_LOADER_PROXY_URL` (по умолчанию
+`socks5h://host.docker.internal:1080`); пустое значение отключает прокси.
+`host.docker.internal` добавляется через `host-gateway`, поэтому прокси на
+хосте должен слушать не только `127.0.0.1`.
+
 - `media-loader` — API и UI на `http://127.0.0.1:${MEDIA_LOADER_PORT:-8097}/ui`;
 - `media-loader-worker` — очередь yt-dlp/ffmpeg;
 - `media-loader-redis` — очередь и кэш;
