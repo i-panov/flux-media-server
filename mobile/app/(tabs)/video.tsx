@@ -120,6 +120,7 @@ export default function VideoScreen() {
 			<VideoTabs
 				value={tab}
 				onChange={(next) => {
+					if (next === tab) return;
 					setTab(next);
 					// Формат со старой вкладки может быть скрыт на новой.
 					setFormatID(null);
