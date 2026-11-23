@@ -9,7 +9,7 @@ import {
 	TextInput,
 } from "@mantine/core";
 import { Scissors } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCancelClip, useClip, useCreateClip } from "../../api/clip";
 import { formatDuration } from "../../core/format";
@@ -36,14 +36,17 @@ export function ClipDialog({
 	const task = useClip(taskID);
 	const duration = Math.max(media.duration, 1);
 
-	useEffect(() => {
+	// Сброс при открытии без эффекта: рендер-синхронизация с пропом.
+	const [prevOpened, setPrevOpened] = useState(false);
+	if (opened !== prevOpened) {
+		setPrevOpened(opened);
 		if (opened) {
 			setRange([0, duration]);
 			setTaskID(null);
 			setError(null);
 			setTitle("");
 		}
-	}, [opened, duration]);
+	}
 
 	const onTimeUpdate = () => {
 		const el = mediaRef.current;

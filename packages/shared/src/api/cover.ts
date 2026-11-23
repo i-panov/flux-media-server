@@ -49,8 +49,10 @@ export function fileExtension(name: string): string {
 	return match === null ? "" : match[0].slice(1).toLowerCase();
 }
 
+const URI_QUERY_OR_FRAGMENT = /[?#]/;
+
 export function fileNameFromUri(uri: string): string {
-	const clean = uri.split(/[?#]/, 1)[0] ?? uri;
+	const clean = uri.split(URI_QUERY_OR_FRAGMENT, 1)[0] ?? uri;
 	const part = clean.slice(clean.lastIndexOf("/") + 1);
 	try {
 		return decodeURIComponent(part);

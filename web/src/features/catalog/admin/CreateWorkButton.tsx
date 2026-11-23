@@ -9,7 +9,7 @@ import {
 	TextInput,
 } from "@mantine/core";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCreateWork, type WorkKind } from "../../../api/catalog";
 
@@ -22,9 +22,15 @@ export function CreateWorkButton({
 	const create = useCreateWork();
 	const [open, setOpen] = useState(false);
 	const [kind, setKind] = useState<WorkKind>(initialKind ?? "series");
-	useEffect(() => {
-		if (initialKind !== undefined) setKind(initialKind);
-	}, [initialKind]);
+	// Синхронизация с пропом без эффекта: setState в рендере допустим,
+	// когда условие — сравнение с предыдущим значением пропа.
+	const [prevInitialKind, setPrevInitialKind] = useState(initialKind);
+	if (initialKind !== prevInitialKind) {
+		setPrevInitialKind(initialKind);
+		if (initialKind !== undefined) {
+			setKind(initialKind);
+		}
+	}
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [coverURL, setCoverURL] = useState("");

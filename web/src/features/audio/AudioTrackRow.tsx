@@ -8,6 +8,7 @@ import {
 	Text,
 	Tooltip,
 } from "@mantine/core";
+import { useNavigate } from "@tanstack/react-router";
 import { MoreVertical, Music, Pencil, Scissors, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,6 +27,7 @@ import { useTVMode } from "../tv/useTVMode";
 // Строка трека: клик по всей строке запускает/ставит на паузу мини-плеер.
 // Никакой детальной страницы у аудио нет: полный плеер открывается
 // кликом по названию в мини-плеере.
+// eslint-disable-next-line max-lines-per-function -- строка с меню, диалогами и плеером.
 export function AudioTrackRow({
 	media,
 	onPlay,
@@ -38,6 +40,7 @@ export function AudioTrackRow({
 	isCurrent?: boolean;
 }) {
 	const { t } = useTranslation();
+	const navigate = useNavigate();
 	const player = useAudioPlayer();
 	const active = isCurrent || player.current?.id === media.id;
 	const { capabilities } = useTVMode();
@@ -154,6 +157,19 @@ export function AudioTrackRow({
 									onClick={() => setEditOpened(true)}
 								>
 									{t("metadata.edit")}
+								</Menu.Item>
+							)}
+							{media.source_media_id != null && media.source_media_id > 0 && (
+								<Menu.Item
+									leftSection={<Music size={16} />}
+									onClick={() => {
+										void navigate({
+											to: "/video/$id",
+											params: { id: String(media.source_media_id) },
+										});
+									}}
+								>
+									{t("audio.sourceVideo")}
 								</Menu.Item>
 							)}
 							{isAdmin && capabilities.canChangeCover && (

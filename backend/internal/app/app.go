@@ -326,6 +326,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		uploadQueue,
 		transcodeQueue,
 	)
+	mediaLoader.SetSourceStore(mediaRepo)
 	downloadHandler := handlers.NewDownloadHandler(mediaLoader)
 
 	// File watcher for automatic library monitoring.

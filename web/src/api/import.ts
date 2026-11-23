@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "./client";
 
-export interface ImportProbeEpisode {
+interface ImportProbeEpisode {
 	season: number;
 	episode: number;
 	title: string;

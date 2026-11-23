@@ -211,8 +211,6 @@ const maintenanceSchema = z.object({
 	state: maintenanceStateSchema,
 });
 
-export type MaintenanceInfo = z.infer<typeof maintenanceSchema>;
-
 export function useMaintenanceQuery(options?: { enabled?: boolean }) {
 	return useQuery({
 		queryKey: ["admin", "maintenance"],

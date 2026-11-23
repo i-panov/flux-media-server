@@ -77,7 +77,16 @@ describe("videoSearchOptions", () => {
 
 		expect(calls).toHaveLength(1);
 		expect(requestedUrl(calls).searchParams.has("q")).toBe(false);
-		expect(options.queryKey).toEqual(["media", "video", "", "desc", 0]);
+		expect(options.queryKey).toEqual([
+			"media",
+			"video",
+			"",
+			"desc",
+			0,
+			"",
+			"",
+			"",
+		]);
 	});
 
 	it("смена q или sort начинает пагинацию заново с offset=0", async () => {

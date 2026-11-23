@@ -11,7 +11,9 @@ export interface MetadataInput {
 	sourceUrl?: string;
 }
 
-export function buildMetadataBody(input: MetadataInput): Record<string, unknown> {
+export function buildMetadataBody(
+	input: MetadataInput,
+): Record<string, unknown> {
 	const body: Record<string, unknown> = {
 		title: input.title,
 		artists: input.artists,

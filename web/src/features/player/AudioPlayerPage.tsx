@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- страница плеера: полный экран, очередь и текст. */
 import { parseSyncedLyrics } from "@flux/shared";
 import {
 	ActionIcon,
@@ -465,6 +466,23 @@ export function AudioPlayerPage() {
 									{current.album}
 								</Text>
 							)}
+							{current.source_media_id != null &&
+								current.source_media_id > 0 && (
+									<Button
+										variant="subtle"
+										size="compact-sm"
+										w="fit-content"
+										px={0}
+										onClick={() => {
+											void navigate({
+												to: "/video/$id",
+												params: { id: String(current.source_media_id) },
+											});
+										}}
+									>
+										{t("audio.sourceVideo")}
+									</Button>
+								)}
 						</Stack>
 
 						<SeekSlider

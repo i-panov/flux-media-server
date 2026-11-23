@@ -8,9 +8,10 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
-import { useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAudioList } from "../../api/media";
+import { useAudioList, useMedia } from "../../api/media";
 import { useSession } from "../../api/session";
 import { CardGridSkeletons } from "../../components/CardGridSkeletons";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -47,6 +48,14 @@ export function AudioPage() {
 		{ secondary: true },
 	);
 
+	const { play: playID = null } = useSearch({ from: "/audio/" });
+	const navigate = useNavigate();
+	// Фиксируем id один раз: дальше URL очищается, а запрос уже запущен.
+	const [requestedID] = useState<number | null>(playID);
+	const requested = useMedia(requestedID ?? 0, requestedID !== null);
+	const playedRef = useRef<number | null>(null);
+	// Клик по другому треку во время загрузки ?play отменяет автозапуск.
+	const interactedRef = useRef(false);
 	const list = useAudioList(debounced, undefined, true, sort);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const { data: session } = useSession();
@@ -54,9 +63,51 @@ export function AudioPage() {
 	const { capabilities } = useTVMode();
 	const visibleItems = useVisibleMedia("audio", items, debounced !== "");
 
+	// ?play=<id> — переход со страницы видео «Открыть трек».
+	// Параметр одноразовый: сразу убираем его из URL, иначе F5 и «назад»
+	// повторяли бы автозапуск.
+	const clearedRef = useRef(false);
+	useEffect(() => {
+		if (playID === null || clearedRef.current) {
+			return;
+		}
+		clearedRef.current = true;
+		interactedRef.current = false;
+		void navigate({ to: "/audio", search: {}, replace: true });
+	}, [playID, navigate]);
+
+	useEffect(() => {
+		const track = requested.data;
+		if (track === undefined || requestedID === null) {
+			return;
+		}
+		if (playedRef.current === requestedID) {
+			return;
+		}
+		playedRef.current = requestedID;
+		if (interactedRef.current) {
+			return;
+		}
+		// Тот же трек на паузе — просто продолжаем, а не перезапускаем.
+		if (player.current?.id === track.id) {
+			if (!player.playing) {
+				player.toggle();
+			}
+			return;
+		}
+		player.playQueue([track], 0);
+	}, [requestedID, requested.data, player]);
+
 	return (
 		<Stack
 			gap="lg"
+			onPointerDownCapture={() => {
+				interactedRef.current = true;
+			}}
+			onKeyDownCapture={() => {
+				// ТВ и клавиатура: Enter по строке тоже отменяет поздний ?play.
+				interactedRef.current = true;
+			}}
 			ref={tvRef}
 			tabIndex={tvMode ? -1 : undefined}
 			data-tv-page-root="true"

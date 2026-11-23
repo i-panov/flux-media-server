@@ -85,8 +85,11 @@ export function ActivatePage() {
 		const normalized = code.replace(NON_DIGITS, "").slice(0, 6);
 		if (normalized.length !== 6) return;
 		inspectedRef.current = true;
-		runInspect(normalized);
-		window.history.replaceState(null, "", window.location.pathname);
+		// Микрозадача: state мутации не должен обновляться синхронно в эффекте.
+		queueMicrotask(() => {
+			runInspect(normalized);
+			window.history.replaceState(null, "", window.location.pathname);
+		});
 	}, [code, runInspect]);
 
 	const codeDigits = code.replace(/\D/g, "").slice(0, 6);

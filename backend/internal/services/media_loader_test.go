@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"flux/internal/models"
+	"flux/internal/repository"
 )
 
 type fakeLoaderQueue struct {
@@ -60,6 +62,8 @@ func TestMediaLoaderImportsFileAndEnqueues(t *testing.T) {
 	queue := &fakeLoaderQueue{status: UploadJobStatus{Status: UploadJobDone, MediaID: 7}}
 	dir := t.TempDir()
 	loader := NewMediaLoader(srv.URL, "", dir, 1024, 5*time.Second, queue, nil)
+	sources := &fakeSourceSetter{}
+	loader.SetSourceStore(sources)
 	job, err := loader.Submit(MediaLoaderRequest{URL: "https://example.com/video", Format: "mp4"})
 	require.NoError(t, err)
 	require.Equal(t, "queued", job.Status)
@@ -82,6 +86,11 @@ func TestMediaLoaderImportsFileAndEnqueues(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(dir, "Video.mp4"))
 	require.NoError(t, err)
 	require.Equal(t, "video-bytes", string(content))
+
+	// Upload-ветка (audio-only и видео без transcode) сохраняет источник.
+	savedID, savedURL := sources.saved()
+	require.Equal(t, uint(7), savedID)
+	require.Equal(t, "https://example.com/video", savedURL)
 }
 
 func TestMediaLoaderRejectsInvalidURL(t *testing.T) {
@@ -152,6 +161,28 @@ func TestMediaLoaderRetriesConnectionReset(t *testing.T) {
 	require.GreaterOrEqual(t, calls, 3)
 }
 
+type fakeSourceSetter struct {
+	mu  sync.Mutex
+	id  uint
+	url string
+}
+
+func (f *fakeSourceSetter) PatchMetadata(_ context.Context, id uint, p repository.MetadataPatch) (*models.Media, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.id = id
+	if p.SourceURL != nil {
+		f.url = *p.SourceURL
+	}
+	return &models.Media{ID: id}, nil
+}
+
+func (f *fakeSourceSetter) saved() (uint, string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.id, f.url
+}
+
 type fakeTranscodeQueue struct {
 	enqueued []string
 	status   TranscodeJobStatus
@@ -182,6 +213,8 @@ func TestMediaLoaderVideoUsesTranscodeQueue(t *testing.T) {
 
 	transcode := &fakeTranscodeQueue{status: TranscodeJobStatus{Status: TranscodeTaskDone, MediaID: 11}}
 	loader := NewMediaLoader(srv.URL, "", t.TempDir(), 1024, 5*time.Second, &fakeLoaderQueue{}, transcode)
+	sources := &fakeSourceSetter{}
+	loader.SetSourceStore(sources)
 	job, err := loader.Submit(MediaLoaderRequest{URL: "https://example.com/video", Format: "mp4"})
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
@@ -192,4 +225,8 @@ func TestMediaLoaderVideoUsesTranscodeQueue(t *testing.T) {
 	got, _ := loader.Get(job.ID)
 	require.Equal(t, uint(11), got.MediaID)
 	require.Len(t, transcode.enqueued, 1)
+	// Ссылка пользователя сохраняется как источник.
+	savedID, savedURL := sources.saved()
+	require.Equal(t, uint(11), savedID)
+	require.Equal(t, "https://example.com/video", savedURL)
 }

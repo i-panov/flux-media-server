@@ -590,6 +590,7 @@ func (q *ExtractService) process(job *ExtractJob) {
 		FilePath:      finalPath,
 		FileSize:      fileSize,
 		FileHash:      hash,
+		SourceURL:     source.SourceURL,
 		SourceMediaID: &sourceID,
 	}
 	if media.Title == "" {

@@ -3,6 +3,7 @@ import { stubEmptyLibraryMeta } from "./stubs";
 
 const VIDEO_LIST_PATTERN = /\/video$/;
 const VIDEO_DETAIL_PATTERN = /\/video\/1$/;
+// ?play=<id> приложение сразу убирает из URL; отдельной страницы аудио нет.
 const AUDIO_TRACK_PATTERN = /\/audio$/;
 const COLLECTION_DETAIL_PATTERN = /\/collections\/1$/;
 
@@ -327,6 +328,10 @@ test("извлечение: джоб доводится до трека и сс�
 	});
 	await page.getByRole("button", { name: "Открыть трек" }).click();
 	await expect(page).toHaveURL(AUDIO_TRACK_PATTERN);
+	// Трек реально включился в мини-плеере.
+	await expect(
+		page.getByText("Извлечённый трек", { exact: true }).first(),
+	).toBeVisible();
 });
 
 test("удаление медиа уводит в раздел", async ({ page }) => {

@@ -589,5 +589,7 @@
 	"video.allFormats": "Все форматы",
 	"video.allTags": "Все жанры",
 	"tags.type": "Тип",
-	"catalog.allGenres": "Все жанры"
+	"catalog.allGenres": "Все жанры",
+	"audio.sourceVideo": "Исходное видео",
+	"extract.ready": "Аудиодорожка извлечена: {{title}}"
 }

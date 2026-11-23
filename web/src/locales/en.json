@@ -589,5 +589,7 @@
 	"video.allFormats": "All formats",
 	"video.allTags": "All genres",
 	"tags.type": "Type",
-	"catalog.allGenres": "All genres"
+	"catalog.allGenres": "All genres",
+	"audio.sourceVideo": "Source video",
+	"extract.ready": "Audio track extracted: {{title}}"
 }

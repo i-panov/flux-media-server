@@ -43,6 +43,7 @@ export function splitSubLang(lang: string): { base: string; label: string } {
 	return { base, label: `${base} (${lang.slice(base.length)})` };
 }
 
+const FILENAME_EXTENSION_PATTERN = /\.[^.]+$/;
 const FILENAME_EPISODE_PATTERN =
 	/^(.*?)[. _-](?:S(\d{1,2})E(\d{1,2})|(\d{1,2})x(\d{1,2}))(?:[. _-].*)?$/i;
 const FILENAME_YEAR_PATTERN = /(?:^|[. _(-])((?:18|19|20)\d{2})(?=$|[. _)-])/g;
@@ -54,7 +55,7 @@ export function parseFilename(filename: string): {
 	title: string;
 	year: number | null;
 } {
-	const stem = filename.replace(/\.[^.]+$/, "");
+	const stem = filename.replace(FILENAME_EXTENSION_PATTERN, "");
 	const episode = FILENAME_EPISODE_PATTERN.exec(stem);
 	if (episode?.[1] !== undefined) {
 		return { title: episode[1].trim().replace(/[._]+/g, " "), year: null };

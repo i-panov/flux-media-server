@@ -50,13 +50,20 @@ export function ExtractAudioSection({ mediaId }: { mediaId: number }) {
 						variant="light"
 						leftSection={<AudioLines size={16} />}
 						onClick={() => {
-							void navigate({ to: "/audio" });
+							// Детальной страницы аудио нет: открываем список и
+							// сразу включаем извлечённый трек.
+							void navigate({ to: "/audio", search: { play: track.id } });
 						}}
 					>
 						{t("extract.openTrack")}
 					</Button>
 				)}
 			</Group>
+			{track !== null && (
+				<Text size="sm" c="dimmed">
+					{t("extract.ready", { title: track.title })}
+				</Text>
+			)}
 			{flow.isExtracting && (
 				<Text size="sm" c="dimmed">
 					{t("extract.inProgress")}

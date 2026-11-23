@@ -162,7 +162,9 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		mediaID, err := s.loader.ImportDownload(ctx, item.DownloadURL, item.Filename, "video/mp4")
+		mediaID, err := s.loader.ImportDownload(
+			ctx, item.DownloadURL, item.Filename, "video/mp4", req.URL,
+		)
 		if err != nil {
 			failed++
 			_ = s.imports.UpdateEpisode(ctx, episode.ID, map[string]any{

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"flux/internal/models"
+	"flux/internal/repository"
 )
 
 // MediaLoader — клиент внешнего media-loader (yt-dlp/ffmpeg) и импортёр
@@ -35,6 +37,7 @@ type MediaLoader struct {
 	maxBytes    int64
 	queue       uploadEnqueuer
 	transcode   transcodeEnqueuer
+	sources     mediaSourceSetter
 	mu          sync.Mutex
 	jobs        map[string]*MediaLoaderJob
 	nextID      atomic.Uint64
@@ -56,6 +59,11 @@ type transcodeEnqueuer interface {
 	Cancel(uint64) error
 }
 
+// mediaSourceSetter сохраняет ссылку-источник у созданного медиа.
+type mediaSourceSetter interface {
+	PatchMetadata(ctx context.Context, id uint, p repository.MetadataPatch) (*models.Media, error)
+}
+
 type MediaLoaderJob struct {
 	ID          string    `json:"id"`
 	Status      string    `json:"status"`
@@ -69,7 +77,10 @@ type MediaLoaderJob struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	mediaType   models.MediaType
-	cancel      context.CancelFunc
+	// sourceURL — исходная ссылка, которую пользователь вставил. Пишется
+	// в media.source_url после создания записи.
+	sourceURL string
+	cancel    context.CancelFunc
 }
 
 type MediaLoaderRequest struct {
@@ -126,6 +137,13 @@ func NewMediaLoader(cfgURL, token, originals string, maxBytes int64, timeout tim
 	return m
 }
 
+// SetSourceStore подключает сохранение ссылки-источника. Вызывать до
+// запуска заданий (в app — сразу после конструктора); в тестах может
+// остаться nil.
+func (m *MediaLoader) SetSourceStore(sources mediaSourceSetter) {
+	m.sources = sources
+}
+
 func (m *MediaLoader) Enabled() bool {
 	return m != nil && m.baseURL != "" && m.queue != nil
 }
@@ -152,7 +170,7 @@ func (m *MediaLoader) Submit(req MediaLoaderRequest) (MediaLoaderJob, error) {
 	}
 	job := &MediaLoaderJob{
 		ID: id, Status: "queued", Stage: "queued", mediaType: mediaType,
-		CreatedAt: now, UpdatedAt: now, cancel: cancel,
+		sourceURL: req.URL, CreatedAt: now, UpdatedAt: now, cancel: cancel,
 	}
 	m.mu.Lock()
 	m.jobs[id] = job
@@ -474,6 +492,21 @@ func (m *MediaLoader) importFile(ctx context.Context, job *MediaLoaderJob, out l
 	return nil
 }
 
+// saveSource пишет ссылку-источник в медиа. Ошибка не должна ломать
+// импорт: файл уже в библиотеке, ссылка — метаданные.
+func (m *MediaLoader) saveSource(mediaID uint, rawURL string) {
+	if m == nil || m.sources == nil || mediaID == 0 || strings.TrimSpace(rawURL) == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := m.sources.PatchMetadata(ctx, mediaID,
+		repository.MetadataPatch{SourceURL: &rawURL})
+	if err != nil {
+		log.Printf("media loader: save source for %d: %v", mediaID, err)
+	}
+}
+
 func (m *MediaLoader) monitorTranscode(job *MediaLoaderJob, taskID uint64) {
 	deadline := time.Now().Add(12 * time.Hour)
 	for time.Now().Before(deadline) {
@@ -481,6 +514,9 @@ func (m *MediaLoader) monitorTranscode(job *MediaLoaderJob, taskID uint64) {
 		if ok {
 			switch snap.Status {
 			case TranscodeTaskDone:
+				// Ссылку пишем до публикации done: клиент не должен
+				// увидеть готовое задание без источника.
+				m.saveSource(snap.MediaID, job.sourceURL)
 				m.mu.Lock()
 				job.Status = "done"
 				job.Stage = "done"
@@ -510,6 +546,9 @@ func (m *MediaLoader) monitorUpload(job *MediaLoaderJob, uploadID uint64) {
 		if ok {
 			switch snap.Status {
 			case UploadJobDone:
+				// Ссылку пишем до публикации done: клиент не должен
+				// увидеть готовое задание без источника.
+				m.saveSource(snap.MediaID, job.sourceURL)
 				m.mu.Lock()
 				job.Status = "done"
 				job.Stage = "done"
@@ -734,7 +773,7 @@ func (m *MediaLoader) RunCollection(
 
 // ImportDownload скачивает готовый файл коллекции, кладёт его в обработку
 // и ждёт создания media. Возвращает id созданной записи.
-func (m *MediaLoader) ImportDownload(ctx context.Context, downloadURL, filename, contentType string) (uint, error) {
+func (m *MediaLoader) ImportDownload(ctx context.Context, downloadURL, filename, contentType, sourceURL string) (uint, error) {
 	job := &MediaLoaderJob{
 		ID:        "collection-" + strconv.FormatInt(time.Now().UnixNano(), 36),
 		Status:    "importing",
@@ -745,8 +784,10 @@ func (m *MediaLoader) ImportDownload(ctx context.Context, downloadURL, filename,
 		return 0, err
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	return job.MediaID, nil
+	mediaID := job.MediaID
+	m.mu.Unlock()
+	m.saveSource(mediaID, sourceURL)
+	return mediaID, nil
 }
 
 // ProbeSeries — быстрый metadata-only запрос без скачивания. Пытается

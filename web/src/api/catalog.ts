@@ -24,7 +24,7 @@ export interface CatalogSeason {
 	tags?: CatalogTag[];
 }
 
-export interface CatalogTag {
+interface CatalogTag {
 	id: number;
 	group: string;
 	slug: string;
