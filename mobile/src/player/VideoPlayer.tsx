@@ -41,6 +41,8 @@ interface VideoPlayerProps {
 	title?: string;
 	/** Версия обложки: после загрузки новой постер перезагружается. */
 	coverVersion?: number;
+	/** Текущая позиция и длительность: нужны обрезке для маркеров. */
+	onTimeUpdate?: (position: number, duration: number) => void;
 }
 
 // Отдельный компонент, потому что useKeepAwake нельзя вызывать условно:
@@ -139,6 +141,7 @@ export function VideoPlayer({
 	media,
 	title,
 	coverVersion = 0,
+	onTimeUpdate,
 }: VideoPlayerProps) {
 	useEffect(() => {
 		setPlayingMediaId(media.id);
@@ -223,11 +226,13 @@ export function VideoPlayer({
 
 	useEventListener(player, "timeUpdate", ({ currentTime }) => {
 		setPosition(currentTime);
+		onTimeUpdate?.(currentTime, duration);
 	});
 
 	useEventListener(player, "sourceLoad", ({ duration: loadedDuration }) => {
 		if (Number.isFinite(loadedDuration) && loadedDuration > 0) {
 			setDuration(loadedDuration);
+			onTimeUpdate?.(0, loadedDuration);
 		}
 	});
 

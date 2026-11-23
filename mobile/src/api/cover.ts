@@ -64,6 +64,24 @@ export async function uploadCover(
 	return parseCoverResponse(body);
 }
 
+export function useCoverFromFrame(mediaId: number) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: async () => {
+			await apiFetch<unknown>(`/media/${mediaId}/cover/from-frame`, {
+				method: "POST",
+			});
+			return Date.now();
+		},
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["favorites"] });
+			void queryClient.invalidateQueries({ queryKey: ["collections"] });
+			void queryClient.invalidateQueries({ queryKey: ["progress"] });
+		},
+	});
+}
+
 export function useUploadCover(mediaId: number) {
 	const queryClient = useQueryClient();
 	return useMutation({

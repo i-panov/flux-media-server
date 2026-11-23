@@ -16,6 +16,7 @@ import {
 	coverErrorKey,
 	coverUploadFile,
 	isCoverTooLarge,
+	useCoverFromFrame,
 	useUploadCover,
 } from "../api/cover";
 import { t, useLanguage } from "../i18n";
@@ -137,6 +138,7 @@ export function ChangeCoverSheet({
 	const { colors, radii, spacing } = useTheme();
 	const insets = useSafeAreaInsets();
 	const upload = useUploadCover(media.id);
+	const fromFrame = useCoverFromFrame(media.id);
 	const [error, setError] = useState<CoverMessageKey | null>(null);
 	const [uploaded, setUploaded] = useState(false);
 	// URL обложки на сервере не меняется, а expo-image кэширует его по URI.
@@ -145,7 +147,7 @@ export function ChangeCoverSheet({
 	const hasCover = media.cover_url !== "" || version > 0;
 	const previewPath = hasCover ? `${coverPath(media.id)}?v=${version}` : null;
 	const preview = useAuthImageSource(previewPath);
-	const busy = upload.isPending;
+	const busy = upload.isPending || fromFrame.isPending;
 	// Закрыть можно и во время загрузки: сеть могла зависнуть, а
 	// пользователь не должен оказаться заперт в модалке.
 	const close = () => onClose();
@@ -270,6 +272,41 @@ export function ChangeCoverSheet({
 							{busy ? t("cover.uploading") : t("cover.choose")}
 						</Text>
 					</Pressable>
+					{media.type === "video" && (
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel={t("cover.fromFrame")}
+							accessibilityState={{ disabled: busy, busy: fromFrame.isPending }}
+							disabled={busy}
+							onPress={() => {
+								setError(null);
+								setUploaded(false);
+								fromFrame.mutate(undefined, {
+									onSuccess: () => {
+										setVersion(Date.now());
+										setUploaded(true);
+										onUploaded();
+									},
+									onError: () => setError("cover.uploadError"),
+								});
+							}}
+							testID="change-cover-from-frame"
+							style={({ pressed }) => [
+								styles.secondary,
+								{
+									borderColor: colors.border,
+									borderRadius: radii.sm,
+									paddingHorizontal: spacing.md,
+									paddingVertical: spacing.md,
+									gap: spacing.sm,
+								},
+								(pressed || busy) && styles.pressed,
+							]}
+						>
+							<Ionicons name="camera-outline" size={20} color={colors.text} />
+							<Text style={{ color: colors.text }}>{t("cover.fromFrame")}</Text>
+						</Pressable>
+					)}
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel={uploaded ? t("cover.done") : t("common.cancel")}

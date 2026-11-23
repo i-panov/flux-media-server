@@ -27,8 +27,10 @@ import { DownloadButton } from "../../src/components/DownloadButton";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
+import { VideoClipAction } from "../../src/components/VideoClipAction";
 import { VideoMeta } from "../../src/components/VideoMeta";
 import { t, useLanguage } from "../../src/i18n";
+import { confirmDeleteMedia } from "../../src/media/confirmDelete";
 import {
 	extractFailureLabel,
 	extractPhaseLabel,
@@ -282,6 +284,7 @@ function VideoDetailContent() {
 	const removeMedia = useDeleteMedia();
 	const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
 	const [coverSheetOpen, setCoverSheetOpen] = useState(false);
+	const [playerPosition, setPlayerPosition] = useState(0);
 	// После PUT обложки URL не меняется, поэтому постер получает версию и
 	// перезагружает картинку в обход кэша expo-image.
 	const [coverVersion, setCoverVersion] = useState(0);
@@ -342,26 +345,23 @@ function VideoDetailContent() {
 		});
 	};
 
-	const confirmDelete = () => {
-		Alert.alert(t("video.deleteTitle"), t("video.deleteConfirm"), [
-			{ text: t("common.cancel"), style: "cancel" },
-			{
-				text: t("video.delete"),
-				style: "destructive",
-				onPress: () => {
-					removeMedia.mutate(item.id, {
-						onSuccess: goBackToVideoList,
-						onError: () => Alert.alert(t("video.deleteError")),
-					});
-				},
-			},
-		]);
-	};
+	const confirmDelete = () =>
+		confirmDeleteMedia(() =>
+			removeMedia.mutate(item.id, {
+				onSuccess: goBackToVideoList,
+				onError: () => Alert.alert(t("video.deleteError")),
+			}),
+		);
 
 	return (
 		<Screen scroll testID="video-detail-screen">
 			<BackButton />
-			<VideoPlayer key={item.id} media={item} coverVersion={coverVersion} />
+			<VideoPlayer
+				key={item.id}
+				media={item}
+				coverVersion={coverVersion}
+				onTimeUpdate={(position) => setPlayerPosition(position)}
+			/>
 			<View style={{ gap: spacing.xs }}>
 				<Text
 					testID="video-detail-title"
@@ -448,6 +448,7 @@ function VideoDetailContent() {
 							onPress={() => setCoverSheetOpen(true)}
 							testID="video-detail-cover"
 						/>
+						<VideoClipAction media={item} position={playerPosition} />
 						<ActionButton
 							icon="trash-outline"
 							label={t("video.delete")}
