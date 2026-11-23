@@ -292,6 +292,26 @@ export default function SettingsScreen() {
 				</View>
 			)}
 
+			{session.data?.is_admin === true && (
+				<View
+					style={[
+						styles.card,
+						{
+							borderColor: colors.borderStrong,
+							backgroundColor: colors.surface,
+						},
+					]}
+				>
+					<Link href="/admin" asChild>
+						<Pressable style={styles.linkButton} testID="settings-admin">
+							<Text style={[styles.link, { color: colors.accent }]}>
+								{t("admin.title")}
+							</Text>
+						</Pressable>
+					</Link>
+				</View>
+			)}
+
 			{!isTV && session.data !== null && (
 				<View
 					style={[

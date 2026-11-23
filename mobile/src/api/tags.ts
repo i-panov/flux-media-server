@@ -32,6 +32,18 @@ export function useEntityTags(entity: TagEntity, id: number, enabled = true) {
 	});
 }
 
+export function useDeleteTag() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) =>
+			apiFetch<void>(`/tags/${id}`, { method: "DELETE" }),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["tags"] });
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+		},
+	});
+}
+
 export function useCreateTag() {
 	const queryClient = useQueryClient();
 	return useMutation({
