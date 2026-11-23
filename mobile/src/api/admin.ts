@@ -17,7 +17,7 @@ const maintenanceSchema = z.object({
 		kind: z.string().optional(),
 		generated: z.number(),
 		failed: z.number(),
-		last_error: z.string().optional(),
+		last_error: z.string().nullish(),
 	}),
 });
 
@@ -42,7 +42,7 @@ const transcodeSchema = z.object({
 	filename: z.string(),
 	status: z.string(),
 	progress: z.number(),
-	error: z.string().optional(),
+	error: z.string().nullish(),
 });
 
 const originalSchema = z.object({

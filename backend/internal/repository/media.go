@@ -214,6 +214,17 @@ func (r *MediaStore) FindAudioMissingCover(ctx context.Context, limit int) ([]mo
 	return rows, err
 }
 
+// FindAudioCoverCandidates — аудио без обложки с курсором по id: админская
+// очередь не должна крутиться по одной и той же странице.
+func (r *MediaStore) FindAudioCoverCandidates(ctx context.Context, lastID uint, limit int) ([]models.Media, error) {
+	var rows []models.Media
+	err := r.db.WithContext(ctx).
+		Where("id > ? AND type = ? AND (cover_url IS NULL OR cover_url = '')",
+			lastID, models.MediaTypeAudio).
+		Order("id ASC").Limit(limit).Find(&rows).Error
+	return rows, err
+}
+
 func (r *MediaStore) SetClipSourceMediaID(ctx context.Context, id, sourceID uint) error {
 	return r.db.WithContext(ctx).Model(&models.Media{}).Where("id = ?", id).
 		Update("clip_source_media_id", sourceID).Error
@@ -348,7 +359,8 @@ func (r *MediaStore) attachTags(ctx context.Context, rows []models.Media) error 
 		tagIDs = append(tagIDs, link.TagID)
 	}
 	var tags []models.Tag
-	if err := r.db.WithContext(ctx).Where("id IN ?", tagIDs).Find(&tags).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id IN ?", tagIDs).
+		Order("tag_group ASC, name ASC").Find(&tags).Error; err != nil {
 		return err
 	}
 	byID := make(map[uint]models.Tag, len(tags))

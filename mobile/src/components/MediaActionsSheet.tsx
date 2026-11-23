@@ -137,6 +137,7 @@ export function MediaActionsSheet({
 							row("image-outline", t("cover.change"), () => setCoverOpen(true))}
 						<MediaExtraRows
 							media={media}
+							admin={admin}
 							onClip={() => setClipOpen(true)}
 							onSource={() => {
 								onClose();
@@ -216,16 +217,18 @@ function ActionRow({
 
 function MediaExtraRows({
 	media,
+	admin,
 	onClip,
 	onSource,
 }: {
 	media: Media;
+	admin: boolean;
 	onClip: () => void;
 	onSource: () => void;
 }) {
 	return (
 		<>
-			{(media.type === "video" || media.type === "audio") && (
+			{admin && (media.type === "video" || media.type === "audio") && (
 				<ActionRow
 					icon="cut-outline"
 					label={t("clip.submit")}

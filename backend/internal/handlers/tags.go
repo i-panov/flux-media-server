@@ -154,6 +154,9 @@ func (h *TagHandler) SetMediaTags(c *fiber.Ctx) error {
 	if err != nil {
 		return h.mapError(c, err)
 	}
+	if rows == nil {
+		rows = []models.Tag{}
+	}
 	return c.JSON(rows)
 }
 
@@ -188,6 +191,9 @@ func (h *TagHandler) SetWorkTags(c *fiber.Ctx) error {
 	if err != nil {
 		return h.mapError(c, err)
 	}
+	if rows == nil {
+		rows = []models.Tag{}
+	}
 	return c.JSON(rows)
 }
 
@@ -221,6 +227,9 @@ func (h *TagHandler) SetFranchiseTags(c *fiber.Ctx) error {
 	rows, err := h.tags.FranchiseTags(c.UserContext(), id)
 	if err != nil {
 		return h.mapError(c, err)
+	}
+	if rows == nil {
+		rows = []models.Tag{}
 	}
 	return c.JSON(rows)
 }

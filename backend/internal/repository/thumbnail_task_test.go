@@ -24,12 +24,12 @@ func TestThumbnailQueueLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), pending)
 
-	task, err := store.NextQueued(ctx)
+	task, err := store.NextQueued(ctx, models.ThumbnailKindThumb)
 	require.NoError(t, err)
 	require.Equal(t, uint(1), task.MediaID)
 	require.Equal(t, models.ThumbnailTaskProcessing, task.Status)
 
-	_, err = store.NextQueued(ctx)
+	_, err = store.NextQueued(ctx, models.ThumbnailKindThumb)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	require.NoError(t, store.Finish(ctx, task.ID, models.ThumbnailTaskDone, ""))

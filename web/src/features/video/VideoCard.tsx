@@ -167,6 +167,7 @@ export function VideoCard({
 					>
 						{media.title}
 					</Text>
+					<CardTags media={media} />
 					{media.year > 0 && (
 						<Text size="xs" c="dimmed">
 							{media.year}

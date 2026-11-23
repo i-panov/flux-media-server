@@ -34,7 +34,7 @@ export function useEntityTags(entity: TagEntity, id: number, enabled = true) {
 	return useQuery({
 		queryKey: ["tags", entity, id],
 		queryFn: async () =>
-			tagListSchema.parse(await apiFetch<unknown>(PATHS[entity](id))),
+			tagListSchema.parse((await apiFetch<unknown>(PATHS[entity](id))) ?? []),
 		enabled: enabled && id > 0,
 	});
 }
@@ -81,7 +81,7 @@ export function useSetEntityTags(entity: TagEntity, id: number) {
 				method: "PUT",
 				body: JSON.stringify({ tag_ids: tagIDs }),
 			});
-			return tagListSchema.parse(body);
+			return tagListSchema.parse(body ?? []);
 		},
 		onSuccess: (tags) => {
 			queryClient.setQueryData(["tags", entity, id], tags);

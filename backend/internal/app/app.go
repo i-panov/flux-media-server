@@ -956,6 +956,11 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 			log.Printf("dimensions: залито размеров кадра для %d видео", updated)
 		}
 	})
+	// Очередь админских задач поднимаем сразу, не дожидаясь стартовых
+	// бэкфиллов: иначе «продолжение после рестарта» откладывается на часы.
+	goSafe(func() {
+		thumbnailQueue.Resume(dimensionsCtx)
+	})
 	thumbBackfillWG := new(sync.WaitGroup)
 	thumbBackfillWG.Add(1)
 	goSafe(func() {
@@ -968,8 +973,6 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		if covers > 0 || coverFailed > 0 {
 			log.Printf("covers: извлечено %d, ошибок %d", covers, coverFailed)
 		}
-		// Незавершённые задачи админской очереди продолжаем после рестарта.
-		thumbnailQueue.Resume(dimensionsCtx)
 	})
 	goSafe(func() {
 		<-cleanupStop

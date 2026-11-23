@@ -218,3 +218,39 @@ func mediaFiltersFormat(formatTagID, genreTagID uint) MediaFilters {
 func kindPtr(kind models.VideoKind) *models.VideoKind {
 	return &kind
 }
+
+func TestMediaListIncludesTagsAndWorkTagsInContext(t *testing.T) {
+	db := setupCatalogDB(t)
+	tags := NewTagRepository(db)
+	mediaRepo := NewMediaRepository(db)
+	works := NewWorkRepository(db)
+	ctx := context.Background()
+	genre := models.Tag{Group: models.TagGroupGenre, Slug: "drama-attach", Name: "Драма"}
+	require.NoError(t, tags.Create(ctx, &genre))
+	media := models.Media{Title: "Эпизод", Type: models.MediaTypeVideo, FilePath: "/e.mp4", VideoKind: kindPtr(models.VideoKindMovie)}
+	require.NoError(t, mediaRepo.Create(ctx, &media))
+	require.NoError(t, tags.SetMediaTags(ctx, media.ID, []uint{genre.ID}))
+
+	rows, _, err := mediaRepo.FindAll(ctx, MediaFilters{Type: models.MediaTypeVideo}, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Len(t, rows[0].Tags, 1)
+	require.Equal(t, genre.Name, rows[0].Tags[0].Name)
+
+	found, err := mediaRepo.FindByID(ctx, media.ID)
+	require.NoError(t, err)
+	require.Len(t, found.Tags, 1)
+
+	work := models.Work{Kind: models.WorkKindSeries, Title: "Сериал"}
+	require.NoError(t, works.Create(ctx, &work))
+	require.NoError(t, tags.SetWorkTags(ctx, work.ID, []uint{genre.ID}))
+	season, err := works.CreateSeason(ctx, work.ID, 7, "")
+	require.NoError(t, err)
+	_, err = works.AddEpisode(ctx, season.ID, media.ID, nil)
+	require.NoError(t, err)
+
+	contextRow, err := works.GetMediaContext(ctx, media.ID)
+	require.NoError(t, err)
+	require.Len(t, contextRow.WorkTags, 1)
+	require.Equal(t, genre.Name, contextRow.WorkTags[0].Name)
+}

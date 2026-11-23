@@ -40,7 +40,7 @@ func (s *MediaMaintenanceService) Status() MaintenanceState {
 	return s.state
 }
 
-func (s *MediaMaintenanceService) start(kind string, run func(context.Context) (int, int)) bool {
+func (s *MediaMaintenanceService) start(kind string, run func(context.Context) (int, int, error)) bool {
 	s.mu.Lock()
 	if s.state.Running {
 		s.mu.Unlock()
@@ -49,12 +49,15 @@ func (s *MediaMaintenanceService) start(kind string, run func(context.Context) (
 	s.state = MaintenanceState{Running: true, Kind: kind, StartedAt: time.Now().UTC()}
 	s.mu.Unlock()
 	go func() {
-		generated, failed := run(context.Background())
+		generated, failed, runErr := run(context.Background())
 		s.mu.Lock()
 		s.state.Running = false
 		s.state.Generated = generated
 		s.state.Failed = failed
-		if failed > 0 {
+		switch {
+		case runErr != nil:
+			s.state.LastError = runErr.Error()
+		case failed > 0:
 			s.state.LastError = fmt.Sprintf("failed files: %d", failed)
 		}
 		s.state.FinishedAt = time.Now().UTC()
@@ -64,19 +67,21 @@ func (s *MediaMaintenanceService) start(kind string, run func(context.Context) (
 }
 
 func (s *MediaMaintenanceService) StartThumbnails() bool {
-	return s.start("thumbnails", func(ctx context.Context) (int, int) {
+	return s.start("thumbnails", func(ctx context.Context) (int, int, error) {
 		if err := s.queue.EnqueueMissing(ctx, models.ThumbnailKindThumb); err != nil {
-			return 0, 0
+			return 0, 0, err
 		}
-		return s.queue.Run(ctx, models.ThumbnailKindThumb)
+		generated, failed := s.queue.Run(ctx, models.ThumbnailKindThumb)
+		return generated, failed, nil
 	})
 }
 
 func (s *MediaMaintenanceService) StartCovers() bool {
-	return s.start("covers", func(ctx context.Context) (int, int) {
+	return s.start("covers", func(ctx context.Context) (int, int, error) {
 		if err := s.queue.EnqueueMissing(ctx, models.ThumbnailKindCover); err != nil {
-			return 0, 0
+			return 0, 0, err
 		}
-		return s.queue.Run(ctx, models.ThumbnailKindCover)
+		generated, failed := s.queue.Run(ctx, models.ThumbnailKindCover)
+		return generated, failed, nil
 	})
 }

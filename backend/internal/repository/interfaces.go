@@ -93,6 +93,8 @@ type MediaRepository interface {
 	// FindAudioMissingCover — аудио без обложки, для которого извлечение
 	// ещё не пробовали.
 	FindAudioMissingCover(ctx context.Context, limit int) ([]models.Media, error)
+	// FindAudioCoverCandidates — аудио без обложки с курсором по id.
+	FindAudioCoverCandidates(ctx context.Context, lastID uint, limit int) ([]models.Media, error)
 	// SetCoverAttempted фиксирует попытку извлечения встроенной обложки.
 	SetCoverAttempted(ctx context.Context, id uint, attempted bool) error
 	UpdateCoverURL(ctx context.Context, id uint, url string) error

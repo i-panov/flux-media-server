@@ -33,10 +33,10 @@ func (r *ThumbnailStore) ResetFinished(ctx context.Context, kind string) error {
 		Delete(&models.ThumbnailTask{}).Error
 }
 
-func (r *ThumbnailStore) NextQueued(ctx context.Context) (*models.ThumbnailTask, error) {
+func (r *ThumbnailStore) NextQueued(ctx context.Context, kind string) (*models.ThumbnailTask, error) {
 	var task models.ThumbnailTask
 	err := r.db.WithContext(ctx).
-		Where("status = ?", models.ThumbnailTaskQueued).
+		Where("status = ? AND kind = ?", models.ThumbnailTaskQueued, kind).
 		Order("id").First(&task).Error
 	if err != nil {
 		return nil, err
@@ -62,6 +62,15 @@ func (r *ThumbnailStore) Finish(ctx context.Context, id uint, status, message st
 	return r.db.WithContext(ctx).Model(&models.ThumbnailTask{}).
 		Where("id = ?", id).
 		Updates(map[string]any{"status": status, "error": message}).Error
+}
+
+// RequeueProcessing возвращает зависшие processing-задачи в очередь:
+// после падения процесса их никто не продолжит.
+func (r *ThumbnailStore) RequeueProcessing(ctx context.Context, kind string) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&models.ThumbnailTask{}).
+		Where("kind = ? AND status = ?", kind, models.ThumbnailTaskProcessing).
+		Updates(map[string]any{"status": models.ThumbnailTaskQueued})
+	return res.RowsAffected, res.Error
 }
 
 func (r *ThumbnailStore) Pending(ctx context.Context, kind string) (int64, error) {

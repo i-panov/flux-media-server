@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strconv"
+
+	"gorm.io/gorm"
 
 	"flux/internal/models"
 	"flux/internal/repository"
@@ -28,8 +31,12 @@ func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string)
 		return err
 	}
 	if kind == models.ThumbnailKindCover {
+		lastID := uint(0)
 		for {
-			rows, err := s.media.FindAudioMissingCover(ctx, thumbnailBackfillBatch)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			rows, err := s.media.FindAudioCoverCandidates(ctx, lastID, thumbnailBackfillBatch)
 			if err != nil {
 				return err
 			}
@@ -37,6 +44,7 @@ func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string)
 				return nil
 			}
 			for _, media := range rows {
+				lastID = media.ID
 				if err := s.tasks.Enqueue(ctx, media.ID, kind); err != nil {
 					return err
 				}
@@ -48,6 +56,9 @@ func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string)
 	}
 	lastID := uint(0)
 	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		rows, err := s.media.FindThumbnailCandidates(ctx, lastID, thumbnailBackfillBatch)
 		if err != nil {
 			return err
@@ -57,6 +68,9 @@ func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string)
 		}
 		for _, media := range rows {
 			lastID = media.ID
+			if s.thumb != nil && s.thumb.Exists(media.ID) {
+				continue
+			}
 			if err := s.tasks.Enqueue(ctx, media.ID, kind); err != nil {
 				return err
 			}
@@ -74,20 +88,20 @@ func (s *ThumbnailQueueService) Run(ctx context.Context, kind string) (int, int)
 		if ctx.Err() != nil {
 			return generated, failed
 		}
-		task, err := s.tasks.NextQueued(ctx)
+		task, err := s.tasks.NextQueued(ctx, kind)
 		if err != nil {
-			return generated, failed
-		}
-		if task.Kind != kind {
-			// Чужая очередь (превью vs обложки): возвращаем и выходим,
-			// следующий запуск продолжит свою.
-			_ = s.tasks.Finish(ctx, task.ID, models.ThumbnailTaskQueued, "")
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return generated, failed
+			}
+			log.Printf("thumbnail queue: claim %s: %v", kind, err)
 			return generated, failed
 		}
 		media, err := s.media.FindByID(ctx, task.MediaID)
 		if err != nil {
 			failed++
-			_ = s.tasks.Finish(ctx, task.ID, models.ThumbnailTaskError, "media not found")
+			if err := s.tasks.Finish(ctx, task.ID, models.ThumbnailTaskError, "media not found"); err != nil {
+				log.Printf("thumbnail queue: finish %d: %v", task.ID, err)
+			}
 			continue
 		}
 		ok := false
@@ -98,10 +112,14 @@ func (s *ThumbnailQueueService) Run(ctx context.Context, kind string) (int, int)
 		}
 		if ok {
 			generated++
-			_ = s.tasks.Finish(ctx, task.ID, models.ThumbnailTaskDone, "")
+			if err := s.tasks.Finish(ctx, task.ID, models.ThumbnailTaskDone, ""); err != nil {
+				log.Printf("thumbnail queue: finish %d: %v", task.ID, err)
+			}
 		} else {
 			failed++
-			_ = s.tasks.Finish(ctx, task.ID, models.ThumbnailTaskError, "generation failed")
+			if err := s.tasks.Finish(ctx, task.ID, models.ThumbnailTaskError, "generation failed"); err != nil {
+				log.Printf("thumbnail queue: finish %d: %v", task.ID, err)
+			}
 		}
 	}
 }
@@ -123,6 +141,9 @@ func (s *ThumbnailQueueService) processThumbnail(ctx context.Context, media *mod
 }
 
 func (s *ThumbnailQueueService) processCover(ctx context.Context, media *models.Media) bool {
+	if media.CoverURL != "" {
+		return true
+	}
 	if s.thumb.ExtractCoverContext(ctx, media.ID, media.FilePath) == "" {
 		_ = s.media.SetCoverAttempted(ctx, media.ID, true)
 		return false
@@ -137,6 +158,11 @@ func (s *ThumbnailQueueService) processCover(ctx context.Context, media *models.
 // Resume продолжает незавершённые задачи обоих видов после рестарта.
 func (s *ThumbnailQueueService) Resume(ctx context.Context) {
 	for _, kind := range []string{models.ThumbnailKindThumb, models.ThumbnailKindCover} {
+		if requeued, err := s.tasks.RequeueProcessing(ctx, kind); err != nil {
+			log.Printf("thumbnail queue: requeue %s: %v", kind, err)
+		} else if requeued > 0 {
+			log.Printf("thumbnail queue: requeued %d stale %s tasks", requeued, kind)
+		}
 		pending, err := s.tasks.Pending(ctx, kind)
 		if err != nil || pending == 0 {
 			continue
