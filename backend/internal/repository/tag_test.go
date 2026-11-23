@@ -254,3 +254,27 @@ func TestMediaListIncludesTagsAndWorkTagsInContext(t *testing.T) {
 	require.Len(t, contextRow.WorkTags, 1)
 	require.Equal(t, genre.Name, contextRow.WorkTags[0].Name)
 }
+
+func TestFavoritesIncludeMediaTags(t *testing.T) {
+	db := setupCatalogDB(t)
+	tags := NewTagRepository(db)
+	mediaRepo := NewMediaRepository(db)
+	favorites := NewFavoriteRepository(db)
+	users := NewUserRepository(db)
+	ctx := context.Background()
+	user := models.User{Email: "fav@example.com"}
+	require.NoError(t, users.Create(ctx, &user))
+	genre := models.Tag{Group: models.TagGroupGenre, Slug: "fav-tag", Name: "Комедия"}
+	require.NoError(t, tags.Create(ctx, &genre))
+	media := models.Media{Title: "Фильм", Type: models.MediaTypeVideo, FilePath: "/f.mp4", VideoKind: kindPtr(models.VideoKindMovie)}
+	require.NoError(t, mediaRepo.Create(ctx, &media))
+	require.NoError(t, tags.SetMediaTags(ctx, media.ID, []uint{genre.ID}))
+	require.NoError(t, favorites.Create(ctx, &models.Favorite{UserID: user.ID, MediaID: &media.ID}))
+
+	rows, _, err := favorites.FindByUser(ctx, user.ID, string(models.MediaTypeVideo), 10, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.NotNil(t, rows[0].Media)
+	require.Len(t, rows[0].Media.Tags, 1)
+	require.Equal(t, genre.Name, rows[0].Media.Tags[0].Name)
+}

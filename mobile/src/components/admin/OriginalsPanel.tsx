@@ -6,6 +6,27 @@ import { useTheme } from "../../theme/ThemeProvider";
 
 // Карантин оригиналов: список и удаление. Скачивание на мобильном не
 // делаем — файл и так лежит на сервере.
+function statusLabel(status: string): string {
+	switch (status) {
+		case "untracked":
+			return t("admin.originals.statusUntracked");
+		case "orphaned":
+			return t("admin.originals.statusOrphaned");
+		case "queued":
+			return t("admin.queue.statusQueued");
+		case "processing":
+			return t("admin.queue.statusProcessing");
+		case "done":
+			return t("admin.queue.statusDone");
+		case "error":
+			return t("admin.queue.statusError");
+		case "cancelled":
+			return t("admin.queue.statusCancelled");
+		default:
+			return status;
+	}
+}
+
 export function OriginalsPanel() {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
@@ -46,7 +67,8 @@ export function OriginalsPanel() {
 						{row.name}
 					</Text>
 					<Text style={{ color: colors.textMuted }}>
-						{formatFileSize(row.size_bytes)} · {row.status} · {row.views}
+						{formatFileSize(row.size_bytes)} · {statusLabel(row.status)} ·{" "}
+						{t("admin.originals.views", { count: row.views })}
 					</Text>
 					<Pressable
 						testID={`admin-original-delete-${row.name}`}

@@ -23,6 +23,7 @@ import (
 	"flux/internal/email"
 	"flux/internal/handlers"
 	"flux/internal/middleware"
+	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/services"
 )
@@ -956,22 +957,24 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 			log.Printf("dimensions: залито размеров кадра для %d видео", updated)
 		}
 	})
-	// Очередь админских задач поднимаем сразу, не дожидаясь стартовых
-	// бэкфиллов: иначе «продолжение после рестарта» откладывается на часы.
-	goSafe(func() {
-		thumbnailQueue.Resume(dimensionsCtx)
-	})
 	thumbBackfillWG := new(sync.WaitGroup)
 	thumbBackfillWG.Add(1)
 	goSafe(func() {
 		defer thumbBackfillWG.Done()
-		generated, failed := services.BackfillThumbnails(dimensionsCtx, mediaRepo, thumbSvc)
-		if generated > 0 || failed > 0 {
-			log.Printf("thumbnails: сгенерировано %d, ошибок %d", generated, failed)
-		}
-		covers, coverFailed := services.BackfillAudioCovers(dimensionsCtx, mediaRepo, thumbSvc)
-		if covers > 0 || coverFailed > 0 {
-			log.Printf("covers: извлечено %d, ошибок %d", covers, coverFailed)
+		// Стартовый проход идёт через ту же очередь, что и админка:
+		// незавершённые задачи продолжаются, дублирующего ffmpeg нет.
+		for _, kind := range []string{
+			models.ThumbnailKindThumb,
+			models.ThumbnailKindCover,
+		} {
+			if err := thumbnailQueue.EnqueueMissing(dimensionsCtx, kind); err != nil {
+				log.Printf("thumbnail queue %s: enqueue: %v", kind, err)
+				continue
+			}
+			generated, failed := thumbnailQueue.Run(dimensionsCtx, kind)
+			if generated > 0 || failed > 0 {
+				log.Printf("%s: готово %d, ошибок %d", kind, generated, failed)
+			}
 		}
 	})
 	goSafe(func() {

@@ -428,6 +428,9 @@ func (r *CollectionItemStore) FindMediaByCollection(ctx context.Context, collect
 	if loadErr := LoadArtistsForMedia(r.db.WithContext(ctx), media); loadErr != nil {
 		return nil, loadErr
 	}
+	if err := attachTagsToMediaRows(r.db.WithContext(ctx), media); err != nil {
+		return nil, err
+	}
 
 	return media, nil
 }

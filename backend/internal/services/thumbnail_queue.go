@@ -27,6 +27,9 @@ func NewThumbnailQueueService(tasks *repository.ThumbnailStore, media repository
 
 // EnqueueMissing ставит в очередь всё, чему не хватает превью или обложки.
 func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string) error {
+	if _, err := s.tasks.RequeueProcessing(ctx, kind); err != nil {
+		return err
+	}
 	if err := s.tasks.ResetFinished(ctx, kind); err != nil {
 		return err
 	}
@@ -126,6 +129,14 @@ func (s *ThumbnailQueueService) Run(ctx context.Context, kind string) (int, int)
 
 func (s *ThumbnailQueueService) processThumbnail(ctx context.Context, media *models.Media) bool {
 	if s.thumb.Exists(media.ID) {
+		// Файл есть, но URL потерян — восстанавливаем ссылку.
+		if media.ThumbnailURL == "" {
+			url := "/api/media/" + strconv.FormatUint(uint64(media.ID), 10) + "/thumb"
+			if err := s.media.UpdateThumbnailURL(ctx, media.ID, url); err != nil {
+				log.Printf("thumbnail queue: restore url %d: %v", media.ID, err)
+				return false
+			}
+		}
 		return true
 	}
 	url := s.thumb.GenerateWithContext(ctx, media.ID, media.FilePath)

@@ -51,3 +51,21 @@ func TestThumbnailQueueRequeuesStaleProcessing(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint(1), task.MediaID)
 }
+
+func TestThumbnailQueueRunIgnoresOtherKind(t *testing.T) {
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+	store := repository.NewThumbnailRepository(db)
+	mediaRepo := repository.NewMediaRepository(db)
+	queue := NewThumbnailQueueService(store, mediaRepo, nil)
+	ctx := context.Background()
+	require.NoError(t, store.Enqueue(ctx, 1, models.ThumbnailKindCover))
+
+	generated, failed := queue.Run(ctx, models.ThumbnailKindThumb)
+	require.Zero(t, generated)
+	require.Zero(t, failed)
+	pending, err := store.Pending(ctx, models.ThumbnailKindCover)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), pending, "чужая задача остаётся в очереди")
+}

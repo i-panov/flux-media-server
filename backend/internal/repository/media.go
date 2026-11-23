@@ -219,8 +219,8 @@ func (r *MediaStore) FindAudioMissingCover(ctx context.Context, limit int) ([]mo
 func (r *MediaStore) FindAudioCoverCandidates(ctx context.Context, lastID uint, limit int) ([]models.Media, error) {
 	var rows []models.Media
 	err := r.db.WithContext(ctx).
-		Where("id > ? AND type = ? AND (cover_url IS NULL OR cover_url = '')",
-			lastID, models.MediaTypeAudio).
+		Where("id > ? AND type = ? AND (cover_url IS NULL OR cover_url = '') AND cover_attempted = ?",
+			lastID, models.MediaTypeAudio, false).
 		Order("id ASC").Limit(limit).Find(&rows).Error
 	return rows, err
 }

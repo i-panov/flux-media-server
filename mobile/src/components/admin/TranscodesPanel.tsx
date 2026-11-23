@@ -17,6 +17,8 @@ function statusLabel(status: string): string {
 			return t("admin.queue.statusDone");
 		case "error":
 			return t("admin.queue.statusError");
+		case "cancelled":
+			return t("admin.queue.statusCancelled");
 		default:
 			return status;
 	}
@@ -66,6 +68,7 @@ export function TranscodesPanel() {
 					{(row.status === "processing" || row.status === "queued") && (
 						<Pressable
 							testID={`admin-transcode-cancel-${row.id}`}
+							disabled={cancel.isPending}
 							onPress={() =>
 								cancel.mutate(row.id, {
 									onError: () =>
@@ -83,6 +86,7 @@ export function TranscodesPanel() {
 							</Text>
 							<Pressable
 								testID={`admin-transcode-retry-${row.id}`}
+								disabled={retry.isPending}
 								onPress={() =>
 									retry.mutate(row.id, {
 										onError: () =>
