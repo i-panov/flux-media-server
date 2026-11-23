@@ -591,5 +591,6 @@
 	"tags.type": "Тип",
 	"catalog.allGenres": "Все жанры",
 	"audio.sourceVideo": "Исходное видео",
-	"extract.ready": "Аудиодорожка извлечена: {{title}}"
+	"extract.ready": "Аудиодорожка извлечена: {{title}}",
+	"catalog.inheritedTags": "Жанры сериала"
 }

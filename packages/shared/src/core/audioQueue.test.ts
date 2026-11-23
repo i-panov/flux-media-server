@@ -34,6 +34,7 @@ function media(id: number): Media {
 		view_count: 0,
 		created_at: "2026-01-01T00:00:00Z",
 		source_url: "",
+		tags: [],
 		source_media_id: null,
 	};
 }

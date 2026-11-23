@@ -12,6 +12,13 @@ export type CoreFetcher = (
 	init?: { signal?: AbortSignal },
 ) => Promise<unknown>;
 
+const mediaTagSchema = z.object({
+	id: z.number(),
+	group: z.string(),
+	slug: z.string(),
+	name: z.string(),
+});
+
 const artistSchema = z.object({
 	id: z.number(),
 	name: z.string(),
@@ -52,6 +59,9 @@ export const mediaSchema = z.object({
 	// показать обратную ссылку без отдельной страницы аудио. Поле
 	// необязательное: старые ответы и очереди его не содержат.
 	source_media_id: z.number().nullish(),
+	// Теги для бейджей на карточках. Старые ответы и вложенные медиа
+	// приходят без них — поле необязательное.
+	tags: z.array(mediaTagSchema).optional(),
 });
 
 export type Media = z.infer<typeof mediaSchema>;

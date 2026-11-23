@@ -591,5 +591,6 @@
 	"tags.type": "Type",
 	"catalog.allGenres": "All genres",
 	"audio.sourceVideo": "Source video",
-	"extract.ready": "Audio track extracted: {{title}}"
+	"extract.ready": "Audio track extracted: {{title}}",
+	"catalog.inheritedTags": "Series genres"
 }

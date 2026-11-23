@@ -68,6 +68,26 @@ export function useWorks(kind: WorkKind, tagIDs: number[] = []) {
 	});
 }
 
+export interface MediaCatalogContext {
+	work_id?: number;
+	work_title?: string;
+	work_kind?: WorkKind;
+	season_id?: number;
+	season_number?: number;
+	episode_number?: number;
+	franchises: { id: number; name: string }[];
+	work_tags?: { id: number; group: string; slug: string; name: string }[];
+}
+
+export function useMediaCatalogContext(mediaId: number, enabled = true) {
+	return useQuery({
+		queryKey: ["media", mediaId, "catalog-context"],
+		queryFn: () =>
+			apiFetch<MediaCatalogContext>(`/media/${mediaId}/catalog-context`),
+		enabled: enabled && mediaId > 0,
+	});
+}
+
 export function useWork(id: number, enabled = true) {
 	return useQuery({
 		queryKey: ["works", id],

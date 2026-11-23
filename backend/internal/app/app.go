@@ -378,7 +378,9 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		log.Printf("import: recover stale jobs: %v", err)
 	}
 	importHandler := handlers.NewImportHandler(mediaLoader, importRepo, importSvc)
-	maintenanceSvc := services.NewMediaMaintenanceService(mediaRepo, thumbSvc)
+	thumbnailStore := repository.NewThumbnailRepository(db)
+	thumbnailQueue := services.NewThumbnailQueueService(thumbnailStore, mediaRepo, thumbSvc)
+	maintenanceSvc := services.NewMediaMaintenanceService(mediaRepo, thumbSvc, thumbnailQueue)
 	maintenanceHandler := handlers.NewMaintenanceHandler(mediaRepo, maintenanceSvc)
 	trashHandler := handlers.NewTrashHandler(mediaRepo, colRepo, streamer, thumbSvc, subRepo)
 	lyricsHandler := handlers.NewLyricsHandler(lyricsRepo, mediaRepo)
@@ -966,6 +968,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		if covers > 0 || coverFailed > 0 {
 			log.Printf("covers: извлечено %d, ошибок %d", covers, coverFailed)
 		}
+		// Незавершённые задачи админской очереди продолжаем после рестарта.
+		thumbnailQueue.Resume(dimensionsCtx)
 	})
 	goSafe(func() {
 		<-cleanupStop

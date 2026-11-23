@@ -1,4 +1,4 @@
-import { Card, Text } from "@mantine/core";
+import { Badge, Card, Group, Text } from "@mantine/core";
 import { Link } from "@tanstack/react-router";
 import { Check, Film } from "lucide-react";
 import { useId } from "react";
@@ -29,6 +29,22 @@ function ThumbImage({
 			onError={onError}
 			className="aspect-video w-full object-cover"
 		/>
+	);
+}
+
+function CardTags({ media }: { media: Media }) {
+	const tags = (media.tags ?? []).slice(0, 2);
+	if (tags.length === 0) {
+		return null;
+	}
+	return (
+		<Group gap={4} mt={4} wrap="nowrap">
+			{tags.map((tag) => (
+				<Badge key={tag.id} size="xs" variant="light" radius="sm">
+					{tag.name}
+				</Badge>
+			))}
+		</Group>
 	);
 }
 
@@ -96,6 +112,7 @@ export function VideoCard({
 					<Text fw={600} size="sm" mt="xs" lineClamp={2}>
 						{media.title}
 					</Text>
+					<CardTags media={media} />
 				</Card>
 			</button>
 		);

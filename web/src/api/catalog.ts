@@ -351,6 +351,7 @@ export interface MediaCatalogContext {
 	season_number?: number;
 	episode_number?: number;
 	franchises: Array<{ id: number; name: string }>;
+	work_tags?: Array<{ id: number; group: string; slug: string; name: string }>;
 }
 
 export function useMediaCatalogContext(mediaId: number, enabled = true) {

@@ -71,12 +71,15 @@ type Media struct {
 	// (POST /api/media/:id/clip). Отдельно от SourceMediaID: тот означает
 	// «аудиодорожка, извлечённая из видео», и смешивать их нельзя —
 	// экран видео искал бы видеоклип вместо трека.
-	ClipSourceMediaID *uint `gorm:"index" json:"clip_source_media_id,omitempty"`
-	MetadataID    *uint          `json:"metadata_id,omitempty"`
-	Metadata      *Metadata      `json:"metadata,omitempty"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ClipSourceMediaID *uint     `gorm:"index" json:"clip_source_media_id,omitempty"`
+	MetadataID        *uint     `json:"metadata_id,omitempty"`
+	Metadata          *Metadata `json:"metadata,omitempty"`
+	// Tags заполняется репозиторием отдельным запросом (gorm:"-"):
+	// карточкам нужны бейджи, но постоянная связь в preload дорога.
+	Tags      []Tag          `gorm:"-" json:"tags,omitempty"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 	// AutoTrashed — запись убрана сканером из-за пропажи файла, а не
 	// пользователем. Purge такой записи не удаляет файлы с диска: файл
 	// мог вернуться, а строка осталась в корзине. Пользовательская

@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
+	"flux/internal/models"
 	"flux/internal/repository"
 )
 
@@ -25,10 +27,11 @@ type MediaMaintenanceService struct {
 	state  MaintenanceState
 	media  repository.MediaRepository
 	thumbs *ThumbnailService
+	queue  *ThumbnailQueueService
 }
 
-func NewMediaMaintenanceService(media repository.MediaRepository, thumbs *ThumbnailService) *MediaMaintenanceService {
-	return &MediaMaintenanceService{media: media, thumbs: thumbs}
+func NewMediaMaintenanceService(media repository.MediaRepository, thumbs *ThumbnailService, queue *ThumbnailQueueService) *MediaMaintenanceService {
+	return &MediaMaintenanceService{media: media, thumbs: thumbs, queue: queue}
 }
 
 func (s *MediaMaintenanceService) Status() MaintenanceState {
@@ -51,6 +54,9 @@ func (s *MediaMaintenanceService) start(kind string, run func(context.Context) (
 		s.state.Running = false
 		s.state.Generated = generated
 		s.state.Failed = failed
+		if failed > 0 {
+			s.state.LastError = fmt.Sprintf("failed files: %d", failed)
+		}
 		s.state.FinishedAt = time.Now().UTC()
 		s.mu.Unlock()
 	}()
@@ -59,12 +65,18 @@ func (s *MediaMaintenanceService) start(kind string, run func(context.Context) (
 
 func (s *MediaMaintenanceService) StartThumbnails() bool {
 	return s.start("thumbnails", func(ctx context.Context) (int, int) {
-		return BackfillThumbnails(ctx, s.media, s.thumbs)
+		if err := s.queue.EnqueueMissing(ctx, models.ThumbnailKindThumb); err != nil {
+			return 0, 0
+		}
+		return s.queue.Run(ctx, models.ThumbnailKindThumb)
 	})
 }
 
 func (s *MediaMaintenanceService) StartCovers() bool {
 	return s.start("covers", func(ctx context.Context) (int, int) {
-		return BackfillAudioCovers(ctx, s.media, s.thumbs)
+		if err := s.queue.EnqueueMissing(ctx, models.ThumbnailKindCover); err != nil {
+			return 0, 0
+		}
+		return s.queue.Run(ctx, models.ThumbnailKindCover)
 	})
 }

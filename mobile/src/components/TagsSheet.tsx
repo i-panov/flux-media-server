@@ -13,6 +13,7 @@ import {
 	View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMediaCatalogContext } from "../api/catalog";
 import {
 	type Tag,
 	type TagEntity,
@@ -276,6 +277,13 @@ export function TagsSheet(props: TagsSheetProps) {
 	const insets = useSafeAreaInsets();
 	const current = useEntityTags(props.entity, props.id);
 	const tags = useTags();
+	const context = useMediaCatalogContext(
+		props.entity === "media" ? props.id : 0,
+		props.entity === "media",
+	);
+	const inherited = (context.data?.work_tags ?? []).filter(
+		(tag) => tag.group === "genre",
+	);
 	const ready =
 		current.data !== undefined &&
 		current.data !== null &&
@@ -313,6 +321,31 @@ export function TagsSheet(props: TagsSheetProps) {
 								<Ionicons name="close" size={20} color={colors.textMuted} />
 							</Pressable>
 						</View>
+						{inherited.length > 0 && (
+							<View style={{ gap: 4 }}>
+								<Text style={{ color: colors.textMuted }}>
+									{t("catalog.inheritedTags")}
+								</Text>
+								<View style={[styles.wrap, { gap: spacing.xs }]}>
+									{inherited.map((tag) => (
+										<View
+											key={tag.id}
+											style={[
+												styles.chip,
+												{
+													borderRadius: radii.md,
+													borderColor: colors.border,
+												},
+											]}
+										>
+											<Text style={{ color: colors.textMuted }}>
+												{tag.name}
+											</Text>
+										</View>
+									))}
+								</View>
+							</View>
+						)}
 						{ready ? (
 							<TagsForm
 								{...props}

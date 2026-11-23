@@ -178,6 +178,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.ImportJob{},
 		&models.ImportEpisode{},
 		&models.ClipTask{},
+		&models.ThumbnailTask{},
 	); err != nil {
 		return err
 	}
@@ -328,7 +329,32 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV11(db); err != nil {
 		return err
 	}
-	return runMigrationsV12(db)
+	if err := runMigrationsV12(db); err != nil {
+		return err
+	}
+	return runMigrationsV13(db)
+}
+
+// runMigrationsV13 — постоянная очередь превью и обложек.
+func runMigrationsV13(db *gorm.DB) error {
+	const schemaVersion = 13
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 13: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,

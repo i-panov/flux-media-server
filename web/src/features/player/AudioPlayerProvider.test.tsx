@@ -36,6 +36,7 @@ function media(id: number, title: string): Media {
 		created_at: "2026-01-01T00:00:00Z",
 		source_url: "",
 		source_media_id: null,
+		tags: [],
 	};
 }
 

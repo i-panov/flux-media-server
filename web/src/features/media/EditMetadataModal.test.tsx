@@ -33,6 +33,7 @@ function mediaItem(): Media {
 		created_at: "2026-01-01T00:00:00Z",
 		source_url: "https://example.com/source",
 		source_media_id: null,
+		tags: [],
 	};
 }
 

@@ -678,6 +678,9 @@ type MediaCatalogContext struct {
 	SeasonNumber  int                `json:"season_number,omitempty"`
 	EpisodeNumber *int               `json:"episode_number,omitempty"`
 	Franchises    []FranchiseContext `json:"franchises"`
+	// WorkTags — теги произведения: эпизод наследует жанры сериала,
+	// если у самого медиа тегов нет.
+	WorkTags []models.Tag `json:"work_tags,omitempty"`
 }
 
 type FranchiseContext struct {
@@ -733,6 +736,15 @@ func (r *WorkStore) GetMediaContext(ctx context.Context, mediaID uint) (*MediaCa
 	if err := entryQuery.Order("franchises.name ASC, franchises.id ASC").
 		Scan(&result.Franchises).Error; err != nil {
 		return nil, err
+	}
+	if result.WorkID != nil {
+		if err := r.db.WithContext(ctx).Model(&models.Tag{}).
+			Joins("JOIN work_tags ON work_tags.tag_id = tags.id").
+			Where("work_tags.work_id = ?", *result.WorkID).
+			Order("tags.tag_group ASC, tags.name ASC").
+			Find(&result.WorkTags).Error; err != nil {
+			return nil, err
+		}
 	}
 	return result, nil
 }

@@ -1,4 +1,4 @@
-import { Anchor, Button, Group, Stack, Text } from "@mantine/core";
+import { Anchor, Badge, Button, Group, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -22,6 +22,9 @@ export function VideoCatalogContext({ mediaId }: { mediaId: number }) {
 	}
 	const { work_id, work_title, work_kind, season_number, episode_number } =
 		context.data;
+	const inherited = (context.data.work_tags ?? []).filter(
+		(tag) => tag.group === "genre",
+	);
 	const hasWork = work_id !== undefined;
 	return (
 		<Stack gap={4}>
@@ -44,6 +47,18 @@ export function VideoCatalogContext({ mediaId }: { mediaId: number }) {
 								: ` · ${t("catalog.episode", { number: episode_number })}`}
 						</Text>
 					)}
+				</Group>
+			)}
+			{inherited.length > 0 && (
+				<Group gap={4}>
+					<Text size="sm" c="dimmed">
+						{t("catalog.inheritedTags")}:
+					</Text>
+					{inherited.map((tag) => (
+						<Badge key={tag.id} size="xs" variant="light">
+							{tag.name}
+						</Badge>
+					))}
 				</Group>
 			)}
 			{session.data?.is_admin === true &&

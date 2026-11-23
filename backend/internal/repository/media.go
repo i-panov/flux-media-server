@@ -101,6 +101,9 @@ func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, o
 	if loadErr := LoadArtistsForMedia(r.db.WithContext(ctx), media); loadErr != nil {
 		return nil, 0, loadErr
 	}
+	if err := r.attachTags(ctx, media); err != nil {
+		return nil, 0, err
+	}
 
 	return media, total, err
 }
@@ -119,6 +122,11 @@ func (r *MediaStore) FindByID(ctx context.Context, id uint) (*models.Media, erro
 		return &media, err
 	}
 	media.Artists = mediaSlice[0].Artists
+	rows := []models.Media{media}
+	if err := r.attachTags(ctx, rows); err != nil {
+		return &media, err
+	}
+	media.Tags = rows[0].Tags
 	return &media, nil
 }
 
@@ -311,6 +319,52 @@ func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media
 	// по ветке restore вместо честного 409.
 	err := r.db.WithContext(ctx).Unscoped().Where("file_hash = ?", hash).Order("deleted_at").Order("id").First(&media).Error
 	return &media, err
+}
+
+// attachTags подставляет теги пачкой: один запрос на страницу списка.
+func (r *MediaStore) attachTags(ctx context.Context, rows []models.Media) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	ids := make([]uint, 0, len(rows))
+	for i := range rows {
+		ids = append(ids, rows[i].ID)
+	}
+	var links []struct {
+		MediaID uint
+		TagID   uint
+	}
+	if err := r.db.WithContext(ctx).Table("media_tags").
+		Select("media_tags.media_id, media_tags.tag_id").
+		Where("media_tags.media_id IN ?", ids).
+		Scan(&links).Error; err != nil {
+		return err
+	}
+	if len(links) == 0 {
+		return nil
+	}
+	tagIDs := make([]uint, 0, len(links))
+	for _, link := range links {
+		tagIDs = append(tagIDs, link.TagID)
+	}
+	var tags []models.Tag
+	if err := r.db.WithContext(ctx).Where("id IN ?", tagIDs).Find(&tags).Error; err != nil {
+		return err
+	}
+	byID := make(map[uint]models.Tag, len(tags))
+	for _, tag := range tags {
+		byID[tag.ID] = tag
+	}
+	byMedia := make(map[uint][]models.Tag, len(rows))
+	for _, link := range links {
+		if tag, ok := byID[link.TagID]; ok {
+			byMedia[link.MediaID] = append(byMedia[link.MediaID], tag)
+		}
+	}
+	for i := range rows {
+		rows[i].Tags = byMedia[rows[i].ID]
+	}
+	return nil
 }
 
 // FindBySourceMediaID ищет аудиотрек, извлечённый из видео mediaID.
