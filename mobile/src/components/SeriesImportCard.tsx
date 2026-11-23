@@ -107,6 +107,9 @@ export function SeriesImportCard() {
 				{t("import.title")}
 			</Text>
 			<Text style={{ color: colors.textMuted }}>{t("import.hint")}</Text>
+			<Text style={{ color: colors.textMuted, fontSize: 12 }}>
+				{t("import.limit")}
+			</Text>
 			<TextInput
 				value={url}
 				onChangeText={setUrl}

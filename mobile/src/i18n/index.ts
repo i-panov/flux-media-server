@@ -107,6 +107,8 @@ export const ru = {
 	"import.title": "Импорт сезона по ссылке",
 	"import.hint":
 		"Вставьте ссылку на серию, сезон или сериал. Сначала проверяем структуру без скачивания.",
+	"import.limit":
+		"Сервис скачивает коллекцию целиком; в каталог попадут только выбранные серии.",
 	"import.url": "Ссылка",
 	"import.probe": "Проверить",
 	"import.probeError": "Не удалось проверить ссылку",
@@ -495,6 +497,8 @@ export const en: Record<keyof typeof ru, string> = {
 	"import.title": "Import season by link",
 	"import.hint":
 		"Paste an episode, season or series link. The structure is checked without downloading.",
+	"import.limit":
+		"The service downloads the whole collection; only selected episodes are added to the catalog.",
 	"import.url": "Link",
 	"import.probe": "Check",
 	"import.probeError": "Could not check the link",
