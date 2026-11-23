@@ -5,8 +5,9 @@ import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { isTV } from "../tv/profile";
 import { CatalogCard } from "./CatalogCard";
-import { catalogCardWidth, catalogColumns } from "./grid";
+import { catalogCardWidth, catalogColumns, catalogPadding } from "./grid";
 
 export function FranchisesList() {
 	useLanguage();
@@ -14,7 +15,10 @@ export function FranchisesList() {
 	const franchises = useFranchises();
 	const { width } = useWindowDimensions();
 	const columns = catalogColumns(width);
-	const cardWidth = catalogCardWidth(width, columns, 16, 12);
+	// Отступы берём те же, что Screen: на TV они больше, иначе строка
+	// шире контента и правая карточка обрезается.
+	const padding = catalogPadding(isTV, spacing);
+	const cardWidth = catalogCardWidth(width, columns, padding, spacing.md);
 	if (franchises.isPending) {
 		return <ActivityIndicator color={colors.accent} />;
 	}

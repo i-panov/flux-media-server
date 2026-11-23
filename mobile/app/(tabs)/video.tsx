@@ -117,7 +117,14 @@ export default function VideoScreen() {
 				titleStyle={styles.title}
 				trailing={isGrid ? <UploadAction type="video" /> : undefined}
 			/>
-			<VideoTabs value={tab} onChange={setTab} />
+			<VideoTabs
+				value={tab}
+				onChange={(next) => {
+					setTab(next);
+					// Формат со старой вкладки может быть скрыт на новой.
+					setFormatID(null);
+				}}
+			/>
 			{isGrid ? (
 				<>
 					<MediaSearchBar

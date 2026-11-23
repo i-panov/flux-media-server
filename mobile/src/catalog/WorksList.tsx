@@ -10,8 +10,9 @@ import { useWorks, type WorkKind } from "../api/catalog";
 import { EmptyState } from "../components/EmptyState";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { isTV } from "../tv/profile";
 import { CatalogCard } from "./CatalogCard";
-import { catalogCardWidth, catalogColumns } from "./grid";
+import { catalogCardWidth, catalogColumns, catalogPadding } from "./grid";
 
 // Список произведений одного типа: используется и отдельными экранами,
 // и вкладками видео-раздела.
@@ -21,7 +22,10 @@ export function WorksList({ kind }: { kind: WorkKind }) {
 	const works = useWorks(kind);
 	const { width } = useWindowDimensions();
 	const columns = catalogColumns(width);
-	const cardWidth = catalogCardWidth(width, columns, 16, 12);
+	// Отступы берём те же, что Screen: на TV они больше, иначе строка
+	// шире контента и правая карточка обрезается.
+	const padding = catalogPadding(isTV, spacing);
+	const cardWidth = catalogCardWidth(width, columns, padding, spacing.md);
 	if (works.isPending) {
 		return <ActivityIndicator color={colors.accent} />;
 	}

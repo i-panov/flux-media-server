@@ -5,6 +5,15 @@ export function catalogColumns(width: number): number {
 	return 2;
 }
 
+// Отступы экрана: на ТВ Screen использует spacing.xl, на телефоне spacing.lg.
+// Отдельная функция, чтобы TV-путь был покрыт тестом.
+export function catalogPadding(
+	wide: boolean,
+	spacing: { lg: number; xl: number },
+): number {
+	return wide ? spacing.xl : spacing.lg;
+}
+
 // Ширина карточки без «растягивания» последнего ряда: фиксируем её от
 // доступной ширины, а не через flex.
 export function catalogCardWidth(
