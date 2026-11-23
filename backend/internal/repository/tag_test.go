@@ -176,3 +176,45 @@ func TestFranchiseTagFilter(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 }
+
+func TestMediaFormatTagAndGenreIntersect(t *testing.T) {
+	db := setupCatalogDB(t)
+	tags := NewTagRepository(db)
+	mediaRepo := NewMediaRepository(db)
+	ctx := context.Background()
+	film := models.Tag{Group: models.TagGroupFormat, Slug: "film-int", Name: "Фильм"}
+	clip := models.Tag{Group: models.TagGroupFormat, Slug: "clip-int", Name: "Клип"}
+	action := models.Tag{Group: models.TagGroupGenre, Slug: "action-int", Name: "Боевик"}
+	for _, tag := range []*models.Tag{&film, &clip, &action} {
+		require.NoError(t, tags.Create(ctx, tag))
+	}
+	rows := []models.Media{
+		{Title: "Фильм-боевик", Type: models.MediaTypeVideo, FilePath: "/a.mp4", VideoKind: kindPtr(models.VideoKindMovie)},
+		{Title: "Фильм-комедия", Type: models.MediaTypeVideo, FilePath: "/b.mp4", VideoKind: kindPtr(models.VideoKindMovie)},
+		{Title: "Клип-боевик", Type: models.MediaTypeVideo, FilePath: "/c.mp4", VideoKind: kindPtr(models.VideoKindMovie)},
+	}
+	for i := range rows {
+		require.NoError(t, mediaRepo.Create(ctx, &rows[i]))
+	}
+	require.NoError(t, tags.SetMediaTags(ctx, rows[0].ID, []uint{film.ID, action.ID}))
+	require.NoError(t, tags.SetMediaTags(ctx, rows[1].ID, []uint{film.ID}))
+	require.NoError(t, tags.SetMediaTags(ctx, rows[2].ID, []uint{clip.ID, action.ID}))
+
+	found, total, err := mediaRepo.FindAll(ctx, mediaFiltersFormat(film.ID, action.ID), 10, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, found, 1)
+	require.Equal(t, "Фильм-боевик", found[0].Title)
+}
+
+func mediaFiltersFormat(formatTagID, genreTagID uint) MediaFilters {
+	return MediaFilters{
+		Type:        models.MediaTypeVideo,
+		FormatTagID: formatTagID,
+		TagIDs:      []uint{genreTagID},
+	}
+}
+
+func kindPtr(kind models.VideoKind) *models.VideoKind {
+	return &kind
+}

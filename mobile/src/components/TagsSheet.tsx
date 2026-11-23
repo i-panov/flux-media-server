@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
 	ActivityIndicator,
 	KeyboardAvoidingView,
@@ -31,6 +31,39 @@ interface TagsSheetProps {
 	onClose: () => void;
 }
 
+function TagChip({
+	tag,
+	active,
+	onPress,
+}: {
+	tag: Tag;
+	active: boolean;
+	onPress: () => void;
+}) {
+	const { colors, radii } = useTheme();
+	return (
+		<Pressable
+			testID={`tag-${tag.id}`}
+			accessibilityRole="button"
+			accessibilityState={{ selected: active }}
+			accessibilityLabel={tag.name}
+			onPress={onPress}
+			style={[
+				styles.chip,
+				{
+					borderRadius: radii.md,
+					borderColor: active ? colors.accent : colors.border,
+					backgroundColor: active ? colors.surfaceMuted : colors.surface,
+				},
+			]}
+		>
+			<Text style={{ color: active ? colors.accent : colors.text }}>
+				{tag.name}
+			</Text>
+		</Pressable>
+	);
+}
+
 // Формат — ровно один (только у медиа), жанры — сколько угодно.
 // Значения читаются один раз при открытии, дальше правятся локально.
 function TagsForm({
@@ -49,14 +82,8 @@ function TagsForm({
 	const [group, setGroup] = useState<"genre" | "format">("genre");
 	const [error, setError] = useState<string | null>(null);
 
-	const formats = useMemo(
-		() => tags.filter((tag) => tag.group === "format"),
-		[tags],
-	);
-	const genres = useMemo(
-		() => tags.filter((tag) => tag.group === "genre"),
-		[tags],
-	);
+	const formats = tags.filter((tag) => tag.group === "format");
+	const genres = tags.filter((tag) => tag.group === "genre");
 
 	const toggle = (tag: Tag) => {
 		setSelected((prev) => {
@@ -76,26 +103,6 @@ function TagsForm({
 		});
 	};
 
-	const chip = (tag: Tag, active: boolean) => (
-		<Pressable
-			key={tag.id}
-			testID={`tag-${tag.id}`}
-			onPress={() => toggle(tag)}
-			style={[
-				styles.chip,
-				{
-					borderRadius: radii.md,
-					borderColor: active ? colors.accent : colors.border,
-					backgroundColor: active ? colors.surfaceMuted : colors.surface,
-				},
-			]}
-		>
-			<Text style={{ color: active ? colors.accent : colors.text }}>
-				{tag.name}
-			</Text>
-		</Pressable>
-	);
-
 	return (
 		<>
 			<Text style={[styles.heading, { color: colors.text }]}>
@@ -106,7 +113,14 @@ function TagsForm({
 					<View style={{ gap: spacing.xs }}>
 						<Text style={{ color: colors.textMuted }}>{t("tags.format")}</Text>
 						<View style={[styles.wrap, { gap: spacing.xs }]}>
-							{formats.map((tag) => chip(tag, selected.includes(tag.id)))}
+							{formats.map((tag) => (
+								<TagChip
+									key={tag.id}
+									tag={tag}
+									active={selected.includes(tag.id)}
+									onPress={() => toggle(tag)}
+								/>
+							))}
 						</View>
 					</View>
 				)}
@@ -116,7 +130,14 @@ function TagsForm({
 						<Text style={{ color: colors.textMuted }}>{t("tags.empty")}</Text>
 					) : (
 						<View style={[styles.wrap, { gap: spacing.xs }]}>
-							{genres.map((tag) => chip(tag, selected.includes(tag.id)))}
+							{genres.map((tag) => (
+								<TagChip
+									key={tag.id}
+									tag={tag}
+									active={selected.includes(tag.id)}
+									onPress={() => toggle(tag)}
+								/>
+							))}
 						</View>
 					)}
 				</View>
@@ -179,7 +200,21 @@ function TagsForm({
 								},
 								{
 									onSuccess: (tag) => {
-										setSelected((prev) => [...prev, tag.id]);
+										setSelected((prev) => {
+											if (tag.group !== "format") {
+												return [...prev, tag.id];
+											}
+											const otherFormats = tags
+												.filter(
+													(item) =>
+														item.group === "format" && item.id !== tag.id,
+												)
+												.map((item) => item.id);
+											return [
+												...prev.filter((id) => !otherFormats.includes(id)),
+												tag.id,
+											];
+										});
 										setName("");
 									},
 									onError: () => setError(t("tags.saveError")),

@@ -70,6 +70,7 @@ describe("videoSearchOptions", () => {
 		await client.fetchInfiniteQuery(
 			videoSearchOptions(stubFetcher(listBody([1], 1), calls), "", "desc", {
 				excludeFormat: "film",
+				formatTagID: 3,
 				tagIDs: [4, 7],
 			}),
 		);
@@ -77,12 +78,14 @@ describe("videoSearchOptions", () => {
 		const requested = requestedUrl(calls);
 		expect(requested.searchParams.get("exclude_format")).toBe("film");
 		expect(requested.searchParams.get("tag_ids")).toBe("4,7");
+		expect(requested.searchParams.get("format_tag_id")).toBe("3");
 		expect(
 			videoSearchOptions(stubFetcher(listBody([], 0)), "", "desc", {
 				excludeFormat: "film",
+				formatTagID: 3,
 				tagIDs: [4, 7],
 			}).queryKey,
-		).toEqual(["media", "video", "", "desc", 0, "", "film", 0, "4,7"]);
+		).toEqual(["media", "video", "", "desc", 0, "", "film", 3, "4,7"]);
 	});
 
 	it("пробельный q даёт один запрос без q и пустой ключ", async () => {

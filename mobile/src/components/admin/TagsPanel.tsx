@@ -28,6 +28,7 @@ export function TagsPanel() {
 	const [name, setName] = useState("");
 	const [group, setGroup] = useState<TagGroup>("genre");
 	const deleteLabel = t("admin.delete");
+	const errorLabel = t("common.error");
 	const formatLabel = t("tags.format");
 	const genreLabel = t("tags.genre");
 
@@ -40,7 +41,10 @@ export function TagsPanel() {
 				name: value,
 				slug: value.toLocaleLowerCase().replace(/\s+/g, "-"),
 			},
-			{ onSuccess: () => setName("") },
+			{
+				onSuccess: () => setName(""),
+				onError: () => Alert.alert(t("admin.tags"), errorLabel),
+			},
 		);
 	};
 

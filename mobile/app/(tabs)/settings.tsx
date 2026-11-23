@@ -280,7 +280,7 @@ export default function SettingsScreen() {
 							</Text>
 						</Pressable>
 					</Link>
-					{session.data?.is_admin === true && (
+					{!isTV && session.data?.is_admin === true && (
 						<Link href="/trash" asChild>
 							<Pressable style={styles.linkButton}>
 								<Text style={[styles.link, { color: colors.accent }]}>
@@ -292,7 +292,7 @@ export default function SettingsScreen() {
 				</View>
 			)}
 
-			{session.data?.is_admin === true && (
+			{!isTV && session.data?.is_admin === true && (
 				<View
 					style={[
 						styles.card,

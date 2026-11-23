@@ -1,6 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { Pressable, Text, View } from "react-native";
+import {
+	Pressable,
+	type StyleProp,
+	Text,
+	View,
+	type ViewStyle,
+} from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 
 export function CatalogCard({
@@ -10,6 +16,7 @@ export function CatalogCard({
 	icon,
 	onPress,
 	testID,
+	style,
 }: {
 	id: number;
 	title: string;
@@ -17,6 +24,7 @@ export function CatalogCard({
 	icon: "tv" | "film";
 	onPress: () => void;
 	testID: string;
+	style?: StyleProp<ViewStyle>;
 }) {
 	const { colors, radii, spacing } = useTheme();
 	return (
@@ -25,7 +33,7 @@ export function CatalogCard({
 			accessibilityLabel={title}
 			onPress={onPress}
 			testID={testID}
-			style={{ width: 160, gap: spacing.xs }}
+			style={[{ width: 160, gap: spacing.xs }, style]}
 		>
 			<View
 				style={{

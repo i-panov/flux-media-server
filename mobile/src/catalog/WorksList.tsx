@@ -1,5 +1,12 @@
 import { router } from "expo-router";
-import { ActivityIndicator, FlatList, Pressable, Text } from "react-native";
+import {
+	ActivityIndicator,
+	FlatList,
+	Pressable,
+	Text,
+	useWindowDimensions,
+	View,
+} from "react-native";
 import { useWorks, type WorkKind } from "../api/catalog";
 import { EmptyState } from "../components/EmptyState";
 import { t, useLanguage } from "../i18n";
@@ -12,6 +19,10 @@ export function WorksList({ kind }: { kind: WorkKind }) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const works = useWorks(kind);
+	const { width } = useWindowDimensions();
+	// Телефон — 2 колонки, планшет — 3, ТВ/широкий экран — 4: карточки
+	// тянутся по ширине, а не висят по 160 dp с пустым полем.
+	const columns = width >= 900 ? 4 : width >= 600 ? 3 : 2;
 	if (works.isPending) {
 		return <ActivityIndicator color={colors.accent} />;
 	}
@@ -40,19 +51,22 @@ export function WorksList({ kind }: { kind: WorkKind }) {
 		<FlatList
 			data={works.data ?? []}
 			keyExtractor={(work) => String(work.id)}
-			numColumns={2}
+			numColumns={columns}
 			style={{ flex: 1 }}
 			contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.lg }}
 			columnWrapperStyle={{ gap: spacing.md }}
 			renderItem={({ item: work }) => (
-				<CatalogCard
-					id={work.id}
-					title={work.title}
-					coverURL={work.cover_url}
-					icon={work.kind === "series" ? "tv" : "film"}
-					testID={`work-card-${work.id}`}
-					onPress={() => router.push(`/series/${work.id}`)}
-				/>
+				<View style={{ flex: 1 }}>
+					<CatalogCard
+						style={{ width: "100%" }}
+						id={work.id}
+						title={work.title}
+						coverURL={work.cover_url}
+						icon={work.kind === "series" ? "tv" : "film"}
+						testID={`work-card-${work.id}`}
+						onPress={() => router.push(`/series/${work.id}`)}
+					/>
+				</View>
 			)}
 		/>
 	);
