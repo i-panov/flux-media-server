@@ -24,6 +24,7 @@ const fetcher: CoreFetcher = (path, init) => apiFetch(path, init);
 export interface VideoListFilters {
 	format?: string;
 	excludeFormat?: string;
+	formatTagID?: number;
 	tagIDs?: number[];
 }
 
@@ -40,6 +41,7 @@ export function videoSearchOptions(
 			sort,
 			filters.format,
 			filters.excludeFormat,
+			filters.formatTagID,
 			filters.tagIDs,
 		),
 		// Смена q/sort не должна схлопывать уже загруженный список в

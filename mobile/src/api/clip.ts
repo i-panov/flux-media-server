@@ -37,9 +37,16 @@ export function useCreateClip() {
 }
 
 export function useClip(id: number | null) {
+	const queryClient = useQueryClient();
 	return useQuery({
 		queryKey: ["clips", id],
-		queryFn: () => apiFetch<ClipTask>(`/clips/${id}`),
+		queryFn: async () => {
+			const task = await apiFetch<ClipTask>(`/clips/${id}`);
+			if (task.status === "done") {
+				void queryClient.invalidateQueries({ queryKey: ["media"] });
+			}
+			return task;
+		},
 		enabled: id !== null && id > 0,
 		refetchInterval: (query) => {
 			const status = query.state.data?.status;

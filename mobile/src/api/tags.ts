@@ -40,6 +40,8 @@ export function useDeleteTag() {
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["tags"] });
 			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["works"] });
+			void queryClient.invalidateQueries({ queryKey: ["franchises"] });
 		},
 	});
 }

@@ -47,6 +47,7 @@ export function VideoTabs({
 		<ScrollView
 			horizontal
 			showsHorizontalScrollIndicator={false}
+			style={{ flexGrow: 0 }}
 			contentContainerStyle={{ gap: spacing.xs }}
 		>
 			{TABS.map((tab) => {
@@ -55,6 +56,9 @@ export function VideoTabs({
 					<Pressable
 						key={tab}
 						testID={`video-tab-${tab}`}
+						accessibilityRole="tab"
+						accessibilityState={{ selected: active }}
+						accessibilityLabel={label(tab)}
 						onPress={() => onChange(tab)}
 						style={[
 							styles.tab,

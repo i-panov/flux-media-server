@@ -83,9 +83,21 @@ export function useStartImport() {
 }
 
 export function useImportJob(id: number | null) {
+	const queryClient = useQueryClient();
 	return useQuery({
 		queryKey: ["import", id],
-		queryFn: () => apiFetch<ImportJobDetail>(`/import/${id}`),
+		queryFn: async () => {
+			const detail = await apiFetch<ImportJobDetail>(`/import/${id}`);
+			if (
+				detail.job.status !== "queued" &&
+				detail.job.status !== "downloading" &&
+				detail.job.status !== "importing"
+			) {
+				void queryClient.invalidateQueries({ queryKey: ["works"] });
+				void queryClient.invalidateQueries({ queryKey: ["media"] });
+			}
+			return detail;
+		},
 		enabled: id !== null && id > 0,
 		refetchInterval: (query) => {
 			const status = query.state.data?.job.status;

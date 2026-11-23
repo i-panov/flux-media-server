@@ -72,6 +72,13 @@ func (h *MediaHandler) List(c *fiber.Ctx) error {
 	filters.IncludeEpisodes = c.QueryBool("include_episodes", false)
 	filters.Format = strings.TrimSpace(c.Query("format"))
 	filters.ExcludeFormat = strings.TrimSpace(c.Query("exclude_format"))
+	if rawFormatTag := strings.TrimSpace(c.Query("format_tag_id")); rawFormatTag != "" {
+		id, err := strconv.ParseUint(rawFormatTag, 10, 32)
+		if err != nil || id == 0 {
+			return response.Error(c, fiber.StatusBadRequest, "invalid format_tag_id")
+		}
+		filters.FormatTagID = uint(id)
+	}
 	if rawTags := strings.TrimSpace(c.Query("tag_ids")); rawTags != "" {
 		for _, part := range strings.Split(rawTags, ",") {
 			id, err := strconv.ParseUint(strings.TrimSpace(part), 10, 32)

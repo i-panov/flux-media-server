@@ -3,13 +3,16 @@ import type { Media } from "@flux/shared";
 import { useState } from "react";
 import {
 	ActivityIndicator,
+	KeyboardAvoidingView,
 	Modal,
+	Platform,
 	Pressable,
 	StyleSheet,
 	Text,
 	TextInput,
 	View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCancelClip, useClip, useCreateClip } from "../api/clip";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
@@ -29,6 +32,7 @@ export function ClipSheet({
 }) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
+	const insets = useSafeAreaInsets();
 	const create = useCreateClip();
 	const cancel = useCancelClip();
 	const [start, setStart] = useState("0");
@@ -66,141 +70,147 @@ export function ClipSheet({
 	const running = status === "queued" || status === "processing";
 	return (
 		<Modal visible transparent animationType="slide" onRequestClose={onClose}>
-			<Pressable style={styles.backdrop} onPress={onClose}>
-				<Pressable
-					onPress={() => undefined}
-					style={[
-						styles.sheet,
-						{
-							backgroundColor: colors.surface,
-							borderRadius: radii.lg,
-							padding: spacing.lg,
-							gap: spacing.sm,
-						},
-					]}
-				>
-					<View style={[styles.row, styles.between]}>
-						<Text
-							style={{ color: colors.text, fontSize: 18, fontWeight: "600" }}
-						>
-							{t("clip.title")}
-						</Text>
-						<Pressable onPress={onClose} testID="clip-close">
-							<Ionicons name="close" size={20} color={colors.textMuted} />
-						</Pressable>
-					</View>
-					<Text style={{ color: colors.textMuted }}>
-						{t("clip.position", { value: position.toFixed(1) })}
-					</Text>
-					<View style={[styles.row, { gap: spacing.sm }]}>
-						{[
-							{
-								key: "start",
-								label: t("clip.setStart"),
-								apply: () => setStart(position.toFixed(1)),
-							},
-							{
-								key: "end",
-								label: t("clip.setEnd"),
-								apply: () => setEnd(position.toFixed(1)),
-							},
-						].map((action) => (
-							<Pressable
-								key={action.key}
-								testID={`clip-${action.key}-here`}
-								onPress={action.apply}
-								style={[
-									styles.small,
-									{ borderColor: colors.border, borderRadius: radii.md },
-								]}
-							>
-								<Text style={{ color: colors.accent }}>{action.label}</Text>
-							</Pressable>
-						))}
-					</View>
-					<View style={[styles.row, { gap: spacing.sm }]}>
-						{[
-							{
-								key: "start",
-								value: start,
-								set: setStart,
-								label: t("clip.start"),
-							},
-							{ key: "end", value: end, set: setEnd, label: t("clip.end") },
-						].map((field) => (
-							<View key={field.key} style={{ flex: 1, gap: 4 }}>
-								<Text style={{ color: colors.textMuted }}>{field.label}</Text>
-								<TextInput
-									value={field.value}
-									onChangeText={field.set}
-									keyboardType="numeric"
-									testID={`clip-${field.key}`}
-									style={[
-										styles.input,
-										{
-											color: colors.text,
-											borderColor: colors.border,
-											borderRadius: radii.md,
-										},
-									]}
-								/>
-							</View>
-						))}
-					</View>
-					<TextInput
-						value={title}
-						onChangeText={setTitle}
-						placeholder={t("clip.name")}
-						placeholderTextColor={colors.textMuted}
-						testID="clip-title"
-						style={[
-							styles.input,
-							{
-								color: colors.text,
-								borderColor: colors.border,
-								borderRadius: radii.md,
-							},
-						]}
-					/>
-					{error !== null && (
-						<Text style={{ color: colors.danger }}>{error}</Text>
-					)}
-					{status !== undefined && (
-						<Text style={{ color: colors.textMuted }}>
-							{status === "done"
-								? t("clip.done")
-								: status === "error"
-									? (job.data?.error ?? t("clip.error"))
-									: t("clip.progress")}
-						</Text>
-					)}
-					{running && jobID !== null && (
-						<Pressable
-							testID="clip-cancel"
-							onPress={() => cancel.mutate(jobID)}
-						>
-							<Text style={{ color: colors.danger }}>{t("clip.cancel")}</Text>
-						</Pressable>
-					)}
+			<KeyboardAvoidingView
+				style={styles.backdrop}
+				behavior={Platform.OS === "ios" ? "padding" : undefined}
+			>
+				<Pressable style={styles.backdrop} onPress={onClose}>
 					<Pressable
-						testID="clip-submit"
-						disabled={create.isPending || running}
-						onPress={submit}
+						onPress={() => undefined}
 						style={[
-							styles.button,
-							{ backgroundColor: colors.accent, borderRadius: radii.md },
+							styles.sheet,
+							{
+								backgroundColor: colors.surface,
+								borderRadius: radii.lg,
+								padding: spacing.lg,
+								paddingBottom: spacing.lg + insets.bottom,
+								gap: spacing.sm,
+							},
 						]}
 					>
-						{create.isPending ? (
-							<ActivityIndicator color={colors.onAccent} />
-						) : (
-							<Text style={{ color: colors.onAccent, fontWeight: "600" }}>
-								{t("clip.submit")}
+						<View style={[styles.row, styles.between]}>
+							<Text
+								style={{ color: colors.text, fontSize: 18, fontWeight: "600" }}
+							>
+								{t("clip.title")}
+							</Text>
+							<Pressable onPress={onClose} testID="clip-close">
+								<Ionicons name="close" size={20} color={colors.textMuted} />
+							</Pressable>
+						</View>
+						<Text style={{ color: colors.textMuted }}>
+							{t("clip.position", { value: position.toFixed(1) })}
+						</Text>
+						<View style={[styles.row, { gap: spacing.sm }]}>
+							{[
+								{
+									key: "start",
+									label: t("clip.setStart"),
+									apply: () => setStart(position.toFixed(1)),
+								},
+								{
+									key: "end",
+									label: t("clip.setEnd"),
+									apply: () => setEnd(position.toFixed(1)),
+								},
+							].map((action) => (
+								<Pressable
+									key={action.key}
+									testID={`clip-${action.key}-here`}
+									onPress={action.apply}
+									style={[
+										styles.small,
+										{ borderColor: colors.border, borderRadius: radii.md },
+									]}
+								>
+									<Text style={{ color: colors.accent }}>{action.label}</Text>
+								</Pressable>
+							))}
+						</View>
+						<View style={[styles.row, { gap: spacing.sm }]}>
+							{[
+								{
+									key: "start",
+									value: start,
+									set: setStart,
+									label: t("clip.start"),
+								},
+								{ key: "end", value: end, set: setEnd, label: t("clip.end") },
+							].map((field) => (
+								<View key={field.key} style={{ flex: 1, gap: 4 }}>
+									<Text style={{ color: colors.textMuted }}>{field.label}</Text>
+									<TextInput
+										value={field.value}
+										onChangeText={field.set}
+										keyboardType="numeric"
+										testID={`clip-${field.key}`}
+										style={[
+											styles.input,
+											{
+												color: colors.text,
+												borderColor: colors.border,
+												borderRadius: radii.md,
+											},
+										]}
+									/>
+								</View>
+							))}
+						</View>
+						<TextInput
+							value={title}
+							onChangeText={setTitle}
+							placeholder={t("clip.name")}
+							placeholderTextColor={colors.textMuted}
+							testID="clip-title"
+							style={[
+								styles.input,
+								{
+									color: colors.text,
+									borderColor: colors.border,
+									borderRadius: radii.md,
+								},
+							]}
+						/>
+						{error !== null && (
+							<Text style={{ color: colors.danger }}>{error}</Text>
+						)}
+						{status !== undefined && (
+							<Text style={{ color: colors.textMuted }}>
+								{status === "done"
+									? t("clip.done")
+									: status === "error"
+										? (job.data?.error ?? t("clip.error"))
+										: t("clip.progress")}
 							</Text>
 						)}
+						{running && jobID !== null && (
+							<Pressable
+								testID="clip-cancel"
+								onPress={() => cancel.mutate(jobID)}
+							>
+								<Text style={{ color: colors.danger }}>{t("clip.cancel")}</Text>
+							</Pressable>
+						)}
+						<Pressable
+							testID="clip-submit"
+							disabled={create.isPending || running}
+							onPress={submit}
+							style={[
+								styles.button,
+								{ backgroundColor: colors.accent, borderRadius: radii.md },
+							]}
+						>
+							{create.isPending ? (
+								<ActivityIndicator color={colors.onAccent} />
+							) : (
+								<Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+									{t("clip.submit")}
+								</Text>
+							)}
+						</Pressable>
 					</Pressable>
 				</Pressable>
-			</Pressable>
+			</KeyboardAvoidingView>
 		</Modal>
 	);
 }

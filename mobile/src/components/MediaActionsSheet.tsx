@@ -146,6 +146,7 @@ export function MediaActionsSheet({
 							media.type !== "image" &&
 							row("image-outline", t("cover.change"), () => setCoverOpen(true))}
 						{admin &&
+							media.type !== "image" &&
 							row("pricetags-outline", t("tags.title"), () =>
 								setTagsOpen(true),
 							)}

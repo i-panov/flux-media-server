@@ -51,6 +51,10 @@ func (r *MediaStore) FindAll(ctx context.Context, filters MediaFilters, limit, o
 			JOIN tags t ON t.id = mt.tag_id
 			WHERE t.tag_group = ? AND t.slug = ?)`, models.TagGroupFormat, filters.ExcludeFormat)
 	}
+	if filters.FormatTagID != 0 {
+		query = query.Where(`media.id IN (
+			SELECT media_id FROM media_tags WHERE tag_id = ?)`, filters.FormatTagID)
+	}
 	if len(filters.TagIDs) > 0 {
 		query = query.Where(`media.id IN (
 			SELECT media_id FROM media_tags WHERE tag_id IN ?)`, filters.TagIDs)

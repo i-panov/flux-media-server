@@ -132,7 +132,11 @@ export function TagsPanel() {
 											{
 												text: deleteLabel,
 												style: "destructive",
-												onPress: () => remove.mutate(tag.id),
+												onPress: () =>
+													remove.mutate(tag.id, {
+														onError: () =>
+															Alert.alert(t("admin.tags"), t("common.error")),
+													}),
 											},
 										])
 									}

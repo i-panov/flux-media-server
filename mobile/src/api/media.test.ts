@@ -82,7 +82,7 @@ describe("videoSearchOptions", () => {
 				excludeFormat: "film",
 				tagIDs: [4, 7],
 			}).queryKey,
-		).toEqual(["media", "video", "", "desc", 0, "", "film", "4,7"]);
+		).toEqual(["media", "video", "", "desc", 0, "", "film", 0, "4,7"]);
 	});
 
 	it("пробельный q даёт один запрос без q и пустой ключ", async () => {
@@ -106,6 +106,7 @@ describe("videoSearchOptions", () => {
 			0,
 			"",
 			"",
+			0,
 			"",
 		]);
 	});

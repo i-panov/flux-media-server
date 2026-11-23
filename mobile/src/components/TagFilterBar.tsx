@@ -56,6 +56,9 @@ export function TagFilterBar({
 			key={testID}
 			onPress={onPress}
 			testID={testID}
+			accessibilityRole="button"
+			accessibilityLabel={label}
+			accessibilityState={{ selected: active }}
 			style={[
 				styles.chip,
 				{
@@ -117,6 +120,8 @@ export function TagFilterBar({
 						</Text>
 						{mode === "format" && (
 							<Pressable
+								accessibilityRole="button"
+								accessibilityState={{ selected: formatID === null }}
 								onPress={() => {
 									onFormatChange(null);
 									setMode(null);
@@ -149,6 +154,8 @@ export function TagFilterBar({
 									<Pressable
 										key={tag.id}
 										testID={`filter-option-${tag.id}`}
+										accessibilityRole="button"
+										accessibilityState={{ selected: active }}
 										onPress={() => {
 											if (mode === "format") {
 												onFormatChange(tag.id);

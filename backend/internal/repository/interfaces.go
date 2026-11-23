@@ -40,6 +40,9 @@ type MediaFilters struct {
 	Format string
 	// ExcludeFormat — исключить media с этим format-тегом.
 	ExcludeFormat string
+	// FormatTagID — точный format-тег (AND к TagIDs): фильтр формата и
+	// жанров должен пересекаться, а не складываться по OR.
+	FormatTagID uint
 	// TagIDs — хотя бы один из тегов (OR). Пустой — без фильтра.
 	TagIDs []uint
 }

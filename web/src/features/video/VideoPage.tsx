@@ -260,15 +260,15 @@ function MoviesContent({
 	const formatTags = (tags.data ?? [])
 		.filter((tag) => tag.group === "format")
 		.map((tag) => ({ value: String(tag.id), label: tag.name }));
-	const selectedTagIDs = [
-		...(selectedFormat === null ? [] : [Number(selectedFormat)]),
-		...selectedTags.map(Number),
-	];
+	// Формат и жанры передаются раздельно: сервер применяет их как AND,
+	// иначе «фильм + боевик» вернул бы все фильмы и все боевики.
+	const selectedTagIDs = selectedTags.map(Number);
 	const list = useVideoList(
 		debounced,
 		sort,
 		format,
 		excludeFormat,
+		selectedFormat === null ? undefined : Number(selectedFormat),
 		selectedTagIDs,
 	);
 	const items = list.data?.pages.flatMap((page) => page.items) ?? [];

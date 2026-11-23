@@ -53,6 +53,7 @@ function AppShell({
 			pathname === "/downloads" ||
 			pathname === "/devices" ||
 			pathname === "/activate" ||
+			pathname === "/admin" ||
 			pathname.startsWith("/media/")
 		) {
 			router.replace("/video");

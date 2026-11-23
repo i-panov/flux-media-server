@@ -2,7 +2,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState } from "react";
 import {
 	ActivityIndicator,
+	KeyboardAvoidingView,
 	Modal,
+	Platform,
 	Pressable,
 	ScrollView,
 	StyleSheet,
@@ -10,6 +12,7 @@ import {
 	TextInput,
 	View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
 	type Tag,
 	type TagEntity,
@@ -55,19 +58,29 @@ function TagsForm({
 		[tags],
 	);
 
-	const toggle = (tagID: number) => {
-		setSelected((prev) =>
-			prev.includes(tagID)
-				? prev.filter((value) => value !== tagID)
-				: [...prev, tagID],
-		);
+	const toggle = (tag: Tag) => {
+		setSelected((prev) => {
+			if (tag.group !== "format") {
+				return prev.includes(tag.id)
+					? prev.filter((value) => value !== tag.id)
+					: [...prev, tag.id];
+			}
+			// Формат ровно один: выбор нового снимает прежний.
+			const otherFormats = tags
+				.filter((item) => item.group === "format" && item.id !== tag.id)
+				.map((item) => item.id);
+			const next = prev.filter((id) => !otherFormats.includes(id));
+			return next.includes(tag.id)
+				? next.filter((id) => id !== tag.id)
+				: [...next, tag.id];
+		});
 	};
 
 	const chip = (tag: Tag, active: boolean) => (
 		<Pressable
 			key={tag.id}
 			testID={`tag-${tag.id}`}
-			onPress={() => toggle(tag.id)}
+			onPress={() => toggle(tag)}
 			style={[
 				styles.chip,
 				{
@@ -221,6 +234,7 @@ function TagsForm({
 
 export function TagsSheet(props: TagsSheetProps) {
 	const { colors, radii, spacing } = useTheme();
+	const insets = useSafeAreaInsets();
 	const current = useEntityTags(props.entity, props.id);
 	const tags = useTags();
 	const ready =
@@ -234,38 +248,44 @@ export function TagsSheet(props: TagsSheetProps) {
 			animationType="slide"
 			onRequestClose={props.onClose}
 		>
-			<Pressable style={styles.backdrop} onPress={props.onClose}>
-				<Pressable
-					onPress={() => undefined}
-					style={[
-						styles.sheet,
-						{
-							backgroundColor: colors.surface,
-							borderRadius: radii.lg,
-							padding: spacing.lg,
-							gap: spacing.sm,
-						},
-					]}
-				>
-					<View style={[styles.row, styles.between]}>
-						<Text style={{ color: colors.textMuted }} numberOfLines={1}>
-							{props.title}
-						</Text>
-						<Pressable onPress={props.onClose} testID="tags-close">
-							<Ionicons name="close" size={20} color={colors.textMuted} />
-						</Pressable>
-					</View>
-					{ready ? (
-						<TagsForm
-							{...props}
-							tags={tags.data ?? []}
-							initial={(current.data ?? []).map((tag) => tag.id)}
-						/>
-					) : (
-						<ActivityIndicator color={colors.accent} />
-					)}
+			<KeyboardAvoidingView
+				style={styles.backdrop}
+				behavior={Platform.OS === "ios" ? "padding" : undefined}
+			>
+				<Pressable style={styles.backdrop} onPress={props.onClose}>
+					<Pressable
+						onPress={() => undefined}
+						style={[
+							styles.sheet,
+							{
+								backgroundColor: colors.surface,
+								borderRadius: radii.lg,
+								padding: spacing.lg,
+								paddingBottom: spacing.lg + insets.bottom,
+								gap: spacing.sm,
+							},
+						]}
+					>
+						<View style={[styles.row, styles.between]}>
+							<Text style={{ color: colors.textMuted }} numberOfLines={1}>
+								{props.title}
+							</Text>
+							<Pressable onPress={props.onClose} testID="tags-close">
+								<Ionicons name="close" size={20} color={colors.textMuted} />
+							</Pressable>
+						</View>
+						{ready ? (
+							<TagsForm
+								{...props}
+								tags={tags.data ?? []}
+								initial={(current.data ?? []).map((tag) => tag.id)}
+							/>
+						) : (
+							<ActivityIndicator color={colors.accent} />
+						)}
+					</Pressable>
 				</Pressable>
-			</Pressable>
+			</KeyboardAvoidingView>
 		</Modal>
 	);
 }

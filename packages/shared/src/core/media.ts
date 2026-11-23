@@ -101,6 +101,7 @@ interface MediaListRequest {
 	artistId?: number;
 	format?: string;
 	excludeFormat?: string;
+	formatTagID?: number;
 	tagIDs?: number[];
 	signal?: AbortSignal;
 }
@@ -116,6 +117,7 @@ export async function fetchMediaList(
 		artistId,
 		format,
 		excludeFormat,
+		formatTagID,
 		tagIDs,
 		signal,
 	}: MediaListRequest,
@@ -140,6 +142,9 @@ export async function fetchMediaList(
 	if (excludeFormat !== undefined && excludeFormat !== "") {
 		params.set("exclude_format", excludeFormat);
 	}
+	if (formatTagID !== undefined) {
+		params.set("format_tag_id", String(formatTagID));
+	}
 	if (tagIDs !== undefined && tagIDs.length > 0) {
 		params.set("tag_ids", tagIDs.join(","));
 	}
@@ -154,11 +159,21 @@ interface MediaListOptions {
 	artistId?: number;
 	format?: string;
 	excludeFormat?: string;
+	formatTagID?: number;
 	tagIDs?: number[];
 }
 
 function mediaListOptions(fetch: CoreFetcher, options: MediaListOptions) {
-	const { type, q, sort, artistId, format, excludeFormat, tagIDs } = options;
+	const {
+		type,
+		q,
+		sort,
+		artistId,
+		format,
+		excludeFormat,
+		formatTagID,
+		tagIDs,
+	} = options;
 	return infiniteQueryOptions({
 		queryKey: [
 			"media",
@@ -168,6 +183,7 @@ function mediaListOptions(fetch: CoreFetcher, options: MediaListOptions) {
 			artistId ?? 0,
 			format ?? "",
 			excludeFormat ?? "",
+			formatTagID ?? 0,
 			tagIDs?.join(",") ?? "",
 		],
 		queryFn: ({ pageParam, signal }) =>
@@ -180,6 +196,7 @@ function mediaListOptions(fetch: CoreFetcher, options: MediaListOptions) {
 				artistId,
 				format,
 				excludeFormat,
+				formatTagID,
 				tagIDs,
 				signal,
 			}),
@@ -206,6 +223,7 @@ export function videoListOptions(
 	sort: "asc" | "desc" = "desc",
 	format?: string,
 	excludeFormat?: string,
+	formatTagID?: number,
 	tagIDs?: number[],
 ) {
 	return mediaListOptions(fetch, {
@@ -214,6 +232,7 @@ export function videoListOptions(
 		sort,
 		format,
 		excludeFormat,
+		formatTagID,
 		tagIDs,
 	});
 }

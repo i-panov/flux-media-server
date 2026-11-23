@@ -93,7 +93,8 @@ export default function VideoScreen() {
 		{
 			format: tab === "films" ? "film" : undefined,
 			excludeFormat: tab === "videos" ? "film" : undefined,
-			tagIDs: [...(formatID === null ? [] : [formatID]), ...genreIDs],
+			formatTagID: formatID === null ? undefined : formatID,
+			tagIDs: genreIDs,
 		},
 		isGrid,
 	);

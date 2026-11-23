@@ -7,6 +7,7 @@ import { useTheme } from "../../theme/ThemeProvider";
 export function UsersPanel() {
 	useLanguage();
 	const { colors, spacing } = useTheme();
+	const errorLabel = t("common.error");
 	const users = useAdminUsers();
 	const session = useSession();
 	const setAdmin = useSetUserAdmin();
@@ -18,7 +19,7 @@ export function UsersPanel() {
 		);
 	}
 	if (users.isError) {
-		return <Text style={{ color: colors.danger }}>{t("common.error")}</Text>;
+		return <Text style={{ color: colors.danger }}>{errorLabel}</Text>;
 	}
 	if ((users.data ?? []).length === 0) {
 		return (
@@ -39,7 +40,12 @@ export function UsersPanel() {
 							disabled={self || setAdmin.isPending}
 							testID={`admin-user-admin-${user.id}`}
 							onValueChange={(value) =>
-								setAdmin.mutate({ id: user.id, isAdmin: value })
+								setAdmin.mutate(
+									{ id: user.id, isAdmin: value },
+									{
+										onError: () => Alert.alert(t("admin.users"), errorLabel),
+									},
+								)
 							}
 						/>
 						{!self && (
@@ -52,7 +58,11 @@ export function UsersPanel() {
 										{
 											text: deleteLabel,
 											style: "destructive",
-											onPress: () => remove.mutate(user.id),
+											onPress: () =>
+												remove.mutate(user.id, {
+													onError: () =>
+														Alert.alert(t("admin.users"), errorLabel),
+												}),
 										},
 									])
 								}

@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, Text } from "react-native";
 import { useWorks, type WorkKind } from "../api/catalog";
 import { EmptyState } from "../components/EmptyState";
 import { t, useLanguage } from "../i18n";
@@ -37,10 +37,15 @@ export function WorksList({ kind }: { kind: WorkKind }) {
 		);
 	}
 	return (
-		<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-			{works.data?.map((work) => (
+		<FlatList
+			data={works.data ?? []}
+			keyExtractor={(work) => String(work.id)}
+			numColumns={2}
+			style={{ flex: 1 }}
+			contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.lg }}
+			columnWrapperStyle={{ gap: spacing.md }}
+			renderItem={({ item: work }) => (
 				<CatalogCard
-					key={work.id}
 					id={work.id}
 					title={work.title}
 					coverURL={work.cover_url}
@@ -48,7 +53,7 @@ export function WorksList({ kind }: { kind: WorkKind }) {
 					testID={`work-card-${work.id}`}
 					onPress={() => router.push(`/series/${work.id}`)}
 				/>
-			))}
-		</View>
+			)}
+		/>
 	);
 }

@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, FlatList } from "react-native";
 import { useFranchises } from "../api/catalog";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
@@ -28,10 +28,15 @@ export function FranchisesList() {
 		);
 	}
 	return (
-		<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-			{franchises.data?.map((franchise) => (
+		<FlatList
+			data={franchises.data ?? []}
+			keyExtractor={(franchise) => String(franchise.id)}
+			numColumns={2}
+			style={{ flex: 1 }}
+			contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.lg }}
+			columnWrapperStyle={{ gap: spacing.md }}
+			renderItem={({ item: franchise }) => (
 				<CatalogCard
-					key={franchise.id}
 					id={franchise.id}
 					title={franchise.name}
 					coverURL={franchise.cover_url}
@@ -39,7 +44,7 @@ export function FranchisesList() {
 					testID={`franchise-card-${franchise.id}`}
 					onPress={() => router.push(`/franchises/${franchise.id}`)}
 				/>
-			))}
-		</View>
+			)}
+		/>
 	);
 }
