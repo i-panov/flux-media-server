@@ -69,6 +69,18 @@ func (r *FavoriteStore) FindByUser(ctx context.Context, userID uint, mediaType s
 				favs[i].Media.Artists = artistsByID[favs[i].Media.ID]
 			}
 		}
+		if err := attachTagsToMediaRows(r.db.WithContext(ctx), media); err != nil {
+			return favs, total, err
+		}
+		tagsByID := make(map[uint][]models.Tag, len(media))
+		for i := range media {
+			tagsByID[media[i].ID] = media[i].Tags
+		}
+		for i := range favs {
+			if favs[i].Media != nil {
+				favs[i].Media.Tags = tagsByID[favs[i].Media.ID]
+			}
+		}
 	}
 	return favs, total, nil
 }

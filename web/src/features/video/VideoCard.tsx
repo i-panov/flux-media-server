@@ -40,7 +40,14 @@ function CardTags({ media }: { media: Media }) {
 	return (
 		<Group gap={4} mt={4} wrap="nowrap">
 			{tags.map((tag) => (
-				<Badge key={tag.id} size="xs" variant="light" radius="sm">
+				<Badge
+					key={tag.id}
+					size="xs"
+					variant="light"
+					radius="sm"
+					maw={96}
+					styles={{ label: { overflow: "hidden", textOverflow: "ellipsis" } }}
+				>
 					{tag.name}
 				</Badge>
 			))}

@@ -334,6 +334,12 @@ func (r *MediaStore) FindByHash(ctx context.Context, hash string) (*models.Media
 
 // attachTags подставляет теги пачкой: один запрос на страницу списка.
 func (r *MediaStore) attachTags(ctx context.Context, rows []models.Media) error {
+	return attachTagsToMediaRows(r.db.WithContext(ctx), rows)
+}
+
+// attachTagsToMediaRows — общий помощник для списков, где медиа приходит
+// через Preload (избранное, прогресс): бейджи тегов нужны и там.
+func attachTagsToMediaRows(db *gorm.DB, rows []models.Media) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -345,7 +351,7 @@ func (r *MediaStore) attachTags(ctx context.Context, rows []models.Media) error 
 		MediaID uint
 		TagID   uint
 	}
-	if err := r.db.WithContext(ctx).Table("media_tags").
+	if err := db.Table("media_tags").
 		Select("media_tags.media_id, media_tags.tag_id").
 		Where("media_tags.media_id IN ?", ids).
 		Scan(&links).Error; err != nil {
@@ -359,7 +365,7 @@ func (r *MediaStore) attachTags(ctx context.Context, rows []models.Media) error 
 		tagIDs = append(tagIDs, link.TagID)
 	}
 	var tags []models.Tag
-	if err := r.db.WithContext(ctx).Where("id IN ?", tagIDs).
+	if err := db.Where("id IN ?", tagIDs).
 		Order("tag_group ASC, name ASC").Find(&tags).Error; err != nil {
 		return err
 	}

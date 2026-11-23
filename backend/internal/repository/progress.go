@@ -50,7 +50,28 @@ func (r *ProgressStore) FindByUser(ctx context.Context, userID uint, mediaType m
 	// Stable pagination order — most recently watched first.
 	query = query.Order("updated_at DESC")
 	err := query.Find(&progress).Error
-	return progress, total, err
+	if err != nil {
+		return progress, total, err
+	}
+	media := make([]models.Media, 0, len(progress))
+	for i := range progress {
+		if progress[i].Media != nil {
+			media = append(media, *progress[i].Media)
+		}
+	}
+	if err := attachTagsToMediaRows(r.db.WithContext(ctx), media); err != nil {
+		return progress, total, err
+	}
+	tagsByID := make(map[uint][]models.Tag, len(media))
+	for i := range media {
+		tagsByID[media[i].ID] = media[i].Tags
+	}
+	for i := range progress {
+		if progress[i].Media != nil {
+			progress[i].Media.Tags = tagsByID[progress[i].Media.ID]
+		}
+	}
+	return progress, total, nil
 }
 
 func (r *ProgressStore) FindByUserAndMedia(ctx context.Context, userID, mediaID uint) (*models.WatchProgress, error) {

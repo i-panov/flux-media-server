@@ -136,6 +136,17 @@ export function useTranscodes() {
 	});
 }
 
+export function useCancelTranscode() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) =>
+			apiFetch<void>(`/media/transcodes/${id}`, { method: "DELETE" }),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["admin", "transcodes"] });
+		},
+	});
+}
+
 export function useRetryTranscode() {
 	const queryClient = useQueryClient();
 	return useMutation({
