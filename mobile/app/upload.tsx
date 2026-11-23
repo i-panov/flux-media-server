@@ -16,10 +16,16 @@ import { AuthGate } from "../src/components/AuthGate";
 import { EmptyState } from "../src/components/EmptyState";
 import { LinkDownloadCard } from "../src/components/LinkDownloadCard";
 import { Screen } from "../src/components/Screen";
+import {
+	EMPTY_DESTINATION,
+	UploadDestination,
+	type UploadDestinationValue,
+} from "../src/components/UploadDestination";
 import { UploadQueueRow } from "../src/components/UploadQueueRow";
 import { t, useLanguage } from "../src/i18n";
 import { useTheme } from "../src/theme/ThemeProvider";
 import { pickUploadSources } from "../src/upload/picker";
+import { useCatalogAssignment } from "../src/upload/useCatalogAssignment";
 import { useUploadQueue } from "../src/upload/useUploadQueue";
 
 function closeUpload(): void {
@@ -89,7 +95,10 @@ function UploadContent() {
 		params.type === "audio" || params.type === "image" ? params.type : "video";
 	const { colors, radii, spacing } = useTheme();
 	const session = useSession();
-	const queue = useUploadQueue();
+	const [destination, setDestination] =
+		useState<UploadDestinationValue>(EMPTY_DESTINATION);
+	const assignment = useCatalogAssignment(destination);
+	const queue = useUploadQueue({ onCompleted: assignment.assign });
 	const [picking, setPicking] = useState(false);
 	const [pickerError, setPickerError] = useState<string | null>(null);
 
@@ -167,6 +176,15 @@ function UploadContent() {
 			<Text style={[styles.hint, { color: colors.textMuted }]}>
 				{t(`upload.type.${uploadType}`)}
 			</Text>
+
+			{uploadType === "video" && (
+				<UploadDestination value={destination} onChange={setDestination} />
+			)}
+			{assignment.error !== null && (
+				<Text accessibilityRole="alert" style={{ color: colors.danger }}>
+					{assignment.error}
+				</Text>
+			)}
 
 			<Pressable
 				accessibilityRole="button"

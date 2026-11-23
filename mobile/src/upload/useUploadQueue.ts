@@ -1,3 +1,4 @@
+import type { Media } from "@flux/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -34,6 +35,7 @@ export interface UploadQueueItem {
 export interface UploadCompleted {
 	readonly key: string;
 	readonly title: string;
+	readonly media: Media | null;
 }
 
 type ProcessItem = (key: string, force: boolean) => void;
@@ -47,7 +49,7 @@ interface PipelineContext {
 	readonly registerAbort: (abort: () => void) => void;
 	readonly clearAbort: () => void;
 	readonly invalidate: () => void;
-	readonly onDone: (title: string) => void;
+	readonly onDone: (title: string, media: Media | null) => void;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -97,7 +99,7 @@ async function pollUploadJob(
 				job: null,
 			});
 			ctx.invalidate();
-			ctx.onDone(title);
+			ctx.onDone(title, status.media ?? null);
 			return;
 		}
 		if (status.status === "duplicate") {
@@ -174,8 +176,14 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 // Системных уведомлений нет: lastCompleted — in-app баннер, который виден
 // только на открытом экране и не догоняет пользователя после ухода.
 /* eslint-disable max-lines-per-function -- очередь держит XHR, поллинг и отмену. */
-export function useUploadQueue() {
+export function useUploadQueue(options?: {
+	onCompleted?: (media: Media | null) => void;
+}) {
 	const queryClient = useQueryClient();
+	const onCompletedRef = useRef(options?.onCompleted);
+	useEffect(() => {
+		onCompletedRef.current = options?.onCompleted;
+	});
 	const [items, setItems] = useState<UploadQueueItem[]>([]);
 	const [completed, setCompleted] = useState<UploadCompleted | null>(null);
 	const itemsRef = useRef<UploadQueueItem[]>([]);
@@ -258,7 +266,10 @@ export function useUploadQueue() {
 					registerAbort: (abort) => aborts.current.set(key, abort),
 					clearAbort: () => aborts.current.delete(key),
 					invalidate: invalidateAfterUpload,
-					onDone: (title) => setCompleted({ key, title }),
+					onDone: (title, media) => {
+						setCompleted({ key, title, media });
+						onCompletedRef.current?.(media);
+					},
 				});
 			} catch (error) {
 				if (!isCurrent(key, token)) {
