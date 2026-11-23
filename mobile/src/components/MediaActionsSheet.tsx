@@ -16,6 +16,7 @@ import { useTheme } from "../theme/ThemeProvider";
 import { tvCapabilities } from "../tv/profile";
 import { AddToCollectionSheet } from "./AddToCollectionSheet";
 import { ChangeCoverSheet } from "./ChangeCoverSheet";
+import { TagsSheet } from "./TagsSheet";
 
 export function MediaActionsSheet({
 	media,
@@ -31,6 +32,7 @@ export function MediaActionsSheet({
 	const downloadActions = useDownloadActions();
 	const [coverOpen, setCoverOpen] = useState(false);
 	const [collectionOpen, setCollectionOpen] = useState(false);
+	const [tagsOpen, setTagsOpen] = useState(false);
 	if (media === null) return null;
 	const admin = session.data?.is_admin === true;
 
@@ -143,12 +145,24 @@ export function MediaActionsSheet({
 							admin &&
 							media.type !== "image" &&
 							row("image-outline", t("cover.change"), () => setCoverOpen(true))}
+						{admin &&
+							row("pricetags-outline", t("tags.title"), () =>
+								setTagsOpen(true),
+							)}
 						{tvCapabilities.canDelete &&
 							admin &&
 							row("trash-outline", t("media.delete"), confirmDelete)}
 					</Pressable>
 				</Pressable>
 			</Modal>
+			{tagsOpen && (
+				<TagsSheet
+					entity="media"
+					id={media.id}
+					title={media.title}
+					onClose={() => setTagsOpen(false)}
+				/>
+			)}
 			<ChangeCoverSheet
 				visible={coverOpen}
 				media={media}

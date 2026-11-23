@@ -55,6 +55,22 @@ function draftFrom(lyrics: Lyrics | null | undefined): LyricsDraft {
 	};
 }
 
+function SourceVideoLink({ mediaID }: { mediaID: number | null | undefined }) {
+	useLanguage();
+	const { colors } = useTheme();
+	if (mediaID == null || mediaID <= 0) {
+		return null;
+	}
+	return (
+		<Pressable
+			testID="audio-source-video"
+			onPress={() => router.push(`/video/${mediaID}`)}
+		>
+			<Text style={{ color: colors.accent }}>{t("audio.sourceVideo")}</Text>
+		</Pressable>
+	);
+}
+
 function HeaderButton({
 	icon,
 	label,
@@ -327,6 +343,7 @@ function AudioLyricsContent() {
 						style={styles.artist}
 						testID="audio-lyrics-artist"
 					/>
+					<SourceVideoLink mediaID={track.source_media_id} />
 				</View>
 			</View>
 			{current !== null && !isCurrentTrack && (

@@ -12,11 +12,7 @@ import {
 	Text,
 	View,
 } from "react-native";
-import {
-	type ExtractFailure,
-	type ExtractPhase,
-	useExtractAudio,
-} from "../../src/api/extract";
+import { useExtractAudio } from "../../src/api/extract";
 import {
 	useFavoriteVideoIds,
 	useToggleVideoFavorite,
@@ -33,6 +29,10 @@ import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
 import { VideoMeta } from "../../src/components/VideoMeta";
 import { t, useLanguage } from "../../src/i18n";
+import {
+	extractFailureLabel,
+	extractPhaseLabel,
+} from "../../src/media/extractLabels";
 import { isHttpSourceUrl } from "../../src/media/source";
 import { VideoPlayer } from "../../src/player/VideoPlayer";
 import { useTheme } from "../../src/theme/ThemeProvider";
@@ -129,29 +129,6 @@ function ActionButton({
 	);
 }
 
-function extractPhaseLabel(phase: ExtractPhase | null): string {
-	if (phase === "processing") {
-		return t("video.extractProcessing");
-	}
-	if (phase === "queued") {
-		return t("video.extractQueued");
-	}
-	return t("video.extractStarting");
-}
-
-function extractFailureLabel(failure: ExtractFailure): string {
-	switch (failure.kind) {
-		case "conflict":
-			return t("video.extractAlready");
-		case "unavailable":
-			return t("video.extractUnavailable");
-		case "rateLimited":
-			return t("video.extractRateLimited");
-		default:
-			return t("video.extractError");
-	}
-}
-
 // Извлечение доступно только админу (backend requireAdmin). Компонент
 // монтируется в admin-ветке, поэтому хук не крутится у обычных зрителей.
 function ExtractAudioControl({ mediaId }: { mediaId: number }) {
@@ -173,6 +150,15 @@ function ExtractAudioControl({ mediaId }: { mediaId: number }) {
 			result.alreadyExtracted
 				? t("video.extractAlready")
 				: t("video.extractDone"),
+			[
+				{
+					text: t("video.extractOpenTrack"),
+					onPress: () => {
+						router.push(`/audio/${result.track.id}`);
+					},
+				},
+				{ text: t("common.close"), style: "cancel" },
+			],
 		);
 	};
 

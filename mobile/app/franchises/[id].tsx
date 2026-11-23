@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, Text } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useFranchise } from "../../src/api/catalog";
 import { useSession } from "../../src/auth/session";
 import { CatalogHeader } from "../../src/catalog/CatalogHeader";
@@ -8,6 +9,7 @@ import { AuthGate } from "../../src/components/AuthGate";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
+import { TagsSheet } from "../../src/components/TagsSheet";
 import { t, useLanguage } from "../../src/i18n";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
@@ -28,6 +30,7 @@ function FranchiseDetailContent() {
 	const numeric = parsed ?? 0;
 	const franchise = useFranchise(numeric, valid);
 	const session = useSession();
+	const [tagsOpen, setTagsOpen] = useState(false);
 	const { colors, spacing } = useTheme();
 	const data = franchise.data;
 	const entries = (data?.entries ?? []).filter(
@@ -54,15 +57,30 @@ function FranchiseDetailContent() {
 				onBack={() => router.replace("/franchises")}
 			/>
 			{session.data?.is_admin === true && (
-				<Pressable
-					onPress={() =>
-						router.push(`/catalog-admin?kind=franchise&id=${numeric}`)
-					}
-				>
-					<Text style={{ color: colors.accent, fontWeight: "600" }}>
-						{t("catalog.adminTitle")}
-					</Text>
-				</Pressable>
+				<View style={{ flexDirection: "row", gap: spacing.md }}>
+					<Pressable
+						onPress={() =>
+							router.push(`/catalog-admin?kind=franchise&id=${numeric}`)
+						}
+					>
+						<Text style={{ color: colors.accent, fontWeight: "600" }}>
+							{t("catalog.adminTitle")}
+						</Text>
+					</Pressable>
+					<Pressable onPress={() => setTagsOpen(true)} testID="franchise-tags">
+						<Text style={{ color: colors.accent, fontWeight: "600" }}>
+							{t("tags.title")}
+						</Text>
+					</Pressable>
+				</View>
+			)}
+			{tagsOpen && (
+				<TagsSheet
+					entity="franchise"
+					id={numeric}
+					title={data?.name ?? ""}
+					onClose={() => setTagsOpen(false)}
+				/>
 			)}
 			{franchise.isPending ? (
 				<ActivityIndicator color={colors.accent} />

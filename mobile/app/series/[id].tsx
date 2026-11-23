@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useWork } from "../../src/api/catalog";
 import { useSession } from "../../src/auth/session";
@@ -8,6 +9,7 @@ import { AuthGate } from "../../src/components/AuthGate";
 import { EmptyState } from "../../src/components/EmptyState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
+import { TagsSheet } from "../../src/components/TagsSheet";
 import { t, useLanguage } from "../../src/i18n";
 import { useTheme } from "../../src/theme/ThemeProvider";
 
@@ -28,6 +30,7 @@ function SeriesDetailContent() {
 	const numeric = parsed ?? 0;
 	const work = useWork(numeric, valid);
 	const session = useSession();
+	const [tagsOpen, setTagsOpen] = useState(false);
 	const { colors, spacing } = useTheme();
 	const data = work.data;
 	if (!valid) {
@@ -51,13 +54,30 @@ function SeriesDetailContent() {
 				onBack={() => router.replace("/series")}
 			/>
 			{session.data?.is_admin === true && (
-				<Pressable
-					onPress={() => router.push(`/catalog-admin?kind=work&id=${numeric}`)}
-				>
-					<Text style={{ color: colors.accent, fontWeight: "600" }}>
-						{t("catalog.adminTitle")}
-					</Text>
-				</Pressable>
+				<View style={{ flexDirection: "row", gap: spacing.md }}>
+					<Pressable
+						onPress={() =>
+							router.push(`/catalog-admin?kind=work&id=${numeric}`)
+						}
+					>
+						<Text style={{ color: colors.accent, fontWeight: "600" }}>
+							{t("catalog.adminTitle")}
+						</Text>
+					</Pressable>
+					<Pressable onPress={() => setTagsOpen(true)} testID="work-tags">
+						<Text style={{ color: colors.accent, fontWeight: "600" }}>
+							{t("tags.title")}
+						</Text>
+					</Pressable>
+				</View>
+			)}
+			{tagsOpen && (
+				<TagsSheet
+					entity="work"
+					id={numeric}
+					title={data?.title ?? ""}
+					onClose={() => setTagsOpen(false)}
+				/>
 			)}
 			{work.isPending ? (
 				<ActivityIndicator color={colors.accent} />
