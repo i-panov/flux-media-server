@@ -216,6 +216,7 @@ function TagsForm({
 											];
 										});
 										setName("");
+										setError(null);
 									},
 									onError: () => setError(t("tags.saveError")),
 								},
@@ -242,7 +243,10 @@ function TagsForm({
 				disabled={save.isPending}
 				onPress={() => {
 					save.mutate(selected, {
-						onSuccess: onClose,
+						onSuccess: () => {
+							setError(null);
+							onClose();
+						},
 						onError: () => setError(t("tags.saveError")),
 					});
 				}}

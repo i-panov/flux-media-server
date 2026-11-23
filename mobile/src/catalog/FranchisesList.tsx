@@ -1,23 +1,20 @@
 import { router } from "expo-router";
-import {
-	ActivityIndicator,
-	FlatList,
-	useWindowDimensions,
-	View,
-} from "react-native";
+import { ActivityIndicator, FlatList, useWindowDimensions } from "react-native";
 import { useFranchises } from "../api/catalog";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 import { CatalogCard } from "./CatalogCard";
+import { catalogCardWidth, catalogColumns } from "./grid";
 
 export function FranchisesList() {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const franchises = useFranchises();
 	const { width } = useWindowDimensions();
-	const columns = width >= 900 ? 4 : width >= 600 ? 3 : 2;
+	const columns = catalogColumns(width);
+	const cardWidth = catalogCardWidth(width, columns, 16, 12);
 	if (franchises.isPending) {
 		return <ActivityIndicator color={colors.accent} />;
 	}
@@ -36,6 +33,7 @@ export function FranchisesList() {
 	}
 	return (
 		<FlatList
+			key={`franchises-${columns}`}
 			data={franchises.data ?? []}
 			keyExtractor={(franchise) => String(franchise.id)}
 			numColumns={columns}
@@ -43,17 +41,15 @@ export function FranchisesList() {
 			contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.lg }}
 			columnWrapperStyle={{ gap: spacing.md }}
 			renderItem={({ item: franchise }) => (
-				<View style={{ flex: 1 }}>
-					<CatalogCard
-						style={{ width: "100%" }}
-						id={franchise.id}
-						title={franchise.name}
-						coverURL={franchise.cover_url}
-						icon="film"
-						testID={`franchise-card-${franchise.id}`}
-						onPress={() => router.push(`/franchises/${franchise.id}`)}
-					/>
-				</View>
+				<CatalogCard
+					style={{ width: cardWidth }}
+					id={franchise.id}
+					title={franchise.name}
+					coverURL={franchise.cover_url}
+					icon="film"
+					testID={`franchise-card-${franchise.id}`}
+					onPress={() => router.push(`/franchises/${franchise.id}`)}
+				/>
 			)}
 		/>
 	);

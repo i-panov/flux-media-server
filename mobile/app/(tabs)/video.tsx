@@ -133,6 +133,7 @@ export default function VideoScreen() {
 						genreIDs={genreIDs}
 						onFormatChange={setFormatID}
 						onGenresChange={setGenreIDs}
+						hiddenFormatSlugs={tab === "videos" ? ["film"] : []}
 					/>
 					{isTV ? (
 						<TVVideoList

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
 	Modal,
 	Pressable,
@@ -19,6 +19,8 @@ interface TagFilterBarProps {
 	genreIDs: number[];
 	onFormatChange: (id: number | null) => void;
 	onGenresChange: (ids: number[]) => void;
+	/** Слаги форматов, которые на этой вкладке заведомо дадут пусто. */
+	hiddenFormatSlugs?: string[];
 }
 
 // Фильтры видео: формат (один) и жанры (много). Оба — теги с сервера,
@@ -28,20 +30,18 @@ export function TagFilterBar({
 	genreIDs,
 	onFormatChange,
 	onGenresChange,
+	hiddenFormatSlugs,
 }: TagFilterBarProps) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
 	const tags = useTags();
 	const [mode, setMode] = useState<Mode | null>(null);
 
-	const formats = useMemo(
-		() => (tags.data ?? []).filter((tag) => tag.group === "format"),
-		[tags.data],
+	const hidden = hiddenFormatSlugs ?? [];
+	const formats = (tags.data ?? []).filter(
+		(tag) => tag.group === "format" && !hidden.includes(tag.slug),
 	);
-	const genres = useMemo(
-		() => (tags.data ?? []).filter((tag) => tag.group === "genre"),
-		[tags.data],
-	);
+	const genres = (tags.data ?? []).filter((tag) => tag.group === "genre");
 
 	const formatName = formats.find((tag) => tag.id === formatID)?.name;
 	const genreCount = genreIDs.length;
