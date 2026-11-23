@@ -19,8 +19,6 @@ import {
 	useTags,
 } from "../../api/tags";
 
-const GROUPS: Array<{ value: TagGroup; label: string }> = [];
-
 export function TagsAdmin() {
 	const { t } = useTranslation();
 	const tags = useTags();
@@ -32,7 +30,6 @@ export function TagsAdmin() {
 	const groups = [
 		{ value: "format", label: t("tags.format") },
 		{ value: "genre", label: t("tags.genre") },
-		{ value: "mood", label: t("tags.mood") },
 	];
 
 	const submit = async () => {
@@ -59,8 +56,8 @@ export function TagsAdmin() {
 			<Card withBorder padding="md" radius="md">
 				<Group align="end" wrap="wrap">
 					<Select
-						label={t("tags.group")}
-						data={groups.length > 0 ? groups : GROUPS}
+						label={t("tags.type")}
+						data={groups}
 						value={group}
 						onChange={setGroup}
 						w={180}

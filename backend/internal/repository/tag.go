@@ -32,9 +32,7 @@ func NewTagRepository(db *gorm.DB) *TagStore {
 }
 
 func validTagGroup(group string) bool {
-	return group == models.TagGroupFormat ||
-		group == models.TagGroupGenre ||
-		group == models.TagGroupMood
+	return group == models.TagGroupFormat || group == models.TagGroupGenre
 }
 
 func normalizeTagSlug(slug string) string {

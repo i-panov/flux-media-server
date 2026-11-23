@@ -43,7 +43,9 @@ function groupDisks(disks: StorageInfo["disks"]) {
 		{ disk: StorageInfo["disks"][number]; usedBytes: number; paths: string[] }
 	>();
 	for (const disk of disks) {
-		const key = `${disk.total_bytes}:${disk.free_bytes}`;
+		// Свободное место замеряется по каждому пути отдельно и отличается
+		// на килобайты, поэтому раздел определяем по общему размеру.
+		const key = String(disk.total_bytes);
 		const existing = groups.get(key);
 		if (existing === undefined) {
 			groups.set(key, {
@@ -95,12 +97,7 @@ export function StorageWidget({ data }: { data: StorageInfo }) {
 				const freePct = freePercent(disk.total_bytes, disk.free_bytes);
 				const low = freePct < 10;
 				return (
-					<Card
-						key={`${disk.total_bytes}-${disk.free_bytes}`}
-						withBorder
-						padding="md"
-						radius="md"
-					>
+					<Card key={disk.total_bytes} withBorder padding="md" radius="md">
 						<Stack gap="xs">
 							<Text fw={600}>
 								{t("admin.storage.diskFree", {

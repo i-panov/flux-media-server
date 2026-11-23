@@ -30,7 +30,7 @@ export function SeriesPage({
 	const tags = useTags();
 	const selectedTags = tagIDs.map(Number);
 	const filterTags = (tags.data ?? [])
-		.filter((tag) => tag.group === "genre" || tag.group === "mood")
+		.filter((tag) => tag.group === "genre")
 		.map((tag) => ({ value: String(tag.id), label: tag.name }));
 	const series = useWorks("series", true, selectedTags);
 	const films = useWorks("film_series", true, selectedTags);
@@ -59,10 +59,23 @@ export function SeriesPage({
 			data-tv-focus-key={embedded ? undefined : "series-page"}
 		>
 			{kind !== undefined && (
-				<Group justify="space-between">
-					<Title order={2} size="h4">
-						{heading}
-					</Title>
+				<Group justify="space-between" wrap="wrap" align="flex-end">
+					<Group gap="sm" align="flex-end" wrap="wrap">
+						<Title order={2} size="h4">
+							{heading}
+						</Title>
+						<MultiSelect
+							placeholder={t("catalog.allGenres")}
+							aria-label={t("catalog.tagFilter")}
+							data={filterTags}
+							value={tagIDs}
+							onChange={setTagIDs}
+							clearable
+							searchable
+							nothingFoundMessage={t("video.noTags")}
+							w={{ base: "100%", sm: 260 }}
+						/>
+					</Group>
 					{canManage && <CreateWorkButton initialKind={kind} />}
 				</Group>
 			)}
@@ -74,14 +87,16 @@ export function SeriesPage({
 					{canManage && <CreateWorkButton />}
 				</Group>
 			)}
-			{!embedded && filterTags.length > 0 && (
+			{!embedded && (
 				<MultiSelect
-					label={t("catalog.tagFilter")}
+					placeholder={t("catalog.allGenres")}
+					aria-label={t("catalog.tagFilter")}
 					data={filterTags}
 					value={tagIDs}
 					onChange={setTagIDs}
 					clearable
 					searchable
+					nothingFoundMessage={t("video.noTags")}
 					w={{ base: "100%", sm: 320 }}
 				/>
 			)}

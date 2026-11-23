@@ -138,6 +138,16 @@ test("страница артиста: треки и переименовани�
 		{ id: 1, name: "Исполнитель Один" },
 		{ id: 2, name: "Исполнитель Два" },
 	];
+	// Клиент сначала спрашивает отдельный endpoint избранных артистов.
+	await page.route(
+		(url) => url.pathname === "/api/favorites/artists",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: [] }),
+			}),
+	);
 	await page.route(
 		(url) => url.pathname === "/api/artists",
 		(route) =>
@@ -220,6 +230,16 @@ test("избранные артисты: секция в списке и сер�
 			});
 		},
 	);
+	// Клиент сначала спрашивает отдельный endpoint избранных артистов.
+	await page.route(
+		(url) => url.pathname === "/api/favorites/artists",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: [] }),
+			}),
+	);
 	await page.route(
 		(url) => url.pathname === "/api/artists",
 		(route) =>
@@ -232,6 +252,16 @@ test("избранные артисты: секция в списке и сер�
 						{ id: 2, name: "Исполнитель Два" },
 					],
 				}),
+			}),
+	);
+	// Динамический список для этого теста регистрируем позже — он важнее.
+	await page.route(
+		(url) => url.pathname === "/api/favorites/artists",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: artistFavs }),
 			}),
 	);
 	const artistRequests: string[] = [];
@@ -309,6 +339,16 @@ test("страница артиста: ошибка треков и исполн
 			}),
 	);
 	let artistsCalls = 0;
+	// Клиент сначала спрашивает отдельный endpoint избранных артистов.
+	await page.route(
+		(url) => url.pathname === "/api/favorites/artists",
+		(route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ items: [] }),
+			}),
+	);
 	await page.route(
 		(url) => url.pathname === "/api/artists",
 		(route) => {

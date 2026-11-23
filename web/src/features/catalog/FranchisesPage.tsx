@@ -80,7 +80,7 @@ export function FranchisesPage({ embedded = false }: { embedded?: boolean }) {
 	const [tagIDs, setTagIDs] = useState<string[]>([]);
 	const tags = useTags();
 	const filterTags = (tags.data ?? [])
-		.filter((tag) => tag.group === "genre" || tag.group === "mood")
+		.filter((tag) => tag.group === "genre")
 		.map((tag) => ({ value: String(tag.id), label: tag.name }));
 	const franchises = useFranchises(tagIDs.map(Number));
 	const session = useSession();
@@ -99,19 +99,17 @@ export function FranchisesPage({ embedded = false }: { embedded?: boolean }) {
 		>
 			{embedded ? (
 				<Group justify="space-between" align="flex-end" wrap="wrap">
-					{filterTags.length > 0 ? (
-						<MultiSelect
-							label={t("catalog.tagFilter")}
-							data={filterTags}
-							value={tagIDs}
-							onChange={setTagIDs}
-							clearable
-							searchable
-							w={{ base: "100%", sm: 320 }}
-						/>
-					) : (
-						<span />
-					)}
+					<MultiSelect
+						placeholder={t("catalog.allGenres")}
+						aria-label={t("catalog.tagFilter")}
+						data={filterTags}
+						value={tagIDs}
+						onChange={setTagIDs}
+						clearable
+						searchable
+						nothingFoundMessage={t("video.noTags")}
+						w={{ base: "100%", sm: 320 }}
+					/>
 					{canManage && <CreateFranchiseButton />}
 				</Group>
 			) : (
@@ -122,14 +120,16 @@ export function FranchisesPage({ embedded = false }: { embedded?: boolean }) {
 					{canManage && <CreateFranchiseButton />}
 				</Group>
 			)}
-			{!embedded && filterTags.length > 0 && (
+			{!embedded && (
 				<MultiSelect
-					label={t("catalog.tagFilter")}
+					placeholder={t("catalog.allGenres")}
+					aria-label={t("catalog.tagFilter")}
 					data={filterTags}
 					value={tagIDs}
 					onChange={setTagIDs}
 					clearable
 					searchable
+					nothingFoundMessage={t("video.noTags")}
 					w={{ base: "100%", sm: 320 }}
 				/>
 			)}

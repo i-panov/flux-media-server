@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "./client";
 
-export type TagGroup = "format" | "genre" | "mood";
+export type TagGroup = "format" | "genre";
 export type TagEntity = "media" | "work" | "franchise";
 
 export interface Tag {

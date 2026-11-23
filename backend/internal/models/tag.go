@@ -5,11 +5,10 @@ import "time"
 const (
 	TagGroupFormat = "format"
 	TagGroupGenre  = "genre"
-	TagGroupMood   = "mood"
 )
 
-// Tag — глобальная смысловая метка: формат, жанр или настроение.
-// Группа хранится строкой, чтобы новые группы не требовали миграции.
+// Tag — глобальная смысловая метка: формат или жанр. Набор групп
+// фиксирован в коде и проверяется при создании.
 type Tag struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Group     string    `gorm:"column:tag_group;not null;uniqueIndex:idx_tags_group_slug,priority:1;index" json:"group"`

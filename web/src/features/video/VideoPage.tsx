@@ -255,7 +255,7 @@ function MoviesContent({
 		{ secondary: true },
 	);
 	const filterTags = (tags.data ?? [])
-		.filter((tag) => tag.group === "genre" || tag.group === "mood")
+		.filter((tag) => tag.group === "genre")
 		.map((tag) => ({ value: String(tag.id), label: tag.name }));
 	const formatTags = (tags.data ?? [])
 		.filter((tag) => tag.group === "format")

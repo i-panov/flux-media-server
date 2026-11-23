@@ -21,7 +21,7 @@ import {
 	useTags,
 } from "../../api/tags";
 
-const GROUPS = ["format", "genre", "mood"] as const;
+const GROUPS = ["format", "genre"] as const;
 
 export function TagEditor({ entity, id }: { entity: TagEntity; id: number }) {
 	const { t } = useTranslation();
@@ -94,7 +94,7 @@ export function TagEditor({ entity, id }: { entity: TagEntity; id: number }) {
 				) : (
 					<MultiSelect
 						key={group}
-						label={group === "genre" ? t("tags.genre") : t("tags.mood")}
+						label={t("tags.genre")}
 						data={options}
 						value={selectedFor(group)}
 						onChange={(values) => setGroup(group, values)}
@@ -134,12 +134,11 @@ export function TagEditor({ entity, id }: { entity: TagEntity; id: number }) {
 			>
 				<Stack>
 					<Select
-						label={t("tags.group")}
+						label={t("tags.type")}
 						value={newGroup}
 						onChange={(value) => setNewGroup((value as TagGroup) ?? "genre")}
 						data={[
 							{ value: "genre", label: t("tags.genre") },
-							{ value: "mood", label: t("tags.mood") },
 							...(entity === "media"
 								? [{ value: "format", label: t("tags.format") }]
 								: []),

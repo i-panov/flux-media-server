@@ -325,7 +325,10 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV10(db); err != nil {
 		return err
 	}
-	return runMigrationsV11(db)
+	if err := runMigrationsV11(db); err != nil {
+		return err
+	}
+	return runMigrationsV12(db)
 }
 
 // runMigrationsV1 — историческая миграция схемы. Оставлена отдельной,
@@ -678,6 +681,45 @@ func runMigrationsV4(db *gorm.DB) error {
 				ON subtitles(media_id, lang)`).Error; err != nil {
 				return fmt.Errorf("create subtitles unique index: %w", err)
 			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// runMigrationsV12 — удаление группы настроений: она оказалась лишней,
+// теги и связи с ними больше не нужны.
+func runMigrationsV12(db *gorm.DB) error {
+	const schemaVersion = 12
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 12: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		// На свежей БД таблиц ещё нет: миграция идёт до AutoMigrate.
+		if !tx.Migrator().HasTable(&models.Tag{}) {
+			return tx.Create(&models.SchemaMigration{
+				Version:   schemaVersion,
+				AppliedAt: time.Now().UTC(),
+			}).Error
+		}
+		const moodTags = `(SELECT id FROM tags WHERE tag_group = 'mood')`
+		for _, table := range []string{"media_tags", "work_tags", "franchise_tags"} {
+			if err := tx.Exec("DELETE FROM " + table + " WHERE tag_id IN " + moodTags).Error; err != nil {
+				return fmt.Errorf("delete mood links from %s: %w", table, err)
+			}
+		}
+		if err := tx.Exec("DELETE FROM tags WHERE tag_group = 'mood'").Error; err != nil {
+			return fmt.Errorf("delete mood tags: %w", err)
 		}
 		return tx.Create(&models.SchemaMigration{
 			Version:   schemaVersion,
