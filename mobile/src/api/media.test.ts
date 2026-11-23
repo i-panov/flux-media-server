@@ -64,6 +64,27 @@ describe("videoSearchOptions", () => {
 		expect(requested.searchParams.get("sort")).toBe("asc");
 	});
 
+	it("передаёт формат и теги в запрос и ключ", async () => {
+		const calls: string[] = [];
+		const client = new QueryClient();
+		await client.fetchInfiniteQuery(
+			videoSearchOptions(stubFetcher(listBody([1], 1), calls), "", "desc", {
+				excludeFormat: "film",
+				tagIDs: [4, 7],
+			}),
+		);
+
+		const requested = requestedUrl(calls);
+		expect(requested.searchParams.get("exclude_format")).toBe("film");
+		expect(requested.searchParams.get("tag_ids")).toBe("4,7");
+		expect(
+			videoSearchOptions(stubFetcher(listBody([], 0)), "", "desc", {
+				excludeFormat: "film",
+				tagIDs: [4, 7],
+			}).queryKey,
+		).toEqual(["media", "video", "", "desc", 0, "", "film", "4,7"]);
+	});
+
 	it("пробельный q даёт один запрос без q и пустой ключ", async () => {
 		const calls: string[] = [];
 		const client = new QueryClient();

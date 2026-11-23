@@ -21,13 +21,27 @@ const fetcher: CoreFetcher = (path, init) => apiFetch(path, init);
 
 // Нормализация и query key живут в shared: смена q/sort автоматически
 // сбрасывает пагинацию (новый infinite-запрос с offset=0).
+export interface VideoListFilters {
+	format?: string;
+	excludeFormat?: string;
+	tagIDs?: number[];
+}
+
 export function videoSearchOptions(
 	fetch: CoreFetcher,
 	q: string,
 	sort: SortOrder,
+	filters: VideoListFilters = {},
 ) {
 	return {
-		...videoListOptions(fetch, normalizeSearchQuery(q), sort),
+		...videoListOptions(
+			fetch,
+			normalizeSearchQuery(q),
+			sort,
+			filters.format,
+			filters.excludeFormat,
+			filters.tagIDs,
+		),
 		// Смена q/sort не должна схлопывать уже загруженный список в
 		// спиннер: предыдущие данные остаются до ответа нового ключа.
 		placeholderData: keepPreviousData,
@@ -46,8 +60,16 @@ export function audioSearchOptions(
 	};
 }
 
-export function useVideoList(q = "", sort: SortOrder = "desc") {
-	return useInfiniteQuery(videoSearchOptions(fetcher, q, sort));
+export function useVideoList(
+	q = "",
+	sort: SortOrder = "desc",
+	filters: VideoListFilters = {},
+	enabled = true,
+) {
+	return useInfiniteQuery({
+		...videoSearchOptions(fetcher, q, sort, filters),
+		enabled,
+	});
 }
 
 export function useAudioList(q = "", sort: SortOrder = "desc") {

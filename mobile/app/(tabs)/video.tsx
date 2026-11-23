@@ -7,6 +7,8 @@ import {
 	useToggleVideoFavorite,
 } from "../../src/api/favorites";
 import { useVideoList } from "../../src/api/media";
+import { FranchisesList } from "../../src/catalog/FranchisesList";
+import { WorksList } from "../../src/catalog/WorksList";
 import { VideoHomeRows } from "../../src/components/HomeRows";
 import { MediaActionsSheet } from "../../src/components/MediaActionsSheet";
 import { MediaCard } from "../../src/components/MediaCard";
@@ -14,7 +16,9 @@ import { MediaGrid } from "../../src/components/MediaGrid";
 import { MediaSearchBar } from "../../src/components/MediaSearchBar";
 import { Screen } from "../../src/components/Screen";
 import { SectionHeader } from "../../src/components/SectionHeader";
+import { TagFilterBar } from "../../src/components/TagFilterBar";
 import { UploadAction } from "../../src/components/UploadAction";
+import { type VideoTab, VideoTabs } from "../../src/components/VideoTabs";
 import { useDownloadIndicator } from "../../src/downloads/DownloadProvider";
 import { t, useLanguage } from "../../src/i18n";
 import { normalizeSearchQuery, type SortOrder } from "../../src/media/search";
@@ -74,12 +78,25 @@ export default function VideoScreen() {
 	useLanguage();
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<SortOrder>("desc");
+	const [tab, setTab] = useState<VideoTab>("videos");
+	const [formatID, setFormatID] = useState<number | null>(null);
+	const [genreIDs, setGenreIDs] = useState<number[]>([]);
 	const debouncedQuery = useDebouncedValue(query);
+	const isGrid = tab === "videos" || tab === "films";
 	// Raw-запрос учитывается сразу: пустое состояние «ничего не найдено»
 	// не должно на 300 мс показывать «библиотека пуста». Данные при этом
 	// запрашиваются только по debounced-значению.
 	const searching = debouncedQuery !== "" || normalizeSearchQuery(query) !== "";
-	const list = useVideoList(debouncedQuery, sort);
+	const list = useVideoList(
+		debouncedQuery,
+		sort,
+		{
+			format: tab === "films" ? "film" : undefined,
+			excludeFormat: tab === "videos" ? "film" : undefined,
+			tagIDs: [...(formatID === null ? [] : [formatID]), ...genreIDs],
+		},
+		isGrid,
+	);
 	const favorites = useFavoriteVideoIds();
 	const [actionsMedia, setActionsMedia] = useState<Media | null>(null);
 	const allItems = list.data?.pages.flatMap((page) => page.items) ?? [];
@@ -89,66 +106,84 @@ export default function VideoScreen() {
 	// Ряды остаются смонтированными и просто скрываются: сброс поиска не
 	// создаёт заново их запросы.
 	const header = useMemo(
-		() => <VideoHomeRows hidden={searching} />,
-		[searching],
+		() => <VideoHomeRows hidden={searching || tab !== "videos"} />,
+		[searching, tab],
 	);
 	return (
 		<Screen>
 			<SectionHeader
 				title={t("video.title")}
 				titleStyle={styles.title}
-				trailing={<UploadAction type="video" />}
+				trailing={isGrid ? <UploadAction type="video" /> : undefined}
 			/>
-			<MediaSearchBar
-				value={query}
-				onChangeText={setQuery}
-				sort={sort}
-				onSortChange={setSort}
-				placeholder={t("video.search")}
-				testID="video-search"
-			/>
-			{isTV ? (
-				<TVVideoList
-					items={tvItems}
-					onPressItem={openVideo}
-					onEndReached={() => {
-						if (list.hasNextPage && !list.isFetchingNextPage) {
-							void list.fetchNextPage();
-						}
-					}}
-					isPending={list.isPending}
-					isError={list.isError && allItems.length === 0}
-					isFetchingNextPage={list.isFetchingNextPage}
-					onRetry={() => void list.refetch()}
-				/>
-			) : (
-				<MediaGrid
-					items={
-						searching ? allItems : excludeMediaIds(allItems, favorites.data)
-					}
-					renderCard={(item) => (
-						<VideoGridCard media={item} onMenu={() => setActionsMedia(item)} />
+			<VideoTabs value={tab} onChange={setTab} />
+			{isGrid ? (
+				<>
+					<MediaSearchBar
+						value={query}
+						onChangeText={setQuery}
+						sort={sort}
+						onSortChange={setSort}
+						placeholder={t("video.search")}
+						testID="video-search"
+					/>
+					<TagFilterBar
+						formatID={formatID}
+						genreIDs={genreIDs}
+						onFormatChange={setFormatID}
+						onGenresChange={setGenreIDs}
+					/>
+					{isTV ? (
+						<TVVideoList
+							items={tvItems}
+							onPressItem={openVideo}
+							onEndReached={() => {
+								if (list.hasNextPage && !list.isFetchingNextPage) {
+									void list.fetchNextPage();
+								}
+							}}
+							isPending={list.isPending}
+							isError={list.isError && allItems.length === 0}
+							isFetchingNextPage={list.isFetchingNextPage}
+							onRetry={() => void list.refetch()}
+						/>
+					) : (
+						<MediaGrid
+							items={
+								searching ? allItems : excludeMediaIds(allItems, favorites.data)
+							}
+							renderCard={(item) => (
+								<VideoGridCard
+									media={item}
+									onMenu={() => setActionsMedia(item)}
+								/>
+							)}
+							ListHeaderComponent={header}
+							isPending={list.isPending}
+							isError={list.isError && allItems.length === 0}
+							isFetchingNextPage={list.isFetchingNextPage}
+							onRetry={() => void list.refetch()}
+							onEndReached={() => {
+								if (list.hasNextPage && !list.isFetchingNextPage) {
+									void list.fetchNextPage();
+								}
+							}}
+							emptyTitle={
+								searching ? t("search.noResults") : t("search.libraryEmpty")
+							}
+							emptyDescription={
+								searching
+									? t("search.noResultsHint")
+									: t("search.libraryEmptyVideoHint")
+							}
+							testID="video-grid"
+						/>
 					)}
-					ListHeaderComponent={header}
-					isPending={list.isPending}
-					isError={list.isError && allItems.length === 0}
-					isFetchingNextPage={list.isFetchingNextPage}
-					onRetry={() => void list.refetch()}
-					onEndReached={() => {
-						if (list.hasNextPage && !list.isFetchingNextPage) {
-							void list.fetchNextPage();
-						}
-					}}
-					emptyTitle={
-						searching ? t("search.noResults") : t("search.libraryEmpty")
-					}
-					emptyDescription={
-						searching
-							? t("search.noResultsHint")
-							: t("search.libraryEmptyVideoHint")
-					}
-					testID="video-grid"
-				/>
+				</>
+			) : tab === "franchises" ? (
+				<FranchisesList />
+			) : (
+				<WorksList kind={tab} />
 			)}
 			<MediaActionsSheet
 				media={actionsMedia}
