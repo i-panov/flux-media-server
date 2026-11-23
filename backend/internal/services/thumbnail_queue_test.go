@@ -99,3 +99,21 @@ func TestThumbnailQueueRestoresLostURL(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, stored.ThumbnailURL, "потерянный URL восстановлен")
 }
+
+func TestThumbnailQueueRecoverStale(t *testing.T) {
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+	store := repository.NewThumbnailRepository(db)
+	ctx := context.Background()
+	require.NoError(t, store.Enqueue(ctx, 1, models.ThumbnailKindThumb))
+	_, err = store.NextQueued(ctx, models.ThumbnailKindThumb)
+	require.NoError(t, err)
+
+	queue := NewThumbnailQueueService(store, repository.NewMediaRepository(db), nil)
+	queue.RecoverStale(ctx)
+
+	task, err := store.NextQueued(ctx, models.ThumbnailKindThumb)
+	require.NoError(t, err)
+	require.Equal(t, uint(1), task.MediaID)
+}

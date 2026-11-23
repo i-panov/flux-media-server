@@ -278,3 +278,30 @@ func TestFavoritesIncludeMediaTags(t *testing.T) {
 	require.Len(t, rows[0].Media.Tags, 1)
 	require.Equal(t, genre.Name, rows[0].Media.Tags[0].Name)
 }
+
+func TestCollectionMediaIncludesTags(t *testing.T) {
+	db := setupCatalogDB(t)
+	tags := NewTagRepository(db)
+	mediaRepo := NewMediaRepository(db)
+	collections := NewCollectionRepository(db)
+	items := NewCollectionItemRepository(db)
+	users := NewUserRepository(db)
+	ctx := context.Background()
+	user := models.User{Email: "col@example.com"}
+	require.NoError(t, users.Create(ctx, &user))
+	collection := models.Collection{UserID: user.ID, Name: "Сборник"}
+	require.NoError(t, collections.Create(ctx, &collection))
+	genre := models.Tag{Group: models.TagGroupGenre, Slug: "col-tag", Name: "Триллер"}
+	require.NoError(t, tags.Create(ctx, &genre))
+	media := models.Media{Title: "Фильм", Type: models.MediaTypeVideo, FilePath: "/c.mp4", VideoKind: kindPtr(models.VideoKindMovie)}
+	require.NoError(t, mediaRepo.Create(ctx, &media))
+	require.NoError(t, tags.SetMediaTags(ctx, media.ID, []uint{genre.ID}))
+	_, err := items.AddItemAtomic(ctx, collection.ID, media.ID)
+	require.NoError(t, err)
+
+	rows, err := items.FindMediaByCollection(ctx, collection.ID)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Len(t, rows[0].Tags, 1)
+	require.Equal(t, genre.Name, rows[0].Tags[0].Name)
+}
