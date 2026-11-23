@@ -963,6 +963,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		defer thumbBackfillWG.Done()
 		// Стартовый проход идёт через ту же очередь, что и админка:
 		// незавершённые задачи продолжаются, дублирующего ffmpeg нет.
+		thumbnailQueue.RecoverStale(dimensionsCtx)
 		for _, kind := range []string{
 			models.ThumbnailKindThumb,
 			models.ThumbnailKindCover,
@@ -1179,7 +1180,7 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 		select {
 		case <-thumbDone:
 		case <-shutdownCtx.Done():
-			log.Printf("shutdown: timed out waiting for thumbnail backfill; closing database anyway")
+			log.Printf("shutdown: timed out waiting for media maintenance; closing database anyway")
 		}
 	}
 	if a.sqlDB != nil {

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -68,4 +69,33 @@ func TestThumbnailQueueRunIgnoresOtherKind(t *testing.T) {
 	pending, err := store.Pending(ctx, models.ThumbnailKindCover)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), pending, "чужая задача остаётся в очереди")
+}
+
+func TestThumbnailQueueRestoresLostURL(t *testing.T) {
+	db, err := repository.InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, repository.AutoMigrate(db))
+	mediaRepo := repository.NewMediaRepository(db)
+	ctx := context.Background()
+	row := models.Media{
+		Title: "video", Type: models.MediaTypeVideo, FilePath: "/tmp/video.mp4",
+		VideoKind: func() *models.VideoKind { k := models.VideoKindMovie; return &k }(),
+	}
+	require.NoError(t, mediaRepo.Create(ctx, &row))
+
+	dir := t.TempDir()
+	thumb := NewThumbnailService(dir)
+	require.NoError(t, os.MkdirAll(dir, 0o750))
+	require.NoError(t, os.WriteFile(thumb.GetPath(row.ID), []byte("thumb"), 0o600))
+
+	store := repository.NewThumbnailRepository(db)
+	queue := NewThumbnailQueueService(store, mediaRepo, thumb)
+	require.NoError(t, queue.EnqueueMissing(ctx, models.ThumbnailKindThumb))
+	generated, failed := queue.Run(ctx, models.ThumbnailKindThumb)
+	require.Equal(t, 1, generated)
+	require.Zero(t, failed)
+
+	stored, err := mediaRepo.FindByID(ctx, row.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, stored.ThumbnailURL, "потерянный URL восстановлен")
 }

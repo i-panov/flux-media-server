@@ -206,14 +206,6 @@ func (r *MediaStore) FindMissingThumbnails(ctx context.Context, limit int) ([]mo
 	return rows, err
 }
 
-func (r *MediaStore) FindAudioMissingCover(ctx context.Context, limit int) ([]models.Media, error) {
-	var rows []models.Media
-	err := r.db.WithContext(ctx).
-		Where("type = ? AND (cover_url IS NULL OR cover_url = '') AND cover_attempted = ?", models.MediaTypeAudio, false).
-		Order("id ASC").Limit(limit).Find(&rows).Error
-	return rows, err
-}
-
 // FindAudioCoverCandidates — аудио без обложки с курсором по id: админская
 // очередь не должна крутиться по одной и той же странице.
 func (r *MediaStore) FindAudioCoverCandidates(ctx context.Context, lastID uint, limit int) ([]models.Media, error) {

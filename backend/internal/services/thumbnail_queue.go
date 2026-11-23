@@ -27,9 +27,6 @@ func NewThumbnailQueueService(tasks *repository.ThumbnailStore, media repository
 
 // EnqueueMissing ставит в очередь всё, чему не хватает превью или обложки.
 func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string) error {
-	if _, err := s.tasks.RequeueProcessing(ctx, kind); err != nil {
-		return err
-	}
 	if err := s.tasks.ResetFinished(ctx, kind); err != nil {
 		return err
 	}
@@ -71,7 +68,9 @@ func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string)
 		}
 		for _, media := range rows {
 			lastID = media.ID
-			if s.thumb != nil && s.thumb.Exists(media.ID) {
+			// Файл есть и URL на месте — задача не нужна. Если URL пуст,
+			// задача восстановит ссылку, даже когда файл уже существует.
+			if s.thumb != nil && s.thumb.Exists(media.ID) && media.ThumbnailURL != "" {
 				continue
 			}
 			if err := s.tasks.Enqueue(ctx, media.ID, kind); err != nil {
@@ -80,6 +79,19 @@ func (s *ThumbnailQueueService) EnqueueMissing(ctx context.Context, kind string)
 		}
 		if len(rows) < thumbnailBackfillBatch {
 			return nil
+		}
+	}
+}
+
+// RecoverStale возвращает в очередь задачи, оставшиеся processing после
+// падения процесса. Вызывается только на старте: админский клик не должен
+// «угонять» задачу у работающего воркера.
+func (s *ThumbnailQueueService) RecoverStale(ctx context.Context) {
+	for _, kind := range []string{models.ThumbnailKindThumb, models.ThumbnailKindCover} {
+		if requeued, err := s.tasks.RequeueProcessing(ctx, kind); err != nil {
+			log.Printf("thumbnail queue: requeue %s: %v", kind, err)
+		} else if requeued > 0 {
+			log.Printf("thumbnail queue: requeued %d stale %s tasks", requeued, kind)
 		}
 	}
 }
@@ -164,21 +176,4 @@ func (s *ThumbnailQueueService) processCover(ctx context.Context, media *models.
 	}
 	_ = s.media.SetCoverAttempted(ctx, media.ID, true)
 	return true
-}
-
-// Resume продолжает незавершённые задачи обоих видов после рестарта.
-func (s *ThumbnailQueueService) Resume(ctx context.Context) {
-	for _, kind := range []string{models.ThumbnailKindThumb, models.ThumbnailKindCover} {
-		if requeued, err := s.tasks.RequeueProcessing(ctx, kind); err != nil {
-			log.Printf("thumbnail queue: requeue %s: %v", kind, err)
-		} else if requeued > 0 {
-			log.Printf("thumbnail queue: requeued %d stale %s tasks", requeued, kind)
-		}
-		pending, err := s.tasks.Pending(ctx, kind)
-		if err != nil || pending == 0 {
-			continue
-		}
-		log.Printf("thumbnail queue: resuming %d %s tasks", pending, kind)
-		s.Run(ctx, kind)
-	}
 }
