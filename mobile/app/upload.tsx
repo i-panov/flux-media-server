@@ -16,6 +16,7 @@ import { AuthGate } from "../src/components/AuthGate";
 import { EmptyState } from "../src/components/EmptyState";
 import { LinkDownloadCard } from "../src/components/LinkDownloadCard";
 import { Screen } from "../src/components/Screen";
+import { SeriesImportCard } from "../src/components/SeriesImportCard";
 import {
 	EMPTY_DESTINATION,
 	UploadDestination,
@@ -219,6 +220,7 @@ function UploadContent() {
 			</Pressable>
 
 			<LinkDownloadCard key={uploadType} type={uploadType} />
+			{uploadType === "video" && <SeriesImportCard />}
 
 			{pickerError !== null && (
 				<Text
