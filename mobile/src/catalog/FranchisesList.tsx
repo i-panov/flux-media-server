@@ -9,15 +9,15 @@ import { isTV } from "../tv/profile";
 import { CatalogCard } from "./CatalogCard";
 import { catalogCardWidth, catalogColumns, catalogPadding } from "./grid";
 
-export function FranchisesList() {
+export function FranchisesList({ tagIDs = [] }: { tagIDs?: number[] }) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
-	const franchises = useFranchises();
+	const franchises = useFranchises(tagIDs);
 	const { width } = useWindowDimensions();
 	const columns = catalogColumns(width);
 	// Отступы берём те же, что Screen: на TV они больше, иначе строка
 	// шире контента и правая карточка обрезается.
-	const padding = catalogPadding(isTV, spacing);
+	const padding = catalogPadding(isTV);
 	const cardWidth = catalogCardWidth(width, columns, padding, spacing.md);
 	if (franchises.isPending) {
 		return <ActivityIndicator color={colors.accent} />;

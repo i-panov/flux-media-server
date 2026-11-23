@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvFocusStyle } from "../tv/focus";
 
 export type VideoTab =
 	| "videos"
@@ -60,13 +61,14 @@ export function VideoTabs({
 						accessibilityState={{ selected: active }}
 						accessibilityLabel={label(tab)}
 						onPress={() => onChange(tab)}
-						style={[
+						style={({ focused }) => [
 							styles.tab,
 							{
 								borderRadius: radii.md,
 								borderColor: active ? colors.accent : colors.border,
 								backgroundColor: active ? colors.accent : colors.surface,
 							},
+							tvFocusStyle(focused, colors.accent),
 						]}
 					>
 						<Text

@@ -126,6 +126,15 @@ export default function VideoScreen() {
 					setFormatID(null);
 				}}
 			/>
+			{!isGrid && (
+				<TagFilterBar
+					formatID={null}
+					genreIDs={genreIDs}
+					onFormatChange={() => undefined}
+					onGenresChange={setGenreIDs}
+					genresOnly
+				/>
+			)}
 			{isGrid ? (
 				<>
 					<MediaSearchBar
@@ -191,9 +200,9 @@ export default function VideoScreen() {
 					)}
 				</>
 			) : tab === "franchises" ? (
-				<FranchisesList />
+				<FranchisesList tagIDs={genreIDs} />
 			) : (
-				<WorksList kind={tab} />
+				<WorksList kind={tab} tagIDs={genreIDs} />
 			)}
 			<MediaActionsSheet
 				media={actionsMedia}

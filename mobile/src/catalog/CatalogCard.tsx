@@ -8,6 +8,7 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvFocusStyle } from "../tv/focus";
 
 export function CatalogCard({
 	id,
@@ -33,7 +34,11 @@ export function CatalogCard({
 			accessibilityLabel={title}
 			onPress={onPress}
 			testID={testID}
-			style={[{ width: 160, gap: spacing.xs }, style]}
+			style={({ focused }) => [
+				{ width: 160, gap: spacing.xs },
+				style,
+				tvFocusStyle(focused, colors.accent),
+			]}
 		>
 			<View
 				style={{

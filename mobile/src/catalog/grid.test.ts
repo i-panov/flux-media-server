@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { spacing } from "../theme/tokens";
 import { catalogCardWidth, catalogColumns, catalogPadding } from "./grid";
 
 describe("catalogColumns", () => {
@@ -12,10 +13,9 @@ describe("catalogColumns", () => {
 });
 
 describe("catalogPadding", () => {
-	it("на ТВ отступ больше", () => {
-		const spacing = { lg: 16, xl: 24 };
-		expect(catalogPadding(false, spacing)).toBe(16);
-		expect(catalogPadding(true, spacing)).toBe(24);
+	it("совпадает с отступами Screen", () => {
+		expect(catalogPadding(false)).toBe(spacing.lg);
+		expect(catalogPadding(true)).toBe(spacing.xl);
 	});
 });
 

@@ -7,6 +7,7 @@ import {
 	Modal,
 	Platform,
 	Pressable,
+	ScrollView,
 	StyleSheet,
 	Text,
 	TextInput,
@@ -88,130 +89,133 @@ export function ClipSheet({
 							},
 						]}
 					>
-						<View style={[styles.row, styles.between]}>
-							<Text
-								style={{ color: colors.text, fontSize: 18, fontWeight: "600" }}
-							>
-								{t("clip.title")}
-							</Text>
-							<Pressable onPress={onClose} testID="clip-close">
-								<Ionicons name="close" size={20} color={colors.textMuted} />
-							</Pressable>
-						</View>
-						<Text style={{ color: colors.textMuted }}>
-							{t("clip.position", { value: position.toFixed(1) })}
-						</Text>
-						<View style={[styles.row, { gap: spacing.sm }]}>
-							{[
-								{
-									key: "start",
-									label: t("clip.setStart"),
-									apply: () => setStart(position.toFixed(1)),
-								},
-								{
-									key: "end",
-									label: t("clip.setEnd"),
-									apply: () => setEnd(position.toFixed(1)),
-								},
-							].map((action) => (
-								<Pressable
-									key={action.key}
-									testID={`clip-${action.key}-here`}
-									onPress={action.apply}
-									style={[
-										styles.small,
-										{ borderColor: colors.border, borderRadius: radii.md },
-									]}
-								>
-									<Text style={{ color: colors.accent }}>{action.label}</Text>
-								</Pressable>
-							))}
-						</View>
-						<View style={[styles.row, { gap: spacing.sm }]}>
-							{[
-								{
-									key: "start",
-									value: start,
-									set: setStart,
-									label: t("clip.start"),
-								},
-								{ key: "end", value: end, set: setEnd, label: t("clip.end") },
-							].map((field) => (
-								<View key={field.key} style={{ flex: 1, gap: 4 }}>
-									<Text style={{ color: colors.textMuted }}>{field.label}</Text>
-									<TextInput
-										value={field.value}
-										onChangeText={field.set}
-										keyboardType="numeric"
-										testID={`clip-${field.key}`}
-										style={[
-											styles.input,
-											{
-												color: colors.text,
-												borderColor: colors.border,
-												borderRadius: radii.md,
-											},
-										]}
-									/>
-								</View>
-							))}
-						</View>
-						<TextInput
-							value={title}
-							onChangeText={setTitle}
-							placeholder={t("clip.name")}
-							placeholderTextColor={colors.textMuted}
-							testID="clip-title"
-							style={[
-								styles.input,
-								{
-									color: colors.text,
-									borderColor: colors.border,
-									borderRadius: radii.md,
-								},
-							]}
-						/>
-						{error !== null && (
-							<Text style={{ color: colors.danger }}>{error}</Text>
-						)}
-						{status !== undefined && (
-							<Text style={{ color: colors.textMuted }}>
-								{status === "done"
-									? t("clip.done")
-									: status === "error"
-										? (job.data?.error ?? t("clip.error"))
-										: t("clip.progress")}
-							</Text>
-						)}
-						{running && jobID !== null && (
-							<Pressable
-								testID="clip-cancel"
-								onPress={() => cancel.mutate(jobID)}
-							>
-								<Text style={{ color: colors.danger }}>{t("clip.cancel")}</Text>
-							</Pressable>
-						)}
-						<Pressable
-							testID="clip-submit"
-							disabled={create.isPending || running}
-							onPress={submit}
-							style={[
-								styles.button,
-								{ backgroundColor: colors.accent, borderRadius: radii.md },
-							]}
+						<ScrollView
+							keyboardShouldPersistTaps="handled"
+							contentContainerStyle={{ gap: spacing.sm }}
 						>
-							{create.isPending ? (
-								<ActivityIndicator color={colors.onAccent} />
-							) : (
-								<Text style={{ color: colors.onAccent, fontWeight: "600" }}>
-									{t("clip.submit")}
+							<View style={[styles.row, styles.between]}>
+								<Text
+									style={{
+										color: colors.text,
+										fontSize: 18,
+										fontWeight: "600",
+									}}
+								>
+									{t("clip.title")}
+								</Text>
+								<Pressable onPress={onClose} testID="clip-close">
+									<Ionicons name="close" size={20} color={colors.textMuted} />
+								</Pressable>
+							</View>
+							<Text style={{ color: colors.textMuted }}>
+								{t("clip.position", { value: position.toFixed(1) })}
+							</Text>
+							<View style={[styles.row, { gap: spacing.sm }]}>
+								<TimeField
+									testID="clip-start"
+									label={t("clip.start")}
+									value={start}
+									onChange={setStart}
+								/>
+								<TimeField
+									testID="clip-end"
+									label={t("clip.end")}
+									value={end}
+									onChange={setEnd}
+								/>
+							</View>
+							<TextInput
+								value={title}
+								onChangeText={setTitle}
+								placeholder={t("clip.name")}
+								placeholderTextColor={colors.textMuted}
+								testID="clip-title"
+								style={[
+									styles.input,
+									{
+										color: colors.text,
+										borderColor: colors.border,
+										borderRadius: radii.md,
+									},
+								]}
+							/>
+							{error !== null && (
+								<Text style={{ color: colors.danger }}>{error}</Text>
+							)}
+							{status !== undefined && (
+								<Text style={{ color: colors.textMuted }}>
+									{status === "done"
+										? t("clip.done")
+										: status === "error"
+											? t("clip.error")
+											: t("clip.progress")}
 								</Text>
 							)}
-						</Pressable>
+							{running && jobID !== null && (
+								<Pressable
+									testID="clip-cancel"
+									onPress={() => cancel.mutate(jobID)}
+								>
+									<Text style={{ color: colors.danger }}>
+										{t("clip.cancel")}
+									</Text>
+								</Pressable>
+							)}
+							<Pressable
+								testID="clip-submit"
+								disabled={create.isPending || running}
+								onPress={submit}
+								style={[
+									styles.button,
+									{ backgroundColor: colors.accent, borderRadius: radii.md },
+								]}
+							>
+								{create.isPending ? (
+									<ActivityIndicator color={colors.onAccent} />
+								) : (
+									<Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+										{t("clip.submit")}
+									</Text>
+								)}
+							</Pressable>
+						</ScrollView>
 					</Pressable>
 				</Pressable>
 			</KeyboardAvoidingView>
 		</Modal>
+	);
+}
+
+function TimeField({
+	testID,
+	label,
+	value,
+	onChange,
+}: {
+	testID: string;
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	const { colors, radii } = useTheme();
+	return (
+		<View style={{ flex: 1, gap: 4 }}>
+			<Text style={{ color: colors.textMuted }}>{label}</Text>
+			<TextInput
+				value={value}
+				onChangeText={onChange}
+				keyboardType="numeric"
+				testID={testID}
+				style={[
+					styles.input,
+					{
+						color: colors.text,
+						borderColor: colors.border,
+						borderRadius: radii.md,
+					},
+				]}
+			/>
+		</View>
 	);
 }
 

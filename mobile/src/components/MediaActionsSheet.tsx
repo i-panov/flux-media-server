@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Media } from "@flux/shared";
 import { router } from "expo-router";
+import type { ComponentProps } from "react";
 import { useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDeleteMedia } from "../api/media";
@@ -16,6 +17,7 @@ import { useTheme } from "../theme/ThemeProvider";
 import { tvCapabilities } from "../tv/profile";
 import { AddToCollectionSheet } from "./AddToCollectionSheet";
 import { ChangeCoverSheet } from "./ChangeCoverSheet";
+import { ClipSheet } from "./ClipSheet";
 import { TagsSheet } from "./TagsSheet";
 
 export function MediaActionsSheet({
@@ -33,6 +35,7 @@ export function MediaActionsSheet({
 	const [coverOpen, setCoverOpen] = useState(false);
 	const [collectionOpen, setCollectionOpen] = useState(false);
 	const [tagsOpen, setTagsOpen] = useState(false);
+	const [clipOpen, setClipOpen] = useState(false);
 	if (media === null) return null;
 	const admin = session.data?.is_admin === true;
 
@@ -54,23 +57,10 @@ export function MediaActionsSheet({
 	};
 
 	const row = (
-		icon: keyof typeof Ionicons.glyphMap,
+		icon: ComponentProps<typeof Ionicons>["name"],
 		label: string,
 		onPress: () => void,
-	) => (
-		<Pressable
-			accessibilityRole="button"
-			onPress={onPress}
-			style={({ pressed }) => [
-				styles.row,
-				{ gap: spacing.sm, paddingVertical: spacing.sm },
-				pressed && styles.pressed,
-			]}
-		>
-			<Ionicons name={icon} size={20} color={colors.text} />
-			<Text style={{ color: colors.text, fontSize: 16 }}>{label}</Text>
-		</Pressable>
-	);
+	) => <ActionRow icon={icon} label={label} onPress={onPress} />;
 
 	return (
 		<>
@@ -145,6 +135,14 @@ export function MediaActionsSheet({
 							admin &&
 							media.type !== "image" &&
 							row("image-outline", t("cover.change"), () => setCoverOpen(true))}
+						<MediaExtraRows
+							media={media}
+							onClip={() => setClipOpen(true)}
+							onSource={() => {
+								onClose();
+								router.push(`/video/${media.source_media_id ?? 0}`);
+							}}
+						/>
 						{admin &&
 							media.type !== "image" &&
 							row("pricetags-outline", t("tags.title"), () =>
@@ -156,6 +154,14 @@ export function MediaActionsSheet({
 					</Pressable>
 				</Pressable>
 			</Modal>
+			{clipOpen && (
+				<ClipSheet
+					media={media}
+					position={0}
+					duration={media.duration}
+					onClose={() => setClipOpen(false)}
+				/>
+			)}
 			{tagsOpen && (
 				<TagsSheet
 					entity="media"
@@ -176,6 +182,61 @@ export function MediaActionsSheet({
 					mediaId={media.id}
 					type={media.type === "audio" ? "audio" : "video"}
 					onClose={() => setCollectionOpen(false)}
+				/>
+			)}
+		</>
+	);
+}
+
+function ActionRow({
+	icon,
+	label,
+	onPress,
+}: {
+	icon: ComponentProps<typeof Ionicons>["name"];
+	label: string;
+	onPress: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<Pressable
+			accessibilityRole="button"
+			onPress={onPress}
+			style={({ pressed }) => [
+				styles.row,
+				{ gap: spacing.sm, paddingVertical: spacing.sm },
+				pressed && styles.pressed,
+			]}
+		>
+			<Ionicons name={icon} size={20} color={colors.text} />
+			<Text style={{ color: colors.text, fontSize: 16 }}>{label}</Text>
+		</Pressable>
+	);
+}
+
+function MediaExtraRows({
+	media,
+	onClip,
+	onSource,
+}: {
+	media: Media;
+	onClip: () => void;
+	onSource: () => void;
+}) {
+	return (
+		<>
+			{(media.type === "video" || media.type === "audio") && (
+				<ActionRow
+					icon="cut-outline"
+					label={t("clip.submit")}
+					onPress={onClip}
+				/>
+			)}
+			{media.source_media_id != null && media.source_media_id > 0 && (
+				<ActionRow
+					icon="film-outline"
+					label={t("audio.sourceVideo")}
+					onPress={onSource}
 				/>
 			)}
 		</>

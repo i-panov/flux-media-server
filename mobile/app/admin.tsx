@@ -3,7 +3,10 @@ import { StyleSheet, Text, View } from "react-native";
 import { useSession } from "../src/auth/session";
 import { AuthGate } from "../src/components/AuthGate";
 import { MaintenancePanel } from "../src/components/admin/MaintenancePanel";
+import { OriginalsPanel } from "../src/components/admin/OriginalsPanel";
+import { StoragePanel } from "../src/components/admin/StoragePanel";
 import { TagsPanel } from "../src/components/admin/TagsPanel";
+import { TranscodesPanel } from "../src/components/admin/TranscodesPanel";
 import { UsersPanel } from "../src/components/admin/UsersPanel";
 import { EmptyState } from "../src/components/EmptyState";
 import { Screen } from "../src/components/Screen";
@@ -75,6 +78,15 @@ function AdminContent() {
 					{t("admin.title")}
 				</Text>
 			</View>
+			<Section title={t("admin.storage.title")}>
+				<StoragePanel />
+			</Section>
+			<Section title={t("admin.queue.title")}>
+				<TranscodesPanel />
+			</Section>
+			<Section title={t("admin.originals.title")}>
+				<OriginalsPanel />
+			</Section>
 			<Section title={t("admin.tags")}>
 				<TagsPanel />
 			</Section>

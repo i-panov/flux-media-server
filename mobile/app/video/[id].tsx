@@ -29,6 +29,7 @@ import { ErrorState } from "../../src/components/ErrorState";
 import { Screen } from "../../src/components/Screen";
 import { VideoClipAction } from "../../src/components/VideoClipAction";
 import { VideoMeta } from "../../src/components/VideoMeta";
+import { VideoTagsAction } from "../../src/components/VideoTagsAction";
 import { t, useLanguage } from "../../src/i18n";
 import { confirmDeleteMedia } from "../../src/media/confirmDelete";
 import {
@@ -449,6 +450,7 @@ function VideoDetailContent() {
 							testID="video-detail-cover"
 						/>
 						<VideoClipAction media={item} position={playerPosition} />
+						<VideoTagsAction media={item} />
 						<ActionButton
 							icon="trash-outline"
 							label={t("video.delete")}

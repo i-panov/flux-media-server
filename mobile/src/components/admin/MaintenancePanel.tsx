@@ -81,7 +81,7 @@ export function MaintenancePanel() {
 				</Text>
 			)}
 			{state.last_error !== undefined && state.last_error !== "" && (
-				<Text style={{ color: colors.danger }}>{state.last_error}</Text>
+				<Text style={{ color: colors.danger }}>{errorLabel}</Text>
 			)}
 		</View>
 	);

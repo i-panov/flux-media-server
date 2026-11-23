@@ -11,6 +11,7 @@ import {
 import { useTags } from "../api/tags";
 import { t, useLanguage } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
+import { tvFocusStyle } from "../tv/focus";
 
 type Mode = "format" | "genre";
 
@@ -21,6 +22,8 @@ interface TagFilterBarProps {
 	onGenresChange: (ids: number[]) => void;
 	/** Слаги форматов, которые на этой вкладке заведомо дадут пусто. */
 	hiddenFormatSlugs?: string[];
+	/** Только жанры: в каталоге формат задаётся вкладкой. */
+	genresOnly?: boolean;
 }
 
 // Фильтры видео: формат (один) и жанры (много). Оба — теги с сервера,
@@ -31,6 +34,7 @@ export function TagFilterBar({
 	onFormatChange,
 	onGenresChange,
 	hiddenFormatSlugs,
+	genresOnly = false,
 }: TagFilterBarProps) {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
@@ -59,13 +63,14 @@ export function TagFilterBar({
 			accessibilityRole="button"
 			accessibilityLabel={label}
 			accessibilityState={{ selected: active }}
-			style={[
+			style={({ focused }) => [
 				styles.chip,
 				{
 					borderColor: active ? colors.accent : colors.border,
 					backgroundColor: active ? colors.surfaceMuted : colors.surface,
 					borderRadius: radii.md,
 				},
+				tvFocusStyle(focused, colors.accent),
 			]}
 		>
 			<Text
@@ -82,12 +87,13 @@ export function TagFilterBar({
 	return (
 		<View style={{ gap: spacing.sm }}>
 			<View style={[styles.row, { gap: spacing.sm }]}>
-				{chip(
-					formatName ?? t("video.allFormats"),
-					formatID !== null,
-					() => setMode("format"),
-					"filter-format",
-				)}
+				{!genresOnly &&
+					chip(
+						formatName ?? t("video.allFormats"),
+						formatID !== null,
+						() => setMode("format"),
+						"filter-format",
+					)}
 				{chip(
 					genreCount > 0
 						? t("video.genresCount", { count: genreCount })

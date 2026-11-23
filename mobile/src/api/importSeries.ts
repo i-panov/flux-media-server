@@ -1,59 +1,96 @@
 import { apiFetch } from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 
-export interface ImportProbeEpisode {
-	season: number;
-	episode: number;
-	title: string;
-	duration: number;
-}
+const probeEpisodeSchema = z.object({
+	season: z.number(),
+	episode: z.number(),
+	title: z.string(),
+	duration: z.number(),
+});
 
-export interface ImportProbe {
-	kind: "series" | "episode";
-	series_id?: string;
-	title: string;
-	scope: string;
-	seasons?: number[];
-	episodes: ImportProbeEpisode[];
-	duration?: number;
-	thumbnail?: string;
-}
+const probeSchema = z.object({
+	kind: z.enum(["series", "episode"]),
+	series_id: z.string().optional(),
+	title: z.string(),
+	scope: z.string(),
+	seasons: z.array(z.number()).optional(),
+	episodes: z.array(probeEpisodeSchema),
+	duration: z.number().optional(),
+	thumbnail: z.string().optional(),
+});
 
-export interface ImportEpisode {
-	id: number;
-	season: number;
-	episode: number;
-	title: string;
-	status: "queued" | "downloading" | "done" | "error";
-	error?: string;
-	media_id?: number;
-}
+export type ImportProbe = z.infer<typeof probeSchema>;
+export type ImportProbeEpisode = z.infer<typeof probeEpisodeSchema>;
 
-export interface ImportJob {
-	id: number;
-	source_url: string;
-	scope: string;
-	title: string;
-	status: "queued" | "downloading" | "importing" | "done" | "partial" | "error";
-	episodes_total: number;
-	episodes_done: number;
-	episodes_error: number;
-	error?: string;
-}
+const episodeSchema = z.object({
+	id: z.number(),
+	season: z.number(),
+	episode: z.number(),
+	title: z.string(),
+	status: z.enum(["queued", "downloading", "done", "error"]),
+	error: z.string().optional(),
+	media_id: z.number().optional(),
+});
 
-export interface ImportJobDetail {
-	job: ImportJob;
-	episodes: ImportEpisode[];
-}
+const jobSchema = z.object({
+	id: z.number(),
+	source_url: z.string(),
+	scope: z.string(),
+	title: z.string(),
+	status: z.enum([
+		"queued",
+		"downloading",
+		"importing",
+		"done",
+		"partial",
+		"error",
+	]),
+	episodes_total: z.number(),
+	episodes_done: z.number(),
+	episodes_error: z.number(),
+	error: z.string().optional(),
+});
+
+const jobDetailSchema = z.object({
+	job: jobSchema,
+	episodes: z.array(episodeSchema),
+});
+
+export type ImportJob = z.infer<typeof jobSchema>;
+export type ImportEpisode = z.infer<typeof episodeSchema>;
+export type ImportJobDetail = z.infer<typeof jobDetailSchema>;
 
 export function useImportProbe() {
 	return useMutation({
-		mutationFn: (url: string) =>
-			apiFetch<ImportProbe>("/import/probe", {
+		mutationFn: async (url: string) => {
+			const body = await apiFetch<unknown>("/import/probe", {
 				method: "POST",
 				body: JSON.stringify({ url }),
-			}),
+			});
+			return probeSchema.parse(body);
+		},
 	});
+}
+
+async function startImport(input: {
+	url: string;
+	scope: "season" | "series";
+	title: string;
+	seriesID?: string;
+	episodes: { season: number; episode: number }[];
+}): Promise<ImportJob> {
+	const body = await apiFetch<unknown>("/import", {
+		method: "POST",
+		body: JSON.stringify({
+			url: input.url,
+			scope: input.scope,
+			title: input.title,
+			series_id: input.seriesID,
+			episodes: input.episodes,
+		}),
+	});
+	return jobSchema.parse(body);
 }
 
 export function useStartImport() {
@@ -65,17 +102,7 @@ export function useStartImport() {
 			title: string;
 			seriesID?: string;
 			episodes: { season: number; episode: number }[];
-		}) =>
-			apiFetch<ImportJob>("/import", {
-				method: "POST",
-				body: JSON.stringify({
-					url: input.url,
-					scope: input.scope,
-					title: input.title,
-					series_id: input.seriesID,
-					episodes: input.episodes,
-				}),
-			}),
+		}) => startImport(input),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["import"] });
 		},
@@ -87,7 +114,9 @@ export function useImportJob(id: number | null) {
 	return useQuery({
 		queryKey: ["import", id],
 		queryFn: async () => {
-			const detail = await apiFetch<ImportJobDetail>(`/import/${id}`);
+			const detail = jobDetailSchema.parse(
+				await apiFetch<unknown>(`/import/${id}`),
+			);
 			if (
 				detail.job.status !== "queued" &&
 				detail.job.status !== "downloading" &&

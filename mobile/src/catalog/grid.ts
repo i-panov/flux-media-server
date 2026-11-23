@@ -1,3 +1,5 @@
+import { screenPadding } from "../theme/layout";
+
 // Колонки каталога по ширине окна: телефон/планшет/ТВ.
 export function catalogColumns(width: number): number {
 	if (width >= 900) return 4;
@@ -5,13 +7,10 @@ export function catalogColumns(width: number): number {
 	return 2;
 }
 
-// Отступы экрана: на ТВ Screen использует spacing.xl, на телефоне spacing.lg.
-// Отдельная функция, чтобы TV-путь был покрыт тестом.
-export function catalogPadding(
-	wide: boolean,
-	spacing: { lg: number; xl: number },
-): number {
-	return wide ? spacing.xl : spacing.lg;
+// Отступы экрана: единственный источник — theme/layout, чтобы сетка не
+// разошлась с Screen.
+export function catalogPadding(wide: boolean): number {
+	return screenPadding(wide);
 }
 
 // Ширина карточки без «растягивания» последнего ряда: фиксируем её от

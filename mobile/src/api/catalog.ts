@@ -57,10 +57,14 @@ export interface CatalogFranchise {
 	entries?: CatalogEntry[];
 }
 
-export function useWorks(kind: WorkKind) {
+export function useWorks(kind: WorkKind, tagIDs: number[] = []) {
+	const tags = tagIDs.join(",");
 	return useQuery({
-		queryKey: ["works", kind],
-		queryFn: () => apiFetch<CatalogWork[]>(`/works?kind=${kind}`),
+		queryKey: ["works", kind, tags],
+		queryFn: () =>
+			apiFetch<CatalogWork[]>(
+				`/works?kind=${kind}${tags === "" ? "" : `&tag_ids=${tags}`}`,
+			),
 	});
 }
 
@@ -72,10 +76,14 @@ export function useWork(id: number, enabled = true) {
 	});
 }
 
-export function useFranchises() {
+export function useFranchises(tagIDs: number[] = []) {
+	const tags = tagIDs.join(",");
 	return useQuery({
-		queryKey: ["franchises"],
-		queryFn: () => apiFetch<CatalogFranchise[]>("/franchises"),
+		queryKey: ["franchises", tags],
+		queryFn: () =>
+			apiFetch<CatalogFranchise[]>(
+				`/franchises${tags === "" ? "" : `?tag_ids=${tags}`}`,
+			),
 	});
 }
 

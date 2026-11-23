@@ -16,15 +16,21 @@ import { catalogCardWidth, catalogColumns, catalogPadding } from "./grid";
 
 // Список произведений одного типа: используется и отдельными экранами,
 // и вкладками видео-раздела.
-export function WorksList({ kind }: { kind: WorkKind }) {
+export function WorksList({
+	kind,
+	tagIDs = [],
+}: {
+	kind: WorkKind;
+	tagIDs?: number[];
+}) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
-	const works = useWorks(kind);
+	const works = useWorks(kind, tagIDs);
 	const { width } = useWindowDimensions();
 	const columns = catalogColumns(width);
 	// Отступы берём те же, что Screen: на TV они больше, иначе строка
 	// шире контента и правая карточка обрезается.
-	const padding = catalogPadding(isTV, spacing);
+	const padding = catalogPadding(isTV);
 	const cardWidth = catalogCardWidth(width, columns, padding, spacing.md);
 	if (works.isPending) {
 		return <ActivityIndicator color={colors.accent} />;
