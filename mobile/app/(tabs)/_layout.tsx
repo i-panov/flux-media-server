@@ -42,6 +42,10 @@ export default function TabsLayout() {
 				)}
 				screenOptions={{
 					headerShown: false,
+					// Иконки и подписи таб-бара не масштабируем: при крупном
+					// системном шрифте подпись наезжает на иконку и вылезает
+					// за высоту бара. Контент экранов при этом масштабируется.
+					tabBarAllowFontScaling: false,
 					tabBarActiveTintColor: colors.accent,
 					tabBarInactiveTintColor: colors.textMuted,
 					tabBarStyle: {

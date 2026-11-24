@@ -48,8 +48,14 @@ export function VideoTabs({
 		<ScrollView
 			horizontal
 			showsHorizontalScrollIndicator={false}
-			style={{ flexGrow: 0 }}
-			contentContainerStyle={{ gap: spacing.xs }}
+			// flexShrink: 0 обязателен: иначе в колонке экрана ScrollView
+			// сжимается по высоте и обрезает подписи вкладок.
+			style={{ flexGrow: 0, flexShrink: 0 }}
+			contentContainerStyle={{
+				gap: spacing.xs,
+				alignItems: "center",
+				paddingRight: spacing.md,
+			}}
 		>
 			{TABS.map((tab) => {
 				const active = tab === value;
@@ -76,6 +82,11 @@ export function VideoTabs({
 								color: active ? colors.onAccent : colors.text,
 								fontSize: 13,
 								fontWeight: active ? "600" : "400",
+								// Android добавляет вертикальный font padding,
+								// из-за которого при крупном системном шрифте
+								// подпись выглядит подрезанной.
+								includeFontPadding: false,
+								textAlignVertical: "center",
 							}}
 						>
 							{label(tab)}
@@ -88,5 +99,12 @@ export function VideoTabs({
 }
 
 const styles = StyleSheet.create({
-	tab: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+	tab: {
+		borderWidth: 1,
+		minHeight: 34,
+		paddingHorizontal: 12,
+		paddingVertical: 7,
+		alignItems: "center",
+		justifyContent: "center",
+	},
 });

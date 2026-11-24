@@ -70,6 +70,16 @@ export const ru = {
 	"login.invalid": "Неверный или истёкший код",
 	"login.error": "Не удалось войти",
 	"video.title": "Видео",
+	"auth.scanQr": "Сканировать QR",
+	"auth.scanTitle": "Сканер QR",
+	"auth.scanHint":
+		"Наведите камеру на QR-код на телевизоре или другом устройстве.",
+	"auth.cameraHint": "Для сканирования QR нужен доступ к камере.",
+	"auth.cameraDenied":
+		"Доступ к камере запрещён. Разрешите его в настройках приложения или введите код вручную.",
+	"auth.cameraAllow": "Разрешить камеру",
+	"auth.cameraSettings": "Открыть настройки",
+	"auth.cameraUnavailable": "Камера недоступна. Введите код вручную.",
 	"admin.queue.statusCancelled": "Отменено",
 	"admin.originals.statusUntracked": "Без задания",
 	"admin.originals.statusOrphaned": "Копия потеряна",
@@ -460,6 +470,16 @@ export const en: Record<keyof typeof ru, string> = {
 	"login.invalid": "Invalid or expired code",
 	"login.error": "Could not sign in",
 	"video.title": "Video",
+	"auth.scanQr": "Scan QR",
+	"auth.scanTitle": "QR scanner",
+	"auth.scanHint":
+		"Point the camera at the QR code on your TV or another device.",
+	"auth.cameraHint": "Camera access is needed to scan the QR code.",
+	"auth.cameraDenied":
+		"Camera access is denied. Allow it in app settings or enter the code manually.",
+	"auth.cameraAllow": "Allow camera",
+	"auth.cameraSettings": "Open settings",
+	"auth.cameraUnavailable": "Camera is unavailable. Enter the code manually.",
 	"admin.queue.statusCancelled": "Cancelled",
 	"admin.originals.statusUntracked": "No task",
 	"admin.originals.statusOrphaned": "Copy lost",

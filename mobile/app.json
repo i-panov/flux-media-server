@@ -3,16 +3,17 @@
     "name": "Flux",
     "slug": "mobile",
     "scheme": "flux",
-    "version": "0.1.49",
+    "version": "0.1.50",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.lib.flux",
-      "buildNumber": "67",
+      "buildNumber": "68",
       "infoPlist": {
-        "NSLocalNetworkUsageDescription": "Flux обращается к вашему домашнему медиа-серверу в локальной сети."
+        "NSLocalNetworkUsageDescription": "Flux обращается к вашему домашнему медиа-серверу в локальной сети.",
+        "NSCameraUsageDescription": "Flux сканирует QR-код с телевизора, чтобы подтвердить устройство."
       }
     },
     "android": {
@@ -24,7 +25,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.lib.flux",
-      "versionCode": 67,
+      "versionCode": 68,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -66,7 +67,7 @@
         {
           "microphonePermission": false,
           "photosPermission": "Flux открывает выбранное фото для обложки.",
-          "cameraPermission": false
+          "cameraPermission": "Flux сканирует QR-код с телевизора, чтобы подтвердить устройство."
         }
       ],
       "expo-image",
@@ -81,7 +82,15 @@
         }
       ],
       "./plugins/withCleartextTraffic",
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Flux сканирует QR-код с телевизора, чтобы подтвердить устройство.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ]
   }
 }

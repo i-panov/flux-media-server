@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import {
 	approveDeviceCode,
 	type DeviceInspectResponse,
@@ -14,9 +15,12 @@ import {
 	View,
 } from "react-native";
 import { useSession } from "../src/auth/session";
+import { QrScannerModal } from "../src/components/QrScannerModal";
 import { Screen } from "../src/components/Screen";
 import { t, useLanguage } from "../src/i18n";
 import { useTheme } from "../src/theme/ThemeProvider";
+import { tvFocusStyle } from "../src/tv/focus";
+import { isTV } from "../src/tv/profile";
 
 export default function ActivateScreen() {
 	useLanguage();
@@ -25,17 +29,23 @@ export default function ActivateScreen() {
 	const session = useSession();
 	const [code, setCode] = useState(params.code ?? "");
 	const [device, setDevice] = useState<DeviceInspectResponse | null>(null);
+	const [inspectedCode, setInspectedCode] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [done, setDone] = useState(false);
+	const [scanOpen, setScanOpen] = useState(false);
 
 	const inspect = useCallback(async (value: string) => {
 		const normalized = value.replace(/\D/g, "").slice(0, 6);
 		if (normalized.length !== 6) return;
 		setLoading(true);
 		setError(null);
+		setDevice(null);
+		setInspectedCode(null);
 		try {
-			setDevice(await inspectDeviceCode(normalized));
+			const found = await inspectDeviceCode(normalized);
+			setDevice(found);
+			setInspectedCode(normalized);
 		} catch {
 			setError(t("auth.activateInvalid"));
 		} finally {
@@ -50,13 +60,22 @@ export default function ActivateScreen() {
 		}
 	}, [inspect, params.code]);
 
+	const backLabel = t("common.back");
+	const goBack = () => {
+		if (router.canGoBack()) {
+			router.back();
+			return;
+		}
+		router.replace(session.data == null ? "/login" : "/settings");
+	};
+
 	const codeDigits = code.replace(/\D/g, "").slice(0, 6);
-	const displayCode =
-		codeDigits.length > 3
-			? `${codeDigits.slice(0, 3)} ${codeDigits.slice(3)}`
-			: codeDigits;
+	const displayCode = formatCode(codeDigits);
 
 	const approve = async () => {
+		if (loading || device === null || inspectedCode !== codeDigits) {
+			return;
+		}
 		setLoading(true);
 		setError(null);
 		try {
@@ -72,6 +91,7 @@ export default function ActivateScreen() {
 	if (session.data === null) {
 		return (
 			<Screen scroll testID="activate-screen">
+				<BackButton label={backLabel} onPress={goBack} />
 				<Text style={[styles.title, { color: colors.text }]}>
 					{t("auth.activateTitle")}
 				</Text>
@@ -92,6 +112,7 @@ export default function ActivateScreen() {
 
 	return (
 		<Screen scroll testID="activate-screen">
+			<BackButton label={backLabel} onPress={goBack} />
 			<Text style={[styles.title, { color: colors.text }]}>
 				{t("auth.activateTitle")}
 			</Text>
@@ -114,9 +135,11 @@ export default function ActivateScreen() {
 				<View style={{ gap: spacing.md }}>
 					<TextInput
 						value={displayCode}
-						onChangeText={(value) =>
-							setCode(value.replace(/\D/g, "").slice(0, 6))
-						}
+						onChangeText={(value) => {
+							setCode(value.replace(/\D/g, "").slice(0, 6));
+							setDevice(null);
+							setInspectedCode(null);
+						}}
 						keyboardType="number-pad"
 						inputMode="numeric"
 						autoComplete="one-time-code"
@@ -148,7 +171,12 @@ export default function ActivateScreen() {
 								{t("auth.activateDeviceHint")}
 							</Text>
 							<Pressable
-								style={[styles.button, { backgroundColor: colors.accent }]}
+								disabled={loading || inspectedCode !== codeDigits}
+								style={[
+									styles.button,
+									{ backgroundColor: colors.accent },
+									(loading || inspectedCode !== codeDigits) && styles.disabled,
+								]}
 								onPress={() => void approve()}
 							>
 								<Text style={[styles.buttonText, { color: colors.onAccent }]}>
@@ -159,6 +187,20 @@ export default function ActivateScreen() {
 					)}
 					{error !== null && (
 						<Text style={{ color: colors.danger }}>{error}</Text>
+					)}
+					{!isTV && (
+						<Pressable
+							style={[
+								styles.button,
+								{ borderColor: colors.accent, borderWidth: 1 },
+							]}
+							onPress={() => setScanOpen(true)}
+							testID="activate-scan"
+						>
+							<Text style={{ color: colors.accent, fontWeight: "600" }}>
+								{t("auth.scanQr")}
+							</Text>
+						</Pressable>
 					)}
 					<Pressable
 						disabled={loading}
@@ -175,11 +217,57 @@ export default function ActivateScreen() {
 					</Pressable>
 				</View>
 			)}
+			<QrScannerModal
+				visible={scanOpen}
+				onClose={() => setScanOpen(false)}
+				onCode={(value) => {
+					setScanOpen(false);
+					setCode(value);
+					void inspect(value);
+				}}
+			/>
 		</Screen>
 	);
 }
 
+function formatCode(code: string): string {
+	return code.length > 3 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+}
+
+function BackButton({
+	label,
+	onPress,
+}: {
+	label: string;
+	onPress: () => void;
+}) {
+	const { colors } = useTheme();
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={label}
+			onPress={onPress}
+			testID="activate-back"
+			hitSlop={8}
+			style={({ focused }) => [
+				styles.back,
+				tvFocusStyle(focused, colors.accent),
+			]}
+		>
+			<Ionicons name="chevron-back" size={24} color={colors.text} />
+			<Text style={{ color: colors.text, fontSize: 16 }}>{label}</Text>
+		</Pressable>
+	);
+}
+
 const styles = StyleSheet.create({
+	back: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 4,
+		alignSelf: "flex-start",
+	},
+	disabled: { opacity: 0.5 },
 	title: { fontSize: 26, fontWeight: "700" },
 	input: { borderWidth: 1, padding: 12, fontSize: 18 },
 	button: { borderRadius: 8, padding: 14, alignItems: "center" },
