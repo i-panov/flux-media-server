@@ -2,6 +2,8 @@ import {
 	addEpisode,
 	addFilm,
 	addFranchiseEntry,
+	type CatalogFranchise,
+	type CatalogWork,
 	createFranchise,
 	createSeason,
 	createWork,
@@ -116,8 +118,12 @@ export function useRemoveMediaFromCatalog() {
 export function useUpdateWork() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({ id, title }: { id: number; title: string }) =>
-			updateWork(id, { title }),
+		mutationFn: ({
+			id,
+			...patch
+		}: { id: number } & Partial<
+			Pick<CatalogWork, "title" | "description" | "cover_url" | "year">
+		>) => updateWork(id, patch),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -226,8 +232,12 @@ export function useCreateFranchise() {
 export function useUpdateFranchise() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({ id, name }: { id: number; name: string }) =>
-			updateFranchise(id, { name }),
+		mutationFn: ({
+			id,
+			...patch
+		}: { id: number } & Partial<
+			Pick<CatalogFranchise, "name" | "description" | "cover_url">
+		>) => updateFranchise(id, patch),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }

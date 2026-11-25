@@ -53,6 +53,23 @@ export default function CatalogAdminScreen() {
 	);
 }
 
+// null — поле не трогали; пустая строка — осознанная очистка.
+function editedValue<T>(value: T | null, original: T): T {
+	return value === null ? original : value;
+}
+
+function yearFieldValue(value: string | null, original: number): string {
+	if (value !== null) {
+		return value;
+	}
+	return original > 0 ? String(original) : "";
+}
+
+function parseYearValue(value: string | null, original: number): number {
+	const parsed = value === null ? original : Number(value);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function CatalogAdminContent() {
 	const params = useLocalSearchParams<{ kind?: string; id?: string }>();
 	const kind = params.kind === "franchise" ? "franchise" : "work";
@@ -83,6 +100,10 @@ function CatalogAdminContent() {
 	const removeEntry = useRemoveFranchiseEntry();
 	const reorderEntries = useReorderFranchiseEntries();
 	const [title, setTitle] = useState("");
+	// null — «не трогали», пустая строка — осознанная очистка.
+	const [description, setDescription] = useState<string | null>(null);
+	const [coverURL, setCoverURL] = useState<string | null>(null);
+	const [year, setYear] = useState<string | null>(null);
 	const [picker, setPicker] = useState<Picker>(null);
 	const [pickerSeason, setPickerSeason] = useState<number | null>(null);
 	const [sortKind, setSortKind] = useState<
@@ -174,6 +195,46 @@ function CatalogAdminContent() {
 					onChangeText={setTitle}
 					placeholder={t("catalog.adminTitle")}
 				/>
+				<TextInput
+					style={{
+						color: colors.text,
+						borderColor: colors.border,
+						borderWidth: 1,
+						borderRadius: 8,
+						padding: spacing.sm,
+					}}
+					value={editedValue(description, data.description)}
+					onChangeText={setDescription}
+					placeholder={t("catalog.description")}
+					multiline
+				/>
+				<TextInput
+					style={{
+						color: colors.text,
+						borderColor: colors.border,
+						borderWidth: 1,
+						borderRadius: 8,
+						padding: spacing.sm,
+					}}
+					value={editedValue(coverURL, data.cover_url)}
+					onChangeText={setCoverURL}
+					placeholder={t("catalog.coverUrl")}
+					autoCapitalize="none"
+					autoCorrect={false}
+				/>
+				<TextInput
+					style={{
+						color: colors.text,
+						borderColor: colors.border,
+						borderWidth: 1,
+						borderRadius: 8,
+						padding: spacing.sm,
+					}}
+					value={yearFieldValue(year, data.year)}
+					onChangeText={setYear}
+					placeholder={t("catalog.year")}
+					keyboardType="number-pad"
+				/>
 				<View style={{ flexDirection: "row", gap: spacing.md }}>
 					<Pressable
 						onPress={() =>
@@ -181,6 +242,12 @@ function CatalogAdminContent() {
 								updateWork.mutateAsync({
 									id: data.id,
 									title: (title || data.title).trim(),
+									description: editedValue(
+										description,
+										data.description,
+									).trim(),
+									cover_url: editedValue(coverURL, data.cover_url).trim(),
+									year: parseYearValue(year, data.year),
 								}),
 							)
 						}
@@ -529,6 +596,33 @@ function CatalogAdminContent() {
 				onChangeText={setTitle}
 				placeholder={t("catalog.newFranchise")}
 			/>
+			<TextInput
+				style={{
+					color: colors.text,
+					borderColor: colors.border,
+					borderWidth: 1,
+					borderRadius: 8,
+					padding: spacing.sm,
+				}}
+				value={editedValue(description, data.description)}
+				onChangeText={setDescription}
+				placeholder={t("catalog.description")}
+				multiline
+			/>
+			<TextInput
+				style={{
+					color: colors.text,
+					borderColor: colors.border,
+					borderWidth: 1,
+					borderRadius: 8,
+					padding: spacing.sm,
+				}}
+				value={editedValue(coverURL, data.cover_url)}
+				onChangeText={setCoverURL}
+				placeholder={t("catalog.coverUrl")}
+				autoCapitalize="none"
+				autoCorrect={false}
+			/>
 			<View style={{ flexDirection: "row", gap: spacing.md }}>
 				<Pressable
 					onPress={() =>
@@ -536,6 +630,8 @@ function CatalogAdminContent() {
 							updateFranchise.mutateAsync({
 								id: data.id,
 								name: (title || data.name).trim(),
+								description: editedValue(description, data.description).trim(),
+								cover_url: editedValue(coverURL, data.cover_url).trim(),
 							}),
 						)
 					}

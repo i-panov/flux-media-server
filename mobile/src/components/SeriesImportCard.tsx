@@ -10,9 +10,11 @@ import {
 	View,
 } from "react-native";
 import {
+	type ImportJob,
 	type ImportProbe,
 	useCancelImport,
 	useImportJob,
+	useImportJobs,
 	useImportProbe,
 	useStartImport,
 } from "../api/importSeries";
@@ -22,6 +24,33 @@ import { useTheme } from "../theme/ThemeProvider";
 
 function keyOf(season: number, episode: number): string {
 	return `${season}:${episode}`;
+}
+
+function ImportJobsList({
+	jobs,
+	onSelect,
+}: {
+	jobs: ImportJob[];
+	onSelect: (id: number) => void;
+}) {
+	const { colors } = useTheme();
+	return (
+		<View style={{ gap: 4 }} testID="import-jobs">
+			<Text style={{ color: colors.textMuted }}>{t("import.recent")}</Text>
+			{jobs.slice(0, 5).map((item) => (
+				<Pressable
+					key={item.id}
+					testID={`import-job-${item.id}`}
+					onPress={() => onSelect(item.id)}
+				>
+					<Text style={{ color: colors.text }} numberOfLines={1}>
+						{item.title || `#${item.id}`} · {item.episodes_done}/
+						{item.episodes_total}
+					</Text>
+				</Pressable>
+			))}
+		</View>
+	);
 }
 
 // Импорт сериала по ссылке: сначала проверяем структуру без скачивания,
@@ -38,6 +67,7 @@ export function SeriesImportCard() {
 	const start = useStartImport();
 	const cancel = useCancelImport();
 	const job = useImportJob(jobID);
+	const jobs = useImportJobs();
 
 	const seasons = useMemo(() => {
 		const groups = new Map<number, ImportProbe["episodes"]>();
@@ -210,6 +240,9 @@ export function SeriesImportCard() {
 						</Pressable>
 					)}
 				</View>
+			)}
+			{jobs.data !== undefined && jobs.data.length > 0 && (
+				<ImportJobsList jobs={jobs.data} onSelect={setJobID} />
 			)}
 		</View>
 	);

@@ -1,6 +1,7 @@
 import {
 	cancelImport,
 	fetchImportJob,
+	fetchImportJobs,
 	probeImport,
 	startImport,
 } from "@flux/shared";
@@ -25,6 +26,19 @@ export function useStartImport() {
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["import"] });
 		},
+	});
+}
+
+const IMPORT_ACTIVE = new Set(["queued", "downloading", "importing"]);
+
+export function useImportJobs() {
+	return useQuery({
+		queryKey: ["import", "list"],
+		queryFn: fetchImportJobs,
+		refetchInterval: (query) =>
+			(query.state.data ?? []).some((job) => IMPORT_ACTIVE.has(job.status))
+				? 3000
+				: false,
 	});
 }
 

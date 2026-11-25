@@ -3,14 +3,14 @@
     "name": "Flux",
     "slug": "mobile",
     "scheme": "flux",
-    "version": "0.1.51",
+    "version": "0.1.52",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.lib.flux",
-      "buildNumber": "69",
+      "buildNumber": "70",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Flux обращается к вашему домашнему медиа-серверу в локальной сети.",
         "NSCameraUsageDescription": "Flux сканирует QR-код с телевизора, чтобы подтвердить устройство.",
@@ -28,7 +28,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.lib.flux",
-      "versionCode": 69,
+      "versionCode": 70,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",

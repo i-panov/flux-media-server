@@ -73,7 +73,9 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 	})
 	db, err := gorm.Open(sqlite.New(sqlite.Config{
 		DriverName: fluxDriverName,
-		DSN:        path + "?_journal=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL&_cache_size=-8000&_txlock=immediate",
+	// 15s busy_timeout: при одном писателе (BEGIN IMMEDIATE) параллельные
+	// загрузки/транскод/скан чаще ждут, чем падают; 5s давали 500 клиенту.
+		DSN:        path + "?_journal=WAL&_busy_timeout=15000&_foreign_keys=on&_synchronous=NORMAL&_cache_size=-8000&_txlock=immediate",
 	}), &gorm.Config{
 		Logger: gormLogger,
 	})
