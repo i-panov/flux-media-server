@@ -114,6 +114,15 @@ vi.mock("../media/source", () => ({
 	streamPath: (id: number) => `/media/${id}/stream`,
 }));
 
+vi.mock("@flux/shared", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@flux/shared")>();
+	return {
+		...actual,
+		// Preflight перед скачиванием: тесты не ходят в сеть.
+		apiFetch: () => Promise.resolve({}),
+	};
+});
+
 const { hydrateDownloads, removeFile, runDownload } = await import(
 	"./downloadRunner"
 );

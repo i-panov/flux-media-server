@@ -36,7 +36,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 			</View>
 		);
 	}
-	if (session.isError && !session.data) {
+	// Сетевая/серверная ошибка при отсутствии сессии: даём «Повторить».
+	// Проверяем раньше null, иначе упавший refetch с закэшированным null
+	// молча уводил бы на логин.
+	if (
+		session.isError &&
+		(session.data === undefined || session.data === null)
+	) {
 		// Сеть/сервер недоступны: единственный путь починить адрес — публичный
 		// /server в корневом Stack. На /settings вести нельзя: он под этим же
 		// AuthGate и снова покажет ошибку. Кэшированную сессию не выкидываем:
@@ -76,6 +82,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
 					</Text>
 				</Pressable>
 				<Pressable
+					testID="auth-open-downloads"
+					accessibilityRole="button"
+					hitSlop={8}
+					style={styles.linkButton}
+					onPress={() => router.push("/downloads")}
+				>
+					<Text style={[styles.link, { color: colors.accent }]}>
+						{t("downloads.title")}
+					</Text>
+				</Pressable>
+				<Pressable
 					testID="auth-go-login"
 					accessibilityRole="button"
 					hitSlop={8}
@@ -89,6 +106,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 			</View>
 		);
 	}
+	// data === null — сессия мертва/сброшена (auth failure): штатный вход.
 	if (!session.data) {
 		return <Redirect href="/login" />;
 	}

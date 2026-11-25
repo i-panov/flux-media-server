@@ -1,3 +1,4 @@
+import { MAX_UPLOAD_BYTES, UPLOAD_POLL_INTERVAL_MS } from "@flux/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +11,7 @@ import {
 } from "../../api/upload";
 import { createUploadSemaphore, type UploadSemaphore } from "./uploadSemaphore";
 
-const POLL_INTERVAL_MS = 900;
+const POLL_INTERVAL_MS = UPLOAD_POLL_INTERVAL_MS;
 // Сервер буферизует тело загрузки целиком в RAM: десятки параллельных
 // файлов могут положить инстанс. Слот держится только на время POST.
 const MAX_PARALLEL_UPLOADS = 2;
@@ -55,6 +56,8 @@ interface PipelineContext {
 	invalidateList: (type: UploadType) => void;
 	addToCollection: (mediaId: number) => Promise<string>;
 	addToTarget: (mediaId: number) => Promise<string>;
+	rememberJob: (job: NonNullable<QueueItem["job"]>) => void;
+	forgetJob: () => void;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -88,12 +91,24 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 			return;
 		}
 		job = { id: enqueued.jobId, kind: enqueued.jobType };
+		ctx.rememberJob(job);
 		ctx.update({ status: "processing", job });
 	} finally {
 		ctx.gate.release();
 	}
+	if (job !== null) {
+		await pollJob(ctx, job);
+	}
+}
 
-	while (job !== null) {
+// pollJob доводит уже поставленное задание до терминального статуса.
+// Вынесен отдельно: сбой сети на поллинге повторяется опросом того же
+// job_id, а не повторной заливкой файла.
+async function pollJob(
+	ctx: PipelineContext,
+	job: NonNullable<QueueItem["job"]>,
+): Promise<void> {
+	while (true) {
 		const status = await fetchUploadJob(job.kind, job.id);
 		if (!ctx.isCurrent()) {
 			return;
@@ -106,6 +121,7 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 				mediaId === null ? "" : await ctx.addToCollection(mediaId);
 			const targetError =
 				mediaId === null ? "" : await ctx.addToTarget(mediaId);
+			ctx.forgetJob();
 			ctx.update({
 				status: "done",
 				progress: 100,
@@ -117,6 +133,7 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 			return;
 		}
 		if (status.status === "duplicate") {
+			ctx.forgetJob();
 			ctx.update({
 				status: "duplicate",
 				progress: null,
@@ -125,6 +142,7 @@ async function runUploadPipeline(ctx: PipelineContext): Promise<void> {
 			return;
 		}
 		if (status.status === "error" || status.status === "cancelled") {
+			ctx.forgetJob();
 			ctx.update({
 				status: status.status === "cancelled" ? "cancelled" : "error",
 				progress: null,
@@ -159,6 +177,9 @@ export function useUploadQueue(
 	if (semaphore.current === null) {
 		semaphore.current = createUploadSemaphore(MAX_PARALLEL_UPLOADS);
 	}
+	// Поставленные серверные задания: сбой поллинга повторяется опросом
+	// этого же job_id, а не повторной заливкой файла.
+	const jobs = useRef(new Map<string, NonNullable<QueueItem["job"]>>());
 
 	const updateItem = (key: string, patch: Partial<QueueItem>) => {
 		setItems((prev) =>
@@ -232,12 +253,47 @@ export function useUploadQueue(
 		}
 	};
 
+	const makeContext = (
+		item: QueueItem,
+		force: boolean,
+		token: number,
+		gate: UploadSemaphore,
+	): PipelineContext => ({
+		item,
+		force,
+		token,
+		gate,
+		shouldAbort: () =>
+			stopped.current ||
+			cancelledKeys.current.has(item.key) ||
+			!isCurrent(item.key, token),
+		isCurrent: () => isCurrent(item.key, token),
+		update: (patch) => updateItem(item.key, patch),
+		invalidateList,
+		addToCollection,
+		addToTarget,
+		rememberJob: (job) => jobs.current.set(item.key, job),
+		forgetJob: () => jobs.current.delete(item.key),
+	});
+
 	const processItem = async (item: QueueItem, force: boolean) => {
 		if (
 			stopped.current ||
 			cancelledKeys.current.has(item.key) ||
 			activeKeys.current.has(item.key)
 		) {
+			return;
+		}
+		// Проверка на входе, а не только в addFiles: retry/force тоже не
+		// должны заливать заведомо непроходной файл.
+		if (item.file.size > MAX_UPLOAD_BYTES) {
+			updateItem(item.key, {
+				status: "error",
+				progress: null,
+				error: t("upload.tooLarge", {
+					size: Math.round(MAX_UPLOAD_BYTES / 1024 ** 3),
+				}),
+			});
 			return;
 		}
 		activeKeys.current.add(item.key);
@@ -255,21 +311,52 @@ export function useUploadQueue(
 			if (gate === null) {
 				return;
 			}
-			await runUploadPipeline({
-				item,
-				force,
-				token,
-				gate,
-				shouldAbort: () =>
-					stopped.current ||
-					cancelledKeys.current.has(item.key) ||
-					!isCurrent(item.key, token),
-				isCurrent: () => isCurrent(item.key, token),
-				update: (patch) => updateItem(item.key, patch),
-				invalidateList,
-				addToCollection,
-				addToTarget,
+			await runUploadPipeline(makeContext(item, force, token, gate));
+		} catch (error) {
+			if (!isCurrent(item.key, token)) {
+				return;
+			}
+			updateItem(item.key, {
+				status: "error",
+				progress: null,
+				error: error instanceof ApiError ? error.message : "",
 			});
+		} finally {
+			activeKeys.current.delete(item.key);
+		}
+	};
+
+	// Повтор после сбоя: если задание уже поставлено, продолжаем опрос,
+	// не переливая файл заново.
+	const resumeItem = async (item: QueueItem) => {
+		const job = jobs.current.get(item.key);
+		if (job === undefined) {
+			await processItem(item, false);
+			return;
+		}
+		if (
+			stopped.current ||
+			cancelledKeys.current.has(item.key) ||
+			activeKeys.current.has(item.key)
+		) {
+			return;
+		}
+		activeKeys.current.add(item.key);
+		const token = bumpToken(item.key);
+		updateItem(item.key, {
+			status: "processing",
+			progress: null,
+			error: "",
+			duplicate: null,
+			job,
+			collectionError: "",
+		});
+		try {
+			const gate = semaphore.current;
+			if (gate === null) {
+				return;
+			}
+			await pollJob(makeContext(item, false, token, gate), job);
 		} catch (error) {
 			if (!isCurrent(item.key, token)) {
 				return;
@@ -310,6 +397,7 @@ export function useUploadQueue(
 
 	const cancelItem = (item: QueueItem) => {
 		cancelledKeys.current.add(item.key);
+		jobs.current.delete(item.key);
 		bumpToken(item.key);
 		if (item.job !== null) {
 			void cancelUploadJob(item.job.kind, item.job.id).catch(() => undefined);
@@ -319,6 +407,7 @@ export function useUploadQueue(
 
 	const removeItem = (item: QueueItem) => {
 		cancelledKeys.current.add(item.key);
+		jobs.current.delete(item.key);
 		bumpToken(item.key);
 		// Убранная строка не должна оставлять висящий серверный джоб.
 		if (item.job !== null) {
@@ -329,11 +418,13 @@ export function useUploadQueue(
 
 	const retryItem = (item: QueueItem) => {
 		cancelledKeys.current.delete(item.key);
-		void processItem(item, false);
+		void resumeItem(item);
 	};
 
 	const forceItem = (item: QueueItem) => {
 		cancelledKeys.current.delete(item.key);
+		// Force — осознанная повторная заливка: старое задание не опрашиваем.
+		jobs.current.delete(item.key);
 		void processItem(item, true);
 	};
 

@@ -7,9 +7,18 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, router } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+	Alert,
+	Platform,
+	Pressable,
+	StyleSheet,
+	Text,
+	TextInput,
+	View,
+} from "react-native";
 import {
 	applyServerUrl,
+	isPrivateServerUrl,
 	isServerConfigured,
 	normalizeServerUrl,
 	SERVER_URL_KEY,
@@ -56,11 +65,34 @@ export default function ServerScreen() {
 		}
 	};
 
-	const save = async (): Promise<void> => {
+	const save = async (confirmed = false): Promise<void> => {
 		const normalized = normalizeServerUrl(draft);
 		if (normalized === null) {
 			setError(t("settings.invalidUrl"));
 			setSaved(false);
+			return;
+		}
+		// iOS ATS не пропускает публичный http: сохранение дало бы
+		// «успех» и сетевые ошибки на каждом запросе.
+		if (
+			Platform.OS === "ios" &&
+			normalized.startsWith("http://") &&
+			!isPrivateServerUrl(normalized)
+		) {
+			setError(t("settings.insecureIos"));
+			setSaved(false);
+			return;
+		}
+		// Публичный http — это пароль/медиа открытым текстом в LAN/интернете.
+		if (
+			!confirmed &&
+			normalized.startsWith("http://") &&
+			!isPrivateServerUrl(normalized)
+		) {
+			Alert.alert(t("server.insecureTitle"), t("server.insecureBody"), [
+				{ text: t("common.cancel"), style: "cancel" },
+				{ text: t("server.insecureConfirm"), onPress: () => void save(true) },
+			]);
 			return;
 		}
 		setSaving(true);

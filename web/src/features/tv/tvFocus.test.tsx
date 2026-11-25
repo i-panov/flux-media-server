@@ -32,6 +32,10 @@ vi.mock("@noriginmedia/norigin-spatial-navigation", async (importOriginal) => {
 
 const routerSearch = vi.hoisted(() => ({ value: "?tv=1" }));
 
+vi.mock("./useTVMode", () => ({
+	useTVMode: () => ({ tvMode: routerSearch.value === "?tv=1" }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
 	useRouterState: (options: {
 		select: (state: { location: { searchStr: string } }) => string;

@@ -50,6 +50,33 @@ func IsSubPath(baseDir, path string) bool {
 		strings.HasPrefix(cleanPath, cleanBase+string(filepath.Separator))
 }
 
+// ResolveAllowedFile резолвит симлинки и проверяет, что файл остаётся
+// внутри одной из разрешённых директорий. Лексический IsSubPath этого не
+// ловит: симлинк внутри библиотеки может указывать наружу.
+// Разрешены только файлы с указанным расширением (пусто — любое).
+func ResolveAllowedFile(paths []string, target, ext string) (string, bool) {
+	resolved, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		return "", false
+	}
+	if ext != "" && !strings.EqualFold(filepath.Ext(resolved), ext) {
+		return "", false
+	}
+	for _, dir := range paths {
+		if dir == "" {
+			continue
+		}
+		root, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			root = filepath.Clean(dir)
+		}
+		if IsSubPath(root, resolved) {
+			return resolved, true
+		}
+	}
+	return "", false
+}
+
 // ValidateContentDirs проверяет каталоги контента: пустых быть не
 // должно, пересекаться и вкладываться друг в друга — тоже (иначе сканер
 // проиндексирует карантин как библиотеку, а чистка удалит не то).

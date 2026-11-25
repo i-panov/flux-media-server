@@ -219,13 +219,31 @@ func (s *ScannerService) sweepDeleted(ctx context.Context, scanPath string, seen
 
 		deleted := false
 		for _, m := range mediaList {
-			if _, ok := seen[m.FilePath]; !ok {
-				if err := s.mediaRepo.TrashMissing(ctx, m.ID); err != nil {
-					log.Printf("Sweep: trash media %d (%s): %v", m.ID, m.FilePath, err)
-				} else {
-					deleted = true
-					log.Printf("Sweep: moved missing file to trash: %s", m.FilePath)
+			if _, ok := seen[m.FilePath]; ok {
+				continue
+			}
+			if IsPublishingPath(m.FilePath) {
+				// Очередь прямо сейчас публикует файл: записи ещё нет,
+				// но и удалять нечего.
+				continue
+			}
+			// Walk мог пройти каталог раньше, чем файл появился (watcher,
+			// transcode, ручное копирование). Отсутствие в seen — не
+			// доказательство пропажи, поэтому проверяем диск.
+			if info, statErr := os.Stat(m.FilePath); statErr == nil {
+				if !info.IsDir() {
+					continue
 				}
+			} else if !os.IsNotExist(statErr) {
+				// Ошибка доступа/сети: не трогаем запись.
+				log.Printf("Sweep: stat %s: %v", m.FilePath, statErr)
+				continue
+			}
+			if err := s.mediaRepo.TrashMissing(ctx, m.ID); err != nil {
+				log.Printf("Sweep: trash media %d (%s): %v", m.ID, m.FilePath, err)
+			} else {
+				deleted = true
+				log.Printf("Sweep: moved missing file to trash: %s", m.FilePath)
 			}
 		}
 
@@ -301,22 +319,37 @@ type FSEvent struct {
 // (создание или обновление записи), Remove/Rename → удаление записи
 // (файл исчез). Ошибки отдельных файлов логируются и не прерывают пачку.
 func (s *ScannerService) HandleFSEvents(ctx context.Context, events []FSEvent) {
-	for _, ev := range events {
-		if err := ctx.Err(); err != nil {
-			return
+	// Удаления/переименования — первыми: при rename fsnotify даёт
+	// Rename(old) и Create(new). Если обработать Create раньше, дедуп по
+	// хэшу увидит ещё живую строку старого пути и пропустит новый файл,
+	// а затем Rename уведёт строку в корзину без relink. Пачка приходит
+	// из map, порядок в ней случайный — поэтому два прохода.
+	for pass := 0; pass < 2; pass++ {
+		for _, ev := range events {
+			if err := ctx.Err(); err != nil {
+				return
+			}
+			isRemove := ev.Op&(fsnotify.Remove|fsnotify.Rename) != 0
+			if isRemove != (pass == 0) {
+				continue
+			}
+			s.handleFSEvent(ctx, ev)
 		}
-		ev.Path = filepath.Clean(ev.Path)
-		if ev.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
-			s.removeMediaForPath(ctx, ev.Path)
-			continue
-		}
-		// Файл мог быть ещё не дописан на момент последнего события —
-		// ждём стабилизации размера перед обработкой.
-		if !s.waitForFileStable(ctx, ev.Path) {
-			continue
-		}
-		s.scanFile(ctx, ev.Path)
 	}
+}
+
+func (s *ScannerService) handleFSEvent(ctx context.Context, ev FSEvent) {
+	ev.Path = filepath.Clean(ev.Path)
+	if ev.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
+		s.removeMediaForPath(ctx, ev.Path)
+		return
+	}
+	// Файл мог быть ещё не дописан на момент последнего события —
+	// ждём стабилизации размера перед обработкой.
+	if !s.waitForFileStable(ctx, ev.Path) {
+		return
+	}
+	s.scanFile(ctx, ev.Path)
 }
 
 // waitForFileStable ждёт, пока размер и mtime файла перестанут меняться
@@ -505,6 +538,20 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 		log.Printf("FindByPath (changed) error for %s: %v", path, loadErr)
 	}
 
+	// Файл по тому же пути могли заменить медиа другого типа (audio →
+	// video, image → video). Без пересчёта запись навсегда осталась бы с
+	// прежним типом: неверный плеер, каталог и фильтры.
+	detectedType := determineMediaTypeByExt(path)
+	if detectedType != models.MediaTypeImage {
+		if probeData, probeErr := ffprobe.ProbeURL(ctx, path); probeErr == nil {
+			detectedType = DetermineMediaTypeFromProbe(probeData)
+		}
+	}
+	if detectedType != existing.Type {
+		log.Printf("Type changed for %s: %s -> %s", path, existing.Type, detectedType)
+		existing.Type = detectedType
+	}
+
 	title, year := metadata.ParseFilename(filepath.Base(path))
 	existing.Filename = filepath.Base(path)
 	existing.FileSize = info.Size()
@@ -593,6 +640,59 @@ func (s *ScannerService) updateChangedFile(ctx context.Context, path string, inf
 	}
 }
 
+// relinkIfMoved переносит запись на новый путь, если дубликат по хэшу —
+// это та же запись, чей файл переехал, а не копия.
+// Живая строка со старым файлом на месте — копия; user-trashed — осознанно
+// удалённая копия, её не воскрешаем. Живая строка без старого файла — это
+// переименование, которое полный скан увидел раньше sweep: помечаем её
+// auto-trashed и переносим, иначе sweep уведёт медиа в корзину, а новый
+// путь останется неиндексированным.
+func (s *ScannerService) relinkIfMoved(ctx context.Context, duplicate *models.Media, path string, info os.FileInfo, quickHash string) bool {
+	if duplicate.FilePath == path {
+		return false
+	}
+	if duplicate.DeletedAt.Valid {
+		if !duplicate.AutoTrashed {
+			return false
+		}
+	} else {
+		// Ошибка stat (сеть/ESTALE) — не доказательство перемещения:
+		// не трогаем запись, как и sweep для не-ENOENT.
+		if st, statErr := os.Stat(duplicate.FilePath); statErr == nil {
+			if !st.IsDir() {
+				return false
+			}
+		} else if !os.IsNotExist(statErr) {
+			log.Printf("Relink: stat %s: %v", duplicate.FilePath, statErr)
+			return false
+		}
+		if err := s.mediaRepo.TrashMissing(ctx, duplicate.ID); err != nil {
+			log.Printf("Relink: mark moved media %d trashed: %v", duplicate.ID, err)
+			return false
+		}
+	}
+	s.relinkMovedMedia(ctx, duplicate, path, info, quickHash)
+	return true
+}
+
+// relinkMovedMedia возвращает auto-trashed запись в библиотеку по новому
+// пути: файл переместили/переименовали внутри библиотеки, хэш тот же.
+// Без этого дедуп по хэшу находил бы только trashed-строку старого пути и
+// никогда не индексировал новый — медиа исчезало бы из библиотеки навсегда.
+// Если старый файл ещё на месте, это копия, а не перемещение: вторую запись
+// не создаём (как и раньше).
+func (s *ScannerService) relinkMovedMedia(ctx context.Context, media *models.Media, path string, info os.FileInfo, quickHash string) {
+	if st, err := os.Stat(media.FilePath); err == nil && !st.IsDir() {
+		log.Printf("Skipping duplicate: %s (same hash as %s)", path, media.FilePath)
+		return
+	}
+	if err := s.mediaRepo.RelinkTrashedMedia(ctx, media.ID, path, filepath.Base(path), info.Size(), quickHash); err != nil {
+		log.Printf("Relink moved media %d (%s -> %s): %v", media.ID, media.FilePath, path, err)
+		return
+	}
+	log.Printf("Relinked moved media %d: %s -> %s", media.ID, media.FilePath, path)
+}
+
 // createNewMedia создаёт запись для нового файла (полный хэш, проверка
 // дубликатов, ffprobe, метаданные, миниатюра).
 func (s *ScannerService) createNewMedia(ctx context.Context, path string, info os.FileInfo) {
@@ -618,6 +718,9 @@ func (s *ScannerService) createNewMedia(ctx context.Context, path string, info o
 		return
 	}
 	if duplicate != nil && duplicate.ID != 0 {
+		if s.relinkIfMoved(ctx, duplicate, path, info, qh) {
+			return
+		}
 		log.Printf("Skipping duplicate: %s (same hash as %s)", path, duplicate.FilePath)
 		return
 	}

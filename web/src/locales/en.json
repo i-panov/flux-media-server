@@ -592,5 +592,10 @@
 	"catalog.allGenres": "All genres",
 	"audio.sourceVideo": "Source video",
 	"extract.ready": "Audio track extracted: {{title}}",
-	"catalog.inheritedTags": "Series genres"
+	"catalog.inheritedTags": "Series genres",
+	"trash.purgeTitle": "Delete permanently?",
+	"trash.purgeConfirm": "“{{title}}” will be erased and cannot be restored.",
+	"upload.tooLarge": "The client does not upload files larger than {{size}} GB.",
+	"artists.title": "Artists",
+	"artists.empty": "No artists yet"
 }

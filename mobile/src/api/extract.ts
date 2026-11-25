@@ -1,4 +1,14 @@
-import { ApiError, apiFetch, type Media, mediaSchema } from "@flux/shared";
+import {
+	ApiError,
+	cancelExtractJob,
+	type ExtractJobStatus,
+	type ExtractStartResult,
+	extractJobStatusSchema,
+	fetchExtractStatus,
+	type Media,
+	mediaSchema,
+	startExtract,
+} from "@flux/shared";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -8,14 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export const EXTRACT_POLL_INTERVAL_MS = 1500;
 export const MAX_EXTRACT_POLL_FAILURES = 3;
 
-// Схемы задания нет в shared (там mediaSchema): контракт узкий, поэтому
-// валидируем поля вручную, без зависимости mobile от zod напрямую.
-export interface ExtractJobStatus {
-	readonly id: number;
-	readonly status: string;
-	readonly error: string | null;
-	readonly media: Media | null;
-}
+export type { ExtractJobStatus, ExtractStartResult } from "@flux/shared";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
@@ -27,10 +30,6 @@ function parseJobId(value: unknown): number {
 	}
 	return value;
 }
-
-export type ExtractStartResult =
-	| { kind: "track"; track: Media; alreadyExtracted: true }
-	| { kind: "job"; jobId: number; alreadyExtracted: false };
 
 export type ExtractFailureKind =
 	| "conflict"
@@ -77,20 +76,11 @@ export function phaseAfterStart(
 }
 
 export function classifyExtractStatus(body: unknown): ExtractJobStatus {
-	if (!isRecord(body) || typeof body.id !== "number") {
-		throw new Error("Invalid extract status");
-	}
-	if (typeof body.status !== "string") {
-		throw new Error("Invalid extract status");
-	}
+	const parsed = extractJobStatusSchema.parse(body);
 	return {
-		id: body.id,
-		status: body.status,
-		error: typeof body.error === "string" ? body.error : null,
-		media:
-			body.media === null || body.media === undefined
-				? null
-				: mediaSchema.parse(body.media),
+		...parsed,
+		error: parsed.error ?? null,
+		media: parsed.media ?? null,
 	};
 }
 
@@ -188,10 +178,6 @@ function invalidateMediaLists(queryClient: QueryClient): void {
 	void queryClient.invalidateQueries({ queryKey: ["media"] });
 }
 
-async function cancelExtractJob(jobId: number): Promise<void> {
-	await apiFetch<unknown>(`/media/extract/${jobId}`, { method: "DELETE" });
-}
-
 type ExtractPollOutcome =
 	| { kind: "done"; result: ExtractResult }
 	| { kind: "failed"; failure: ExtractFailure }
@@ -207,14 +193,7 @@ export interface ExtractPollOptions {
 	readonly fetchStatus?: (
 		jobId: number,
 		signal: AbortSignal,
-	) => Promise<unknown>;
-}
-
-async function fetchExtractStatus(
-	jobId: number,
-	signal: AbortSignal,
-): Promise<unknown> {
-	return await apiFetch<unknown>(`/media/extract/${jobId}`, { signal });
+	) => Promise<unknown | ExtractJobStatus>;
 }
 
 // Цикл опроса вынесен из хука: start остаётся коротким, а вся политика
@@ -352,10 +331,7 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 		try {
 			let parsedStart: ExtractStartResult;
 			try {
-				const body = await apiFetch<unknown>(`/media/${mediaId}/extract`, {
-					method: "POST",
-				});
-				parsedStart = classifyExtractStart(body);
+				parsedStart = await startExtract(mediaId);
 			} catch (error) {
 				if (runRef.current === run) {
 					setFailure(classifyExtractError(error));
@@ -389,9 +365,10 @@ export function useExtractAudio(mediaId: number): ExtractAudioState {
 				};
 			}
 
-			run.jobId = parsedStart.jobId;
+			const jobId = parsedStart.jobId;
+			run.jobId = jobId;
 			const outcome = await pollExtractJob({
-				jobId: run.jobId,
+				jobId,
 				signal: run.controller.signal,
 				isActive: () => runRef.current === run && !run.cancelled,
 				wait: () => getDelay().wait(EXTRACT_POLL_INTERVAL_MS),

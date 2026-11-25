@@ -8,7 +8,7 @@ import {
 	TextInput,
 	Title,
 } from "@mantine/core";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAudioList, useMedia } from "../../api/media";
@@ -117,7 +117,12 @@ export function AudioPage() {
 				<Title order={1} size="h2">
 					{t("audio.title")}
 				</Title>
-				<UploadButton type="audio" />
+				<Group gap="xs">
+					<Button component={Link} to="/artists" variant="light">
+						{t("artists.title")}
+					</Button>
+					<UploadButton type="audio" />
+				</Group>
 			</Group>
 			<Group gap="sm" wrap="wrap">
 				<TextInput

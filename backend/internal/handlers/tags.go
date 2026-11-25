@@ -108,6 +108,11 @@ type bulkTagsRequest struct {
 	Add      bool   `json:"add"`
 }
 
+// maxBulkTagMedia ограничивает /tags/bulk: репозиторий делает вставку на
+// каждый ID в одной транзакции, и 4 МБ тела держали бы писательский лок
+// SQLite десятками тысяч вставок.
+const maxBulkTagMedia = 500
+
 func (h *TagHandler) BulkMediaTags(c *fiber.Ctx) error {
 	var req bulkTagsRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -115,6 +120,9 @@ func (h *TagHandler) BulkMediaTags(c *fiber.Ctx) error {
 	}
 	if req.TagID == 0 || len(req.MediaIDs) == 0 {
 		return response.Error(c, fiber.StatusBadRequest, "tag_id and media_ids are required")
+	}
+	if len(req.MediaIDs) > maxBulkTagMedia {
+		return response.Error(c, fiber.StatusBadRequest, "too many media_ids (max 500)")
 	}
 	affected, err := h.tags.BulkMediaTags(c.UserContext(), req.MediaIDs, req.TagID, req.Add)
 	if err != nil {

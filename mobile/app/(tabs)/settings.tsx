@@ -172,6 +172,14 @@ export default function SettingsScreen() {
 				>
 					{getApiConfig().baseUrl}
 				</Text>
+				<Pressable
+					accessibilityRole="button"
+					hitSlop={8}
+					testID="settings-change-server"
+					onPress={() => router.push("/server")}
+				>
+					<Text style={{ color: colors.accent }}>{t("server.open")}</Text>
+				</Pressable>
 			</View>
 
 			<View

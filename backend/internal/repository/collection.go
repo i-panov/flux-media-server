@@ -308,8 +308,11 @@ func (r *CollectionStore) Delete(ctx context.Context, id uint) error {
 			return err
 		}
 		ids = append(ids, id)
+		// Уже лежащие в корзине потомки сохраняют свою старую метку:
+		// иначе восстановление родителя воскресит их, хотя пользователь
+		// удалил их отдельно. Восстановление смотрит на метку этой пачки.
 		return tx.Model(&models.Collection{}).
-			Where("id IN ?", ids).
+			Where("id IN ? AND deleted_at IS NULL", ids).
 			Update("deleted_at", time.Now().UTC()).Error
 	})
 }
@@ -328,8 +331,10 @@ func (r *CollectionStore) RestoreCollection(ctx context.Context, id uint) error 
 			return err
 		}
 		ids = append(ids, id)
+		// Только строки, удалённые этой же операцией: независимо удалённые
+		// потомки остаются в корзине.
 		if err := tx.Unscoped().Model(&models.Collection{}).
-			Where("id IN ? AND deleted_at IS NOT NULL", ids).
+			Where("id IN ? AND deleted_at = ?", ids, col.DeletedAt.Time).
 			Update("deleted_at", nil).Error; err != nil {
 			return err
 		}

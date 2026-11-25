@@ -1,22 +1,21 @@
+import {
+	bulkMediaTags,
+	createTag,
+	deleteTag,
+	fetchEntityTags,
+	fetchTags,
+	setEntityTags,
+} from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "./client";
 
-export type TagGroup = "format" | "genre";
-export type TagEntity = "media" | "work" | "franchise";
+export type { Tag, TagEntity, TagGroup } from "@flux/shared";
 
-export interface Tag {
-	id: number;
-	group: TagGroup;
-	slug: string;
-	name: string;
-	created_at: string;
-	updated_at: string;
-}
+import type { TagEntity, TagGroup } from "@flux/shared";
 
 export function useTags(group?: TagGroup) {
 	return useQuery({
 		queryKey: ["tags", group ?? "all"],
-		queryFn: () => apiFetch<Tag[]>(`/tags${group ? `?group=${group}` : ""}`),
+		queryFn: () => fetchTags(group),
 	});
 }
 
@@ -27,11 +26,7 @@ function invalidateTags(queryClient: ReturnType<typeof useQueryClient>) {
 export function useCreateTag() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (input: { group: TagGroup; slug: string; name: string }) =>
-			apiFetch<Tag>("/tags", {
-				method: "POST",
-				body: JSON.stringify(input),
-			}),
+		mutationFn: createTag,
 		onSuccess: () => invalidateTags(queryClient),
 	});
 }
@@ -39,22 +34,15 @@ export function useCreateTag() {
 export function useDeleteTag() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) =>
-			apiFetch<void>(`/tags/${id}`, { method: "DELETE" }),
+		mutationFn: deleteTag,
 		onSuccess: () => invalidateTags(queryClient),
 	});
 }
 
-const paths: Record<TagEntity, (id: number) => string> = {
-	media: (id) => `/media/${id}/tags`,
-	work: (id) => `/works/${id}/tags`,
-	franchise: (id) => `/franchises/${id}/tags`,
-};
-
 export function useEntityTags(entity: TagEntity, id: number, enabled = true) {
 	return useQuery({
 		queryKey: ["tags", entity, id],
-		queryFn: () => apiFetch<Tag[]>(paths[entity](id)),
+		queryFn: () => fetchEntityTags(entity, id),
 		enabled: enabled && id > 0,
 	});
 }
@@ -62,16 +50,16 @@ export function useEntityTags(entity: TagEntity, id: number, enabled = true) {
 export function useSetEntityTags(entity: TagEntity, id: number) {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (tagIDs: number[]) =>
-			apiFetch<Tag[]>(paths[entity](id), {
-				method: "PUT",
-				body: JSON.stringify({ tag_ids: tagIDs }),
-			}),
+		mutationFn: (tagIDs: number[]) => setEntityTags(entity, id, tagIDs),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["tags", entity, id] });
-			void queryClient.invalidateQueries({ queryKey: ["media", id] });
 			void queryClient.invalidateQueries({ queryKey: ["works", id] });
 			void queryClient.invalidateQueries({ queryKey: ["franchises", id] });
+			if (entity === "media") {
+				// Бейджи тегов на карточках в списках и в избранном.
+				void queryClient.invalidateQueries({ queryKey: ["media"] });
+				void queryClient.invalidateQueries({ queryKey: ["favorites"] });
+			}
 		},
 	});
 }
@@ -79,15 +67,7 @@ export function useSetEntityTags(entity: TagEntity, id: number) {
 export function useBulkMediaTags() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (input: { mediaIDs: number[]; tagID: number; add: boolean }) =>
-			apiFetch<{ affected: number }>("/tags/bulk", {
-				method: "POST",
-				body: JSON.stringify({
-					media_ids: input.mediaIDs,
-					tag_id: input.tagID,
-					add: input.add,
-				}),
-			}),
+		mutationFn: bulkMediaTags,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["media"] });
 			void queryClient.invalidateQueries({ queryKey: ["tags"] });

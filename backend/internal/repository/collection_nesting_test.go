@@ -539,3 +539,28 @@ func TestCollectionStore_RestoreToRoot(t *testing.T) {
 	_, err = store.FindByID(ctx, root)
 	assert.Error(t, err, "родитель остался в корзине")
 }
+
+// Восстановление родителя не должно воскрешать ребёнка, удалённого
+// отдельным действием: у него своя метка корзины.
+func TestCollectionStore_RestoreDoesNotResurrectIndependentlyDeletedChild(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewCollectionRepository(db)
+	ctx := context.Background()
+
+	root := mkCollection(t, store, ctx, 1, "Сериал")
+	child := mkCollection(t, store, ctx, 1, "S01")
+	require.NoError(t, store.SetParent(ctx, child, &root))
+
+	// Сначала удаляем ребёнка отдельно, затем родителя.
+	require.NoError(t, store.Delete(ctx, child))
+	require.NoError(t, store.Delete(ctx, root))
+	require.NoError(t, store.RestoreCollection(ctx, root))
+
+	_, err = store.FindByID(ctx, root)
+	require.NoError(t, err, "родитель восстановлен")
+	_, err = store.FindByID(ctx, child)
+	assert.Error(t, err, "отдельно удалённый ребёнок остался в корзине")
+}

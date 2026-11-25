@@ -10,21 +10,26 @@ import { ClipSheet } from "./ClipSheet";
 // плеера, чтобы маркеры ставились по месту воспроизведения.
 export function VideoClipAction({
 	media,
-	position,
+	getPosition,
 }: {
 	media: Media;
-	position: number;
+	/** Позиция читается при открытии: timeupdate не должен ререндерить экран. */
+	getPosition: () => number;
 }) {
 	useLanguage();
 	const { colors, spacing } = useTheme();
 	const [open, setOpen] = useState(false);
+	const [startAt, setStartAt] = useState(0);
 	return (
 		<>
 			<Pressable
 				accessibilityRole="button"
 				accessibilityLabel={t("clip.submit")}
 				testID="video-detail-clip"
-				onPress={() => setOpen(true)}
+				onPress={() => {
+					setStartAt(getPosition());
+					setOpen(true);
+				}}
 				style={({ pressed }) => [
 					styles.action,
 					{ gap: spacing.xs },
@@ -37,7 +42,7 @@ export function VideoClipAction({
 			{open && (
 				<ClipSheet
 					media={media}
-					position={position}
+					position={startAt}
 					duration={media.duration}
 					onClose={() => setOpen(false)}
 				/>

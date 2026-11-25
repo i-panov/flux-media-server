@@ -1,10 +1,14 @@
-import { configureApi, createTokenTransport } from "@flux/shared";
+import { configureApi, createTokenTransport, getApiConfig } from "@flux/shared";
+import {
+	bumpSessionGeneration,
+	currentSessionGeneration,
+} from "../auth/generation";
 import { secureStore } from "../storage/secureStore";
-import { normalizeServerUrl } from "./serverUrl";
+import { isPrivateServerUrl, normalizeServerUrl } from "./serverUrl";
 
 export const SERVER_URL_KEY = "flux.server_url";
 
-export { normalizeServerUrl };
+export { isPrivateServerUrl, normalizeServerUrl };
 
 // Адрес из окружения — только для разработки/Expo Go. Без сохранённого
 // или заданного адреса приложение не стучится на localhost: корень
@@ -18,7 +22,10 @@ let serverConfigured = ENV_BASE_URL !== null;
 // Импортируется один раз из app/_layout.tsx до любых запросов.
 configureApi({
 	baseUrl: ENV_BASE_URL ?? "",
-	transport: createTokenTransport(secureStore),
+	transport: createTokenTransport(secureStore, {
+		epoch: currentSessionGeneration,
+	}),
+	sessionEpoch: currentSessionGeneration,
 	onAuthFailure: () => authFailureHandler?.(),
 });
 
@@ -35,6 +42,11 @@ export function isServerConfigured(): boolean {
 }
 
 export function applyServerUrl(baseUrl: string): void {
+	// Новый origin — новое поколение: refresh старого сервера не должен
+	// записать пару уже после переключения.
+	if (getApiConfig().baseUrl !== baseUrl) {
+		bumpSessionGeneration();
+	}
 	configureApi({ baseUrl });
 	serverConfigured = true;
 }

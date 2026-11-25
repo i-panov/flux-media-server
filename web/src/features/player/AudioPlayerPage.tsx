@@ -36,7 +36,7 @@ import { useSession } from "../../api/session";
 import { formatDuration } from "../../core/format";
 import { clickNode, TVFocusScope, TVTab, useTVFocusable } from "../tv/tvFocus";
 import { useTVMode } from "../tv/useTVMode";
-import { useAudioPlayer } from "./AudioPlayerProvider";
+import { useAudioPlayer, useAudioPosition } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
 import { QueueTab } from "./QueueTab";
 import { SyncedLyricsView } from "./SyncedLyricsView";
@@ -357,6 +357,7 @@ export function AudioPlayerPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const player = useAudioPlayer();
+	const position = useAudioPosition();
 	const current = player.current;
 	const session = useSession();
 	const isAdmin = session.data?.is_admin === true;
@@ -378,12 +379,12 @@ export function AudioPlayerPage() {
 		(direction) => {
 			// На корне плеера стрелки — seek/volume, а не переход фокуса.
 			if (direction === "left") {
-				player.seek(Math.max(player.currentTime - 10, 0));
+				player.seek(Math.max(position.currentTime - 10, 0));
 			} else if (direction === "right") {
 				player.seek(
-					player.duration > 0
-						? Math.min(player.currentTime + 10, player.duration)
-						: player.currentTime + 10,
+					position.duration > 0
+						? Math.min(position.currentTime + 10, position.duration)
+						: position.currentTime + 10,
 				);
 			} else if (direction === "up") {
 				player.setVolume(player.volume + 0.05);
@@ -487,8 +488,8 @@ export function AudioPlayerPage() {
 
 						<SeekSlider
 							mediaId={current.id}
-							currentTime={player.currentTime}
-							duration={player.duration}
+							currentTime={position.currentTime}
+							duration={position.duration}
 							onSeek={(value) => player.seek(value)}
 						/>
 

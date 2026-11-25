@@ -469,3 +469,55 @@ func TestMediaStore_FindAllFiltersByArtist(t *testing.T) {
 	assert.Equal(t, m1.ID, got[0].ID)
 	assert.Equal(t, "First", got[0].Artists[0].Name)
 }
+
+func TestMediaStore_RelinkTrashedMedia(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	media := &models.Media{
+		Title: "Moved", Type: models.MediaTypeVideo,
+		FilePath: "/media/old.mkv", Filename: "old.mkv", FileSize: 10, FileHash: "hash",
+	}
+	require.NoError(t, store.Create(ctx, media))
+	require.NoError(t, store.TrashMissing(ctx, media.ID))
+
+	require.NoError(t, store.RelinkTrashedMedia(ctx, media.ID, "/media/new.mkv", "new.mkv", 42, "q2"))
+
+	live, err := store.FindByPath(ctx, "/media/new.mkv")
+	require.NoError(t, err)
+	assert.Equal(t, media.ID, live.ID)
+	assert.Equal(t, "Moved", live.Title)
+	assert.False(t, live.DeletedAt.Valid)
+	assert.False(t, live.AutoTrashed)
+	assert.Equal(t, int64(42), live.FileSize)
+	assert.Equal(t, "q2", live.QuickHash)
+
+	_, err = store.FindByPathBasic(ctx, "/media/old.mkv")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func TestMediaStore_RelinkTrashedMediaConflicts(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	store := NewMediaRepository(db)
+	ctx := context.Background()
+
+	trashed := &models.Media{Title: "Trashed", Type: models.MediaTypeVideo, FilePath: "/media/old.mkv", FileHash: "h1"}
+	require.NoError(t, store.Create(ctx, trashed))
+	require.NoError(t, store.TrashMissing(ctx, trashed.ID))
+
+	live := &models.Media{Title: "Live", Type: models.MediaTypeVideo, FilePath: "/media/taken.mkv", FileHash: "h2"}
+	require.NoError(t, store.Create(ctx, live))
+
+	err = store.RelinkTrashedMedia(ctx, trashed.ID, "/media/taken.mkv", "taken.mkv", 1, "q")
+	require.ErrorIs(t, err, ErrPathConflict)
+
+	err = store.RelinkTrashedMedia(ctx, live.ID, "/media/other.mkv", "other.mkv", 1, "q")
+	require.ErrorIs(t, err, ErrNotInTrash)
+}

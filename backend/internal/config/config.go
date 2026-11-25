@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -87,6 +88,11 @@ type RateLimiterConfig struct {
 	// строгими. 0 — взять Max × 30.
 	UploadMax        int   `yaml:"upload_max"`
 	UploadExpiration int64 `yaml:"upload_expiration"` // in seconds
+	// WriteMax/WriteExpiration — бюджет мутаций: SQLite пускает одного
+	// писателя, поток мелких POST/PUT от одного клиента тормозит всех.
+	// 0 — производное: max(read_max/4, 30) и read_expiration.
+	WriteMax        int   `yaml:"write_max"`
+	WriteExpiration int64 `yaml:"write_expiration"` // in seconds
 }
 
 // Дефолты read-бюджета: используются в Load и в app.New (тесты обходят
@@ -279,6 +285,29 @@ func Load(path string) (*Config, error) {
 		u, err := url.Parse(cfg.Server.PublicURL)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return nil, fmt.Errorf("server.public_url must be an absolute http(s) URL, got %q", cfg.Server.PublicURL)
+		}
+		// HTTPS-инсталляция: Secure у кук включаем автоматически, иначе
+		// забытый флаг отдаёт access/refresh по HTTP в открытом виде.
+		if u.Scheme == "https" {
+			cfg.Server.CookieSecure = true
+		}
+	}
+	if strings.HasPrefix(strings.ToLower(cfg.Server.PublicURL), "https://") &&
+		strings.TrimSpace(cfg.Server.TrustedProxies) == "" {
+		log.Printf("config: public_url is https but trusted_proxies is empty; HSTS will not be sent behind a reverse proxy (set trusted_proxies)")
+	}
+	if !cfg.Server.CookieSecure && cfg.Server.PublicURL == "" && cfg.Server.Env == "production" {
+		log.Printf("config: cookie_secure is disabled and server.public_url is empty; session cookies will be sent over HTTP (set https public_url or enable cookie_secure behind TLS)")
+	}
+	// smtp.host уходит в Message-ID и адрес соединения: CRLF/пробелы
+	// ломают заголовки письма, слэши — адрес.
+	smtpHost := strings.TrimSpace(cfg.Auth.SMTP.Host)
+	if smtpHost != "" {
+		if strings.ContainsAny(smtpHost, "\r\n \t/") {
+			return nil, fmt.Errorf("auth.smtp.host is invalid: %q", cfg.Auth.SMTP.Host)
+		}
+		if cfg.Auth.SMTP.Port < 1 || cfg.Auth.SMTP.Port > 65535 {
+			return nil, fmt.Errorf("auth.smtp.port must be between 1 and 65535, got %d", cfg.Auth.SMTP.Port)
 		}
 	}
 	if strings.TrimSpace(cfg.Media.ThumbnailPath) == "" {

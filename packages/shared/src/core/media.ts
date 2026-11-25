@@ -94,6 +94,12 @@ export function isSafeImageUrl(url: string): boolean {
 	if (url === "") {
 		return false;
 	}
+	// Protocol-relative (`//evil.example/x`) и обратные слэши браузер
+	// трактует как чужой origin/путь — для фона принимаем только
+	// same-origin относительные пути и http(s).
+	if (url.startsWith("//") || url.includes("\\")) {
+		return false;
+	}
 	const scheme = URL_SCHEME_PATTERN.exec(url);
 	if (scheme?.[1] === undefined) {
 		return true;

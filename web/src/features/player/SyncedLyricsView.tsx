@@ -1,12 +1,12 @@
 import { type SyncedLyricLine, syncedLyricIndex } from "@flux/shared";
 import { Stack, Text } from "@mantine/core";
 import { useEffect, useRef } from "react";
-import { useAudioPlayer } from "./AudioPlayerProvider";
+import { useAudioPosition } from "./AudioPlayerProvider";
 
 // Построчный синхронный текст (только вкладка лирики): текущая строка
 // подсвечивается по позиции воспроизведения, список держит её в виду.
 export function SyncedLyricsView({ lines }: { lines: SyncedLyricLine[] }) {
-	const { currentTime } = useAudioPlayer();
+	const { currentTime } = useAudioPosition();
 	const active = syncedLyricIndex(lines, currentTime);
 	const activeRef = useRef<HTMLParagraphElement | null>(null);
 

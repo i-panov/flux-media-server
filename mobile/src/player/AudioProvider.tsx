@@ -164,13 +164,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		desiredPlayingRef.current = value;
 		setDesiredPlayingState(value);
 	}, []);
-	// 401 уже восстановил позицию: серверный resume отключаем до смены
-	// трека/нового ручного запуска, не привязываясь к mediaId.
-	const [resumeDisabled, setResumeDisabled] = useState(false);
+	// Аудио сознательно не применяет серверный resume (всегда с нуля);
+	// ref оставлен для 401-ветки, которая восстанавливает позицию сама.
 	const resumePreemptedRef = useRef(false);
 	const resetResumeGuards = () => {
 		resumePreemptedRef.current = false;
-		setResumeDisabled(false);
 	};
 	const sourceReady =
 		current !== null && isSourceLoaded(current.id) && status.isLoaded;
@@ -180,7 +178,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		player,
 		sourceReady,
 		sourceLoading,
-		resumeDisabled,
 		resumePreemptedRef,
 	});
 	const { handleSeek, markUserStarted, resetUserStarted } = progress;
@@ -313,7 +310,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 		// сама 401-ветка, server-resume уступает.
 		if (shouldPreemptResumeOn401(position)) {
 			resumePreemptedRef.current = true;
-			setResumeDisabled(true);
 		} else {
 			resetResumeGuards();
 		}

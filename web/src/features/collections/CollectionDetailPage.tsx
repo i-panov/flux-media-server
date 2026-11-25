@@ -287,11 +287,11 @@ export function CollectionDetailPage() {
 							onMoved={(result) => {
 								setBulkMoveOpened(false);
 								setSelectedIds(new Set());
-								if (result.skipped.length > 0) {
+								if ((result.skipped ?? []).length > 0) {
 									notifications.show({
 										color: "yellow",
 										message: t("collections.bulkSkipped", {
-											count: result.skipped.length,
+											count: (result.skipped ?? []).length,
 										}),
 									});
 								}

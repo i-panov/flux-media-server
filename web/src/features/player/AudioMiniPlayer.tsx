@@ -13,13 +13,14 @@ import { useTranslation } from "react-i18next";
 import { formatDuration } from "../../core/format";
 import { FavoriteButton } from "../favorites/FavoriteButton";
 import { clickNode, TVActionIcon, useTVFocusable } from "../tv/tvFocus";
-import { useAudioPlayer } from "./AudioPlayerProvider";
+import { useAudioPlayer, useAudioPosition } from "./AudioPlayerProvider";
 import { CoverImage } from "./CoverImage";
 import { useMiniPlayerVisible } from "./useMiniPlayerVisible";
 
 export function AudioMiniPlayer() {
 	const { t } = useTranslation();
 	const player = useAudioPlayer();
+	const { currentTime, duration } = useAudioPosition();
 	const visible = useMiniPlayerVisible();
 	const { targetRef: openRef, tvMode } = useTVFocusable<HTMLAnchorElement>(
 		"audio-mini-open",
@@ -30,8 +31,7 @@ export function AudioMiniPlayer() {
 		return null;
 	}
 	const artists = current.artists.map((artist) => artist.name).join(", ");
-	const progress =
-		player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;
+	const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 	return (
 		<div className="audio-mini-player border-t border-[var(--mantine-color-default-border)] bg-[var(--mantine-color-body)]">
 			<Progress value={Math.min(progress, 100)} size={2} radius={0} />
@@ -65,8 +65,7 @@ export function AudioMiniPlayer() {
 					</Stack>
 				</Link>
 				<Text size="xs" c="dimmed" visibleFrom="sm">
-					{formatDuration(player.currentTime)} /{" "}
-					{formatDuration(player.duration)}
+					{formatDuration(currentTime)} / {formatDuration(duration)}
 				</Text>
 				<Group gap={6} wrap="nowrap" visibleFrom="md">
 					<Volume2

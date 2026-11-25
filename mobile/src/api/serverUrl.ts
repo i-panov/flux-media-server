@@ -69,3 +69,22 @@ export function normalizeServerUrl(value: string): string | null {
 
 	return `${url.protocol}//${url.host}/${segments.join("/")}`;
 }
+
+// Локальный/домашний адрес: cleartext http для него ожидаем. Публичный
+// http — предупреждаем, что логин и медиа уходят открытым текстом.
+export function isPrivateServerUrl(baseUrl: string): boolean {
+	try {
+		const host = new URL(baseUrl).hostname.toLowerCase();
+		return (
+			host === "localhost" ||
+			host.startsWith("127.") ||
+			host === "::1" ||
+			host.endsWith(".local") ||
+			PRIVATE_10.test(host) ||
+			PRIVATE_192.test(host) ||
+			PRIVATE_172.test(host)
+		);
+	} catch {
+		return false;
+	}
+}

@@ -108,5 +108,5 @@ func TestRunMigrationsOnFreshDB(t *testing.T) {
 	require.NoError(t, RunMigrations(db))
 	var versions int64
 	require.NoError(t, db.Model(&models.SchemaMigration{}).Count(&versions).Error)
-	assert.Equal(t, int64(13), versions, "версия миграции записывается один раз")
+	assert.Equal(t, int64(14), versions, "версия миграции записывается один раз")
 }

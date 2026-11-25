@@ -168,7 +168,9 @@ export function VideoDetailPage() {
 		);
 	}
 
-	if (media.isError || media.data === undefined) {
+	// Ошибка фонового refetch (например, счётчика просмотров) не должна
+	// размонтировать играющий плеер: фатальна только потеря данных.
+	if (media.data === undefined) {
 		const notFound =
 			media.error instanceof ApiError && media.error.status === 404;
 		return (

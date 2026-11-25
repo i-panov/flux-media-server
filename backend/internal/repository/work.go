@@ -79,14 +79,75 @@ func (r *WorkStore) List(ctx context.Context, kind models.WorkKind, tagIDs ...ui
 	if err := q.Find(&works).Error; err != nil {
 		return nil, err
 	}
-	for i := range works {
-		tags, err := loadWorkTags(r.db.WithContext(ctx), works[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		works[i].Tags = tags
+	if err := attachTagsToWorks(r.db.WithContext(ctx), works); err != nil {
+		return nil, err
 	}
 	return works, nil
+}
+
+// attachTagsToWorks грузит теги одним запросом на список: по одному
+// запросу на work — линейный рост на большой библиотеке.
+func attachTagsToWorks(db *gorm.DB, works []models.Work) error {
+	if len(works) == 0 {
+		return nil
+	}
+	ids := make([]uint, 0, len(works))
+	for i := range works {
+		ids = append(ids, works[i].ID)
+	}
+	links, tagsByID, err := loadTagLinks(db, "work_tags", "work_id", ids)
+	if err != nil {
+		return err
+	}
+	for i := range works {
+		works[i].Tags = tagsFor(links[works[i].ID], tagsByID)
+	}
+	return nil
+}
+
+// loadTagLinks — общий загрузчик связей сущность↔тег и самих тегов.
+func loadTagLinks(db *gorm.DB, table, ownerColumn string, ids []uint) (map[uint][]uint, map[uint]models.Tag, error) {
+	var links []struct {
+		OwnerID uint
+		TagID   uint
+	}
+	if err := db.Table(table).
+		Select(ownerColumn+" AS owner_id, tag_id").
+		Where(ownerColumn+" IN ?", ids).
+		Scan(&links).Error; err != nil {
+		return nil, nil, err
+	}
+	byOwner := make(map[uint][]uint, len(ids))
+	tagIDs := make([]uint, 0, len(links))
+	for _, link := range links {
+		byOwner[link.OwnerID] = append(byOwner[link.OwnerID], link.TagID)
+		tagIDs = append(tagIDs, link.TagID)
+	}
+	byID := make(map[uint]models.Tag, len(tagIDs))
+	if len(tagIDs) > 0 {
+		var tags []models.Tag
+		if err := db.Where("id IN ?", tagIDs).
+			Order("tag_group ASC, name ASC").Find(&tags).Error; err != nil {
+			return nil, nil, err
+		}
+		for _, tag := range tags {
+			byID[tag.ID] = tag
+		}
+	}
+	return byOwner, byID, nil
+}
+
+func tagsFor(tagIDs []uint, byID map[uint]models.Tag) []models.Tag {
+	if len(tagIDs) == 0 {
+		return nil
+	}
+	tags := make([]models.Tag, 0, len(tagIDs))
+	for _, id := range tagIDs {
+		if tag, ok := byID[id]; ok {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
 }
 
 func loadWorkTags(db *gorm.DB, workID uint) ([]models.Tag, error) {

@@ -124,6 +124,11 @@ type MediaRepository interface {
 	TrashMissing(ctx context.Context, id uint) error
 	// RestoreMedia возвращает из корзины; путь занят живым — ErrPathConflict.
 	RestoreMedia(ctx context.Context, id uint) error
+	// RelinkTrashedMedia возвращает auto-trashed запись в библиотеку по
+	// новому пути: файл переместили/переименовали, содержимое (хэш) то же.
+	// Сохраняет избранное, прогресс и элементы коллекций. Живая строка на
+	// новом пути — ErrPathConflict, не trashed — ErrNotInTrash.
+	RelinkTrashedMedia(ctx context.Context, id uint, path, filename string, size int64, quickHash string) error
 	// PurgeMedia сносит навсегда: связи каскадом, строка — hard.
 	PurgeMedia(ctx context.Context, id uint) error
 	// FindTrashedMedia грузит trashed-строку (живая — ErrNotInTrash).

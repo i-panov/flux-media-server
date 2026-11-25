@@ -12,3 +12,9 @@ func diskFreeBytes(path string) int64 {
 func diskTotalBytes(path string) int64 {
 	return -1
 }
+
+// sameFilesystem — заглушка: определить общую ФС нельзя, поэтому не мешаем
+// авточистке работать как раньше.
+func sameFilesystem(a, b string) bool {
+	return true
+}

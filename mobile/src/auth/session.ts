@@ -11,6 +11,7 @@ import {
 	useQuery,
 } from "@tanstack/react-query";
 import { secureStore } from "../storage/secureStore";
+import { bumpSessionGeneration, currentSessionGeneration } from "./generation";
 
 export const sessionQueryKey = ["session"] as const;
 
@@ -19,6 +20,9 @@ export const sessionQueryKey = ["session"] as const;
 // с предикатом не трогает саму session-запись: иначе observer получил бы
 // undefined, а следующий setQueryData(null) уже не дошёл бы до подписчиков.
 export function markSessionSignedOut(queryClient: QueryClient): void {
+	// Поколение меняется до очистки кэша: refresh и /auth/me, начатые
+	// раньше, уже не смогут записать токены или вернуть старого user.
+	bumpSessionGeneration();
 	queryClient.setQueryData(sessionQueryKey, null);
 	queryClient.removeQueries({
 		predicate: (query) => query.queryKey[0] !== sessionQueryKey[0],
@@ -26,12 +30,20 @@ export function markSessionSignedOut(queryClient: QueryClient): void {
 }
 
 async function fetchSession(signal: AbortSignal): Promise<AuthUser | null> {
+	const generation = currentSessionGeneration();
 	try {
 		return await fetchMe(signal);
 	} catch (error) {
 		// 401 — нет/протухла сессия; остальное (сеть, 5xx) — ошибка,
 		// чтобы UI показал retry, а не отправил на логин.
 		if (error instanceof ApiError && error.status === 401) {
+			// Сессия сменилась, пока шёл запрос: это ответ старого
+			// поколения. Логин к этому моменту уже удалил старые queries, а
+			// auth failure выставил null — возвращаем «не вошёл» вместо
+			// ошибки, иначе AuthGate покажет «сервер недоступен».
+			if (currentSessionGeneration() !== generation) {
+				return null;
+			}
 			// Refresh не удался: мёртвая пара не должна переживать рестарт.
 			try {
 				await secureStore.del(ACCESS_TOKEN_KEY);

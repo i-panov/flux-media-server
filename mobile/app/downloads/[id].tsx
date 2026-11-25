@@ -11,6 +11,7 @@ import {
 	Text,
 	View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
 	useDownloadedPath,
 	useDownloadState,
@@ -81,7 +82,10 @@ export default function OfflineVideoScreen() {
 	}
 
 	return (
-		<View style={[styles.root, { backgroundColor: colors.background }]}>
+		<SafeAreaView
+			edges={["top", "bottom"]}
+			style={[styles.root, { backgroundColor: colors.background }]}
+		>
 			<Pressable
 				accessibilityRole="button"
 				accessibilityLabel={t("common.back")}
@@ -101,7 +105,7 @@ export default function OfflineVideoScreen() {
 			<Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
 				{entry?.title ?? ""}
 			</Text>
-		</View>
+		</SafeAreaView>
 	);
 }
 

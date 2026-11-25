@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -197,4 +199,84 @@ func TestRunMigrationsDropsLegacyUniqueFilePathIndex(t *testing.T) {
 	found, err := store.FindByPath(ctx, "/a.mp3")
 	require.NoError(t, err)
 	assert.Equal(t, "/a.mp3", found.FilePath)
+}
+
+// Regression: до канонизации каталогов сканер писал относительные пути
+// (`data/video/x.mkv`). После перехода на абсолютные конфиг-пути такие
+// строки перестают находиться, sweep их не видит, а скан создаёт дубли.
+func TestRunMigrationsNormalizesLegacyRelativePaths(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	ctx := context.Background()
+	media := &models.Media{
+		Title: "Legacy", Type: models.MediaTypeVideo,
+		FilePath: "data/video/legacy.mkv", Filename: "legacy.mkv", FileHash: "h",
+	}
+	require.NoError(t, db.WithContext(ctx).Create(media).Error)
+	sub := &models.Subtitle{MediaID: media.ID, Lang: "rus", Path: "data/video/legacy.rus.vtt"}
+	require.NoError(t, db.Create(sub).Error)
+	task := &models.TranscodeTask{
+		SourcePath: "data/originals/legacy.mkv", Filename: "legacy.mkv", Status: "done",
+	}
+	require.NoError(t, db.Create(task).Error)
+	upload := &models.UploadTask{
+		FilePath: "data/audio/track.mp3", Filename: "track.mp3",
+		MediaType: models.MediaTypeAudio, Status: "queued",
+	}
+	require.NoError(t, db.Create(upload).Error)
+
+	require.NoError(t, RunMigrations(db))
+
+	abs := func(rel string) string {
+		p, absErr := filepath.Abs(rel)
+		require.NoError(t, absErr)
+		return filepath.Clean(p)
+	}
+
+	var gotMedia models.Media
+	require.NoError(t, db.First(&gotMedia, media.ID).Error)
+	assert.Equal(t, abs("data/video/legacy.mkv"), gotMedia.FilePath)
+
+	var gotSub models.Subtitle
+	require.NoError(t, db.First(&gotSub, sub.ID).Error)
+	assert.Equal(t, abs("data/video/legacy.rus.vtt"), gotSub.Path)
+
+	var gotTask models.TranscodeTask
+	require.NoError(t, db.First(&gotTask, task.ID).Error)
+	assert.Equal(t, abs("data/originals/legacy.mkv"), gotTask.SourcePath)
+
+	var gotUpload models.UploadTask
+	require.NoError(t, db.First(&gotUpload, upload.ID).Error)
+	assert.Equal(t, abs("data/audio/track.mp3"), gotUpload.FilePath)
+
+	// Повторный прогон ничего не меняет (идемпотентность).
+	require.NoError(t, RunMigrations(db))
+	var again models.Media
+	require.NoError(t, db.First(&again, media.ID).Error)
+	assert.Equal(t, gotMedia.FilePath, again.FilePath)
+}
+
+// Смена cwd: старый относительный путь должен разрешиться по корню контента,
+// даже если от текущего cwd такого файла нет.
+func TestRunMigrationsResolvesLegacyPathByContentRoot(t *testing.T) {
+	db, err := InitDB(":memory:")
+	require.NoError(t, err)
+	require.NoError(t, AutoMigrate(db))
+
+	root := t.TempDir()
+	file := filepath.Join(root, "movie.mkv")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0o644))
+	media := &models.Media{
+		Title: "Moved cwd", Type: models.MediaTypeVideo,
+		FilePath: "data/video/movie.mkv", Filename: "movie.mkv", FileHash: "h-root",
+	}
+	require.NoError(t, db.Create(media).Error)
+
+	require.NoError(t, RunMigrationsWithRoots(db, []string{root}))
+
+	var got models.Media
+	require.NoError(t, db.First(&got, media.ID).Error)
+	assert.Equal(t, file, got.FilePath)
 }

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import {
 	afterEach,
 	beforeAll,
@@ -12,7 +12,11 @@ import {
 } from "vitest";
 import type { AuthUser } from "../../api/auth";
 import type { Media } from "../../core/media";
-import { AudioPlayerProvider, useAudioPlayer } from "./AudioPlayerProvider";
+import {
+	AudioPlayerProvider,
+	useAudioPlayer,
+	useAudioPosition,
+} from "./AudioPlayerProvider";
 import { QUEUE_STORAGE_KEY } from "./playerPersistence";
 
 function media(id: number, title: string): Media {
@@ -76,6 +80,18 @@ function user(): AuthUser {
 	return { id: 1, email: "user@example.com", is_admin: false };
 }
 
+function PositionProbe({
+	targetRef,
+}: {
+	targetRef: { current: { currentTime: number; duration: number } };
+}) {
+	const position = useAudioPosition();
+	useEffect(() => {
+		targetRef.current = position;
+	}, [targetRef, position]);
+	return null;
+}
+
 function setup(initialSession?: AuthUser | null) {
 	const client = new QueryClient({
 		defaultOptions: {
@@ -86,12 +102,22 @@ function setup(initialSession?: AuthUser | null) {
 	if (initialSession !== undefined) {
 		client.setQueryData(SESSION_KEY, initialSession);
 	}
+	// Позиция снимается из ТОГО ЖЕ провайдера, что и transport: иначе
+	// проверка «после clear позиция 0» проходила бы на пустом инстансе.
+	const positionRef = { current: { currentTime: 0, duration: 0 } };
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={client}>
-			<AudioPlayerProvider>{children}</AudioPlayerProvider>
+			<AudioPlayerProvider>
+				{children}
+				<PositionProbe targetRef={positionRef} />
+			</AudioPlayerProvider>
 		</QueryClientProvider>
 	);
-	return { ...renderHook(() => useAudioPlayer(), { wrapper }), client };
+	return {
+		...renderHook(() => useAudioPlayer(), { wrapper }),
+		getPosition: () => positionRef.current,
+		client,
+	};
 }
 
 describe("AudioPlayerProvider", () => {
@@ -150,12 +176,12 @@ describe("AudioPlayerProvider", () => {
 	});
 
 	it("clear сбрасывает очередь", () => {
-		const { result } = setup();
+		const { result, getPosition } = setup();
 		act(() => result.current.playMedia(media(1, "Первый")));
 		act(() => result.current.clear());
 		expect(result.current.queue).toEqual([]);
 		expect(result.current.current).toBeNull();
-		expect(result.current.currentTime).toBe(0);
+		expect(getPosition().currentTime).toBe(0);
 	});
 
 	it("пустой список не запускает воспроизведение", () => {

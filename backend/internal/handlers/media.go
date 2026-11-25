@@ -241,15 +241,6 @@ func (h *MediaHandler) Stream(c *fiber.Ctx) error {
 
 	c.Set("Content-Type", services.MimeTypeByExt(strings.ToLower(filepath.Ext(resolvedPath))))
 
-	// Счётчик стартов для админской чистки оригиналов. Ошибка записи
-	// стрим не роняет — только лог. Считаем только старты с начала:
-	// запросы с Range (сики/ретраи плеера) аналитику не накручивают.
-	if c.Get("Range") == "" {
-		if err := h.mediaRepo.IncrementViews(ctx, id); err != nil {
-			log.Printf("Stream: increment views %d: %v", id, err)
-		}
-	}
-
 	// SendFile сам возвращает 404 (fiber.Error) для отсутствующего файла.
 	// Отдельный os.Stat не нужен — он давал бы лишний системный вызов,
 	// а fasthttp всё равно проверяет файл при отправке.
@@ -261,6 +252,15 @@ func (h *MediaHandler) Stream(c *fiber.Ctx) error {
 		}
 		log.Printf("Stream: SendFile %s: %v", resolvedPath, err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to stream file")
+	}
+
+	// Счётчик стартов для админской чистки оригиналов: только успешная
+	// отдача с начала (Range — сики/ретраи плеера). Ошибка записи стрим
+	// не роняет — только лог.
+	if c.Get("Range") == "" {
+		if err := h.mediaRepo.IncrementViews(ctx, id); err != nil {
+			log.Printf("Stream: increment views %d: %v", id, err)
+		}
 	}
 	return nil
 }

@@ -12,16 +12,24 @@ server:
   debug: false
   cors_origins: "*"  # Set to your frontend origin in production
   # trusted_proxies: "127.0.0.1/32,10.0.0.0/8"  # X-Forwarded-For принимается только от этих CIDR
-  # cookie_secure: true включает Secure-флаг у сессионных кук веб-клиента
-  # (flux_access, flux_refresh). Нужен HTTPS; в LAN по HTTP оставьте false,
-  # иначе браузер не будет отправлять куки.
+  # HSTS (Strict-Transport-Security) за прокси с TLS-терминацией ставится
+  # только если peer входит в trusted_proxies: X-Forwarded-Proto от прямого
+  # клиента не доверяем. Список должен включать адрес вашего nginx/Traefik.
+  # cookie_secure: Secure-флаг кук (flux_access, flux_refresh). При
+  # public_url: https://… включается автоматически и не отключается.
+  # Для LAN по HTTP оставьте false (или не задавайте public_url с https).
   cookie_secure: false
   # IMPORTANT (memory): the HTTP engine (fasthttp) buffers the ENTIRE request
   # body of an upload in RAM before the handler runs. One upload consumes up
   # to max_upload_size of memory; budget RAM for (limit × concurrent uploads)
   # — concurrency is capped at 256 connections and the upload rate limiter
   # (rate_limiter.max) throttles request frequency. Applies to
-  # /api/media/upload and cover endpoints; the rest of the API is capped at 4 MB.
+  # /api/media/upload and cover endpoints; the rest of the API is capped at
+  # 512 KB (64 KB for /api/auth/*).
+  #
+  # Multipart parts over 16 MiB are spilled to os.TempDir() (usually /tmp)
+  # before the handler sees them: make sure that filesystem has room for one
+  # full upload, or set TMPDIR to a volume with enough space.
   max_upload_size: 2147483648  # 2GB in bytes
   # web_dist: каталог собранного веб-клиента, раздаётся с того же
   # origin, что и API (SPA с fallback на index.html).
@@ -71,9 +79,13 @@ rate_limiter:
   # десятки range-запросов, общий бюджет 10/мин его бы душил.
   read_max: 600
   read_expiration: 60  # seconds
-  # Массовая загрузка: отдельный бюджет. 0 — max × 12.
+  # Массовая загрузка: отдельный бюджет. 0 — max × 30.
   upload_max: 300
   upload_expiration: 60  # seconds
+  # Мутации (POST/PUT/DELETE): общий бюджет по пользователю — SQLite
+  # пускает одного писателя. 0 — max(read_max/4, 30) и read_expiration.
+  write_max: 150
+  write_expiration: 60  # seconds
 
 media:
   thumbnail_path: "./data/thumbnails"

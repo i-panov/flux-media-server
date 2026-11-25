@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	deleteOriginal,
 	deleteUser,
-	downloadOriginal,
 	getStorage,
 	listOriginals,
 	listUsers,
+	originalDownloadUrl,
 	retryTranscode,
 	setAutoCleanup,
 	setUserAdmin,
@@ -118,19 +118,12 @@ describe("admin api", () => {
 		);
 	});
 
-	it("скачивает оригинал как blob", async () => {
-		const blob = new Blob(["data"]);
-		const fetchMock = vi.fn().mockResolvedValue({
-			ok: true,
-			status: 200,
-			blob: () => Promise.resolve(blob),
-		});
-		vi.stubGlobal("fetch", fetchMock);
-
-		const result = await downloadOriginal("movie.mp4");
-		expect(await result.text()).toBe("data");
-		expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toBe(
+	it("даёт прямую ссылку на оригинал", () => {
+		expect(originalDownloadUrl("movie.mp4")).toBe(
 			"/api/admin/originals/movie.mp4/download",
+		);
+		expect(originalDownloadUrl("a b#1.mkv")).toBe(
+			"/api/admin/originals/a%20b%231.mkv/download",
 		);
 	});
 

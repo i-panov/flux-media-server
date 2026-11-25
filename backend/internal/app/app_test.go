@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -308,11 +310,36 @@ func TestMediaListEmpty(t *testing.T) {
 func TestBodySizeLimitRejectsLargeBodies(t *testing.T) {
 	application := newTestApp(t)
 
-	// 5 MB > maxAPIBodySize (4 MB) — fasthttp отклоняет тело на этапе
-	// чтения (per-route лимит из HeaderReceived) и пишет 413 клиенту;
-	// Fiber.Test в этом случае возвращает ошибку вместо ответа.
+	// 5 MB > maxAPIBodySize (512 KB) и maxAuthBodySize (64 KB) — fasthttp
+	// отклоняет тело на этапе чтения (per-route лимит из HeaderReceived)
+	// и пишет 413 клиенту; Fiber.Test в этом случае возвращает ошибку
+	// вместо ответа.
 	body := bytes.NewReader(make([]byte, 5<<20))
 	req := testReq("POST", "/api/auth/request-code", body)
+	_, err := application.Fiber.Test(req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "body size exceeds")
+}
+
+func TestBodySizeLimitAuthRoutesNarrower(t *testing.T) {
+	application := newTestApp(t)
+
+	// 128 КБ проходит общий API-лимит, но не узкий auth-лимит (64 КБ):
+	// публичный эндпоинт не должен буферизовать мегабайты до rate limiter'а.
+	body := bytes.NewReader(make([]byte, 128<<10))
+	req := testReq("POST", "/api/auth/request-code", body)
+	_, err := application.Fiber.Test(req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "body size exceeds")
+}
+
+func TestBodySizeLimitAppliesToGenericAPI(t *testing.T) {
+	application := newTestApp(t)
+
+	// 600 КБ > maxAPIBodySize (512 КБ), но < maxUploadSize: обычный
+	// API-роут режется на чтении до хендлера.
+	body := bytes.NewReader(make([]byte, 600<<10))
+	req := testReq("POST", "/api/media/check-hash", body)
 	_, err := application.Fiber.Test(req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "body size exceeds")
@@ -352,8 +379,8 @@ func TestBodySizeLimitCoverRouteExempt(t *testing.T) {
 }
 
 // Per-route лимиты через HeaderReceived: upload-роут принимает тела
-// больше глобального fallback (25 МБ), не-upload роуты ограничены 4 МБ
-// на уровне fasthttp (до обработчиков).
+// больше глобального fallback (25 МБ), не-upload роуты ограничены
+// maxAPIBodySize (512 КБ, auth — 64 КБ) на уровне fasthttp (до обработчиков).
 func TestHeaderReceivedPerRouteBodyLimits(t *testing.T) {
 	application := newTestApp(t) // MaxUploadSize: 100 MB
 
@@ -379,7 +406,8 @@ func TestIsUploadPath(t *testing.T) {
 		want         bool
 	}{
 		{fiber.MethodPost, "/api/media/upload", true},
-		{fiber.MethodPost, "/api/media/upload/", false},
+		{fiber.MethodPost, "/api/media/upload/", true},
+		{fiber.MethodPost, "/API/MEDIA/UPLOAD", true},
 		{fiber.MethodPut, "/api/media/1/cover", true},
 		{fiber.MethodPut, "/api/media/cover", true},
 		{fiber.MethodGet, "/api/media/upload", false},
@@ -619,4 +647,45 @@ func TestRequestLoggerUsesTrustedProxyClientIP(t *testing.T) {
 	assert.Contains(t, logLine, "203.0.113.9")
 	assert.NotContains(t, logLine, "10.1.2.3")
 	assert.Contains(t, logLine, "| GET | / | -")
+}
+
+// Инвариант: всё, кроме health и публичных auth-роутов, без токена даёт 401.
+// Проверка построена на зарегистрированных маршрутах, а не на списке в коде:
+// новый публичный/закрытый роут не проскочит незамеченным.
+func TestAllAPIRoutesRequireAuth(t *testing.T) {
+	application := newTestApp(t)
+	public := map[string]bool{
+		"GET /api/health":               true,
+		"HEAD /api/health":              true,
+		"POST /api/auth/request-code":   true,
+		"POST /api/auth/verify-code":    true,
+		"POST /api/auth/refresh":        true,
+		"POST /api/auth/logout-refresh": true,
+		"POST /api/auth/device/code":    true,
+		"POST /api/auth/device/token":   true,
+	}
+	param := regexp.MustCompile(`:[A-Za-z_]+`)
+	checked := 0
+	for _, route := range application.Fiber.GetRoutes() {
+		if !strings.HasPrefix(route.Path, "/api") || strings.Contains(route.Path, "*") {
+			continue
+		}
+		switch route.Method {
+		case fiber.MethodGet, fiber.MethodHead, fiber.MethodPost,
+			fiber.MethodPut, fiber.MethodPatch, fiber.MethodDelete:
+		default:
+			// GetRoutes отдаёт и служебные USE-записи группы.
+			continue
+		}
+		key := route.Method + " " + route.Path
+		if public[key] {
+			continue
+		}
+		path := param.ReplaceAllString(route.Path, "1")
+		resp, err := application.Fiber.Test(testReq(route.Method, path, nil))
+		require.NoError(t, err, key)
+		assert.Equal(t, fiber.StatusUnauthorized, resp.StatusCode, key)
+		checked++
+	}
+	assert.Greater(t, checked, 30, "маршруты должны быть зарегистрированы")
 }

@@ -48,19 +48,51 @@ const AUTH_PUBLIC_PATHS = [
 	"/health",
 ];
 
+const PATH_QUERY_SPLIT = /[?#]/;
+const TRAILING_SLASHES = /\/+$/;
+
+// Путь с query/fragment или хвостовым слэшем — всё тот же эндпоинт:
+// сравниваем нормализованный pathname, иначе публичный вызов начнёт
+// пытаться обновить сессию.
+function isPublicAuthPath(path: string): boolean {
+	const pathname =
+		path.split(PATH_QUERY_SPLIT, 1)[0]?.replace(TRAILING_SLASHES, "") ?? "";
+	return AUTH_PUBLIC_PATHS.includes(pathname);
+}
+
 // Общий промис обновления, чтобы пачка параллельных 401 не плодила
 // гонку refresh-запросов.
 let refreshInflight: Promise<void> | null = null;
+let refreshInflightEpoch = 0;
+
+// Зависший refresh (оборванный NAT/TCP) иначе навсегда блокирует все
+// последующие 401: они ждут один и тот же промис.
+const REFRESH_TIMEOUT_MS = 30_000;
+
+function sessionEpoch(): number {
+	return getApiConfig().sessionEpoch?.() ?? 0;
+}
 
 function scheduleRefresh(): Promise<void> {
-	if (refreshInflight === null) {
+	// Поколение сессии входит в идентичность промиса: после logout/смены
+	// сервера нельзя переиспользовать refresh старого поколения, иначе его
+	// ответ запишет токены уже после очистки.
+	const epoch = sessionEpoch();
+	if (refreshInflight === null || refreshInflightEpoch !== epoch) {
+		refreshInflightEpoch = epoch;
+		const config = getApiConfig();
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
 		// Сырой вызов транспорта без рекурсии в apiFetch: refresh сам себя обновлять не должен.
 		// Не привязываем общий refresh к signal первого запроса: его отмена
 		// не должна отменять refresh для всех ожидающих.
-		refreshInflight = getApiConfig()
-			.transport.refresh(getApiConfig().baseUrl)
+		refreshInflight = config.transport
+			.refresh(config.baseUrl, controller.signal)
 			.finally(() => {
-				refreshInflight = null;
+				clearTimeout(timer);
+				if (refreshInflightEpoch === epoch) {
+					refreshInflight = null;
+				}
 			});
 	}
 	return refreshInflight;
@@ -103,9 +135,19 @@ async function parseJSON<T>(response: Response): Promise<T> {
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
-	if (signal?.aborted === true) {
-		throw signal.reason ?? new Error("Aborted");
+	if (signal?.aborted !== true) {
+		return;
 	}
+	// В части полифилов reason — не Error (строка/undefined): нормализуем,
+	// иначе вызывающий код получает брошенное «ничего».
+	const reason: unknown = signal.reason;
+	if (reason instanceof Error) {
+		throw reason;
+	}
+	throw new Error(
+		"Aborted",
+		reason === undefined ? undefined : { cause: reason },
+	);
 }
 
 async function requestWithRefresh<T>(
@@ -139,11 +181,7 @@ async function requestWithRefresh<T>(
 
 	if (!response.ok) {
 		const error = await toApiError(response);
-		if (
-			allowRetry &&
-			error.status === 401 &&
-			!AUTH_PUBLIC_PATHS.includes(path)
-		) {
+		if (allowRetry && error.status === 401 && !isPublicAuthPath(path)) {
 			try {
 				await scheduleRefresh();
 			} catch (refreshError) {
@@ -154,9 +192,17 @@ async function requestWithRefresh<T>(
 					refreshError instanceof RefreshError &&
 					(refreshError.status === 401 || refreshError.status === 400)
 				) {
-					await getApiConfig().onAuthFailure?.();
 					throwIfAborted(init?.signal ?? undefined);
-					return requestWithRefresh<T>(path, init, false, parse);
+					try {
+						return await requestWithRefresh<T>(path, init, false, parse);
+					} catch (retryError) {
+						// Терминальная ошибка — только если и повтор получил
+						// 401: иначе платформа зря сбросила бы живую сессию.
+						if (retryError instanceof ApiError && retryError.status === 401) {
+							await getApiConfig().onAuthFailure?.();
+						}
+						throw retryError;
+					}
 				}
 				throw refreshError;
 			}

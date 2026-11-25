@@ -278,6 +278,12 @@ describe("isSafeImageUrl", () => {
 		expect(isSafeImageUrl("blob:https://example/uuid")).toBe(false);
 		expect(isSafeImageUrl("ftp://example/cover.jpg")).toBe(false);
 	});
+
+	it("отклоняет protocol-relative и обратные слэши", () => {
+		expect(isSafeImageUrl("//evil.example/x.jpg")).toBe(false);
+		expect(isSafeImageUrl("\\\\evil.example\\x.jpg")).toBe(false);
+		expect(isSafeImageUrl("covers\\7.jpg")).toBe(false);
+	});
 });
 
 // biome-ignore lint/security/noSecrets: имя тестируемой функции, не секрет.

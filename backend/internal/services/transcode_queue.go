@@ -123,6 +123,9 @@ type TranscodeQueue struct {
 	runner      FFmpegRunner
 	// freeBytes — шов для тестов (дефолт diskFreeBytes).
 	freeBytes func(string) int64
+	// cleanupMu сериализует авточистку оригиналов: её вызывают и воркер,
+	// и синхронный путь загрузки.
+	cleanupMu sync.Mutex
 }
 
 // NewTranscodeQueue создаёт очередь и запускает воркера. Нулевые значения
@@ -1110,19 +1113,33 @@ func (q *TranscodeQueue) EnsureSpaceForUpload(fileSize int64) error {
 // protect — пути, которые трогать нельзя. Неизвестный остаток (-1,
 // не-unix) — пропуск проверки, как в checkDiskSpace.
 func (q *TranscodeQueue) ensureFreeSpace(dir string, need int64, protect map[string]bool) error {
-	// Список кандидатов строим один раз: nextEvictionVictim в цикле читал
-	// весь каталог и БД на каждого удалённого оригинала (O(N²)).
+	// Параллельные вызовы (воркер + хендлер загрузки) независимо выбирают
+	// жертв и могут удалить больше, чем нужно: сериализуем чистку.
+	q.cleanupMu.Lock()
+	defer q.cleanupMu.Unlock()
+
+	// Дешёвая проверка до ReadDir/БД: на большой библиотеке перечисление
+	// кандидатов (OriginalsStatus) дороже самого Statfs.
+	free := q.freeBytes(dir)
+	if free < 0 || free >= need {
+		return nil
+	}
+	if !q.AutoCleanup() {
+		return ErrInsufficientSpace
+	}
+	// Оригиналы освобождают место только на своей ФС. Если каталог
+	// назначения на другой, чистка уничтожит файлы без выигрыша.
+	if !sameFilesystem(dir, q.cfg.OriginalsDir) {
+		log.Printf("transcode: auto-cleanup skipped: %s and %s are on different filesystems", dir, q.cfg.OriginalsDir)
+		return ErrInsufficientSpace
+	}
 	candidates, err := q.evictionCandidates(protect)
 	if err != nil {
 		return err
 	}
 	for _, victim := range candidates {
-		free := q.freeBytes(dir)
-		if free < 0 || free >= need {
+		if free >= need {
 			return nil
-		}
-		if !q.AutoCleanup() {
-			return ErrInsufficientSpace
 		}
 		path := filepath.Join(q.cfg.OriginalsDir, victim.Name)
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
@@ -1130,8 +1147,9 @@ func (q *TranscodeQueue) ensureFreeSpace(dir string, need int64, protect map[str
 			return err
 		}
 		log.Printf("transcode: auto-cleanup removed %s (%d bytes, %d views)", victim.Name, victim.Size, victim.Views)
+		free = q.freeBytes(dir)
 	}
-	if free := q.freeBytes(dir); free < 0 || free >= need {
+	if free < 0 || free >= need {
 		return nil
 	}
 	return ErrInsufficientSpace

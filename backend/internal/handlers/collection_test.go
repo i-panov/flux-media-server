@@ -487,7 +487,7 @@ func TestCollectionHandler_ForeignCollectionNotModified(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
 	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 
 	// Возвращаемся владельцем и смотрим содержимое: оно должно быть пустым.
 	userID = 1
@@ -514,7 +514,7 @@ func TestCollectionHandler_ForeignCollectionSingleAddNotModified(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
 	require.NoError(t, err)
-	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
+	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
 
 	userID = 1
 	req = httptest.NewRequest("GET", "/api/collections/"+strconv.Itoa(int(colID))+"/items", nil)

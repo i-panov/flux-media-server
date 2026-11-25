@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"flux/internal/metadata"
 	"flux/internal/models"
 	"flux/internal/repository"
 	"flux/internal/response"
@@ -80,6 +81,11 @@ func (h *CatalogHandler) CreateWork(c *fiber.Ctx) error {
 		Kind: req.Kind, Title: req.Title, Description: req.Description,
 		CoverURL: req.CoverURL, Year: req.Year,
 	}
+	// Тот же диапазон, что у метаданных медиа: иначе фильтры и сортировки
+	// каталога получают год, которого не бывает.
+	if work.Year != 0 && !metadata.IsValidYear(work.Year) {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid year: must be between 1888 and current year + 2")
+	}
 	if err := h.works.Create(c.UserContext(), &work); err != nil {
 		return h.mapError(c, err)
 	}
@@ -103,6 +109,9 @@ func (h *CatalogHandler) UpdateWork(c *fiber.Ctx) error {
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if req.Year != nil && *req.Year != 0 && !metadata.IsValidYear(*req.Year) {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid year: must be between 1888 and current year + 2")
 	}
 	work, err := h.works.Update(c.UserContext(), id, repository.WorkPatch{
 		Title: req.Title, Description: req.Description, CoverURL: req.CoverURL, Year: req.Year,

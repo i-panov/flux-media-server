@@ -1,35 +1,17 @@
+import {
+	cancelExtractJob,
+	fetchExtractedAudio,
+	fetchExtractStatus,
+	startExtract,
+} from "@flux/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { z } from "zod";
-import { type Media, mediaSchema } from "../core/media";
-import { ApiError, apiFetch } from "./client";
+import type { Media } from "../core/media";
+import { ApiError } from "./client";
 
 const POLL_INTERVAL_MS = 1500;
 // Сколько подряд неудачных опросов терпим: сеть может моргнуть.
 const MAX_POLL_FAILURES = 3;
-
-const jobSchema = z.object({
-	job_id: z.number(),
-});
-
-const jobStatusSchema = z.object({
-	id: z.number(),
-	status: z.string(),
-	error: z.string().nullish(),
-	media: mediaSchema.nullish(),
-});
-
-async function fetchExtractedAudio(mediaId: number): Promise<Media | null> {
-	try {
-		const body = await apiFetch<unknown>(`/media/${mediaId}/extracted`);
-		return mediaSchema.parse(body);
-	} catch (error) {
-		if (error instanceof ApiError && error.status === 404) {
-			return null;
-		}
-		throw error;
-	}
-}
 
 export function useExtractedAudio(mediaId: number, enabled = true) {
 	return useQuery({
@@ -39,10 +21,6 @@ export function useExtractedAudio(mediaId: number, enabled = true) {
 		retry: false,
 		refetchOnWindowFocus: false,
 	});
-}
-
-async function cancelExtractJob(jobId: number): Promise<void> {
-	await apiFetch<unknown>(`/media/extract/${jobId}`, { method: "DELETE" });
 }
 
 function sleep(ms: number): Promise<void> {
@@ -98,15 +76,12 @@ export function useExtractAudio(mediaId: number) {
 			cancelled.current = false;
 			let id: number;
 			try {
-				const body = await apiFetch<unknown>(`/media/${mediaId}/extract`, {
-					method: "POST",
-				});
-				if (typeof body !== "object" || body === null || !("job_id" in body)) {
-					const track = mediaSchema.parse(body);
-					finish(track);
-					return track;
+				const started = await startExtract(mediaId);
+				if (started.kind === "track") {
+					finish(started.track);
+					return started.track;
 				}
-				id = jobSchema.parse(body).job_id;
+				id = started.jobId;
 				setJobId(id);
 			} catch (startError) {
 				setError(
@@ -123,8 +98,7 @@ export function useExtractAudio(mediaId: number) {
 					return null;
 				}
 				try {
-					const raw = await apiFetch<unknown>(`/media/extract/${id}`);
-					const status = jobStatusSchema.parse(raw);
+					const status = await fetchExtractStatus(id);
 					failures = 0;
 					if (status.status === "done") {
 						const track = status.media ?? null;

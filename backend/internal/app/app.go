@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -29,7 +30,19 @@ import (
 )
 
 // maxAPIBodySize caps request bodies for all non-upload endpoints (JSON API).
-const maxAPIBodySize = 4 << 20 // 4 MB
+// JSON-запросы на два порядка меньше: 512 КБ хватает самым большим bulk-
+// операциям и тексту lyrics, а 256 соединений дают максимум ~128 МБ RAM
+// вместо ~1 ГБ при прежних 4 МБ.
+const maxAPIBodySize = 512 << 10 // 512 KB
+
+// maxAuthBodySize — отдельный узкий лимит для публичных /api/auth/*:
+// неаутентифицированный клиент не должен занимать мегабайты до того,
+// как сработает rate limiter (он выполняется уже после чтения тела).
+const maxAuthBodySize = 64 << 10 // 64 KB
+
+// maxCoverBodySize — предел тела загрузки обложки: реальный лимит
+// изображения 10 МБ (см. thumb.UploadCover) плюс запас на multipart.
+const maxCoverBodySize = 12 << 20 // 12 MB
 
 // minUploadSpeedFloor — минимальная скорость заливки, из которой считаем
 // ReadTimeout для upload-роутов: MaxUploadSize должен успеть залиться
@@ -80,17 +93,86 @@ const (
 // isUploadPath определяет запросы, которым разрешены большие тела
 // (multipart upload и смена обложки). Единая точка для HeaderReceived
 // (лимит применяется до чтения тела) и body-size middleware.
+//
+// Путь нормализуется: Fiber по умолчанию роутит без учёта регистра и
+// хвостового слэша, поэтому предикат обязан видеть те же пути, что роутер.
 func isUploadPath(method, path string) bool {
-	if path == apiMediaRoute+uploadRouteSuffix {
-		return method == fiber.MethodPost
-	}
+	return isUploadOnlyPath(method, path) || isCoverPath(method, path)
+}
+
+// isUploadOnlyPath — именно multipart-загрузка (не обложки).
+func isUploadOnlyPath(method, path string) bool {
+	method, path = normalizeRoutePath(method, path)
+	return method == fiber.MethodPost && path == apiMediaRoute+uploadRouteSuffix
+}
+
+// isCoverPath — загрузка обложки медиа или артиста.
+func isCoverPath(method, path string) bool {
+	method, path = normalizeRoutePath(method, path)
 	if method == fiber.MethodPost &&
 		strings.HasPrefix(path, "/api/artists/") &&
-		strings.HasSuffix(path, "/cover") {
+		strings.HasSuffix(path, coverRouteSuffix) {
 		return true
 	}
 	return method == fiber.MethodPut &&
 		strings.HasPrefix(path, apiMediaRoute+"/") && strings.HasSuffix(path, coverRouteSuffix)
+}
+
+func normalizeRoutePath(method, path string) (string, string) {
+	return strings.ToUpper(method), strings.ToLower(strings.TrimSuffix(path, "/"))
+}
+
+// isWriteExemptPath — тяжёлые операции со своим бюджетом: multipart-загрузка,
+// извлечение и нарезка (ffmpeg). Cover сюда не входит: отдельного лимитера
+// у него не было, теперь он считается обычной мутацией + cover-лимитером.
+func isWriteExemptPath(method, path string) bool {
+	method, path = normalizeRoutePath(method, path)
+	if isUploadOnlyPath(method, path) {
+		return true
+	}
+	if !strings.HasPrefix(path, apiMediaRoute+"/") {
+		return false
+	}
+	if strings.HasPrefix(path, apiMediaRoute+"/extract/") ||
+		strings.HasSuffix(path, "/extract") {
+		return true
+	}
+	return method == fiber.MethodPost && strings.HasSuffix(path, "/clip")
+}
+
+// isAuthPath — публичные auth-роуты: им хватает узкого лимита тела.
+func isAuthPath(path string) bool {
+	_, path = normalizeRoutePath("", path)
+	return path == "/api/auth" || strings.HasPrefix(path, "/api/auth/")
+}
+
+// resolveContentPaths приводит каталоги контента к абсолютным путям.
+// Дедуп по file_path, sweep по префиксу и сравнение каталогов работают со
+// строками, поэтому конфиг и записи в БД обязаны совпадать независимо от
+// cwd процесса.
+func resolveContentPaths(cfg *config.Config) error {
+	targets := []struct {
+		name string
+		path *string
+	}{
+		{"media.video_path", &cfg.Media.VideoPath},
+		{"media.audio_path", &cfg.Media.AudioPath},
+		{"media.image_path", &cfg.Media.ImagePath},
+		{"media.thumbnail_path", &cfg.Media.ThumbnailPath},
+		{"storage.originals_dir", &cfg.Storage.OriginalsDir},
+		{"storage.temp_dir", &cfg.Storage.TempDir},
+	}
+	for _, target := range targets {
+		if *target.path == "" {
+			continue
+		}
+		abs, err := filepath.Abs(*target.path)
+		if err != nil {
+			return fmt.Errorf("resolve %s: %w", target.name, err)
+		}
+		*target.path = filepath.Clean(abs)
+	}
+	return nil
 }
 
 // App holds all application dependencies and the Fiber instance.
@@ -103,6 +185,7 @@ type App struct {
 	ExtractQueue *services.ExtractService
 	// TranscodeQueue — очередь нормализации видео из карантина.
 	TranscodeQueue *services.TranscodeQueue
+	ClipService    *services.ClipService
 	Version        string
 	sqlDB          *sql.DB
 	cleanupStop    chan struct{}
@@ -133,10 +216,11 @@ type options struct {
 	backgroundWorkers bool
 }
 
-// ConsoleMode отключает фоновых работников при старте (первичный скан и
-// файловый watcher). Используется консольным режимом (-scan): фоновый скан
-// гонялся бы с консольным за одну БД (консольный мог получить
-// ErrScanInProgress), а watcher дублировал бы события консольного скана.
+// ConsoleMode отключает фоновых работников при старте (первичный скан,
+// периодический скан и файловый watcher). Очереди upload/transcode/extract
+// создаются как обычно: консольный скан не ставит в них задания, а их
+// воркеры простаивают. Используется консольным режимом (-scan): фоновый скан
+// гонялся бы с консольным за одну БД, а watcher дублировал бы события.
 func ConsoleMode() Option {
 	return func(o *options) {
 		o.backgroundWorkers = false
@@ -145,12 +229,34 @@ func ConsoleMode() Option {
 
 // New creates a new App with all dependencies wired up.
 func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
+	// Дефолты новых секций: тесты обходят config.Load, где живут
+	// основные дефолты, поэтому здесь те же значения (дублирование
+	// осознанное — в одном месте их не собрать без рефакторинга Load).
+	if cfg.Storage.OriginalsDir == "" {
+		cfg.Storage.OriginalsDir = "./data/originals"
+	}
+	if cfg.Storage.TempDir == "" {
+		cfg.Storage.TempDir = "./data/tmp"
+	}
+	// Абсолютные пути: относительные зависят от cwd, и смена способа запуска
+	// выглядит как «вся библиотека пропала» — скан пишет file_path от одного
+	// корня, а sweep ищет записи по другому. Канонизируем ДО миграций:
+	// v14 разрешает старые относительные пути по этим корням, а не по cwd.
+	if err := resolveContentPaths(cfg); err != nil {
+		return nil, err
+	}
 	db, err := repository.InitDB(cfg.Database.Path, cfg.Server.Debug)
 	if err != nil {
 		return nil, fmt.Errorf("init database: %w", err)
 	}
 
-	if err := repository.RunMigrations(db); err != nil {
+	if err := repository.RunMigrationsWithRoots(db, []string{
+		cfg.Media.VideoPath,
+		cfg.Media.AudioPath,
+		cfg.Media.ImagePath,
+		cfg.Storage.OriginalsDir,
+		cfg.Storage.TempDir,
+	}); err != nil {
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
@@ -213,19 +319,12 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		ImplicitTLS: cfg.Auth.SMTP.ImplicitTLS,
 	})
 
+	// Сервисы создаются ПОСЛЕ канонизации: scanner кладёт thumbnail_path в
+	// свой ThumbnailService, а streamer копирует MediaPaths по значению —
+	// иначе они держали бы относительные пути и зависели от cwd.
 	scanner := services.NewScannerService(mediaRepo, cfg)
 	streamer := services.NewStreamerService(cfg)
 	thumbSvc := services.NewThumbnailService(cfg.Media.ThumbnailPath)
-
-	// Дефолты новых секций: тесты обходят config.Load, где живут
-	// основные дефолты, поэтому здесь те же значения (дублирование
-	// осознанное — в одном месте их не собрать без рефакторинга Load).
-	if cfg.Storage.OriginalsDir == "" {
-		cfg.Storage.OriginalsDir = "./data/originals"
-	}
-	if cfg.Storage.TempDir == "" {
-		cfg.Storage.TempDir = "./data/tmp"
-	}
 	crf := 20
 	if cfg.Transcode.CRF != nil {
 		crf = *cfg.Transcode.CRF
@@ -425,12 +524,13 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 	fiberApp.Use(fiberrecover.New())
-	fiberApp.Use(middleware.SecurityHeaders())
-
 	// Доверенные прокси парсим один раз: X-Forwarded-For принимаем
 	// только от них, иначе клиент подделает IP и обойдёт лимитер.
-	// Нужно и лимитерам, и access-логгеру — поэтому вычисляем до них.
+	// Нужно и лимитерам, access-логгеру и HSTS — поэтому вычисляем до них.
 	trustedProxies := parseTrustedProxies(cfg.Server.TrustedProxies)
+	authHandler.SetTrustedProxies(trustedProxies)
+	fiberApp.Use(middleware.SecurityHeaders(trustedProxies))
+
 	clientKey := func(c *fiber.Ctx) string {
 		return getClientIP(c, trustedProxies)
 	}
@@ -489,12 +589,25 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	}
 	fiberApp.Server().HeaderReceived = func(h *fasthttp.RequestHeader) fasthttp.RequestConfig {
 		var u fasthttp.URI
-		_ = u.Parse(nil, h.RequestURI()) // при ошибке path пуст → лимит 4 МБ (безопасный дефолт)
-		if isUploadPath(string(h.Method()), string(u.Path())) {
+		_ = u.Parse(nil, h.RequestURI()) // при ошибке path пуст → обычный лимит API (безопасный дефолт)
+		method, path := normalizeRoutePath(string(h.Method()), string(u.Path()))
+		if !isUploadPath(method, path) && isAuthPath(path) {
+			return fasthttp.RequestConfig{
+				MaxRequestBodySize: maxAuthBodySize,
+				ReadTimeout:        30 * time.Second,
+			}
+		}
+		if isUploadPath(method, path) {
 			if !uploadAuthorized(h) {
 				return fasthttp.RequestConfig{
 					MaxRequestBodySize: maxAPIBodySize,
 					ReadTimeout:        30 * time.Second,
+				}
+			}
+			if isCoverPath(method, path) {
+				return fasthttp.RequestConfig{
+					MaxRequestBodySize: maxCoverBodySize,
+					ReadTimeout:        uploadReadTimeout(maxCoverBodySize),
 				}
 			}
 			return fasthttp.RequestConfig{
@@ -616,6 +729,31 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		},
 	})
 
+	// Write limiter — отдельный бюджет мутаций по пользователю: SQLite
+	// пускает одного писателя (_txlock=immediate), поэтому поток мелких
+	// POST/PUT от одного клиента тормозит всех. Чтения/стримы не страдают.
+	writeMax := cfg.RateLimiter.WriteMax
+	if writeMax <= 0 {
+		writeMax = cfg.RateLimiter.ReadMax / 4
+		if writeMax < 30 {
+			writeMax = 30
+		}
+	}
+	writeExpiration := cfg.RateLimiter.WriteExpiration
+	if writeExpiration <= 0 {
+		writeExpiration = cfg.RateLimiter.ReadExpiration
+	}
+	writeRateLimiter := limiter.New(limiter.Config{
+		Max:          writeMax,
+		Expiration:   time.Duration(writeExpiration) * time.Second,
+		KeyGenerator: uploadKey,
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
+
 	// Extract limiter — отдельный инстанс с тем же бюджетом: им закрыты
 	// запуск ffmpeg (POST) и ручная отмена (DELETE). Статус опроса и
 	// готовый трек (GET) идут через read-лимитер: поллинг раз в ~1.5с
@@ -624,6 +762,19 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		Max:          cfg.RateLimiter.Max,
 		Expiration:   time.Duration(cfg.RateLimiter.Expiration) * time.Second,
 		KeyGenerator: clientKey,
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded, please try again later",
+			})
+		},
+	})
+
+	// Cover limiter: загрузка обложки и кадр из видео (синхронный ffmpeg)
+	// не должны запускаться веером даже с админским токеном.
+	coverRateLimiter := limiter.New(limiter.Config{
+		Max:          uploadMax,
+		Expiration:   time.Duration(uploadExpiration) * time.Second,
+		KeyGenerator: uploadKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Rate limit exceeded, please try again later",
@@ -672,6 +823,20 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 
 	// Protected routes
 	api := fiberApp.Group("/api", middleware.AuthMiddleware(jwtService))
+
+	// Все мутации в защищённой группе проходят write-лимитер. Тяжёлые
+	// операции (upload/extract/cover/clip) уже под своими бюджетами и сюда
+	// не попадают, чтобы не списывать два токена за один запрос.
+	api.Use(func(c *fiber.Ctx) error {
+		switch c.Method() {
+		case fiber.MethodGet, fiber.MethodHead, fiber.MethodOptions:
+			return c.Next()
+		}
+		if isWriteExemptPath(c.Method(), c.Path()) {
+			return c.Next()
+		}
+		return writeRateLimiter(c)
+	})
 
 	api.Get("/auth/me", authHandler.Me)
 	api.Post("/auth/logout", authHandler.Logout)
@@ -735,8 +900,8 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	media.Get("/:id/stream", readRateLimiter, mediaHandler.Stream)
 	media.Get("/:id/thumb", readRateLimiter, thumbHandler.Get)
 	media.Get("/:id/cover", readRateLimiter, thumbHandler.GetCover)
-	media.Put("/:id"+coverRouteSuffix, requireAdmin, thumbHandler.UploadCover)
-	media.Post("/:id/cover/from-frame", requireAdmin, mediaHandler.CoverFromFrame)
+	media.Put("/:id"+coverRouteSuffix, requireAdmin, coverRateLimiter, thumbHandler.UploadCover)
+	media.Post("/:id/cover/from-frame", requireAdmin, coverRateLimiter, mediaHandler.CoverFromFrame)
 
 	progress := api.Group("/progress")
 	progress.Get("", readRateLimiter, progressHandler.List)
@@ -761,7 +926,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	artist := api.Group("/artists")
 	artist.Get("", readRateLimiter, artistHandler.List)
 	artist.Put("/:id", requireAdmin, artistHandler.Update)
-	artist.Post("/:id/cover", requireAdmin, artistHandler.UploadCover)
+	artist.Post("/:id/cover", requireAdmin, coverRateLimiter, artistHandler.UploadCover)
 	artist.Get("/:id/cover", readRateLimiter, artistHandler.GetCover)
 
 	// Collections
@@ -900,11 +1065,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		goSafe(func() {
 			defer scanWG.Done()
 			log.Printf("initial library scan started")
-			if err := scanner.ScanAll(scanCtx); err != nil {
-				log.Printf("initial library scan: %v", err)
-			} else {
-				log.Printf("initial library scan finished")
-			}
+			scanSafely(scanCtx, scanner, "initial library scan")
 			// scanner.interval больше не мёртвая настройка: периодический
 			// скан ловит пропущенные fsnotify-события и отвалившиеся mount.
 			if cfg.Scanner.Interval <= 0 {
@@ -917,9 +1078,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 				case <-scanCtx.Done():
 					return
 				case <-ticker.C:
-					if err := scanner.ScanAll(scanCtx); err != nil {
-						log.Printf("periodic library scan: %v", err)
-					}
+					scanSafely(scanCtx, scanner, "periodic library scan")
 				}
 			}
 		})
@@ -961,20 +1120,37 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 	thumbBackfillWG.Add(1)
 	goSafe(func() {
 		defer thumbBackfillWG.Done()
+		runBackfill := func() {
+			for _, kind := range []string{
+				models.ThumbnailKindThumb,
+				models.ThumbnailKindCover,
+			} {
+				if err := thumbnailQueue.EnqueueMissing(dimensionsCtx, kind); err != nil {
+					log.Printf("thumbnail queue %s: enqueue: %v", kind, err)
+					continue
+				}
+				generated, failed := thumbnailQueue.Run(dimensionsCtx, kind)
+				if generated > 0 || failed > 0 {
+					log.Printf("%s: готово %d, ошибок %d", kind, generated, failed)
+				}
+			}
+		}
 		// Стартовый проход идёт через ту же очередь, что и админка:
 		// незавершённые задачи продолжаются, дублирующего ffmpeg нет.
 		thumbnailQueue.RecoverStale(dimensionsCtx)
-		for _, kind := range []string{
-			models.ThumbnailKindThumb,
-			models.ThumbnailKindCover,
-		} {
-			if err := thumbnailQueue.EnqueueMissing(dimensionsCtx, kind); err != nil {
-				log.Printf("thumbnail queue %s: enqueue: %v", kind, err)
-				continue
-			}
-			generated, failed := thumbnailQueue.Run(dimensionsCtx, kind)
-			if generated > 0 || failed > 0 {
-				log.Printf("%s: готово %d, ошибок %d", kind, generated, failed)
+		runBackfill()
+		// Без фонового воркера строка, оставшаяся processing после сбоя,
+		// ждала бы только рестарта. Периодический проход добирает такие
+		// задачи и новые файлы.
+		ticker := time.NewTicker(15 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-dimensionsCtx.Done():
+				return
+			case <-ticker.C:
+				thumbnailQueue.RecoverStale(dimensionsCtx)
+				runBackfill()
 			}
 		}
 	})
@@ -992,6 +1168,7 @@ func New(cfg *config.Config, version string, opts ...Option) (*App, error) {
 		UploadQueue:      uploadQueue,
 		ExtractQueue:     extractQueue,
 		TranscodeQueue:   transcodeQueue,
+		ClipService:      clipSvc,
 		Version:          version,
 		sqlDB:            sqlDB,
 		cleanupStop:      cleanupStop,
@@ -1082,6 +1259,13 @@ func parseTrustedProxies(raw string) []*net.IPNet {
 			}
 		}
 		if _, network, err := net.ParseCIDR(value); err == nil {
+			// Слишком широкий префикс делает X-Forwarded-For клиентским:
+			// любой сможет подставить IP и обойти все лимитеры.
+			ones, bits := network.Mask.Size()
+			if (bits == 32 && ones < 8) || (bits == 128 && ones < 16) {
+				log.Printf("trusted_proxies: ignoring too broad network %q (%d/%d): X-Forwarded-For would be client-controlled", value, ones, bits)
+				continue
+			}
 			result = append(result, network)
 			continue
 		}
@@ -1112,6 +1296,21 @@ func goSafe(fn func()) {
 	}()
 }
 
+// scanSafely запускает один проход сканера с локальным recover: паника в
+// ScanAll не должна навсегда отключать периодический скан.
+func scanSafely(ctx context.Context, scanner *services.ScannerService, label string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("%s panicked: %v", label, r)
+		}
+	}()
+	if err := scanner.ScanAll(ctx); err != nil {
+		log.Printf("%s: %v", label, err)
+	} else {
+		log.Printf("%s finished", label)
+	}
+}
+
 // Shutdown gracefully stops the application: background workers, the HTTP
 // server and the database. ctx bounds the time spent waiting for in-flight
 // requests; when omitted, context.Background() is used.
@@ -1124,12 +1323,21 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 	a.cleanupOnce.Do(func() {
 		close(a.cleanupStop)
 	})
+	// Сначала дренаж HTTP: новые запросы прекращаются, уже принятые
+	// доходят до хендлера. Если наоборот, остановить очереди, — принятая
+	// загрузка получит 202, но задание останется необработанным.
+	// Сначала отменяем фоновые проходы по ФС, затем дренируем HTTP: иначе
+	// активный стрим съедает бюджет shutdownCtx, скан отменяется уже в
+	// истёкшем контексте, `scanWG.Wait` не успевает, и БД закрывается под
+	// работающим сканом. Очереди останавливаем после дренажа: принятая
+	// загрузка должна успеть дойти до хендлера.
 	if a.scanCancelFn != nil {
 		a.scanCancelFn()
 	}
 	if a.Watcher != nil {
 		a.Watcher.Stop()
 	}
+	err := a.Fiber.ShutdownWithContext(shutdownCtx)
 	if a.UploadQueue != nil {
 		a.UploadQueue.Stop()
 	}
@@ -1139,9 +1347,10 @@ func (a *App) Shutdown(ctx ...context.Context) error {
 	if a.TranscodeQueue != nil {
 		a.TranscodeQueue.Stop()
 	}
+	if a.ClipService != nil {
+		a.ClipService.Stop()
+	}
 	a.OTPStore.Stop()
-
-	err := a.Fiber.ShutdownWithContext(shutdownCtx)
 	// Фоновый скан обязан завершиться до закрытия БД: его контекст уже
 	// отменён выше (scanCancelFn), все операции сканера ctx-aware, так
 	// что Wait завершается быстро. Патологический случай (застрявший

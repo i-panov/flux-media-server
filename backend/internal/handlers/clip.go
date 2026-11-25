@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -36,10 +37,21 @@ func (h *ClipHandler) Create(c *fiber.Ctx) error {
 	}
 	task, err := h.service.Start(c.UserContext(), mediaID, req.Start, req.End, req.Title)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
 			return response.Error(c, fiber.StatusNotFound, "Media not found")
+		case errors.Is(err, services.ErrClipBusy):
+			// Это исчерпание ёмкости (один ffmpeg), а не rate limit:
+			// 503 + Retry-After, чтобы клиент не считал себя ограниченным.
+			c.Set("Retry-After", "30")
+			return response.Error(c, fiber.StatusServiceUnavailable, "Another clip is being created, try again later")
+		case errors.Is(err, services.ErrClipInvalidRange), errors.Is(err, services.ErrClipUnsupported):
+			// Тексты валидации безопасны: без SQL, путей и внутренних деталей.
+			return response.Error(c, fiber.StatusBadRequest, err.Error())
+		default:
+			log.Printf("clip: create: %v", err)
+			return response.Error(c, fiber.StatusInternalServerError, "Failed to create clip")
 		}
-		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
 	return c.Status(fiber.StatusAccepted).JSON(task)
 }

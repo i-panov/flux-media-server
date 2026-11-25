@@ -1,4 +1,5 @@
 import {
+	keepPreviousData,
 	useInfiniteQuery,
 	useMutation,
 	useQuery,
@@ -22,8 +23,8 @@ export function useVideoList(
 	formatTagID?: number,
 	tagIDs?: number[],
 ) {
-	return useInfiniteQuery(
-		videoListOptions(
+	return useInfiniteQuery({
+		...videoListOptions(
 			apiFetch,
 			q,
 			sort,
@@ -32,7 +33,9 @@ export function useVideoList(
 			formatTagID,
 			tagIDs,
 		),
-	);
+		// Смена поиска/сортировки не должна схлопывать список в скелетон.
+		placeholderData: keepPreviousData,
+	});
 }
 
 export function useAudioList(
@@ -44,11 +47,15 @@ export function useAudioList(
 	return useInfiniteQuery({
 		...audioListOptions(apiFetch, q, artistId, sort),
 		enabled,
+		placeholderData: keepPreviousData,
 	});
 }
 
 export function useImageList(q: string) {
-	return useInfiniteQuery(imageListOptions(apiFetch, q));
+	return useInfiniteQuery({
+		...imageListOptions(apiFetch, q),
+		placeholderData: keepPreviousData,
+	});
 }
 
 export function useMedia(id: number, enabled = true) {
@@ -88,29 +95,31 @@ export function useDeleteMedia() {
 // retry() сбрасывает состояние и пробует снова.
 export function useMediaReload(mediaId: number) {
 	const [nonce, setNonce] = useState(0);
-	const [failed, setFailed] = useState(false);
-	const tried = useRef(false);
+	// Ошибка привязана к конкретному медиа: при переходе /video/1 → /video/2
+	// состояние предыдущего не должно помечать новый файл «битым».
+	const [failedId, setFailedId] = useState<number | null>(null);
+	const triedId = useRef<number | null>(null);
 	const handleError = useCallback(() => {
-		if (tried.current) {
-			setFailed(true);
+		if (triedId.current === mediaId) {
+			setFailedId(mediaId);
 			return;
 		}
-		tried.current = true;
+		triedId.current = mediaId;
 		void apiFetch(`/media/${mediaId}`).then(
 			() => {
 				setNonce((n) => n + 1);
 			},
 			() => {
-				setFailed(true);
+				setFailedId(mediaId);
 			},
 		);
 	}, [mediaId]);
 	const retry = useCallback(() => {
-		tried.current = false;
-		setFailed(false);
+		triedId.current = null;
+		setFailedId(null);
 		setNonce((n) => n + 1);
 	}, []);
-	return { nonce, failed, handleError, retry };
+	return { nonce, failed: failedId === mediaId, handleError, retry };
 }
 
 // Позиция воспроизведения переживает remount <video>/<audio key={nonce}>:
@@ -140,6 +149,9 @@ export function useCoverFromFrame() {
 			}),
 		onSuccess: (_data, mediaId) => {
 			void queryClient.invalidateQueries({ queryKey: ["media", mediaId] });
+			// Обложка/превью в списках и избранном — обновиться.
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["favorites"] });
 		},
 	});
 }

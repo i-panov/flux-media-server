@@ -15,8 +15,8 @@ import { Download, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	downloadOriginal,
 	type OriginalItem,
+	originalDownloadUrl,
 	useDeleteOriginal,
 } from "../../api/admin";
 import { ApiError } from "../../api/client";
@@ -61,7 +61,6 @@ export function OriginalsTable({ items }: { items: OriginalItem[] }) {
 	const { t } = useTranslation();
 	const remove = useDeleteOriginal();
 	const { capabilities } = useTVMode();
-	const [pending, setPending] = useState<string | null>(null);
 	const [confirm, setConfirm] = useState<string | null>(null);
 	const downloadLabel = t("admin.originals.download");
 	const deleteLabel = t("admin.originals.delete");
@@ -83,33 +82,13 @@ export function OriginalsTable({ items }: { items: OriginalItem[] }) {
 	}
 
 	const handleDownload = (name: string) => {
-		if (pending !== null) {
-			return;
-		}
-		setPending(name);
-		downloadOriginal(name)
-			.then(
-				(blob) => {
-					const url = URL.createObjectURL(blob);
-					const anchor = document.createElement("a");
-					anchor.href = url;
-					anchor.download = name;
-					document.body.append(anchor);
-					anchor.click();
-					anchor.remove();
-					URL.revokeObjectURL(url);
-				},
-				(error: unknown) => {
-					notifications.show({
-						color: "red",
-						title: t("admin.actionError"),
-						message: error instanceof ApiError ? error.message : "",
-					});
-				},
-			)
-			.finally(() => {
-				setPending(null);
-			});
+		// Прямая ссылка вместо blob: файл не помещается в память вкладки.
+		const anchor = document.createElement("a");
+		anchor.href = originalDownloadUrl(name);
+		anchor.download = name;
+		document.body.append(anchor);
+		anchor.click();
+		anchor.remove();
 	};
 
 	const handleDelete = (name: string) => {
@@ -168,7 +147,6 @@ export function OriginalsTable({ items }: { items: OriginalItem[] }) {
 												<ActionIcon
 													variant="light"
 													aria-label={downloadLabel}
-													loading={pending === item.name}
 													onClick={() => handleDownload(item.name)}
 												>
 													<Download size={16} />

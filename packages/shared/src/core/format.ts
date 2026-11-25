@@ -25,6 +25,17 @@ export function formatFileSize(bytes: number): string {
 		value >= 10 || Number.isInteger(value)
 			? Math.round(value)
 			: Math.round(value * 10) / 10;
+	// Округление могло дотянуть до 1024 B (1023.6 → "1024 B"): это уже
+	// следующая единица измерения.
+	if (rounded >= 1024 && unit < units.length - 1) {
+		value /= 1024;
+		unit += 1;
+		const next =
+			value >= 10 || Number.isInteger(value)
+				? Math.round(value)
+				: Math.round(value * 10) / 10;
+		return `${next} ${units[unit]}`;
+	}
 	return `${rounded} ${units[unit]}`;
 }
 

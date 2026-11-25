@@ -13,6 +13,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 
 	"flux/internal/config"
 	"flux/internal/models"
@@ -706,4 +707,160 @@ func TestDetermineMediaTypeBareFilenameFallback(t *testing.T) {
 	assert.Equal(t, models.MediaTypeVideo, services.DetermineMediaType("noext"))
 
 	assert.Empty(t, logs.String(), "fallback по голому имени обязан быть тихим")
+}
+
+// TestScannerSweepKeepsExistingFileOutsideSeen: отсутствие пути в seen —
+// не доказательство пропажи. Если файл на диске есть (например, расширение
+// не индексируется, или walk прошёл каталог раньше публикации), запись
+// остаётся живой.
+func TestScannerSweepKeepsExistingFileOutsideSeen(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	tempDir := t.TempDir()
+
+	// .txt сканер не индексирует, поэтому путь не попадёт в seen.
+	filePath := filepath.Join(tempDir, "notes.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("hello"), 0644))
+	media := &models.Media{
+		Title: "notes", Type: models.MediaTypeAudio, FilePath: filePath,
+		FileHash: "hash-notes", FileSize: 5,
+	}
+	require.NoError(t, mediaRepo.Create(context.Background(), media))
+
+	cfg := &config.Config{Media: config.MediaConfig{ThumbnailPath: t.TempDir(), VideoPath: tempDir}}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+
+	require.NoError(t, scanner.ScanPath(context.Background(), tempDir))
+
+	live, err := mediaRepo.FindByID(context.Background(), media.ID)
+	require.NoError(t, err)
+	assert.Equal(t, filePath, live.FilePath, "существующий файл не уходит в корзину")
+}
+
+// TestScannerSweepSkipsPublishingPath: пока очередь публикует файл, записи
+// ещё нет, но путь зарезервирован — sweep не должен трогать соседнюю
+// trashed-строку по тому же пути.
+func TestScannerSweepSkipsPublishingPath(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	tempDir := t.TempDir()
+
+	// Запись есть, файла нет: без резерва sweep отправил бы её в корзину.
+	missingPath := filepath.Join(tempDir, "being-published.mp4")
+	media := &models.Media{
+		Title: "publishing", Type: models.MediaTypeVideo, FilePath: missingPath,
+		FileHash: "hash-publishing",
+	}
+	require.NoError(t, mediaRepo.Create(context.Background(), media))
+
+	cfg := &config.Config{Media: config.MediaConfig{ThumbnailPath: t.TempDir(), VideoPath: tempDir}}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+
+	release := services.ReservePublishingPath(missingPath)
+	require.NoError(t, scanner.ScanPath(context.Background(), tempDir))
+	release()
+
+	live, err := mediaRepo.FindByID(context.Background(), media.ID)
+	require.NoError(t, err, "зарезервированный путь не удаляется")
+	assert.Equal(t, missingPath, live.FilePath)
+}
+
+// TestScannerRelinksMovedFile: переименование внутри библиотеки сохраняет
+// строку и пользовательские данные, а не теряет медиа из-за дедупа по хэшу.
+func TestScannerRelinksMovedFile(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	tempDir := t.TempDir()
+
+	oldPath := filepath.Join(tempDir, "old-name.mp4")
+	content := []byte("same content after rename")
+	require.NoError(t, os.WriteFile(oldPath, content, 0644))
+
+	cfg := &config.Config{Media: config.MediaConfig{ThumbnailPath: t.TempDir(), VideoPath: tempDir}}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	ctx := context.Background()
+
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+	original, err := mediaRepo.FindByPath(ctx, oldPath)
+	require.NoError(t, err)
+	_, err = mediaRepo.PatchMetadata(ctx, original.ID, repository.MetadataPatch{Title: strPtr("My Title")})
+	require.NoError(t, err)
+	require.NoError(t, mediaRepo.TrashMissing(ctx, original.ID))
+
+	newPath := filepath.Join(tempDir, "new-name.mp4")
+	require.NoError(t, os.Rename(oldPath, newPath))
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	relinked, err := mediaRepo.FindByPath(ctx, newPath)
+	require.NoError(t, err)
+	assert.Equal(t, original.ID, relinked.ID, "переименование не создаёт новую запись")
+	assert.Equal(t, "My Title", relinked.Title, "пользовательские метаданные сохранены")
+	assert.False(t, relinked.DeletedAt.Valid)
+
+	// Старый путь не должен остаться отдельной записью.
+	_, err = mediaRepo.FindByPathBasic(ctx, oldPath)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func strPtr(v string) *string { return &v }
+
+// Переименование «на холодную» (без предварительного TrashMissing): полный
+// скан видит новый путь раньше sweep, поэтому дедуп по хэшу обязан сам
+// распознать перемещение.
+func TestScannerRelinksMovedFileWithoutPriorTrash(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	tempDir := t.TempDir()
+
+	oldPath := filepath.Join(tempDir, "before.mp4")
+	content := []byte("rename without prior trash")
+	require.NoError(t, os.WriteFile(oldPath, content, 0644))
+
+	cfg := &config.Config{Media: config.MediaConfig{ThumbnailPath: t.TempDir(), VideoPath: tempDir}}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	ctx := context.Background()
+
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+	original, err := mediaRepo.FindByPath(ctx, oldPath)
+	require.NoError(t, err)
+
+	newPath := filepath.Join(tempDir, "after.mp4")
+	require.NoError(t, os.Rename(oldPath, newPath))
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+
+	relinked, err := mediaRepo.FindByPath(ctx, newPath)
+	require.NoError(t, err)
+	assert.Equal(t, original.ID, relinked.ID, "первый же скан переносит запись")
+	assert.False(t, relinked.DeletedAt.Valid)
+
+	_, err = mediaRepo.FindByPathBasic(ctx, oldPath)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+// Пачка fsnotify приходит из map в случайном порядке: Create нового пути
+// может оказаться раньше Rename старого. Удаления обязаны обрабатываться
+// первыми, иначе медиа уедет в корзину без relink.
+func TestHandleFSEventsRenameOutOfOrder(t *testing.T) {
+	mediaRepo := setupTestDB(t)
+	tempDir := t.TempDir()
+
+	oldPath := filepath.Join(tempDir, "watched.mp4")
+	require.NoError(t, os.WriteFile(oldPath, []byte("watched content"), 0644))
+
+	cfg := &config.Config{Media: config.MediaConfig{ThumbnailPath: t.TempDir(), VideoPath: tempDir}}
+	scanner := services.NewScannerService(mediaRepo, cfg)
+	ctx := context.Background()
+
+	require.NoError(t, scanner.ScanPath(ctx, tempDir))
+	original, err := mediaRepo.FindByPath(ctx, oldPath)
+	require.NoError(t, err)
+
+	newPath := filepath.Join(tempDir, "watched-renamed.mp4")
+	require.NoError(t, os.Rename(oldPath, newPath))
+
+	scanner.HandleFSEvents(ctx, []services.FSEvent{
+		{Path: newPath, Op: fsnotify.Create},
+		{Path: oldPath, Op: fsnotify.Rename},
+	})
+
+	relinked, err := mediaRepo.FindByPath(ctx, newPath)
+	require.NoError(t, err)
+	assert.Equal(t, original.ID, relinked.ID)
+	assert.False(t, relinked.DeletedAt.Valid)
 }

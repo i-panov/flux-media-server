@@ -54,7 +54,12 @@ function AppShell({
 			pathname === "/devices" ||
 			pathname === "/activate" ||
 			pathname === "/admin" ||
-			pathname.startsWith("/media/")
+			pathname === "/catalog-admin" ||
+			pathname.startsWith("/media/") ||
+			pathname.startsWith("/artists") ||
+			pathname.startsWith("/series") ||
+			pathname.startsWith("/franchises") ||
+			pathname.startsWith("/collections/")
 		) {
 			router.replace("/video");
 		}

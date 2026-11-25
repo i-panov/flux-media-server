@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { ApiError } from "@flux/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import type { ComponentProps } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -270,6 +270,14 @@ export default function VideoDetailScreen() {
 	);
 }
 
+// Позиция нужна только кнопке «Обрезать»: timeupdate не должен ререндерить
+// весь экран, поэтому храним её в ref.
+function usePositionTracker() {
+	const positionRef = useRef(0);
+	const trackPosition = (position: number) => (positionRef.current = position);
+	return { positionRef, trackPosition };
+}
+
 function VideoDetailContent() {
 	useLanguage();
 	const { colors, spacing } = useTheme();
@@ -277,7 +285,6 @@ function VideoDetailContent() {
 	const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
 	const mediaId = rawId === undefined ? Number.NaN : Number(rawId);
 	const valid = Number.isInteger(mediaId) && mediaId > 0;
-
 	const media = useMedia(valid ? mediaId : 0, valid);
 	const session = useSession();
 	const favorites = useFavoriteVideoIds();
@@ -285,11 +292,9 @@ function VideoDetailContent() {
 	const removeMedia = useDeleteMedia();
 	const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
 	const [coverSheetOpen, setCoverSheetOpen] = useState(false);
-	const [playerPosition, setPlayerPosition] = useState(0);
-	// После PUT обложки URL не меняется, поэтому постер получает версию и
-	// перезагружает картинку в обход кэша expo-image.
+	const { positionRef, trackPosition } = usePositionTracker();
+	// URL обложки после PUT не меняется: версия перезагружает постер.
 	const [coverVersion, setCoverVersion] = useState(0);
-
 	if (!valid) {
 		return <NotFoundScreen />;
 	}
@@ -361,7 +366,7 @@ function VideoDetailContent() {
 				key={item.id}
 				media={item}
 				coverVersion={coverVersion}
-				onTimeUpdate={(position) => setPlayerPosition(position)}
+				onTimeUpdate={trackPosition}
 			/>
 			<View style={{ gap: spacing.xs }}>
 				<Text
@@ -449,7 +454,10 @@ function VideoDetailContent() {
 							onPress={() => setCoverSheetOpen(true)}
 							testID="video-detail-cover"
 						/>
-						<VideoClipAction media={item} position={playerPosition} />
+						<VideoClipAction
+							media={item}
+							getPosition={() => positionRef.current}
+						/>
 						<VideoTagsAction media={item} />
 						<ActionButton
 							icon="trash-outline"

@@ -20,13 +20,28 @@ function joinUrl(baseUrl: string, path: string): string {
 	return `${base}/${suffix}`;
 }
 
-// Токен не кешируется: authHeaders() каждый раз читает SecureStore, иначе
-// после refresh плеер продолжил бы ходить со старым access-токеном.
+// Токен не кешируется между запросами: authHeaders() читает SecureStore,
+// иначе после refresh плеер ходил бы со старым access-токеном. Но при
+// монтировании сетки десятки карточек просят заголовки одновременно —
+// дедуплицируем один и тот же in-flight запрос.
+let headersInflight: Promise<Record<string, string>> | null = null;
+
+function authHeadersOnce(): Promise<Record<string, string>> {
+	if (headersInflight === null) {
+		headersInflight = getApiConfig()
+			.transport.authHeaders()
+			.finally(() => {
+				headersInflight = null;
+			});
+	}
+	return headersInflight;
+}
+
 export async function authSource(path: string): Promise<AuthSource> {
-	const { baseUrl, transport } = getApiConfig();
+	const { baseUrl } = getApiConfig();
 	return {
 		uri: joinUrl(baseUrl, path),
-		headers: await transport.authHeaders(),
+		headers: await authHeadersOnce(),
 	};
 }
 

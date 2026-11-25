@@ -2,7 +2,8 @@ import { configureApi, createWebTransport } from "@flux/shared";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { getRouter } from "./router";
+import { clearSessionData } from "./api/session";
+import { getRouter, router } from "./router";
 import "./i18n";
 import "./styles.css";
 
@@ -12,6 +13,16 @@ import "./styles.css";
 configureApi({
 	baseUrl: "/api",
 	transport: createWebTransport(),
+	onAuthFailure: () => {
+		// Refresh-сессия мертва: без этого вкладка остаётся «залогиненной»,
+		// а каждый экран показывает ошибки загрузки.
+		clearSessionData();
+		const current = window.location.pathname + window.location.search;
+		void router.navigate({
+			to: "/login",
+			search: current.startsWith("/login") ? {} : { redirect: current },
+		});
+	},
 });
 
 const rootElement = document.getElementById("root");

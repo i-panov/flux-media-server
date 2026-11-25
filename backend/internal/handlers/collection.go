@@ -109,7 +109,9 @@ func (h *CollectionHandler) Update(c *fiber.Ctx) error {
 	}
 
 	if col.UserID != userID {
-		return response.Error(c, fiber.StatusForbidden, "Not your collection")
+		// 404, а не 403: иначе перебором ID можно узнать, какие
+		// коллекции существуют у других пользователей (как в /trash).
+		return response.Error(c, fiber.StatusNotFound, "Collection not found")
 	}
 
 	var req CreateCollectionRequest
@@ -153,7 +155,7 @@ func (h *CollectionHandler) Update(c *fiber.Ctx) error {
 		case errors.Is(err, repository.ErrCycle):
 			return response.Error(c, fiber.StatusBadRequest, "Move would create a cycle")
 		case errors.Is(err, repository.ErrCrossUser):
-			return response.Error(c, fiber.StatusForbidden, "Not your collection")
+			return response.Error(c, fiber.StatusNotFound, "Collection not found")
 		case errors.Is(err, repository.ErrCrossType):
 			return response.Error(c, fiber.StatusBadRequest, "Parent collection has different type")
 		case errors.Is(err, repository.ErrTypeChangeBlocked):
@@ -176,7 +178,7 @@ func (h *CollectionHandler) mapParentError(c *fiber.Ctx, err error) error {
 	case errors.Is(err, repository.ErrCycle):
 		return response.Error(c, fiber.StatusBadRequest, "Move would create a cycle")
 	case errors.Is(err, repository.ErrCrossUser):
-		return response.Error(c, fiber.StatusForbidden, "Not your collection")
+		return response.Error(c, fiber.StatusNotFound, "Collection not found")
 	case errors.Is(err, repository.ErrCrossType):
 		return response.Error(c, fiber.StatusBadRequest, "Parent collection has different type")
 	default:
@@ -206,7 +208,7 @@ func (h *CollectionHandler) Delete(c *fiber.Ctx) error {
 	}
 
 	if col.UserID != userID {
-		return response.Error(c, fiber.StatusForbidden, "Not your collection")
+		return response.Error(c, fiber.StatusNotFound, "Collection not found")
 	}
 
 	if err := h.colRepo.Delete(ctx, id); err != nil {
@@ -238,13 +240,20 @@ func (h *CollectionHandler) AddItem(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// Only the owner may modify a collection.
-	if _, ok := h.getOwnedCollection(c, collectionID); !ok {
+	col, ok := h.getOwnedCollection(c, collectionID)
+	if !ok {
 		return nil
 	}
 
 	// Verify media exists
-	if _, err := h.mediaRepo.FindByID(ctx, req.MediaID); err != nil {
+	media, err := h.mediaRepo.FindByID(ctx, req.MediaID)
+	if err != nil {
 		return repoError(c, err, "Media not found", "Failed to fetch media")
+	}
+	// Тип коллекции и элемента должны совпадать: смешанные списки
+	// ломают клиентские фильтры по collection.type.
+	if col.Type != "" && media.Type != col.Type {
+		return response.Error(c, fiber.StatusBadRequest, "Collection type does not match media type")
 	}
 
 	// Позиция и проверка дубликата выполняются атомарно в репозитории:
@@ -435,7 +444,8 @@ func (h *CollectionHandler) AddItemsBulk(c *fiber.Ctx) error {
 	if !ok {
 		return nil
 	}
-	if _, ok := h.getOwnedCollection(c, collectionID); !ok {
+	col, ok := h.getOwnedCollection(c, collectionID)
+	if !ok {
 		return nil
 	}
 
@@ -445,7 +455,14 @@ func (h *CollectionHandler) AddItemsBulk(c *fiber.Ctx) error {
 		if mediaID == 0 {
 			continue
 		}
-		if _, err := h.mediaRepo.FindByID(ctx, mediaID); err != nil {
+		media, err := h.mediaRepo.FindByID(ctx, mediaID)
+		if err != nil {
+			result.Skipped = append(result.Skipped, mediaID)
+			continue
+		}
+		if col.Type != "" && media.Type != col.Type {
+			// Чужой тип — пропуск, как и отсутствующее медиа: bulk не
+			// должен падать целиком из-за одного элемента.
 			result.Skipped = append(result.Skipped, mediaID)
 			continue
 		}
@@ -584,7 +601,7 @@ func (h *CollectionHandler) getOwnedCollection(c *fiber.Ctx, collectionID uint) 
 	}
 
 	if col.UserID != userID {
-		_ = response.Error(c, fiber.StatusForbidden, "Not your collection")
+		_ = response.Error(c, fiber.StatusNotFound, "Collection not found")
 		return nil, false
 	}
 

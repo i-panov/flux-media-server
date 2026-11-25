@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import {
 	ActivityIndicator,
+	Alert,
 	KeyboardAvoidingView,
 	Modal,
 	Platform,
@@ -13,7 +14,10 @@ import {
 	View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMediaCatalogContext } from "../api/catalog";
+import {
+	useMediaCatalogContext,
+	useRemoveMediaFromCatalog,
+} from "../api/catalog";
 import {
 	type Tag,
 	type TagEntity,
@@ -284,6 +288,12 @@ export function TagsSheet(props: TagsSheetProps) {
 	const inherited = (context.data?.work_tags ?? []).filter(
 		(tag) => tag.group === "genre",
 	);
+	const catalog = context.data;
+	const removeFromCatalog = useRemoveMediaFromCatalog();
+	const canRemoveFromCatalog =
+		catalog?.work_id !== undefined &&
+		(catalog.season_id !== undefined || catalog.work_kind === "film_series");
+	const removeFromCatalogLabel = t("catalog.removeFromCatalog");
 	const ready =
 		current.data !== undefined &&
 		current.data !== null &&
@@ -345,6 +355,34 @@ export function TagsSheet(props: TagsSheetProps) {
 									))}
 								</View>
 							</View>
+						)}
+						{canRemoveFromCatalog && catalog !== undefined && (
+							<Pressable
+								testID="tags-remove-catalog"
+								accessibilityRole="button"
+								onPress={() =>
+									Alert.alert(
+										removeFromCatalogLabel,
+										t("catalog.removeFromCatalogConfirm"),
+										[
+											{ text: t("common.cancel"), style: "cancel" },
+											{
+												text: removeFromCatalogLabel,
+												style: "destructive",
+												onPress: () =>
+													removeFromCatalog.mutate(
+														{ mediaID: props.id, context: catalog },
+														{ onSuccess: props.onClose },
+													),
+											},
+										],
+									)
+								}
+							>
+								<Text style={{ color: colors.danger }}>
+									{removeFromCatalogLabel}
+								</Text>
+							</Pressable>
 						)}
 						{ready ? (
 							<TagsForm

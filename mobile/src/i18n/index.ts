@@ -18,6 +18,7 @@ export const ru = {
 	"common.retry": "Повторить",
 	"common.error": "Ошибка",
 	"common.back": "Назад",
+	"common.notFound": "Страница не найдена",
 	"common.cancel": "Отмена",
 	"common.close": "Закрыть",
 	"common.save": "Сохранить",
@@ -89,6 +90,9 @@ export const ru = {
 	"admin.queue.statusDone": "Готово",
 	"admin.queue.statusError": "Ошибка",
 	"catalog.inheritedTags": "Жанры сериала",
+	"catalog.removeFromCatalog": "Убрать из каталога",
+	"catalog.removeFromCatalogConfirm":
+		"Медиа останется в библиотеке, но пропадёт из сериала или франшизы.",
 	"admin.storage.title": "Хранилище",
 	"admin.storage.autoCleanup": "Автоочистка оригиналов",
 	"admin.storage.free": "Свободно {{free}} · {{percent}}%",
@@ -384,7 +388,13 @@ export const ru = {
 	"media.actions": "Действия",
 	"settings.title": "Настройки",
 	"settings.server": "Адрес сервера",
+	"server.insecureTitle": "Небезопасное соединение",
+	"server.insecureBody":
+		"Сервер доступен по http: логин и медиа передаются открытым текстом. Продолжить?",
 	"settings.save": "Сохранить",
+	"settings.insecureIos":
+		"iOS не разрешает незащищённый HTTP для публичных адресов. Используйте https.",
+	"server.insecureConfirm": "Всё равно сохранить",
 	"settings.saving": "Сохранение…",
 	"settings.saved": "Адрес сохранён",
 	"settings.invalidUrl":
@@ -423,6 +433,7 @@ export const en: Record<keyof typeof ru, string> = {
 	"common.retry": "Retry",
 	"common.error": "Error",
 	"common.back": "Back",
+	"common.notFound": "Page not found",
 	"common.cancel": "Cancel",
 	"common.close": "Close",
 	"common.save": "Save",
@@ -489,6 +500,9 @@ export const en: Record<keyof typeof ru, string> = {
 	"admin.queue.statusDone": "Done",
 	"admin.queue.statusError": "Error",
 	"catalog.inheritedTags": "Series genres",
+	"catalog.removeFromCatalog": "Remove from catalog",
+	"catalog.removeFromCatalogConfirm":
+		"The media stays in the library but disappears from the series or franchise.",
 	"admin.storage.title": "Storage",
 	"admin.storage.autoCleanup": "Auto-clean originals",
 	"admin.storage.free": "Free {{free}} · {{percent}}%",
@@ -787,7 +801,13 @@ export const en: Record<keyof typeof ru, string> = {
 	"media.actions": "Actions",
 	"settings.title": "Settings",
 	"settings.server": "Server URL",
+	"server.insecureTitle": "Insecure connection",
+	"server.insecureBody":
+		"The server uses http: login and media travel in plaintext. Continue?",
 	"settings.save": "Save",
+	"settings.insecureIos":
+		"iOS does not allow insecure HTTP for public addresses. Use https.",
+	"server.insecureConfirm": "Save anyway",
 	"settings.saving": "Saving…",
 	"settings.saved": "URL saved",
 	"settings.invalidUrl":

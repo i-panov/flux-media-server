@@ -1,35 +1,12 @@
+import { cancelClip, createClip, fetchClip } from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "./client";
 
-export interface ClipTask {
-	id: number;
-	source_media_id: number;
-	start_seconds: number;
-	end_seconds: number;
-	title: string;
-	status: "queued" | "processing" | "done" | "error";
-	progress: number;
-	error?: string;
-	output_media_id?: number;
-}
+export type { ClipTask } from "@flux/shared";
 
 export function useCreateClip() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (input: {
-			mediaID: number;
-			start: number;
-			end: number;
-			title?: string;
-		}) =>
-			apiFetch<ClipTask>(`/media/${input.mediaID}/clip`, {
-				method: "POST",
-				body: JSON.stringify({
-					start: input.start,
-					end: input.end,
-					title: input.title,
-				}),
-			}),
+		mutationFn: createClip,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["clips"] });
 		},
@@ -39,8 +16,7 @@ export function useCreateClip() {
 export function useCancelClip() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) =>
-			apiFetch<void>(`/clips/${id}`, { method: "DELETE" }),
+		mutationFn: cancelClip,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["clips"] });
 		},
@@ -52,7 +28,7 @@ export function useClip(id: number | null) {
 	return useQuery({
 		queryKey: ["clips", id],
 		queryFn: async () => {
-			const task = await apiFetch<ClipTask>(`/clips/${id}`);
+			const task = await fetchClip(Number(id));
 			if (task.status === "done") {
 				void queryClient.invalidateQueries({ queryKey: ["media"] });
 			}

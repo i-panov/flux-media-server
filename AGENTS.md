@@ -118,16 +118,16 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
 - Анализаторы: biome (extends web) + `eslint-config-expo` + sonarjs.
 - `@flux/shared` — единственный источник API/очереди/lyrics-логики;
   не дублировать fetch-контракты в mobile.
-- Поиск и сортировка списков видео/аудио реализованы в mobile 0.1.31, текущий релиз 0.1.44:
+- Поиск и сортировка списков видео/аудио реализованы в mobile 0.1.31, текущий релиз 0.1.50:
   `useVideoList(q, sort)`/`useAudioList(q, sort)`, debounce 300 мс,
   переключатель asc/desc и отдельные пустые состояния.
-- Maestro: 18 flow в `.maestro/` (tabs, theme, video, audio, lyrics,
-  artists, favorites, search, trash, upload, metadata,
-  downloads).
-  Ручной workflow `.github/workflows/mobile-e2e.yml` поднимает Android
-  emulator, backend и прогоняет `tabs.yaml`/`theme.yaml`; в push/PR не
-  входит (`workflow_dispatch`). CI `shared-mobile` проверяет
-  `expo install --check` и `expo config --type introspect`.
+- Maestro: 18 flow в корневом `.maestro/` (tabs, theme, video, audio, lyrics,
+  artists, favorites, search, trash, upload, metadata, downloads и др.).
+  Прогонов не было: ручной workflow `.github/workflows/mobile-e2e.yml`
+  поднимает Android emulator и backend, но, по комментарию внутри файла,
+  ещё не запускался; в push/PR не входит (`workflow_dispatch`).
+  CI `shared-mobile` проверяет `expo install --check` и
+  `expo config --type introspect`.
 - Dogfood-APK (arm64, ~30 МБ вместо ~92 МБ universal):
   `EXPO_PUBLIC_API_BASE=<url> ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a ./gradlew assembleRelease`
   из `mobile/android` (JDK 17 + `local.properties` с SDK/NDK локально).
@@ -185,8 +185,8 @@ maestro test .maestro/tabs.yaml # нужны Maestro CLI + adb + эмулято�
   доменная логика и чистые хелперы.
 - `src/theme/` — токены и `ThemeProvider`; `src/i18n/` — ru/en.
 - `src/components/` — общие экраны, карточки, диалоги, состояния.
-- `.maestro/` — UI-flow; `.github/workflows/mobile-e2e.yml` — ручной
-  Android emulator прогон (в push/PR не входит).
+- `.maestro/` — 18 UI-flow (корень репозитория), прогонов ещё не было;
+  `.github/workflows/mobile-e2e.yml` — ручной Android-прогон.
 
 ### Shared (`packages/shared/src/`)
 
@@ -264,8 +264,8 @@ npm run typecheck -w mobile && npm run lint -w mobile && npm run test -w mobile
 ```
 
 E2E и production build — перед крупными изменениями web. Mobile E2E —
-ручной workflow `mobile-e2e.yml`; Maestro-flow требуют эмулятора/устройства
-и в обычный CI не входят.
+ручной workflow `mobile-e2e.yml`; 18 Maestro-flow лежат в `.maestro/`, но
+требуют эмулятора/устройства и в обычный CI не входят.
 
 ## Документация
 

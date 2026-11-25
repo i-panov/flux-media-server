@@ -22,12 +22,24 @@ import { useTheme } from "../src/theme/ThemeProvider";
 import { tvFocusStyle } from "../src/tv/focus";
 import { isTV } from "../src/tv/profile";
 
+// expo-router отдаёт массив при повторяющемся ?code=: без нормализации
+// `.replace` упал бы на массиве.
+function firstParam(value: string | string[] | undefined): string {
+	if (typeof value === "string") {
+		return value;
+	}
+	return Array.isArray(value) ? (value[0] ?? "") : "";
+}
+
 export default function ActivateScreen() {
 	useLanguage();
 	const { colors, radii, spacing } = useTheme();
-	const params = useLocalSearchParams<{ code?: string }>();
+	const params = useLocalSearchParams<{ code?: string | string[] }>();
+	// expo-router отдаёт массив при повторяющемся ?code=: без нормализации
+	// `.replace` упал бы на массиве.
+	const deepLinkCode = firstParam(params.code);
 	const session = useSession();
-	const [code, setCode] = useState(params.code ?? "");
+	const [code, setCode] = useState(deepLinkCode);
 	const [device, setDevice] = useState<DeviceInspectResponse | null>(null);
 	const [inspectedCode, setInspectedCode] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -54,11 +66,11 @@ export default function ActivateScreen() {
 	}, []);
 
 	useEffect(() => {
-		if (params.code !== undefined && params.code !== "") {
+		if (deepLinkCode !== "") {
 			// eslint-disable-next-line react-hooks/set-state-in-effect -- внешний запрос при открытии deep link.
-			void inspect(params.code);
+			void inspect(deepLinkCode);
 		}
-	}, [inspect, params.code]);
+	}, [inspect, deepLinkCode]);
 
 	const backLabel = t("common.back");
 	const goBack = () => {

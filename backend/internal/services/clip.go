@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -24,15 +25,60 @@ type ClipService struct {
 	transcode transcodeEnqueuer
 	upload    uploadEnqueuer
 
+	// slots ограничивает одновременные ffmpeg: без него серия запросов
+	// запускала N кодировщиков и выедала CPU/диск.
+	slots chan struct{}
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
 	mu      sync.Mutex
 	running map[uint]context.CancelFunc
 }
 
+// ErrClipBusy — уже идёт максимальное число нарезок: новая получает 429,
+// а не встаёт в бесконечную очередь фоновых ffmpeg.
+var ErrClipBusy = errors.New("clip queue is busy")
+
+// Ошибки валидации: их текст безопасно отдавать клиенту.
+var (
+	ErrClipInvalidRange = errors.New("invalid clip range")
+	ErrClipUnsupported  = errors.New("only video and audio can be trimmed")
+)
+
+const maxConcurrentClips = 1
+
 func NewClipService(clips *repository.ClipStore, media repository.MediaRepository, originals string, transcode transcodeEnqueuer, upload uploadEnqueuer) *ClipService {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &ClipService{
 		clips: clips, media: media, originals: originals,
 		transcode: transcode, upload: upload,
+		slots:   make(chan struct{}, maxConcurrentClips),
 		running: make(map[uint]context.CancelFunc),
+		ctx:     ctx,
+		cancel:  cancel,
+	}
+}
+
+// Stop отменяет активные нарезки, ждёт их завершения и чистит временные
+// файлы. Без этого Shutdown закрывал БД под работающим ffmpeg.
+func (s *ClipService) Stop() {
+	s.cancel()
+	s.wg.Wait()
+	s.removeTempFiles()
+}
+
+func (s *ClipService) removeTempFiles() {
+	entries, err := os.ReadDir(s.originals)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), ".clip-") {
+			continue
+		}
+		_ = os.Remove(filepath.Join(s.originals, entry.Name()))
 	}
 }
 
@@ -43,27 +89,40 @@ const (
 
 func (s *ClipService) Start(ctx context.Context, mediaID uint, start, end float64, title string) (*models.ClipTask, error) {
 	if start < 0 || end <= start {
-		return nil, fmt.Errorf("invalid clip range")
+		return nil, fmt.Errorf("%w: end must be after start", ErrClipInvalidRange)
 	}
 	if end-start < minClipSeconds {
-		return nil, fmt.Errorf("clip is too short")
+		return nil, fmt.Errorf("%w: clip is too short", ErrClipInvalidRange)
 	}
 	if end-start > maxClipSeconds {
-		return nil, fmt.Errorf("clip is too long")
+		return nil, fmt.Errorf("%w: clip is too long", ErrClipInvalidRange)
 	}
 	source, err := s.media.FindByID(ctx, mediaID)
 	if err != nil {
 		return nil, err
 	}
 	if source.Type != models.MediaTypeVideo && source.Type != models.MediaTypeAudio {
-		return nil, fmt.Errorf("only video and audio can be trimmed")
+		return nil, ErrClipUnsupported
 	}
 	if source.Duration > 0 && end > float64(source.Duration)+1 {
-		return nil, fmt.Errorf("clip is outside the media duration")
+		return nil, fmt.Errorf("%w: clip is outside the media duration", ErrClipInvalidRange)
 	}
 	if strings.TrimSpace(title) == "" {
 		title = fmt.Sprintf("%s — фрагмент", source.Title)
 	}
+	// Занимаем слот до создания задачи: лишний запрос не должен оставлять
+	// в БД queued-строку, которую некому обработать.
+	select {
+	case s.slots <- struct{}{}:
+	default:
+		return nil, ErrClipBusy
+	}
+	acquired := true
+	defer func() {
+		if acquired {
+			<-s.slots
+		}
+	}()
 	task := &models.ClipTask{
 		SourceMediaID: mediaID,
 		StartSeconds:  start,
@@ -74,24 +133,42 @@ func (s *ClipService) Start(ctx context.Context, mediaID uint, start, end float6
 	if err := s.clips.Create(ctx, task); err != nil {
 		return nil, err
 	}
-	// Задача переживает HTTP-запрос: отмена — только через Cancel.
-	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	// Задача переживает HTTP-запрос: отмена — только через Cancel() или Stop().
+	runCtx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
 	s.running[task.ID] = cancel
 	s.mu.Unlock()
+	s.wg.Add(1)
 	//nolint:gosec // фоновая задача пишет статус через отдельный контекст.
-	go s.run(runCtx, task, source)
+	go func() {
+		defer s.wg.Done()
+		s.run(runCtx, task, source)
+	}()
+	acquired = false
 	return task, nil
 }
 
 // RecoverStale помечает незавершённые задачи ошибкой после рестарта.
 func (s *ClipService) RecoverStale(ctx context.Context) error {
+	// Временные файлы прошлого процесса продолжать некому.
+	s.removeTempFiles()
 	tasks, err := s.clips.ListActive(ctx)
 	if err != nil {
 		return err
 	}
 	for _, task := range tasks {
 		if task.Status == models.ClipQueued || task.Status == models.ClipProcessing {
+			// Дочерняя задача transcode/upload могла пережить рестарт —
+			// её результат останется сиротой без записи клипа.
+			if task.TranscodeJobID != 0 {
+				if source, err := s.media.FindByID(ctx, task.SourceMediaID); err == nil {
+					if source.Type == models.MediaTypeVideo {
+						_ = s.transcode.Cancel(task.TranscodeJobID)
+					} else {
+						_ = s.upload.Cancel(task.TranscodeJobID)
+					}
+				}
+			}
 			if err := s.clips.Update(ctx, task.ID, map[string]any{
 				"status": models.ClipError, "error": "прервано перезапуском сервера",
 			}); err != nil {
@@ -146,6 +223,7 @@ func (s *ClipService) Cancel(id uint) bool {
 
 func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *models.Media) {
 	defer func() {
+		<-s.slots
 		s.mu.Lock()
 		delete(s.running, task.ID)
 		s.mu.Unlock()
@@ -170,7 +248,12 @@ func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *mo
 	_ = tmp.Close()
 
 	args := s.ffmpegArgs(source, task, outPath)
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	// Таймаут пропорционален длине фрагмента: зависший ffmpeg не держит
+	// слот вечно, но длинный фрагмент успевает обработаться.
+	ffmpegTimeout := time.Duration(task.EndSeconds-task.StartSeconds)*time.Second*3 + 5*time.Minute
+	ffmpegCtx, cancelFFmpeg := context.WithTimeout(ctx, ffmpegTimeout)
+	defer cancelFFmpeg()
+	cmd := exec.CommandContext(ffmpegCtx, "ffmpeg", args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -198,6 +281,7 @@ func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *mo
 	if source.Type == models.MediaTypeVideo {
 		jobID, err := s.transcode.Enqueue(finalPath, filepath.Base(finalPath))
 		if err != nil {
+			_ = os.Remove(finalPath)
 			s.fail(task, err)
 			return
 		}
@@ -214,6 +298,7 @@ func (s *ClipService) run(ctx context.Context, task *models.ClipTask, source *mo
 			MediaType: models.MediaTypeAudio,
 		})
 		if err != nil {
+			_ = os.Remove(finalPath)
 			s.fail(task, err)
 			return
 		}
@@ -313,8 +398,10 @@ func safeClipFilename(title, ext string) string {
 	}
 	replacer := strings.NewReplacer("/", "-", "\\", "-", ":", "-", "\x00", "")
 	title = replacer.Replace(title)
-	if len(title) > 120 {
-		title = title[:120]
+	// Обрезаем по рунам: байтовый срез мог разрезать UTF-8 и оставить
+	// битое имя в файловой системе и JSON.
+	if runes := []rune(title); len(runes) > 120 {
+		title = string(runes[:120])
 	}
 	return fmt.Sprintf("%s-%d%s", title, time.Now().UnixNano(), ext)
 }

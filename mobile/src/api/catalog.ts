@@ -1,119 +1,43 @@
-import { apiFetch } from "@flux/shared";
+import {
+	addEpisode,
+	addFilm,
+	addFranchiseEntry,
+	createFranchise,
+	createSeason,
+	createWork,
+	deleteFranchise,
+	deleteSeason,
+	deleteWork,
+	fetchFranchise,
+	fetchFranchises,
+	fetchMediaCatalogContext,
+	fetchWork,
+	fetchWorks,
+	type MediaCatalogContext,
+	removeEpisode,
+	removeFilm,
+	removeFranchiseEntry,
+	reorderEpisodes,
+	reorderFilms,
+	reorderFranchiseEntries,
+	reorderSeasons,
+	updateFranchise,
+	updateWork,
+	type WorkKind,
+} from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-export type WorkKind = "series" | "film_series";
-
-export interface CatalogItem {
-	id: number;
-	work_id?: number;
-	season_id?: number;
-	media_id: number;
-	position: number;
-	episode_number?: number;
-	media?: {
-		id: number;
-		title: string;
-		duration: number;
-		thumbnail_url?: string;
-		cover_url?: string;
-	};
-}
-
-export interface CatalogSeason {
-	id: number;
-	work_id: number;
-	season_number: number;
-	title: string;
-	position: number;
-	items?: CatalogItem[];
-}
-
-export interface CatalogWork {
-	id: number;
-	kind: WorkKind;
-	title: string;
-	description: string;
-	cover_url: string;
-	year: number;
-	seasons?: CatalogSeason[];
-	items?: CatalogItem[];
-}
-
-export interface CatalogEntry {
-	id: number;
-	franchise_id: number;
-	work_id?: number;
-	media_id?: number;
-	position: number;
-	work?: CatalogWork;
-	media?: { id: number; title: string };
-}
-
-export interface CatalogFranchise {
-	id: number;
-	name: string;
-	description: string;
-	cover_url: string;
-	entries?: CatalogEntry[];
-}
-
-export function useWorks(kind: WorkKind, tagIDs: number[] = []) {
-	const tags = tagIDs.join(",");
-	return useQuery({
-		queryKey: ["works", kind, tags],
-		queryFn: () =>
-			apiFetch<CatalogWork[]>(
-				`/works?kind=${kind}${tags === "" ? "" : `&tag_ids=${tags}`}`,
-			),
-	});
-}
-
-export interface MediaCatalogContext {
-	work_id?: number;
-	work_title?: string;
-	work_kind?: WorkKind;
-	season_id?: number;
-	season_number?: number;
-	episode_number?: number;
-	franchises: { id: number; name: string }[];
-	work_tags?: { id: number; group: string; slug: string; name: string }[];
-}
-
-export function useMediaCatalogContext(mediaId: number, enabled = true) {
-	return useQuery({
-		queryKey: ["media", mediaId, "catalog-context"],
-		queryFn: () =>
-			apiFetch<MediaCatalogContext>(`/media/${mediaId}/catalog-context`),
-		enabled: enabled && mediaId > 0,
-	});
-}
-
-export function useWork(id: number, enabled = true) {
-	return useQuery({
-		queryKey: ["works", id],
-		queryFn: () => apiFetch<CatalogWork>(`/works/${id}`),
-		enabled,
-	});
-}
-
-export function useFranchises(tagIDs: number[] = []) {
-	const tags = tagIDs.join(",");
-	return useQuery({
-		queryKey: ["franchises", tags],
-		queryFn: () =>
-			apiFetch<CatalogFranchise[]>(
-				`/franchises${tags === "" ? "" : `?tag_ids=${tags}`}`,
-			),
-	});
-}
-
-export function useFranchise(id: number, enabled = true) {
-	return useQuery({
-		queryKey: ["franchises", id],
-		queryFn: () => apiFetch<CatalogFranchise>(`/franchises/${id}`),
-		enabled,
-	});
-}
+export type {
+	CatalogEntry,
+	CatalogFranchise,
+	CatalogItem,
+	CatalogMedia,
+	CatalogSeason,
+	CatalogTag,
+	CatalogWork,
+	MediaCatalogContext,
+	WorkKind,
+} from "@flux/shared";
 
 function invalidateCatalog(queryClient: ReturnType<typeof useQueryClient>) {
 	void queryClient.invalidateQueries({ queryKey: ["works"] });
@@ -121,18 +45,70 @@ function invalidateCatalog(queryClient: ReturnType<typeof useQueryClient>) {
 	void queryClient.invalidateQueries({ queryKey: ["media"] });
 }
 
-function write<T>(path: string, method: string, body?: unknown) {
-	return apiFetch<T>(path, {
-		method,
-		body: body === undefined ? undefined : JSON.stringify(body),
+export function useWorks(kind: WorkKind, tagIDs: number[] = []) {
+	return useQuery({
+		queryKey: ["works", kind, tagIDs.join(",")],
+		queryFn: () => fetchWorks(kind, tagIDs),
+	});
+}
+
+export function useWork(id: number, enabled = true) {
+	return useQuery({
+		queryKey: ["works", id],
+		queryFn: () => fetchWork(id),
+		enabled: enabled && id > 0,
+	});
+}
+
+export function useFranchises(tagIDs: number[] = []) {
+	return useQuery({
+		queryKey: ["franchises", tagIDs.join(",")],
+		queryFn: () => fetchFranchises(tagIDs),
+	});
+}
+
+export function useFranchise(id: number, enabled = true) {
+	return useQuery({
+		queryKey: ["franchises", id],
+		queryFn: () => fetchFranchise(id),
+		enabled: enabled && id > 0,
+	});
+}
+
+export function useMediaCatalogContext(mediaId: number, enabled = true) {
+	return useQuery({
+		queryKey: ["media", mediaId, "catalog-context"],
+		queryFn: () => fetchMediaCatalogContext(mediaId),
+		enabled: enabled && mediaId > 0,
 	});
 }
 
 export function useCreateWork() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (input: { kind: WorkKind; title: string }) =>
-			write<CatalogWork>("/works", "POST", input),
+		mutationFn: (input: { kind: WorkKind; title: string }) => createWork(input),
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export function useRemoveMediaFromCatalog() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			mediaID,
+			context,
+		}: {
+			mediaID: number;
+			context: MediaCatalogContext;
+		}) => {
+			if (context.season_id !== undefined) {
+				return removeEpisode(context.season_id, mediaID);
+			}
+			if (context.work_id !== undefined) {
+				return removeFilm(context.work_id, mediaID);
+			}
+			return Promise.resolve();
+		},
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -140,8 +116,16 @@ export function useCreateWork() {
 export function useUpdateWork() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({ id, ...patch }: { id: number; title: string }) =>
-			write<CatalogWork>(`/works/${id}`, "PUT", patch),
+		mutationFn: ({ id, title }: { id: number; title: string }) =>
+			updateWork(id, { title }),
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export function useDeleteWork() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: deleteWork,
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -149,17 +133,8 @@ export function useUpdateWork() {
 export function useCreateSeason() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({
-			workID,
-			seasonNumber,
-		}: {
-			workID: number;
-			seasonNumber: number;
-		}) =>
-			write<CatalogSeason>(`/works/${workID}/seasons`, "POST", {
-				season_number: seasonNumber,
-				title: "",
-			}),
+		mutationFn: (input: { workID: number; seasonNumber: number }) =>
+			createSeason(input),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -167,7 +142,16 @@ export function useCreateSeason() {
 export function useDeleteSeason() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) => write<void>(`/seasons/${id}`, "DELETE"),
+		mutationFn: deleteSeason,
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export function useReorderSeasons() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ workID, ids }: { workID: number; ids: number[] }) =>
+			reorderSeasons(workID, ids),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -175,16 +159,8 @@ export function useDeleteSeason() {
 export function useAddEpisode() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({
-			seasonID,
-			mediaID,
-		}: {
-			seasonID: number;
-			mediaID: number;
-		}) =>
-			write<CatalogItem>(`/seasons/${seasonID}/items`, "POST", {
-				media_id: mediaID,
-			}),
+		mutationFn: (input: { seasonID: number; mediaID: number }) =>
+			addEpisode(input),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -198,7 +174,7 @@ export function useRemoveEpisode() {
 		}: {
 			seasonID: number;
 			mediaID: number;
-		}) => write<void>(`/seasons/${seasonID}/items/${mediaID}`, "DELETE"),
+		}) => removeEpisode(seasonID, mediaID),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -207,7 +183,7 @@ export function useReorderEpisodes() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: ({ seasonID, ids }: { seasonID: number; ids: number[] }) =>
-			write<void>(`/seasons/${seasonID}/items/order`, "PUT", { item_ids: ids }),
+			reorderEpisodes(seasonID, ids),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -216,9 +192,7 @@ export function useAddFilm() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: ({ workID, mediaID }: { workID: number; mediaID: number }) =>
-			write<CatalogItem>(`/works/${workID}/items`, "POST", {
-				media_id: mediaID,
-			}),
+			addFilm(workID, mediaID),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -227,7 +201,7 @@ export function useRemoveFilm() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: ({ workID, mediaID }: { workID: number; mediaID: number }) =>
-			write<void>(`/works/${workID}/items/${mediaID}`, "DELETE"),
+			removeFilm(workID, mediaID),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -236,7 +210,7 @@ export function useReorderFilms() {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: ({ workID, ids }: { workID: number; ids: number[] }) =>
-			write<void>(`/works/${workID}/items/order`, "PUT", { item_ids: ids }),
+			reorderFilms(workID, ids),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -244,8 +218,24 @@ export function useReorderFilms() {
 export function useCreateFranchise() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (input: { name: string }) =>
-			write<CatalogFranchise>("/franchises", "POST", input),
+		mutationFn: (input: { name: string }) => createFranchise(input),
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export function useUpdateFranchise() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, name }: { id: number; name: string }) =>
+			updateFranchise(id, { name }),
+		onSuccess: () => invalidateCatalog(queryClient),
+	});
+}
+
+export function useDeleteFranchise() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: deleteFranchise,
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -253,19 +243,11 @@ export function useCreateFranchise() {
 export function useAddFranchiseEntry() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: ({
-			franchiseID,
-			workID,
-			mediaID,
-		}: {
+		mutationFn: (input: {
 			franchiseID: number;
 			workID?: number;
 			mediaID?: number;
-		}) =>
-			write<CatalogEntry>(`/franchises/${franchiseID}/entries`, "POST", {
-				work_id: workID,
-				media_id: mediaID,
-			}),
+		}) => addFranchiseEntry(input),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -279,8 +261,7 @@ export function useRemoveFranchiseEntry() {
 		}: {
 			franchiseID: number;
 			entryID: number;
-		}) =>
-			write<void>(`/franchises/${franchiseID}/entries/${entryID}`, "DELETE"),
+		}) => removeFranchiseEntry(franchiseID, entryID),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }
@@ -294,44 +275,7 @@ export function useReorderFranchiseEntries() {
 		}: {
 			franchiseID: number;
 			ids: number[];
-		}) =>
-			write<void>(`/franchises/${franchiseID}/entries/order`, "PUT", {
-				entry_ids: ids,
-			}),
-		onSuccess: () => invalidateCatalog(queryClient),
-	});
-}
-
-export function useReorderSeasons() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: ({ workID, ids }: { workID: number; ids: number[] }) =>
-			write<void>(`/works/${workID}/seasons/order`, "PUT", { season_ids: ids }),
-		onSuccess: () => invalidateCatalog(queryClient),
-	});
-}
-
-export function useDeleteWork() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: (id: number) => write<void>(`/works/${id}`, "DELETE"),
-		onSuccess: () => invalidateCatalog(queryClient),
-	});
-}
-
-export function useUpdateFranchise() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: ({ id, name }: { id: number; name: string }) =>
-			write<CatalogFranchise>(`/franchises/${id}`, "PUT", { name }),
-		onSuccess: () => invalidateCatalog(queryClient),
-	});
-}
-
-export function useDeleteFranchise() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: (id: number) => write<void>(`/franchises/${id}`, "DELETE"),
+		}) => reorderFranchiseEntries(franchiseID, ids),
 		onSuccess: () => invalidateCatalog(queryClient),
 	});
 }

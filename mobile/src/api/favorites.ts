@@ -17,7 +17,7 @@ import {
 // а экраны/мини-плеер должны знать, лежит ли текущее медиа в нём.
 // Ключ совпадает с web — инвалидация после toggle обновляет оба клиента
 // в рамках одного приложения (mobile).
-export type FavoriteMediaType = Extract<MediaType, "video" | "audio">;
+export type FavoriteMediaType = Extract<MediaType, "video" | "audio" | "image">;
 
 export function favoritesQueryKey(type: FavoriteMediaType) {
 	return ["favorites", type, "all"] as const;
@@ -108,6 +108,14 @@ export function useFavoriteVideoIds() {
 
 export function useToggleVideoFavorite() {
 	return useToggleMediaFavorite("video");
+}
+
+export function useFavoriteImageIds() {
+	return useFavoriteMediaIds("image");
+}
+
+export function useToggleImageFavorite() {
+	return useToggleMediaFavorite("image");
 }
 
 export function useFavoriteAudioIds() {

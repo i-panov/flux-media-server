@@ -83,12 +83,17 @@ func (h *SubsHandler) ServeSub(c *fiber.Ctx) error {
 	}
 	for _, sub := range subs {
 		if sub.Lang == lang {
-			if !services.IsSubPath(h.mediaCfg.VideoPath, sub.Path) &&
-				!services.IsSubPath(h.mediaCfg.AudioPath, sub.Path) {
+			// IsSubPath лексический: симлинк внутри библиотеки мог бы
+			// указать наружу. Резолвим и требуем .vtt.
+			resolved, ok := services.ResolveAllowedFile(
+				[]string{h.mediaCfg.VideoPath, h.mediaCfg.AudioPath},
+				sub.Path, ".vtt",
+			)
+			if !ok {
 				return response.Error(c, fiber.StatusNotFound, "Subtitle not available")
 			}
 			c.Set("Content-Type", "text/vtt; charset=utf-8")
-			return sendFile(c, sub.Path, "Subtitle not found")
+			return sendFile(c, resolved, "Subtitle not found")
 		}
 	}
 	return response.Error(c, fiber.StatusNotFound, "Subtitle not available")

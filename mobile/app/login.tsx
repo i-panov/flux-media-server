@@ -17,6 +17,7 @@ import {
 	View,
 } from "react-native";
 import { getDeviceIdentity } from "../src/auth/deviceInfo";
+import { bumpSessionGeneration } from "../src/auth/generation";
 import { emitLocalReset } from "../src/auth/reset";
 import { sessionQueryKey, useSession } from "../src/auth/session";
 import { TVDeviceLogin } from "../src/auth/TVDeviceLogin";
@@ -68,6 +69,9 @@ export default function LoginScreen() {
 			// Даже если предыдущая сессия была null (cold start с мёртвым
 			// refresh), локальные данные могли остаться от другого аккаунта.
 			emitLocalReset();
+			// Новый вход — новое поколение: refresh/me предыдущей сессии
+			// не должны перезаписать только что полученную пару.
+			bumpSessionGeneration();
 			await secureStore.set(ACCESS_TOKEN_KEY, data.token);
 			await secureStore.set(REFRESH_TOKEN_KEY, data.refresh_token);
 			// Кэш прошлого пользователя не должен переехать в новую сессию;

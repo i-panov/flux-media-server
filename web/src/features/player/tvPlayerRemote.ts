@@ -2,7 +2,7 @@ import { getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
 import { type RefObject, useEffect, useRef } from "react";
 import { isEditableTarget, isModalOpen } from "../tv/tvBack";
 import { useTVMode } from "../tv/useTVMode";
-import { useAudioPlayer } from "./AudioPlayerProvider";
+import { useAudioPlayer, useAudioPosition } from "./AudioPlayerProvider";
 
 export type TVRemoteAction =
 	| "seek-back"
@@ -441,9 +441,12 @@ export function resolveTVRemoteAction(
 export function useTVPlayerRemote(): void {
 	const { tvMode } = useTVMode();
 	const player = useAudioPlayer();
+	const position = useAudioPosition();
 	const live = useRef(player);
+	const livePosition = useRef(position);
 	useEffect(() => {
 		live.current = player;
+		livePosition.current = position;
 	});
 
 	useEffect(() => {
@@ -458,12 +461,17 @@ export function useTVPlayerRemote(): void {
 			const current = live.current;
 			switch (action) {
 				case "seek-back":
-					current.seek(Math.max(current.currentTime - TV_SEEK_STEP, 0));
+					current.seek(
+						Math.max(livePosition.current.currentTime - TV_SEEK_STEP, 0),
+					);
 					break;
 				case "seek-forward": {
-					const target = current.currentTime + TV_SEEK_STEP;
+					const currentPosition = livePosition.current;
+					const target = currentPosition.currentTime + TV_SEEK_STEP;
 					current.seek(
-						current.duration > 0 ? Math.min(target, current.duration) : target,
+						currentPosition.duration > 0
+							? Math.min(target, currentPosition.duration)
+							: target,
 					);
 					break;
 				}

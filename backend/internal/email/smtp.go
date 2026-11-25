@@ -112,6 +112,11 @@ func (c *SMTPClient) SendCodeContext(ctx context.Context, to string, code string
 	if err != nil {
 		return err
 	}
+	// Message-ID собирается из smtp.host и раньше не проверялся: CRLF в
+	// хосте вставлял бы произвольные заголовки письма.
+	if err := validateHeaderValue("Message-ID", messageID); err != nil {
+		return err
+	}
 	date := time.Now().Format(time.RFC1123Z)
 
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMessage-ID: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",

@@ -21,6 +21,7 @@ import { secureStore } from "../storage/secureStore";
 import { useTheme } from "../theme/ThemeProvider";
 import { tvFocusStyle } from "../tv/focus";
 import { getDeviceIdentity } from "./deviceInfo";
+import { bumpSessionGeneration } from "./generation";
 import { emitLocalReset } from "./reset";
 import { sessionQueryKey } from "./session";
 
@@ -97,6 +98,7 @@ export function TVDeviceLogin({ onUseOtp }: { onUseOtp: () => void }) {
 				if (cancelled) return;
 				if (result.status === "ok") {
 					emitLocalReset();
+					bumpSessionGeneration();
 					await secureStore.set(ACCESS_TOKEN_KEY, result.token);
 					await secureStore.set(REFRESH_TOKEN_KEY, result.refresh_token);
 					queryClient.removeQueries();

@@ -1,84 +1,40 @@
-import { apiFetch } from "@flux/shared";
+import {
+	cancelTranscode,
+	deleteOriginal,
+	deleteUser,
+	getMaintenance,
+	getStorage,
+	listOriginals,
+	listTranscodes,
+	listUsers,
+	retryTranscode,
+	setAutoCleanup,
+	setUserAdmin,
+	startMaintenance,
+} from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 
-const userSchema = z.object({
-	id: z.number(),
-	email: z.string(),
-	is_admin: z.boolean(),
-	created_at: z.string(),
-});
-
-const maintenanceSchema = z.object({
-	missing_thumbnails: z.number(),
-	missing_covers: z.number(),
-	state: z.object({
-		running: z.boolean(),
-		kind: z.string().optional(),
-		generated: z.number(),
-		failed: z.number(),
-		last_error: z.string().nullish(),
-	}),
-});
-
-const storageSchema = z.object({
-	disks: z.array(
-		z.object({
-			path: z.string(),
-			total_bytes: z.number(),
-			free_bytes: z.number(),
-			used_bytes: z.number(),
-		}),
-	),
-	video_bytes: z.number(),
-	audio_bytes: z.number(),
-	originals_bytes: z.number(),
-	temp_bytes: z.number(),
-	auto_cleanup: z.boolean(),
-});
-
-const transcodeSchema = z.object({
-	id: z.number(),
-	filename: z.string(),
-	status: z.string(),
-	progress: z.number(),
-	error: z.string().nullish(),
-});
-
-const originalSchema = z.object({
-	name: z.string(),
-	size_bytes: z.number(),
-	modified: z.string(),
-	status: z.string(),
-	media_id: z.number().optional(),
-	views: z.number(),
-});
-
-export type AdminUser = z.infer<typeof userSchema>;
-export type MaintenanceInfo = z.infer<typeof maintenanceSchema>;
-export type StorageInfo = z.infer<typeof storageSchema>;
-export type StorageDisk = z.infer<typeof storageSchema>["disks"][number];
-export type TranscodeRow = z.infer<typeof transcodeSchema>;
-export type OriginalRow = z.infer<typeof originalSchema>;
+export type {
+	AdminUser,
+	MaintenanceInfo,
+	OriginalItem as OriginalRow,
+	StorageDisk,
+	StorageInfo,
+	TranscodeRow,
+} from "@flux/shared";
 
 export function useAdminUsers() {
 	return useQuery({
 		queryKey: ["admin", "users"],
-		queryFn: async () =>
-			z.array(userSchema).parse(await apiFetch<unknown>("/admin/users")),
+		queryFn: () => listUsers(),
 	});
 }
 
 export function useSetUserAdmin() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async ({ id, isAdmin }: { id: number; isAdmin: boolean }) =>
-			userSchema.parse(
-				await apiFetch<unknown>(`/admin/users/${id}`, {
-					method: "PUT",
-					body: JSON.stringify({ is_admin: isAdmin }),
-				}),
-			),
+		mutationFn: ({ id, isAdmin }: { id: number; isAdmin: boolean }) =>
+			setUserAdmin(id, isAdmin),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
 		},
@@ -88,8 +44,7 @@ export function useSetUserAdmin() {
 export function useDeleteUser() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) =>
-			apiFetch<void>(`/admin/users/${id}`, { method: "DELETE" }),
+		mutationFn: deleteUser,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
 		},
@@ -99,21 +54,14 @@ export function useDeleteUser() {
 export function useStorage() {
 	return useQuery({
 		queryKey: ["admin", "storage"],
-		queryFn: async () =>
-			storageSchema.parse(await apiFetch<unknown>("/admin/storage")),
+		queryFn: () => getStorage(),
 	});
 }
 
 export function useSetAutoCleanup() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async (enabled: boolean) =>
-			z.object({ auto_cleanup: z.boolean() }).parse(
-				await apiFetch<unknown>("/admin/storage/settings", {
-					method: "PUT",
-					body: JSON.stringify({ auto_cleanup: enabled }),
-				}),
-			),
+		mutationFn: setAutoCleanup,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "storage"] });
 		},
@@ -123,10 +71,7 @@ export function useSetAutoCleanup() {
 export function useTranscodes() {
 	return useQuery({
 		queryKey: ["admin", "transcodes"],
-		queryFn: async () =>
-			z
-				.array(transcodeSchema)
-				.parse(await apiFetch<unknown>("/admin/transcodes")),
+		queryFn: listTranscodes,
 		refetchInterval: (query) =>
 			(query.state.data ?? []).some(
 				(row) => row.status === "processing" || row.status === "queued",
@@ -139,8 +84,7 @@ export function useTranscodes() {
 export function useCancelTranscode() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) =>
-			apiFetch<void>(`/media/transcodes/${id}`, { method: "DELETE" }),
+		mutationFn: cancelTranscode,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "transcodes"] });
 		},
@@ -150,8 +94,7 @@ export function useCancelTranscode() {
 export function useRetryTranscode() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) =>
-			apiFetch<unknown>(`/admin/transcodes/${id}/retry`, { method: "POST" }),
+		mutationFn: retryTranscode,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "transcodes"] });
 		},
@@ -161,20 +104,14 @@ export function useRetryTranscode() {
 export function useOriginals() {
 	return useQuery({
 		queryKey: ["admin", "originals"],
-		queryFn: async () =>
-			z
-				.array(originalSchema)
-				.parse(await apiFetch<unknown>("/admin/originals")),
+		queryFn: () => listOriginals(),
 	});
 }
 
 export function useDeleteOriginal() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (name: string) =>
-			apiFetch<void>(`/admin/originals/${encodeURIComponent(name)}`, {
-				method: "DELETE",
-			}),
+		mutationFn: deleteOriginal,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["admin", "originals"] });
 			void queryClient.invalidateQueries({ queryKey: ["admin", "storage"] });
@@ -185,8 +122,7 @@ export function useDeleteOriginal() {
 export function useMaintenance() {
 	return useQuery({
 		queryKey: ["admin", "maintenance"],
-		queryFn: async () =>
-			maintenanceSchema.parse(await apiFetch<unknown>("/admin/maintenance")),
+		queryFn: getMaintenance,
 		refetchInterval: (query) =>
 			query.state.data?.state.running === true ? 2000 : false,
 	});
@@ -195,8 +131,7 @@ export function useMaintenance() {
 export function useBackfill(kind: "thumbnails" | "covers") {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: () =>
-			apiFetch<unknown>(`/admin/maintenance/${kind}`, { method: "POST" }),
+		mutationFn: () => startMaintenance(kind),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({
 				queryKey: ["admin", "maintenance"],

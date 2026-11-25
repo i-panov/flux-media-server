@@ -592,5 +592,10 @@
 	"catalog.allGenres": "Все жанры",
 	"audio.sourceVideo": "Исходное видео",
 	"extract.ready": "Аудиодорожка извлечена: {{title}}",
-	"catalog.inheritedTags": "Жанры сериала"
+	"catalog.inheritedTags": "Жанры сериала",
+	"trash.purgeTitle": "Удалить навсегда?",
+	"trash.purgeConfirm": "«{{title}}» будет стёрт без возможности восстановления.",
+	"upload.tooLarge": "Клиент не отправляет файлы больше {{size}} ГБ.",
+	"artists.title": "Исполнители",
+	"artists.empty": "Пока нет исполнителей"
 }

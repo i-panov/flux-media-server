@@ -1,3 +1,4 @@
+export * from "./api/admin";
 export {
 	type AuthUser,
 	approveDeviceCode,
@@ -19,6 +20,7 @@ export {
 	type VerifyCodeResponse,
 	verifyCode,
 } from "./api/auth";
+export * from "./api/catalog";
 export {
 	ApiError,
 	apiFetch,
@@ -26,6 +28,7 @@ export {
 	getHealth,
 	type HealthResponse,
 } from "./api/client";
+export * from "./api/clip";
 export {
 	addToCollection,
 	type BulkMoveCollectionItemsInput,
@@ -49,6 +52,7 @@ export {
 	renameCollection,
 } from "./api/collections";
 export * from "./api/cover";
+export * from "./api/extract";
 export {
 	type Favorite,
 	favoriteSchema,
@@ -60,6 +64,7 @@ export {
 	toggleFavorite,
 } from "./api/favorites";
 export { type HealthSnapshot, useHealthQuery } from "./api/health";
+export * from "./api/import";
 export {
 	fetchLyrics,
 	type Lyrics,
@@ -67,6 +72,7 @@ export {
 	type SaveLyricsInput,
 	saveLyrics,
 } from "./api/lyrics";
+export * from "./api/mediaLoader";
 export * from "./api/metadata";
 export {
 	type ContinueEntry,
@@ -83,6 +89,7 @@ export {
 	type SaveProgressInput,
 	saveProgress,
 } from "./api/progress";
+export * from "./api/tags";
 export type { CredentialsMode } from "./api/transport";
 export {
 	ACCESS_TOKEN_KEY,

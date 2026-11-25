@@ -22,6 +22,12 @@ afterEach(() => {
 	window.history.replaceState(null, "", "/");
 });
 
+function renderTVHook() {
+	return renderHook(() => useTVMode(), {
+		wrapper: ({ children }) => <TVModeProvider>{children}</TVModeProvider>,
+	});
+}
+
 function StateProbe({
 	id,
 	onState,
@@ -54,25 +60,32 @@ function ReaderProbe() {
 
 describe("useTVMode", () => {
 	it("по умолчанию режим выключен", () => {
+		const { result } = renderTVHook();
+		expect(result.current.tvMode).toBe(false);
+	});
+
+	it("вне провайдера — обычный режим без побочных эффектов", () => {
+		window.localStorage.setItem(TV_MODE_STORAGE_KEY, "1");
 		const { result } = renderHook(() => useTVMode());
 		expect(result.current.tvMode).toBe(false);
+		expect(result.current.capabilities.canUpload).toBe(true);
 	});
 
 	it("?tv=1 включает режим и сохраняет флаг", () => {
 		routerSearch.value = "?tv=1";
-		const { result } = renderHook(() => useTVMode());
+		const { result } = renderTVHook();
 		expect(result.current.tvMode).toBe(true);
 		expect(window.localStorage.getItem(TV_MODE_STORAGE_KEY)).toBe("1");
 	});
 
 	it("сохранённый флаг включает режим без параметра", () => {
 		window.localStorage.setItem(TV_MODE_STORAGE_KEY, "1");
-		const { result } = renderHook(() => useTVMode());
+		const { result } = renderTVHook();
 		expect(result.current.tvMode).toBe(true);
 	});
 
 	it("setTVMode переключает и пишет флаг", () => {
-		const { result } = renderHook(() => useTVMode());
+		const { result } = renderTVHook();
 
 		act(() => {
 			result.current.setTVMode(true);
@@ -90,7 +103,7 @@ describe("useTVMode", () => {
 	it("выключенный тумблер при `?tv=1` остаётся выключенным и после reload", () => {
 		window.history.replaceState(null, "", "/settings?tv=1");
 		routerSearch.value = "?tv=1";
-		const { result, unmount } = renderHook(() => useTVMode());
+		const { result, unmount } = renderTVHook();
 		expect(result.current.tvMode).toBe(true);
 
 		act(() => {
@@ -98,14 +111,16 @@ describe("useTVMode", () => {
 		});
 
 		expect(result.current.tvMode).toBe(false);
-		// Эффект больше не переписывает "1", а устаревший параметр убран,
-		// иначе reload снова включил бы ТВ.
+		// Эффект больше не переписывает "1", а устаревший параметр убран
+		// через router.history (в приложении это меняет адрес), иначе
+		// reload снова включил бы ТВ.
 		expect(window.localStorage.getItem(TV_MODE_STORAGE_KEY)).toBe("0");
-		expect(window.location.search).toBe("");
+		expect(historyReplace).toHaveBeenCalledWith("/settings");
 
 		unmount();
+		window.history.replaceState(null, "", "/settings");
 		routerSearch.value = window.location.search;
-		const reloaded = renderHook(() => useTVMode());
+		const reloaded = renderTVHook();
 		expect(reloaded.result.current.tvMode).toBe(false);
 		reloaded.unmount();
 	});

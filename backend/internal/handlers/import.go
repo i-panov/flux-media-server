@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,6 +13,10 @@ import (
 	"flux/internal/response"
 	"flux/internal/services"
 )
+
+// maxImportEpisodes ограничивает размер одного импорта: сезон/сериал
+// больше этого — ошибка ввода, а не повод держать транзакцию минутами.
+const maxImportEpisodes = 200
 
 type ImportHandler struct {
 	loader  *services.MediaLoader
@@ -39,7 +44,9 @@ func (h *ImportHandler) Probe(c *fiber.Ctx) error {
 		if errors.Is(err, services.ErrMediaLoaderDisabled) {
 			return response.Error(c, fiber.StatusServiceUnavailable, "media loader is not configured")
 		}
-		return response.Error(c, fiber.StatusBadGateway, err.Error())
+		// Текст ошибки может содержать URL/детали upstream — наружу не отдаём.
+		log.Printf("import: probe %s: %v", req.URL, err)
+		return response.Error(c, fiber.StatusBadGateway, "Failed to probe series")
 	}
 	return c.JSON(result)
 }
@@ -72,8 +79,14 @@ func (h *ImportHandler) Start(c *fiber.Ctx) error {
 	if scope != "season" && scope != "series" {
 		return response.Error(c, fiber.StatusBadRequest, "scope must be season or series")
 	}
+	if !h.loader.Enabled() {
+		return response.Error(c, fiber.StatusServiceUnavailable, "media loader is not configured")
+	}
 	if len(req.Episodes) == 0 {
 		return response.Error(c, fiber.StatusBadRequest, "episodes are required")
+	}
+	if len(req.Episodes) > maxImportEpisodes {
+		return response.Error(c, fiber.StatusBadRequest, "too many episodes (max 200)")
 	}
 	selections := make([]services.ImportSelection, 0, len(req.Episodes))
 	for _, episode := range req.Episodes {

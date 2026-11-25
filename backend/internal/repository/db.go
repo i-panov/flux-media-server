@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -61,11 +63,19 @@ func InitDB(path string, debug ...bool) (*gorm.DB, error) {
 	// transactions are serialized at BEGIN instead of failing with
 	// SQLITE_BUSY_SNAPSHOT mid-transaction (read-then-write races in WAL).
 	registerFluxDriver()
+	// ParameterizedQueries: в лог попадают только плейсхолдеры — иначе при
+	// SQL-ошибке туда уходят email, пути и хэши токенов.
+	gormLogger := logger.New(log.New(os.Stdout, "", log.LstdFlags), logger.Config{
+		SlowThreshold:             200 * time.Millisecond,
+		LogLevel:                  logMode,
+		IgnoreRecordNotFoundError: false,
+		ParameterizedQueries:      true,
+	})
 	db, err := gorm.Open(sqlite.New(sqlite.Config{
 		DriverName: fluxDriverName,
 		DSN:        path + "?_journal=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL&_cache_size=-8000&_txlock=immediate",
 	}), &gorm.Config{
-		Logger: logger.Default.LogMode(logMode),
+		Logger: gormLogger,
 	})
 	if err != nil {
 		return nil, err
@@ -293,6 +303,12 @@ func createMetadataIndexes(db *gorm.DB) error {
 // транзакционно, обрыв внутри версии откатывается целиком. Обрыв между
 // версиями безопасен: следующая версия продолжит с записанной schema_migrations.
 func RunMigrations(db *gorm.DB) error {
+	return RunMigrationsWithRoots(db, nil)
+}
+
+// RunMigrationsWithRoots — RunMigrations с корнями контента: v14 разрешает
+// старые относительные пути по ним, а не только от текущего cwd.
+func RunMigrationsWithRoots(db *gorm.DB, contentRoots []string) error {
 	if err := guardLegacyCatalogSchema(db); err != nil {
 		return err
 	}
@@ -332,7 +348,125 @@ func RunMigrations(db *gorm.DB) error {
 	if err := runMigrationsV12(db); err != nil {
 		return err
 	}
-	return runMigrationsV13(db)
+	if err := runMigrationsV13(db); err != nil {
+		return err
+	}
+	return runMigrationsV14(db, contentRoots)
+}
+
+// runMigrationsV14 — относительные пути, записанные до канонизации
+// каталогов конфига, приводим к абсолютным.
+//
+// Сканер хранил file_path ровно тем, что вернул Walk от пути конфига
+// (`./data/video` → `data/video/x.mkv`). После перехода на абсолютные
+// каталоги такие строки перестают находиться по путю: sweep их не видит,
+// а createNewMedia считает файл новым и упирается в дедуп по хэшу.
+// Миграция идемпотентна: абсолютные пути не трогаем.
+func runMigrationsV14(db *gorm.DB, contentRoots []string) error {
+	const schemaVersion = 14
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&models.SchemaMigration{}); err != nil {
+			return fmt.Errorf("create schema_migrations: %w", err)
+		}
+		var applied int64
+		if err := tx.Model(&models.SchemaMigration{}).
+			Where("version = ?", schemaVersion).Count(&applied).Error; err != nil {
+			return fmt.Errorf("check schema version 14: %w", err)
+		}
+		if applied > 0 {
+			return nil
+		}
+		targets := []struct {
+			table  string
+			column string
+			model  any
+		}{
+			{"media", "file_path", &models.Media{}},
+			{"subtitles", "path", &models.Subtitle{}},
+			{"transcode_tasks", "source_path", &models.TranscodeTask{}},
+			{"upload_tasks", "file_path", &models.UploadTask{}},
+		}
+		for _, target := range targets {
+			if err := makeStoredPathsAbsolute(tx, target.table, target.column, target.model, contentRoots); err != nil {
+				return fmt.Errorf("normalize %s.%s: %w", target.table, target.column, err)
+			}
+		}
+		return tx.Create(&models.SchemaMigration{
+			Version:   schemaVersion,
+			AppliedAt: time.Now().UTC(),
+		}).Error
+	})
+}
+
+// makeStoredPathsAbsolute переписывает неабсолютные значения колонки в
+// абсолютные пути текущего процесса (тот же cwd, от которого они были
+// записаны).
+func makeStoredPathsAbsolute(tx *gorm.DB, table, column string, model any, contentRoots []string) error {
+	if !tx.Migrator().HasTable(model) {
+		return nil
+	}
+	if !tx.Migrator().HasColumn(model, column) {
+		return nil
+	}
+	var rows []struct {
+		ID    uint
+		Value string
+	}
+	// Имена таблицы/колонки — константы из вызывающего кода, не пользовательский ввод.
+	if err := tx.Table(table).
+		Select("id, " + column + " AS value").
+		Where(column + " <> ''").
+		Find(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if filepath.IsAbs(row.Value) {
+			continue
+		}
+		resolved := resolveLegacyPath(row.Value, contentRoots)
+		if err := tx.Table(table).
+			Where("id = ?", row.ID).
+			Update(column, resolved).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// resolveLegacyPath выбирает абсолютный путь для записи, сохранённой до
+// канонизации каталогов. Сначала пробуем cwd (прежнее поведение), затем —
+// хвост относительного пути от каждого корня контента: `data/video/x.mkv`
+// может лежать в `/app/data/video/x.mkv` даже если процесс стартовал из
+// другого каталога.
+func resolveLegacyPath(value string, contentRoots []string) string {
+	abs, err := filepath.Abs(value)
+	if err != nil {
+		abs = value
+	}
+	abs = filepath.Clean(abs)
+	if pathIsFile(abs) {
+		return abs
+	}
+	parts := strings.Split(filepath.Clean(value), string(filepath.Separator))
+	for _, root := range contentRoots {
+		if strings.TrimSpace(root) == "" {
+			continue
+		}
+		for i := 0; i < len(parts); i++ {
+			candidate := filepath.Join(append([]string{root}, parts[i:]...)...)
+			if pathIsFile(candidate) {
+				return filepath.Clean(candidate)
+			}
+		}
+	}
+	// Файла нет (корзина/удалён) — оставляем cwd-вариант, но это видно в логе.
+	log.Printf("migration v14: %q not found under content roots, keeping %s", value, abs)
+	return abs
+}
+
+func pathIsFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // runMigrationsV13 — постоянная очередь превью и обложек.

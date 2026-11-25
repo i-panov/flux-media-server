@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, parseFilename, splitSubLang } from "./format";
+import {
+	formatDuration,
+	formatFileSize,
+	parseFilename,
+	splitSubLang,
+} from "./format";
 
 describe("formatDuration", () => {
 	it("форматирует секунды и минуты без часов", () => {
@@ -16,6 +21,20 @@ describe("formatDuration", () => {
 	it("отбрасывает дробь и clamp'ит отрицательные", () => {
 		expect(formatDuration(90.9)).toBe("1:30");
 		expect(formatDuration(-10)).toBe("0:00");
+	});
+});
+
+describe("formatFileSize", () => {
+	it("переводит единицы по порогу 1024", () => {
+		expect(formatFileSize(0)).toBe("0 B");
+		expect(formatFileSize(512)).toBe("512 B");
+		expect(formatFileSize(2048)).toBe("2 KB");
+		expect(formatFileSize(1536)).toBe("1.5 KB");
+	});
+
+	it("округляет до следующей единицы, а не печатает 1024 B", () => {
+		expect(formatFileSize(1023.6)).toBe("1 KB");
+		expect(formatFileSize(1024 * 1023.6)).toBe("1 MB");
 	});
 });
 

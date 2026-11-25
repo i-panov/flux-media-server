@@ -43,12 +43,18 @@ func (r *FranchiseStore) List(ctx context.Context, tagIDs ...uint) ([]models.Fra
 	if err != nil {
 		return nil, err
 	}
-	for i := range rows {
-		tags, tagErr := franchiseTags(r.db.WithContext(ctx), rows[i].ID)
-		if tagErr != nil {
-			return nil, tagErr
+	if len(rows) > 0 {
+		ids := make([]uint, 0, len(rows))
+		for i := range rows {
+			ids = append(ids, rows[i].ID)
 		}
-		rows[i].Tags = tags
+		links, tagsByID, err := loadTagLinks(r.db.WithContext(ctx), "franchise_tags", "franchise_id", ids)
+		if err != nil {
+			return nil, err
+		}
+		for i := range rows {
+			rows[i].Tags = tagsFor(links[rows[i].ID], tagsByID)
+		}
 	}
 	return rows, nil
 }

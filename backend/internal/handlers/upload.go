@@ -64,10 +64,17 @@ func NewUploadHandler(
 // синхронно; хэш, ffprobe и превью выполняются воркером очереди в фоне.
 // Ответ — 202 с job_id; статус обработки — GET /api/media/uploads/:id.
 func (h *UploadHandler) Upload(c *fiber.Ctx) error {
+	// Поля читаем только из multipart. FormValue в fasthttp сначала смотрит
+	// query-параметры, поэтому ?media_type=image перекрывал бы форму и мог
+	// протащить неверный тип в каталог картинок.
+	form, err := c.MultipartForm()
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "File is required")
+	}
 	// Тип определяем консистентно: заданный валидный media_type имеет
 	// приоритет (он и каталог выбирает, и в запись Type попадает);
 	// при отсутствии media_type — по расширению файла.
-	rawType := c.FormValue("media_type")
+	rawType := firstFormValue(form.Value, "media_type")
 	mediaType := models.MediaTypeVideo
 	if rawType != "" {
 		mediaType = models.ParseMediaType(rawType)
@@ -79,13 +86,14 @@ func (h *UploadHandler) Upload(c *fiber.Ctx) error {
 	// force пропускает проверку похожих картинок (pHash), но не точного
 	// дубля по хэшу: подтверждение пользователя относится только к
 	// «похоже, уже есть».
-	force, _ := strconv.ParseBool(c.FormValue("force"))
+	force, _ := strconv.ParseBool(firstFormValue(form.Value, "force"))
 
 	// Get uploaded file.
-	fileHeader, err := c.FormFile("file")
-	if err != nil {
+	fileHeaders := form.File["file"]
+	if len(fileHeaders) == 0 {
 		return response.Error(c, fiber.StatusBadRequest, "File is required")
 	}
+	fileHeader := fileHeaders[0]
 
 	// Check file is not empty.
 	if fileHeader.Size == 0 {
@@ -367,4 +375,12 @@ func (h *UploadHandler) CancelUpload(c *fiber.Ctx) error {
 
 func (h *UploadHandler) isAllowedExtension(ext string) bool {
 	return services.IsAllowedExtension(ext)
+}
+
+// firstFormValue — значение первого поля multipart (пустая строка, если нет).
+func firstFormValue(values map[string][]string, name string) string {
+	if list := values[name]; len(list) > 0 {
+		return list[0]
+	}
+	return ""
 }

@@ -108,6 +108,104 @@ function TrashCollectionCard({
 	);
 }
 
+type PurgeTarget = { kind: "media" | "collection"; id: number; title: string };
+
+// Одно нажатие purge на бэкенде стирает файл навсегда: подтверждение
+// обязательно (в отличие от обычного удаления, которое идёт в корзину).
+function PurgeTrashModal({
+	target,
+	pending,
+	onClose,
+	onConfirm,
+}: {
+	target: PurgeTarget | null;
+	pending: boolean;
+	onClose: () => void;
+	onConfirm: (target: PurgeTarget) => void;
+}) {
+	const { t } = useTranslation();
+	return (
+		<Modal
+			opened={target !== null}
+			onClose={onClose}
+			title={t("trash.purgeTitle")}
+			centered
+		>
+			<TVModalAutoFocus focusKey="purge-trash-cancel" />
+			<Stack gap="md">
+				<Text size="sm">
+					{t("trash.purgeConfirm", { title: target?.title ?? "" })}
+				</Text>
+				<Group justify="flex-end">
+					<TVButton
+						focusKey="purge-trash-cancel"
+						variant="default"
+						onClick={onClose}
+					>
+						{t("collections.cancel")}
+					</TVButton>
+					<TVButton
+						focusKey="purge-trash-confirm"
+						color="red"
+						loading={pending}
+						onClick={() => {
+							if (target !== null) {
+								onConfirm(target);
+							}
+						}}
+					>
+						{t("trash.purge")}
+					</TVButton>
+				</Group>
+			</Stack>
+		</Modal>
+	);
+}
+
+function EmptyTrashModal({
+	opened,
+	pending,
+	onClose,
+	onConfirm,
+}: {
+	opened: boolean;
+	pending: boolean;
+	onClose: () => void;
+	onConfirm: () => void;
+}) {
+	const { t } = useTranslation();
+	return (
+		<Modal
+			opened={opened}
+			onClose={onClose}
+			title={t("trash.emptyTitle")}
+			centered
+		>
+			<TVModalAutoFocus focusKey="empty-trash-cancel" />
+			<Stack gap="md">
+				<Text size="sm">{t("trash.emptyConfirm")}</Text>
+				<Group justify="flex-end">
+					<TVButton
+						focusKey="empty-trash-cancel"
+						variant="default"
+						onClick={onClose}
+					>
+						{t("collections.cancel")}
+					</TVButton>
+					<TVButton
+						focusKey="empty-trash-confirm"
+						color="red"
+						loading={pending}
+						onClick={onConfirm}
+					>
+						{t("trash.emptyAction")}
+					</TVButton>
+				</Group>
+			</Stack>
+		</Modal>
+	);
+}
+
 function TrashMediaCard({
 	media,
 	isAdmin,
@@ -156,6 +254,7 @@ export function TrashPage() {
 	const trash = useTrash();
 	const actions = useTrashActions();
 	const [emptyOpened, setEmptyOpened] = useState(false);
+	const [purgeTarget, setPurgeTarget] = useState<PurgeTarget | null>(null);
 	const isAdmin = session.data?.is_admin === true;
 	const { capabilities } = useTVMode();
 	const canManageTrash = isAdmin && capabilities.canManageTrash;
@@ -273,8 +372,10 @@ export function TrashPage() {
 											});
 										}}
 										onPurge={() => {
-											actions.purgeCollection.mutate(collection.id, {
-												onError: notifyError,
+											setPurgeTarget({
+												kind: "collection",
+												id: collection.id,
+												title: collection.name,
 											});
 										}}
 									/>
@@ -304,8 +405,10 @@ export function TrashPage() {
 											});
 										}}
 										onPurge={() => {
-											actions.purgeMedia.mutate(media.id, {
-												onError: notifyError,
+											setPurgeTarget({
+												kind: "media",
+												id: media.id,
+												title: media.title,
 											});
 										}}
 									/>
@@ -316,39 +419,39 @@ export function TrashPage() {
 				)}
 			</TVFocusScope>
 
-			<Modal
+			<EmptyTrashModal
 				opened={emptyOpened}
+				pending={actions.emptyTrash.isPending}
 				onClose={() => setEmptyOpened(false)}
-				title={t("trash.emptyTitle")}
-				centered
-			>
-				<TVModalAutoFocus focusKey="empty-trash-cancel" />
-				<Stack gap="md">
-					<Text size="sm">{t("trash.emptyConfirm")}</Text>
-					<Group justify="flex-end">
-						<TVButton
-							focusKey="empty-trash-cancel"
-							variant="default"
-							onClick={() => setEmptyOpened(false)}
-						>
-							{t("collections.cancel")}
-						</TVButton>
-						<TVButton
-							focusKey="empty-trash-confirm"
-							color="red"
-							loading={actions.emptyTrash.isPending}
-							onClick={() => {
-								actions.emptyTrash.mutate(undefined, {
-									onSuccess: () => setEmptyOpened(false),
-									onError: notifyError,
-								});
-							}}
-						>
-							{t("trash.emptyAction")}
-						</TVButton>
-					</Group>
-				</Stack>
-			</Modal>
+				onConfirm={() => {
+					actions.emptyTrash.mutate(undefined, {
+						onSuccess: () => setEmptyOpened(false),
+						onError: notifyError,
+					});
+				}}
+			/>
+
+			<PurgeTrashModal
+				target={purgeTarget}
+				pending={
+					actions.purgeMedia.isPending || actions.purgeCollection.isPending
+				}
+				onClose={() => setPurgeTarget(null)}
+				onConfirm={(target) => {
+					const onSuccess = () => setPurgeTarget(null);
+					if (target.kind === "media") {
+						actions.purgeMedia.mutate(target.id, {
+							onSuccess,
+							onError: notifyError,
+						});
+					} else {
+						actions.purgeCollection.mutate(target.id, {
+							onSuccess,
+							onError: notifyError,
+						});
+					}
+				}}
+			/>
 		</Stack>
 	);
 }

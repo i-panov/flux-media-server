@@ -789,6 +789,41 @@ func (r *MediaStore) RestoreMedia(ctx context.Context, id uint) error {
 	})
 }
 
+// RelinkTrashedMedia возвращает auto-trashed запись в библиотеку по новому
+// пути: файл переместили или переименовали, содержимое (хэш) осталось тем
+// же. Метаданные, избранное, прогресс и коллекции сохраняются — в отличие
+// от создания новой строки, где всё это пришлось бы потерять.
+func (r *MediaStore) RelinkTrashedMedia(ctx context.Context, id uint, path, filename string, size int64, quickHash string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var media models.Media
+		if err := tx.Unscoped().Select("id", "deleted_at").First(&media, id).Error; err != nil {
+			return err
+		}
+		if !media.DeletedAt.Valid {
+			return ErrNotInTrash
+		}
+		var live int64
+		if err := tx.Model(&models.Media{}).
+			Where("file_path = ? AND id <> ?", path, id).
+			Count(&live).Error; err != nil {
+			return err
+		}
+		if live > 0 {
+			return ErrPathConflict
+		}
+		return tx.Unscoped().Model(&models.Media{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"file_path":    path,
+				"filename":     filename,
+				"file_size":    size,
+				"quick_hash":   quickHash,
+				"deleted_at":   nil,
+				"auto_trashed": false,
+			}).Error
+	})
+}
+
 // PurgeMedia сносит медиа навсегда: связи каскадом, строка — hard,
 // файлы стирает вызывающий хендлер (как раньше делал Delete).
 // Metadata сносится тоже, но только если на неё никто больше
@@ -804,7 +839,28 @@ func (r *MediaStore) PurgeMedia(ctx context.Context, id uint) error {
 			&models.CollectionItem{}, &models.MediaArtist{}); err != nil {
 			return err
 		}
+		// Задачи превью и клипов не имеют FK на media: без явной чистки
+		// таблицы растут мусором после каждого удаления.
+		if err := tx.Where("media_id = ?", id).Delete(&models.ThumbnailTask{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("source_media_id = ? OR output_media_id = ?", id, id).
+			Delete(&models.ClipTask{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("source_media_id = ? OR media_id = ?", id, id).
+			Delete(&models.ExtractTask{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Unscoped().Delete(&models.Media{}, id).Error; err != nil {
+			return err
+		}
+		// Артисты без треков и без избранного — мусор от удалённых медиа.
+		if err := tx.Exec(`DELETE FROM artists WHERE id NOT IN (
+			SELECT artist_id FROM media_artists WHERE artist_id IS NOT NULL
+		) AND id NOT IN (
+			SELECT artist_id FROM favorites WHERE artist_id IS NOT NULL
+		)`).Error; err != nil {
 			return err
 		}
 		if media.MetadataID != nil {

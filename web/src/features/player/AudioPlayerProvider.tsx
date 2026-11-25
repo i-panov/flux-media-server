@@ -10,6 +10,7 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -25,7 +26,10 @@ import { useAudioElementSync } from "./useAudioElementSync";
 import { useAudioMediaSession } from "./useAudioMediaSession";
 import { useAudioTimings } from "./useAudioTimings";
 import { usePlaybackControls } from "./usePlaybackControls";
-import { usePlayerPersistence } from "./usePlayerPersistence";
+import {
+	useFlushSettingsOnUnmount,
+	usePlayerPersistence,
+} from "./usePlayerPersistence";
 import { useTrackEnded } from "./useTrackEnded";
 
 interface AudioPlayerContextValue {
@@ -33,8 +37,6 @@ interface AudioPlayerContextValue {
 	index: number;
 	current: Media | null;
 	playing: boolean;
-	currentTime: number;
-	duration: number;
 	volume: number;
 	shuffle: boolean;
 	repeat: RepeatMode;
@@ -55,7 +57,15 @@ interface AudioPlayerContextValue {
 	clear: () => void;
 }
 
+interface AudioPositionState {
+	currentTime: number;
+	duration: number;
+}
+
 const AudioPlayerContext = createContext<AudioPlayerContextValue | null>(null);
+// Позиция вынесена в отдельный контекст: timeupdate (~4 раза в секунду)
+// не должен перерисовывать строки списков, карточки и всю оболочку.
+const AudioPositionContext = createContext<AudioPositionState | null>(null);
 
 export function useAudioPlayer(): AudioPlayerContextValue {
 	const context = useContext(AudioPlayerContext);
@@ -63,6 +73,104 @@ export function useAudioPlayer(): AudioPlayerContextValue {
 		throw new Error("useAudioPlayer must be used inside AudioPlayerProvider");
 	}
 	return context;
+}
+
+export function useAudioPosition(): AudioPositionState {
+	const context = useContext(AudioPositionContext);
+	if (context === null) {
+		throw new Error("useAudioPosition must be used inside AudioPlayerProvider");
+	}
+	return context;
+}
+
+// Значения контекстов вынесены из компонента: позиция обновляется ~4 раза
+// в секунду, но transport-контекст обязан оставаться стабильным, иначе
+// перерисовываются все строки списков.
+function usePlayerContextValues(values: {
+	queue: Media[];
+	index: number;
+	current: Media | null;
+	playing: boolean;
+	volume: number;
+	shuffle: boolean;
+	repeat: RepeatMode;
+	error: string | null;
+	controls: ReturnType<typeof usePlaybackControls>;
+	toggleShuffle: () => void;
+	cycleRepeat: () => void;
+	currentTime: number;
+	duration: number;
+}): { player: AudioPlayerContextValue; position: AudioPositionState } {
+	const {
+		queue,
+		index,
+		current,
+		playing,
+		volume,
+		shuffle,
+		repeat,
+		error,
+		controls,
+		toggleShuffle,
+		cycleRepeat,
+		currentTime,
+		duration,
+	} = values;
+	const player = useMemo<AudioPlayerContextValue>(
+		() => ({
+			queue,
+			index,
+			current,
+			playing,
+			volume,
+			shuffle,
+			repeat,
+			error,
+			playQueue: controls.playQueue,
+			playMedia: controls.playMedia,
+			enqueue: controls.enqueue,
+			toggle: controls.toggle,
+			next: controls.next,
+			previous: controls.previous,
+			select: controls.select,
+			seek: controls.seek,
+			setVolume: controls.setVolume,
+			toggleShuffle,
+			cycleRepeat,
+			move: controls.move,
+			removeAt: controls.removeAt,
+			clear: controls.clear,
+		}),
+		[
+			queue,
+			index,
+			current,
+			playing,
+			volume,
+			shuffle,
+			repeat,
+			error,
+			controls.playQueue,
+			controls.playMedia,
+			controls.enqueue,
+			controls.toggle,
+			controls.next,
+			controls.previous,
+			controls.select,
+			controls.seek,
+			controls.setVolume,
+			toggleShuffle,
+			cycleRepeat,
+			controls.move,
+			controls.removeAt,
+			controls.clear,
+		],
+	);
+	const position = useMemo<AudioPositionState>(
+		() => ({ currentTime, duration }),
+		[currentTime, duration],
+	);
+	return { player, position };
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
@@ -203,49 +311,53 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 		previous: controls.previous,
 	});
 
+	useFlushSettingsOnUnmount({ volume, shuffle, repeat });
+	const { player: playerValue, position: positionValue } =
+		usePlayerContextValues({
+			queue,
+			index,
+			current,
+			playing,
+			volume,
+			shuffle,
+			repeat,
+			error,
+			controls,
+			toggleShuffle,
+			cycleRepeat,
+			currentTime: timings.currentTime,
+			duration: timings.duration,
+		});
+
 	return (
-		<AudioPlayerContext.Provider
-			value={{
-				queue,
-				index,
-				current,
-				playing,
-				currentTime: timings.currentTime,
-				duration: timings.duration,
-				volume,
-				shuffle,
-				repeat,
-				error,
-				...controls,
-				toggleShuffle,
-				cycleRepeat,
-			}}
-		>
-			{children}
-			<HiddenAudio
-				audioRef={audioRef}
-				src={
-					current === null
-						? undefined
-						: `/api/media/${current.id}/stream?retry=${sourceNonce}`
-				}
-				onLoadedMetadata={(event) => {
-					timings.markLoaded(event.currentTarget.duration || 0);
-					progress.handleLoadedMetadata();
-				}}
-				onTimeUpdate={(event) => {
-					timings.markTime(event.currentTarget.currentTime);
-					progress.handleTimeUpdate();
-				}}
-				onSeeked={(event) => {
-					// Восстановление позиции на паузе: timeupdate не стреляет.
-					timings.markTime(event.currentTarget.currentTime);
-				}}
-				onPlay={() => setPlaying(true)}
-				onPause={() => setPlaying(false)}
-				onEnded={handleTrackEnded}
-				onError={retryAudio}
-			/>
+		<AudioPlayerContext.Provider value={playerValue}>
+			<AudioPositionContext.Provider value={positionValue}>
+				{children}
+				<HiddenAudio
+					audioRef={audioRef}
+					src={
+						current === null
+							? undefined
+							: `/api/media/${current.id}/stream?retry=${sourceNonce}`
+					}
+					onLoadedMetadata={(event) => {
+						timings.markLoaded(event.currentTarget.duration || 0);
+						progress.handleLoadedMetadata();
+					}}
+					onTimeUpdate={(event) => {
+						timings.markTime(event.currentTarget.currentTime);
+						progress.handleTimeUpdate();
+					}}
+					onSeeked={(event) => {
+						// Восстановление позиции на паузе: timeupdate не стреляет.
+						timings.markTime(event.currentTarget.currentTime);
+					}}
+					onPlay={() => setPlaying(true)}
+					onPause={() => setPlaying(false)}
+					onEnded={handleTrackEnded}
+					onError={retryAudio}
+				/>
+			</AudioPositionContext.Provider>
 		</AudioPlayerContext.Provider>
 	);
 }

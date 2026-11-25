@@ -1,40 +1,12 @@
-import { apiFetch } from "@flux/shared";
+import { cancelClip, createClip, fetchClip } from "@flux/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 
-const clipTaskSchema = z.object({
-	id: z.number(),
-	source_media_id: z.number(),
-	start_seconds: z.number(),
-	end_seconds: z.number(),
-	title: z.string(),
-	status: z.enum(["queued", "processing", "done", "error"]),
-	progress: z.number(),
-	error: z.string().optional(),
-	output_media_id: z.number().optional(),
-});
-
-export type ClipTask = z.infer<typeof clipTaskSchema>;
+export type { ClipTask } from "@flux/shared";
 
 export function useCreateClip() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async (input: {
-			mediaID: number;
-			start: number;
-			end: number;
-			title?: string;
-		}) => {
-			const body = await apiFetch<unknown>(`/media/${input.mediaID}/clip`, {
-				method: "POST",
-				body: JSON.stringify({
-					start: input.start,
-					end: input.end,
-					title: input.title,
-				}),
-			});
-			return clipTaskSchema.parse(body);
-		},
+		mutationFn: createClip,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["clips"] });
 		},
@@ -46,9 +18,7 @@ export function useClip(id: number | null) {
 	return useQuery({
 		queryKey: ["clips", id],
 		queryFn: async () => {
-			const task = clipTaskSchema.parse(
-				await apiFetch<unknown>(`/clips/${id}`),
-			);
+			const task = await fetchClip(Number(id));
 			if (task.status === "done") {
 				void queryClient.invalidateQueries({ queryKey: ["media"] });
 			}
@@ -65,8 +35,7 @@ export function useClip(id: number | null) {
 export function useCancelClip() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: number) =>
-			apiFetch<void>(`/clips/${id}`, { method: "DELETE" }),
+		mutationFn: cancelClip,
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: ["clips"] });
 		},

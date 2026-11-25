@@ -1,4 +1,4 @@
-import type { Media } from "@flux/shared";
+import { ApiError, apiFetch, type Media } from "@flux/shared";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import { type AuthSource, authSource, streamPath } from "../media/source";
@@ -214,6 +214,27 @@ async function prepareDownload(
 	// иначе Range-ответ мог бы смешать байты разных версий файла.
 	await removeFile(partPath);
 	await removeFile(finalPath);
+	if (!run.isCurrent(media.id, token)) {
+		await removeFile(partPath);
+		return null;
+	}
+	// FileSystem.createDownloadResumable идёт мимо apiFetch: истёкший
+	// access-токен сам не обновится, и загрузка упадёт с 401. Дешёвый
+	// авторизованный запрос прогоняет обычный refresh-путь.
+	try {
+		await apiFetch<unknown>("/auth/me");
+	} catch (error) {
+		if (!run.isCurrent(media.id, token)) {
+			await removeFile(partPath);
+			return null;
+		}
+		const status = error instanceof ApiError ? error.status : 0;
+		run.fail(
+			media.id,
+			status === 401 || status === 403 || status === 404 ? "status" : "network",
+		);
+		return null;
+	}
 	if (!run.isCurrent(media.id, token)) {
 		await removeFile(partPath);
 		return null;

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/mail"
 	"net/url"
 	"sort"
@@ -28,6 +29,9 @@ import (
 )
 
 type AuthHandler struct {
+	// trustedProxies — сети, от которых принимается X-Forwarded-Host:
+	// иначе logout за прокси с переписанным Host получал бы 403.
+	trustedProxies []*net.IPNet
 	userRepo       repository.UserRepository
 	refreshTokenDB repository.RefreshTokenRepository
 	deviceAuthRepo repository.DeviceAuthRepository
@@ -84,13 +88,32 @@ func (h *AuthHandler) checkSameOrigin(c *fiber.Ctx) bool {
 			publicHost = u.Host
 		}
 	}
+	hosts := []string{c.Get(fiber.HeaderHost)}
+	// X-Forwarded-Host доверяем только от прокси из trusted_proxies:
+	// прямой клиент иначе подделал бы Origin.
+	if len(h.trustedProxies) > 0 {
+		if peer := net.ParseIP(c.IP()); peer != nil {
+			for _, network := range h.trustedProxies {
+				if network.Contains(peer) {
+					if forwarded := c.Get("X-Forwarded-Host"); forwarded != "" {
+						hosts = append(hosts, forwarded)
+					}
+					break
+				}
+			}
+		}
+	}
 	match := func(raw string) bool {
 		u, err := url.Parse(raw)
 		if err != nil || u.Host == "" {
 			return false
 		}
-		return strings.EqualFold(u.Host, c.Get(fiber.HeaderHost)) ||
-			(publicHost != "" && strings.EqualFold(u.Host, publicHost))
+		for _, host := range hosts {
+			if strings.EqualFold(u.Host, host) {
+				return true
+			}
+		}
+		return publicHost != "" && strings.EqualFold(u.Host, publicHost)
 	}
 	if origin := c.Get("Origin"); origin != "" {
 		return match(origin)
@@ -99,6 +122,11 @@ func (h *AuthHandler) checkSameOrigin(c *fiber.Ctx) bool {
 		return match(referer)
 	}
 	return true
+}
+
+// SetTrustedProxies задаёт доверенные сети для X-Forwarded-Host.
+func (h *AuthHandler) SetTrustedProxies(proxies []*net.IPNet) {
+	h.trustedProxies = proxies
 }
 
 // setSessionCookies сохраняет пару токенов в httpOnly-куки для веб-клиента.
@@ -191,6 +219,35 @@ func randomDeviceCode() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+// ErrInvalidDeviceID — device_id из тела не прошёл проверку формата.
+var ErrInvalidDeviceID = errors.New("invalid device id")
+
+// maxDeviceIDLength ограничивает device_id: SQLite не enforced длину,
+// а мегабайтная строка раздувает БД и ломает группировку в ListDevices.
+const maxDeviceIDLength = 128
+
+// normalizeDeviceID валидирует клиентский device_id. Пустая строка —
+// валидный «сгенерировать новый идентификатор».
+func normalizeDeviceID(raw string) (string, error) {
+	id := strings.TrimSpace(raw)
+	if id == "" {
+		return "", nil
+	}
+	if len(id) > maxDeviceIDLength {
+		return "", ErrInvalidDeviceID
+	}
+	for _, r := range id {
+		ok := r >= 'a' && r <= 'z' ||
+			r >= 'A' && r <= 'Z' ||
+			r >= '0' && r <= '9' ||
+			strings.ContainsRune("-_.:", r)
+		if !ok {
+			return "", ErrInvalidDeviceID
+		}
+	}
+	return id, nil
 }
 
 func normalizeDeviceLabel(name, platform string) (string, string) {
@@ -324,7 +381,10 @@ func (h *AuthHandler) DeviceCode(c *fiber.Ctx) error {
 	if expiresIn < 120 {
 		expiresIn = 120
 	}
-	deviceID := strings.TrimSpace(req.DeviceID)
+	deviceID, err := normalizeDeviceID(req.DeviceID)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid device_id")
+	}
 	if deviceID == "" {
 		deviceID, err = randomDeviceCode()
 		if err != nil {
@@ -758,7 +818,11 @@ func (h *AuthHandler) VerifyCode(c *fiber.Ctx) error {
 	}
 
 	name, platform := h.deviceLabelForRequest(c, req.DeviceName, req.Platform)
-	payload, err := h.issueSession(c, user, req.DeviceID, name, platform)
+	deviceID, err := normalizeDeviceID(req.DeviceID)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid device_id")
+	}
+	payload, err := h.issueSession(c, user, deviceID, name, platform)
 	if err != nil {
 		log.Printf("Failed to create session: %v", err)
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create session")
@@ -834,6 +898,11 @@ func (h *AuthHandler) LogoutByRefresh(c *fiber.Ctx) error {
 // deleted (full logout). Тело опционально: невалидный JSON приравнивается
 // к отсутствующему телу — полный logout безопаснее, чем ошибка 400.
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	// Как и refresh, logout ставит/чистит куки: проверяем origin, чтобы
+	// чужой сайт не мог разлогинить пользователя.
+	if !h.checkSameOrigin(c) {
+		return response.Error(c, fiber.StatusForbidden, "Cross-origin request rejected")
+	}
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
@@ -871,9 +940,11 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 				log.Printf("Logout: delete device: %v", err)
 				return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
 			}
-		} else if err := h.refreshTokenDB.DeleteByToken(ctx, refreshToken); err != nil {
-			log.Printf("Logout: delete refresh token: %v", err)
-			return response.Error(c, fiber.StatusInternalServerError, "Failed to logout")
+		} else if err == nil {
+			// Чужой токен: не удаляем (это уничтожило бы чужую сессию)
+			// и не раскрываем факт существования. Ответ тот же, что при
+			// успешном выходе.
+			log.Printf("Logout: refresh token belongs to another user, ignoring")
 		}
 	} else {
 		if err := h.refreshTokenDB.DeleteByUserID(ctx, userID); err != nil {

@@ -1,3 +1,4 @@
+import { isCoverTooLarge } from "@flux/shared";
 import { Alert, Button, FileButton, Menu, Text } from "@mantine/core";
 import { ImagePlus } from "lucide-react";
 import { useState } from "react";
@@ -8,7 +9,6 @@ import { useUploadCover } from "../../api/cover";
 // Замена обложки (видео/аудио, только админ): JPEG/PNG/WebP до 10 МБ.
 // Сервер отдаёт обложку с Cache-Control: no-cache (URL после PUT
 // не меняется), поэтому превью обновляется сразу после инвалидации.
-const MAX_COVER_BYTES = 10 * 1024 * 1024;
 
 export function ChangeCoverButton({
 	mediaId,
@@ -25,7 +25,7 @@ export function ChangeCoverButton({
 		if (file === null) {
 			return;
 		}
-		if (file.size > MAX_COVER_BYTES) {
+		if (isCoverTooLarge(file.size)) {
 			setError(t("cover.tooLarge"));
 			return;
 		}

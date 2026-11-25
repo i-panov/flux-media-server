@@ -15,6 +15,8 @@ export function useUpdateMetadata(mediaId: number) {
 			// могли поменяться у любого элемента.
 			queryClient.setQueryData(["media", media.id], media);
 			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			// Избранное держит копию медиа и не рефетчится по фокусу.
+			void queryClient.invalidateQueries({ queryKey: ["favorites"] });
 		},
 	});
 }

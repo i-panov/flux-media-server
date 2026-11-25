@@ -8,7 +8,7 @@ export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 export const UPLOAD_POLL_INTERVAL_MS = 900;
 
 export const enqueueSchema = z.object({
-	job_id: z.number(),
+	job_id: z.number().int().positive(),
 	job_type: z.enum(["upload", "transcode"]).optional(),
 });
 

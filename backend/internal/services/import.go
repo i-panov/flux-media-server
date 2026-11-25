@@ -37,6 +37,9 @@ type ImportService struct {
 
 	mu      sync.Mutex
 	running map[uint]context.CancelFunc
+	// createMu сериализует find-or-create сериала: уникального индекса на
+	// название нет, параллельные импорты одного сериала иначе создают два.
+	createMu sync.Mutex
 }
 
 func NewImportService(loader *MediaLoader, works *repository.WorkStore, imports *repository.ImportStore) *ImportService {
@@ -213,12 +216,12 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 		return nil
 	}
 
-	markRemaining := func(message string) {
+	markRemaining := func(message string) (int, int) {
 		// Статусы в срезе не обновляются, поэтому перечитываем из БД:
 		// иначе уже готовые серии затёрлись бы ошибкой.
 		_, current, err := s.imports.Get(context.Background(), job.ID)
 		if err != nil {
-			return
+			return 0, 0
 		}
 		doneCount, failedCount := 0, 0
 		for i := range current {
@@ -237,6 +240,7 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 		_ = s.imports.Update(context.Background(), job.ID, map[string]any{
 			"episodes_done": doneCount, "episodes_error": failedCount,
 		})
+		return doneCount, failedCount
 	}
 
 	err := s.loader.RunCollection(ctx, MediaLoaderRequest{
@@ -262,6 +266,10 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 		})
 		return
 	}
+	// Серии, которых не оказалось в манифесте media-loader, не должны
+	// остаться в queued навсегда: закрываем их ошибкой. Счётчики и статус
+	// считаем ПОСЛЕ этого — иначе импорт с потерянными сериями получал бы done.
+	done, failed = markRemaining("media loader did not produce this episode")
 	status := models.ImportDone
 	if failed > 0 && done > 0 {
 		status = models.ImportPartial
@@ -270,7 +278,6 @@ func (s *ImportService) run(ctx context.Context, job *models.ImportJob, req Impo
 	}
 	_ = s.imports.Update(context.Background(), job.ID, map[string]any{
 		"status": status, "stage": "done",
-		"episodes_done": done, "episodes_error": failed,
 	})
 }
 
@@ -284,6 +291,8 @@ func (s *ImportService) ensureWork(ctx context.Context, job *models.ImportJob, r
 	}
 	// Повторный импорт следующего сезона должен дополнять существующий
 	// сериал, а не создавать второй с тем же названием.
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
 	if existing, found, err := s.works.FindSeriesByTitle(ctx, title); err != nil {
 		if !errors.Is(err, repository.ErrWorkTitleRequired) {
 			return 0, err

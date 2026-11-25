@@ -13,7 +13,10 @@
       "buildNumber": "68",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Flux обращается к вашему домашнему медиа-серверу в локальной сети.",
-        "NSCameraUsageDescription": "Flux сканирует QR-код с телевизора, чтобы подтвердить устройство."
+        "NSCameraUsageDescription": "Flux сканирует QR-код с телевизора, чтобы подтвердить устройство.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {

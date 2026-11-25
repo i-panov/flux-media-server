@@ -22,6 +22,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TrashRouteImport } from './routes/trash'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as VideoRouteImport } from './routes/video'
+import { Route as ArtistsIndexRouteImport } from './routes/artists.index'
 import { Route as ArtistsIdRouteImport } from './routes/artists.$id'
 import { Route as AudioIndexRouteImport } from './routes/audio.index'
 import { Route as AudioIdRouteImport } from './routes/audio.$id'
@@ -98,6 +99,11 @@ const UploadRoute = UploadRouteImport.update({
 const VideoRoute = VideoRouteImport.update({
   id: '/video',
   path: '/video',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArtistsIndexRoute = ArtistsIndexRouteImport.update({
+  id: '/artists/',
+  path: '/artists/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArtistsIdRoute = ArtistsIdRouteImport.update({
@@ -182,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/memes/$id': typeof MemesIdRoute
   '/series/$id': typeof SeriesIdRoute
   '/video/$id': typeof VideoIdRoute
+  '/artists/': typeof ArtistsIndexRoute
   '/audio/': typeof AudioIndexRoute
   '/franchises/': typeof FranchisesIndexRoute
   '/memes/': typeof MemesIndexRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/memes/$id': typeof MemesIdRoute
   '/series/$id': typeof SeriesIdRoute
   '/video/$id': typeof VideoIdRoute
+  '/artists': typeof ArtistsIndexRoute
   '/audio': typeof AudioIndexRoute
   '/franchises': typeof FranchisesIndexRoute
   '/memes': typeof MemesIndexRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/memes/$id': typeof MemesIdRoute
   '/series/$id': typeof SeriesIdRoute
   '/video/$id': typeof VideoIdRoute
+  '/artists/': typeof ArtistsIndexRoute
   '/audio/': typeof AudioIndexRoute
   '/franchises/': typeof FranchisesIndexRoute
   '/memes/': typeof MemesIndexRoute
@@ -261,6 +270,7 @@ export interface FileRouteTypes {
     | '/memes/$id'
     | '/series/$id'
     | '/video/$id'
+    | '/artists/'
     | '/audio/'
     | '/franchises/'
     | '/memes/'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/memes/$id'
     | '/series/$id'
     | '/video/$id'
+    | '/artists'
     | '/audio'
     | '/franchises'
     | '/memes'
@@ -310,6 +321,7 @@ export interface FileRouteTypes {
     | '/memes/$id'
     | '/series/$id'
     | '/video/$id'
+    | '/artists/'
     | '/audio/'
     | '/franchises/'
     | '/memes/'
@@ -333,6 +345,7 @@ export interface RootRouteChildren {
   VideoRoute: typeof VideoRouteWithChildren
   ArtistsIdRoute: typeof ArtistsIdRoute
   CollectionsIdRoute: typeof CollectionsIdRoute
+  ArtistsIndexRoute: typeof ArtistsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -426,6 +439,13 @@ declare module '@tanstack/react-router' {
       path: '/video'
       fullPath: '/video'
       preLoaderRoute: typeof VideoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artists/': {
+      id: '/artists/'
+      path: '/artists'
+      fullPath: '/artists/'
+      preLoaderRoute: typeof ArtistsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/artists/$id': {
@@ -594,6 +614,7 @@ const rootRouteChildren: RootRouteChildren = {
   VideoRoute: VideoRouteWithChildren,
   ArtistsIdRoute: ArtistsIdRoute,
   CollectionsIdRoute: CollectionsIdRoute,
+  ArtistsIndexRoute: ArtistsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

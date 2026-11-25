@@ -20,8 +20,8 @@ import { t } from "../i18n";
 import { useTheme } from "../theme/ThemeProvider";
 
 const VIDEO_FORMATS = ["mp4", "mkv"];
-const AUDIO_FORMATS = ["mp3", "m4a", "opus"];
-const QUALITIES = ["max", "1080p", "720p", "480p"];
+const AUDIO_FORMATS = ["mp3", "m4a", "opus", "original"];
+const QUALITIES = ["max", "2160p", "1440p", "1080p", "720p", "480p", "360p"];
 const TERMINAL = new Set(["done", "error", "cancelled"]);
 
 function activeJob(job: MediaLoaderJob): boolean {
@@ -315,7 +315,11 @@ export function LinkDownloadCard({
 										color: quality === value ? colors.accent : colors.text,
 									}}
 								>
-									{value === "max" ? "MAX" : value}
+									{value === "max"
+										? "MAX"
+										: value === "original"
+											? "ORIGINAL"
+											: value}
 								</Text>
 							</Pressable>
 						))}

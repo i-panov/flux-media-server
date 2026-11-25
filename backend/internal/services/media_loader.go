@@ -224,6 +224,10 @@ func (m *MediaLoader) Cancel(id string) error {
 		return ErrMediaLoaderJobGone
 	}
 	cancel := job.cancel
+	// Снимок под мьютексом: importFile пишет UploadJobID под ним же,
+	// читать после Unlock — гонка (detectable -race).
+	uploadJobID := job.UploadJobID
+	mediaType := job.mediaType
 	job.Status = "cancelled"
 	job.Error = "cancelled"
 	job.UpdatedAt = time.Now()
@@ -231,11 +235,11 @@ func (m *MediaLoader) Cancel(id string) error {
 	if cancel != nil {
 		cancel()
 	}
-	if job.UploadJobID != 0 {
-		if job.mediaType.IsVideo() && m.transcode != nil {
-			_ = m.transcode.Cancel(job.UploadJobID)
+	if uploadJobID != 0 {
+		if mediaType.IsVideo() && m.transcode != nil {
+			_ = m.transcode.Cancel(uploadJobID)
 		} else {
-			_ = m.queue.Cancel(job.UploadJobID)
+			_ = m.queue.Cancel(uploadJobID)
 		}
 	}
 	return nil
@@ -472,8 +476,7 @@ func (m *MediaLoader) importFile(ctx context.Context, job *MediaLoaderJob, out l
 		job.Stage = "transcoding"
 		job.UpdatedAt = time.Now()
 		m.mu.Unlock()
-		m.monitorTranscode(job, taskID)
-		return nil
+		return m.monitorTranscode(ctx, job, taskID)
 	}
 	uploadID, err := m.queue.Enqueue(UploadJobInput{
 		FilePath: final, Filename: filepath.Base(final), MediaType: mediaType,
@@ -488,8 +491,7 @@ func (m *MediaLoader) importFile(ctx context.Context, job *MediaLoaderJob, out l
 	job.Stage = "upload"
 	job.UpdatedAt = time.Now()
 	m.mu.Unlock()
-	m.monitorUpload(job, uploadID)
-	return nil
+	return m.monitorUpload(ctx, job, uploadID)
 }
 
 // saveSource пишет ссылку-источник в медиа. Ошибка не должна ломать
@@ -507,9 +509,12 @@ func (m *MediaLoader) saveSource(mediaID uint, rawURL string) {
 	}
 }
 
-func (m *MediaLoader) monitorTranscode(job *MediaLoaderJob, taskID uint64) {
+func (m *MediaLoader) monitorTranscode(ctx context.Context, job *MediaLoaderJob, taskID uint64) error {
 	deadline := time.Now().Add(12 * time.Hour)
 	for time.Now().Before(deadline) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		snap, ok := m.transcode.Get(taskID)
 		if ok {
 			switch snap.Status {
@@ -524,24 +529,30 @@ func (m *MediaLoader) monitorTranscode(job *MediaLoaderJob, taskID uint64) {
 				job.MediaID = snap.MediaID
 				job.UpdatedAt = time.Now()
 				m.mu.Unlock()
-				return
+				return nil
 			case TranscodeTaskError, TranscodeTaskCancelled:
 				msg := snap.Error
 				if msg == "" {
 					msg = snap.Status
 				}
-				m.fail(job, errors.New(msg))
-				return
+				err := errors.New(msg)
+				m.fail(job, err)
+				return err
 			}
 		}
 		time.Sleep(2 * time.Second)
 	}
-	m.fail(job, errors.New("transcode processing timeout"))
+	err := errors.New("transcode processing timeout")
+	m.fail(job, err)
+	return err
 }
 
-func (m *MediaLoader) monitorUpload(job *MediaLoaderJob, uploadID uint64) {
+func (m *MediaLoader) monitorUpload(ctx context.Context, job *MediaLoaderJob, uploadID uint64) error {
 	deadline := time.Now().Add(6 * time.Hour)
 	for time.Now().Before(deadline) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		snap, ok := m.queue.Status(uploadID)
 		if ok {
 			switch snap.Status {
@@ -556,19 +567,22 @@ func (m *MediaLoader) monitorUpload(job *MediaLoaderJob, uploadID uint64) {
 				job.Progress = 100
 				job.UpdatedAt = time.Now()
 				m.mu.Unlock()
-				return
+				return nil
 			case UploadJobError, UploadJobDuplicate:
 				msg := snap.Error
 				if msg == "" {
 					msg = snap.Status
 				}
-				m.fail(job, errors.New(msg))
-				return
+				err := errors.New(msg)
+				m.fail(job, err)
+				return err
 			}
 		}
 		time.Sleep(2 * time.Second)
 	}
-	m.fail(job, errors.New("upload processing timeout"))
+	err := errors.New("upload processing timeout")
+	m.fail(job, err)
+	return err
 }
 
 func (m *MediaLoader) cleanupLoop() {

@@ -16,10 +16,10 @@ Self-hosted медиа-сервер для стриминга видео и ау
 скачивания видео. Виртуализация длинных списков частичная. Подробности —
 в [docs/review-2026-11-09.md](docs/review-2026-11-09.md).
 
-Ограничения mobile: Maestro-сценарии (19 flow, включая поиск/сортировку) и
-ручной Android e2e-workflow добавлены, но ещё не прогонялись на
-эмуляторе/устройстве; background audio, PiP и offline подтверждены только
-кодом и unit-тестами. Детали —
+Ограничения mobile: 18 Maestro-flow лежат в корневом `.maestro/`, но ни разу
+не прогонялись; ручной Android e2e-workflow (`mobile-e2e.yml`) тоже не
+запускался. Background audio, PiP и offline подтверждены только кодом и
+unit-тестами. Детали —
 в [release notes](docs/mobile-release-notes-2026-11-11.md).
 
 ## Требования
@@ -90,10 +90,10 @@ cd mobile && EXPO_OFFLINE=1 npx expo install --check
 cd mobile && npx expo config --type introspect
 ```
 
-E2E: в `.maestro/` лежат 19 flow для эмулятора/устройства (нужны Maestro CLI
-и adb). Ручной workflow `.github/workflows/mobile-e2e.yml` поднимает Android
-эмулятор, backend и прогоняет `tabs.yaml`/`theme.yaml`; он запускается
-только через `workflow_dispatch` и в push/PR не входит.
+E2E: в `.maestro/` (корень репозитория) лежат 18 flow для эмулятора/устройства
+(нужны Maestro CLI и adb). Ручной workflow `.github/workflows/mobile-e2e.yml`
+поднимает Android-эмулятор и backend, но, по комментарию внутри файла, ещё не
+запускался; он доступен только через `workflow_dispatch` и в push/PR не входит.
 
 ## Docker
 
@@ -183,7 +183,7 @@ cd web && npm run test:e2e && npm run build && npm run size
 - [docs/mobile-parity-handoff-2026-11-10.md](docs/mobile-parity-handoff-2026-11-10.md)
   — исторический handoff mobile-задач и актуальный статус.
 - [docs/mobile-release-notes-2026-11-11.md](docs/mobile-release-notes-2026-11-11.md)
-  — что вошло в mobile 0.1.44 и известные ограничения.
+  — что вошло в mobile 0.1.44 и известные ограничения (исторические).
 - [docs/web-release-notes-2026-11-11.md](docs/web-release-notes-2026-11-11.md)
   — web 0.1.35: TV-OSD видео, TV-вход, read-only, фикс карточек и
   «Продолжить просмотр»; реальный ТВ не проверялся.

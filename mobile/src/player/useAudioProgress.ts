@@ -13,8 +13,6 @@ interface UseAudioProgressOptions {
 	sourceReady: boolean;
 	/** Идёт замена/перечитывание источника: status-события не сохраняем. */
 	sourceLoading: boolean;
-	/** 401-ветка уже восстановила позицию: серверный resume не нужен. */
-	resumeDisabled?: boolean;
 	/** 401-ветка уже забрала seek: серверный resume уступает. */
 	resumePreemptedRef: RefObject<boolean>;
 }

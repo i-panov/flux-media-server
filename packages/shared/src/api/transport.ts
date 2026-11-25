@@ -56,7 +56,20 @@ export const REFRESH_TOKEN_KEY = "flux.refresh_token";
 
 const MALFORMED_RESPONSE_MESSAGE = "Token refresh failed: malformed response";
 
-export function createTokenTransport(store: KeyValueStore): AuthTransport {
+export interface TokenTransportOptions {
+	/**
+	 * Поколение сессии: logout, смена сервера и новый логин его увеличивают.
+	 * Refresh, начатый в старом поколении, не должен писать токены в
+	 * хранилище — иначе после выхода пара «воскресает».
+	 */
+	epoch?: () => number;
+}
+
+export function createTokenTransport(
+	store: KeyValueStore,
+	opts: TokenTransportOptions = {},
+): AuthTransport {
+	const epoch = opts.epoch ?? (() => 0);
 	return {
 		authHeaders: async (): Promise<Record<string, string>> => {
 			const access = await store.get(ACCESS_TOKEN_KEY);
@@ -68,6 +81,7 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 			if (refreshToken === null) {
 				throw new RefreshError(401, "No refresh token stored");
 			}
+			const startedIn = epoch();
 			const response = await fetch(`${baseUrl}/auth/refresh`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -77,9 +91,14 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 			if (!response.ok) {
 				// 401/400 — refresh-токен мёртв: пара больше не нужна,
 				// иначе каждый старт снова пытается им обновиться.
+				// Удаляем только ту пару, которую отправляли: параллельный
+				// логин мог уже записать новую.
 				if (response.status === 401 || response.status === 400) {
-					await store.del(ACCESS_TOKEN_KEY);
-					await store.del(REFRESH_TOKEN_KEY);
+					const stored = await store.get(REFRESH_TOKEN_KEY);
+					if (epoch() === startedIn && stored === refreshToken) {
+						await store.del(ACCESS_TOKEN_KEY);
+						await store.del(REFRESH_TOKEN_KEY);
+					}
 				}
 				throw new RefreshError(
 					response.status,
@@ -104,6 +123,15 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 			) {
 				throw new RefreshError(0, MALFORMED_RESPONSE_MESSAGE);
 			}
+			// Пока шёл запрос, пользователь мог выйти или сменить сервер:
+			// чужую пару в хранилище не пишем.
+			if (epoch() !== startedIn) {
+				throw new RefreshError(0, "Session changed during refresh");
+			}
+			const stored = await store.get(REFRESH_TOKEN_KEY);
+			if (stored !== refreshToken) {
+				throw new RefreshError(0, "Refresh token changed during refresh");
+			}
 			await store.set(ACCESS_TOKEN_KEY, token);
 			await store.set(REFRESH_TOKEN_KEY, nextRefresh);
 		},
@@ -113,6 +141,11 @@ export function createTokenTransport(store: KeyValueStore): AuthTransport {
 export interface ApiConfig {
 	baseUrl: string;
 	transport: AuthTransport;
+	/**
+	 * Поколение сессии/сервера. Меняется при выходе, смене сервера и входе:
+	 * refresh из старого поколения не пишет токены и не переиспользуется.
+	 */
+	sessionEpoch?: () => number;
 	/** Терминальный refresh 401/400: платформа сбрасывает сессию. */
 	onAuthFailure?: () => void | Promise<void>;
 }

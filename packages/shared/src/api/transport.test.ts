@@ -181,3 +181,72 @@ describe("createTokenTransport.refresh", () => {
 		await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBe("old-refresh");
 	});
 });
+
+describe("createTokenTransport поколение сессии", () => {
+	it("не пишет пару, если поколение сменилось во время refresh", async () => {
+		let epoch = 0;
+		const store = memoryStore({ [REFRESH_TOKEN_KEY]: "old-refresh" });
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => {
+				// Пока шёл запрос, пользователь вышел или сменил сервер.
+				epoch = 1;
+				return jsonResponse({
+					token: "new-access",
+					refresh_token: "new-refresh",
+				});
+			}),
+		);
+		const transport = createTokenTransport(store, { epoch: () => epoch });
+
+		await expect(transport.refresh("https://example.com/api")).rejects.toThrow(
+			"Session changed during refresh",
+		);
+		await expect(store.get(ACCESS_TOKEN_KEY)).resolves.toBeNull();
+		await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBe("old-refresh");
+	});
+
+	it("401 не удаляет пару, если поколение сменилось", async () => {
+		let epoch = 0;
+		const store = memoryStore({
+			[ACCESS_TOKEN_KEY]: "old-access",
+			[REFRESH_TOKEN_KEY]: "old-refresh",
+		});
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => {
+				epoch = 1;
+				return jsonResponse({ error: "revoked" }, 401);
+			}),
+		);
+		const transport = createTokenTransport(store, { epoch: () => epoch });
+
+		await expect(transport.refresh("https://example.com/api")).rejects.toThrow(
+			"Token refresh failed: 401",
+		);
+		// Пара принадлежит новой сессии — её не трогаем.
+		await expect(store.get(ACCESS_TOKEN_KEY)).resolves.toBe("old-access");
+		await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBe("old-refresh");
+	});
+
+	it("не пишет пару, если refresh-токен заменили параллельно", async () => {
+		const store = memoryStore({ [REFRESH_TOKEN_KEY]: "old-refresh" });
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				await store.set(REFRESH_TOKEN_KEY, "newer-refresh");
+				return jsonResponse({
+					token: "new-access",
+					refresh_token: "next-refresh",
+				});
+			}),
+		);
+		const transport = createTokenTransport(store);
+
+		await expect(transport.refresh("https://example.com/api")).rejects.toThrow(
+			"Refresh token changed during refresh",
+		);
+		await expect(store.get(ACCESS_TOKEN_KEY)).resolves.toBeNull();
+		await expect(store.get(REFRESH_TOKEN_KEY)).resolves.toBe("newer-refresh");
+	});
+});
