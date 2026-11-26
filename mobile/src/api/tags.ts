@@ -58,6 +58,13 @@ export function useSetEntityTags(entity: TagEntity, id: number) {
 	});
 }
 
-// Массовая разметка на mobile пока не имеет UI, но контракт общий:
-// экран сможет переиспользовать функцию без нового дубля.
-export { bulkMediaTags };
+export function useBulkMediaTags() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: bulkMediaTags,
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: ["media"] });
+			void queryClient.invalidateQueries({ queryKey: ["tags"] });
+		},
+	});
+}

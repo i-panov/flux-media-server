@@ -21,6 +21,7 @@ import { useTheme } from "../theme/ThemeProvider";
 import { isTV } from "../tv/profile";
 import { PlayerControls } from "./PlayerControls";
 import { setPlayingMediaId } from "./playbackRegistry";
+import { SubtitleOverlay } from "./SubtitleOverlay";
 import { useTVVideoRemote } from "./useTVVideoRemote";
 import { useVideoProgress } from "./useVideoProgress";
 import { useVideoSource } from "./useVideoSource";
@@ -329,6 +330,7 @@ export function VideoPlayer({
 				{!hasStarted && !failed && (
 					<PlayOverlay sourceReady={sourceReady} onPlay={startPlayback} />
 				)}
+				{!failed && <SubtitleOverlay mediaId={media.id} player={player} />}
 				{failed && <ErrorOverlay onRetry={retry} />}
 				{/* Маленький неинтерактивный probe для Maestro: состояние playback. */}
 				<Text

@@ -9,6 +9,8 @@ export interface AuthSource {
 }
 
 const TRAILING_SLASHES = /\/+$/;
+const API_SUFFIX = /\/api\/?$/i;
+const HTTP_URL_START = /^https?:\/\//i;
 const LEADING_SLASHES = /^\/+/;
 
 // baseUrl приходит из настроек сервера и может быть с хвостовым слэшем,
@@ -43,6 +45,38 @@ export async function authSource(path: string): Promise<AuthSource> {
 		uri: joinUrl(baseUrl, path),
 		headers: await authHeadersOnce(),
 	};
+}
+
+// Текст по абсолютному пути сервера (/api/...): субтитры нельзя гнать
+// через apiFetch — он парсит JSON. baseUrl содержит /api, поэтому origin
+// отрезаем, иначе получили бы /api/api/....
+export async function fetchAuthedText(path: string): Promise<string> {
+	const { baseUrl } = getApiConfig();
+	const origin = baseUrl.replace(API_SUFFIX, "");
+	const target = new URL(
+		HTTP_URL_START.test(path)
+			? path
+			: `${origin}${path.startsWith("/") ? "" : "/"}${path}`,
+	);
+	// Bearer уходит только на свой сервер: абсолютный URL из ответа API
+	// не должен уводить токен на чужой origin.
+	if (target.origin !== new URL(origin).origin) {
+		throw new Error("Cross-origin subtitle URL rejected");
+	}
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), 15_000);
+	try {
+		const response = await fetch(target.toString(), {
+			headers: await authHeadersOnce(),
+			signal: controller.signal,
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`);
+		}
+		return await response.text();
+	} finally {
+		clearTimeout(timer);
+	}
 }
 
 // Ссылка на источник открывается только по http(s): javascript:, file:,

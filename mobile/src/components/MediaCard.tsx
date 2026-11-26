@@ -50,6 +50,8 @@ export interface MediaCardProps {
 	download?: MediaDownloadState;
 	onPress?: () => void;
 	onLongPress?: () => void;
+	/** Режим массового выбора: рамка и галочка. */
+	selected?: boolean;
 	onFavoritePress?: () => void;
 	onMenuPress?: () => void;
 	favoriteLabel?: string;
@@ -74,6 +76,28 @@ function normalizeImageSource(
 		return null;
 	}
 	return source;
+}
+
+function SelectedBadge({ visible }: { visible: boolean }) {
+	const { colors, radii, spacing } = useTheme();
+	if (!visible) {
+		return null;
+	}
+	return (
+		<View
+			style={[
+				styles.selectedBadge,
+				{
+					backgroundColor: colors.accent,
+					borderRadius: radii.pill,
+					left: spacing.sm,
+					bottom: spacing.sm,
+				},
+			]}
+		>
+			<Ionicons name="checkmark" size={16} color={colors.onAccent} />
+		</View>
+	);
 }
 
 function CardAction({
@@ -185,6 +209,7 @@ export function MediaCard({
 	download,
 	onPress,
 	onLongPress,
+	selected = false,
 	onFavoritePress,
 	onMenuPress,
 	favoriteLabel,
@@ -275,6 +300,7 @@ export function MediaCard({
 						</Text>
 					</View>
 				)}
+				<SelectedBadge visible={selected} />
 				{download !== undefined && (
 					<DownloadBadge download={download} testID={testID} />
 				)}
@@ -316,7 +342,7 @@ export function MediaCard({
 				styles.card,
 				{
 					backgroundColor: colors.surface,
-					borderColor: colors.borderStrong,
+					borderColor: selected ? colors.accent : colors.borderStrong,
 					borderRadius: radii.md,
 				},
 				style,
@@ -392,6 +418,13 @@ const styles = StyleSheet.create({
 	},
 	placeholder: {
 		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	selectedBadge: {
+		position: "absolute",
+		width: 24,
+		height: 24,
 		alignItems: "center",
 		justifyContent: "center",
 	},

@@ -1,14 +1,16 @@
 import type { Media } from "@flux/shared";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
 	useFavoriteVideoIds,
 	useToggleVideoFavorite,
 } from "../../src/api/favorites";
 import { useVideoList } from "../../src/api/media";
+import { useSession } from "../../src/auth/session";
 import { FranchisesList } from "../../src/catalog/FranchisesList";
 import { WorksList } from "../../src/catalog/WorksList";
+import { BulkTagsSheet } from "../../src/components/BulkTagsSheet";
 import { VideoHomeRows } from "../../src/components/HomeRows";
 import { MediaActionsSheet } from "../../src/components/MediaActionsSheet";
 import { MediaCard } from "../../src/components/MediaCard";
@@ -26,15 +28,24 @@ import { coverPath, thumbPath } from "../../src/media/source";
 import { useAuthImageSource } from "../../src/media/useAuthImageSource";
 import { useDebouncedValue } from "../../src/media/useDebouncedValue";
 import { excludeMediaIds } from "../../src/media/visibleMedia";
+import { useTheme } from "../../src/theme/ThemeProvider";
 import { isTV } from "../../src/tv/profile";
 import { TVVideoList } from "../../src/tv/TVVideoList";
 
 function VideoGridCard({
 	media,
 	onMenu,
+	selectable,
+	selected,
+	allowSelect,
+	onSelect,
 }: {
 	media: Media;
 	onMenu: () => void;
+	selectable: boolean;
+	selected: boolean;
+	allowSelect: boolean;
+	onSelect: () => void;
 }) {
 	const favorites = useFavoriteVideoIds();
 	const toggleFavorite = useToggleVideoFavorite();
@@ -54,7 +65,9 @@ function VideoGridCard({
 			imageCachePolicy={media.cover_url === "" ? "memory-disk" : "none"}
 			isFavorite={favorites.data?.has(media.id) ?? false}
 			download={download ?? undefined}
-			onPress={() => openVideo(media)}
+			onPress={() => (selectable ? onSelect() : openVideo(media))}
+			onLongPress={allowSelect ? onSelect : undefined}
+			selected={selected}
 			onFavoritePress={() =>
 				toggleFavorite.mutate({
 					mediaId: media.id,
@@ -65,6 +78,47 @@ function VideoGridCard({
 			onMenuPress={onMenu}
 			testID={`video-card-${media.id}`}
 		/>
+	);
+}
+
+function SelectionBar({
+	count,
+	onTags,
+	onCancel,
+}: {
+	count: number;
+	onTags: () => void;
+	onCancel: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View style={[styles.selectionBar, { borderColor: colors.borderStrong }]}>
+			<Text style={{ color: colors.text }}>
+				{t("bulk.selected", { count })}
+			</Text>
+			<View style={[styles.selectionActions, { gap: spacing.sm }]}>
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("bulk.tags")}
+					hitSlop={8}
+					style={styles.selectionButton}
+					testID="bulk-tags-open"
+					onPress={onTags}
+				>
+					<Text style={{ color: colors.accent }}>{t("bulk.tags")}</Text>
+				</Pressable>
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("common.cancel")}
+					hitSlop={8}
+					style={styles.selectionButton}
+					testID="bulk-tags-cancel"
+					onPress={onCancel}
+				>
+					<Text style={{ color: colors.textMuted }}>{t("common.cancel")}</Text>
+				</Pressable>
+			</View>
+		</View>
 	);
 }
 
@@ -100,6 +154,22 @@ export default function VideoScreen() {
 	);
 	const favorites = useFavoriteVideoIds();
 	const [actionsMedia, setActionsMedia] = useState<Media | null>(null);
+	const session = useSession();
+	const canBulkTag = session.data?.is_admin === true;
+	const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+	const [bulkOpen, setBulkOpen] = useState(false);
+	const selectionMode = selectedIds.size > 0;
+	const toggleSelected = (id: number) => {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			return next;
+		});
+	};
 	const allItems = list.data?.pages.flatMap((page) => page.items) ?? [];
 	const tvItems = searching
 		? allItems
@@ -117,6 +187,13 @@ export default function VideoScreen() {
 				titleStyle={styles.title}
 				trailing={isGrid ? <UploadAction type="video" /> : undefined}
 			/>
+			{selectionMode && (
+				<SelectionBar
+					count={selectedIds.size}
+					onTags={() => setBulkOpen(true)}
+					onCancel={() => setSelectedIds(new Set())}
+				/>
+			)}
 			<VideoTabs
 				value={tab}
 				onChange={(next) => {
@@ -124,6 +201,7 @@ export default function VideoScreen() {
 					setTab(next);
 					// Формат со старой вкладки может быть скрыт на новой.
 					setFormatID(null);
+					setSelectedIds(new Set());
 				}}
 			/>
 			{!isGrid && (
@@ -139,7 +217,10 @@ export default function VideoScreen() {
 				<>
 					<MediaSearchBar
 						value={query}
-						onChangeText={setQuery}
+						onChangeText={(value) => {
+							setQuery(value);
+							setSelectedIds(new Set());
+						}}
 						sort={sort}
 						onSortChange={setSort}
 						placeholder={t("video.search")}
@@ -148,8 +229,14 @@ export default function VideoScreen() {
 					<TagFilterBar
 						formatID={formatID}
 						genreIDs={genreIDs}
-						onFormatChange={setFormatID}
-						onGenresChange={setGenreIDs}
+						onFormatChange={(value) => {
+							setFormatID(value);
+							setSelectedIds(new Set());
+						}}
+						onGenresChange={(value) => {
+							setGenreIDs(value);
+							setSelectedIds(new Set());
+						}}
 						hiddenFormatSlugs={tab === "videos" ? ["film"] : []}
 					/>
 					{isTV ? (
@@ -175,6 +262,10 @@ export default function VideoScreen() {
 								<VideoGridCard
 									media={item}
 									onMenu={() => setActionsMedia(item)}
+									selectable={canBulkTag && selectionMode}
+									selected={selectedIds.has(item.id)}
+									allowSelect={canBulkTag}
+									onSelect={() => toggleSelected(item.id)}
 								/>
 							)}
 							ListHeaderComponent={header}
@@ -208,10 +299,30 @@ export default function VideoScreen() {
 				media={actionsMedia}
 				onClose={() => setActionsMedia(null)}
 			/>
+			{bulkOpen && (
+				<BulkTagsSheet
+					mediaIDs={[...selectedIds]}
+					onClose={() => {
+						setBulkOpen(false);
+						setSelectedIds(new Set());
+					}}
+				/>
+			)}
 		</Screen>
 	);
 }
 
 const styles = StyleSheet.create({
 	title: { fontSize: 24, fontWeight: "700" },
+	selectionBar: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		borderWidth: 1,
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+	},
+	selectionActions: { flexDirection: "row", alignItems: "center" },
+	selectionButton: { minHeight: 44, justifyContent: "center" },
 });

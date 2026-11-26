@@ -110,6 +110,7 @@ export * from "./core/downloads";
 export * from "./core/format";
 export * from "./core/lyricsSync";
 export * from "./core/media";
+export * from "./core/webvtt";
 export { type QrMatrix, qrMatrix } from "./qr";
 export { createQueryClient } from "./query";
 export type { KeyValueStore } from "./storage";
